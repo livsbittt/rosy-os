@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ros:jazzy-ros-base
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fix git safe directory (container)
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
+      - name: Install colcon & tools
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq python3-colcon-common-extensions python3-pip
+          pip3 install --no-cache-dir flake8 pydantic
+
+      - name: Build (colcon)
+        run: |
+          cd src
+          colcon build --symlink-install --event-handlers console_direct+
+
+      - name: Lint (flake8)
+        run: |
+          cd src
+          flake8 rosy_core/rosy_core rosy_gz_sim/launch --count --max-line-length=120 --show-source --statistics || true
+
+      - name: Test (rosy_core protocol schemas, P1-19)
+        run: |
+          cd src/rosy_core
+          python3 -m pytest test/ -v

@@ -1,0 +1,33 @@
+# colcon / ROS
+build/
+install/
+log/
+src/*/build/
+src/*/install/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+
+# Frontend (rosy_web 예정)
+node_modules/
+dist/
+
+# Fleet 로컬 DB
+*.sqlite3
+*.db
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store/
+
+# 대형 바이너리 참조 (upstream 원본 zip — 리포에 반입하지 않음)
+reference/src/*.zip
+
+# 도구 캐시
+.codegraph/
+.omo/
