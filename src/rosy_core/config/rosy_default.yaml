@@ -1,0 +1,28 @@
+# rosy_core 기본 설정 (CFG-001) — 로컬 오버라이드: ~/.rosy/rosy.yaml
+robot:
+  id: rosy_01
+  name: Rosy 01
+
+network:
+  api_port: 8080
+
+profile: profile.pinky_pro.yaml   # HWA-001 Robot Profile
+
+safety:
+  teleop_timeout_ms: 500          # SAF-002
+  battery_warning_percent: 20     # SAF-005
+  battery_critical_percent: 10    # SAF-005
+  battery_critical_policy: RETURN_HOME
+  fleet_loss_policy: STOP         # SAF-003
+
+navigation:
+  max_linear_velocity: 0.20       # SAF-004 / HWA-001에서 주입
+  max_angular_velocity: 0.80
+
+events:
+  ring_buffer_size: 1000          # EVT-004
+
+fleet:
+  enabled: false                  # P4-2에서 활성화 (PRT)
+  # server_url: ws://fleet.local:8081/ws/robots
+  # pairing_token: ""

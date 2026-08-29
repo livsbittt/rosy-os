@@ -1,0 +1,13 @@
+# HWA-001 Robot Profile — 첫 구현 하드웨어: Pinky Pro
+# 이 파일이 Capability(capabilities.yaml) 생성의 원천이다 (HWA-003, D-11).
+profile:
+  model: Pinky Pro
+  vendor: pinklab
+  drivetrain: differential
+  wheel_base: 0.15
+  max_linear_velocity: 0.20
+  max_angular_velocity: 0.80
+  sensors:
+    - lidar: rplidar_c1
+    - imu: bno055
+    - battery: adc
