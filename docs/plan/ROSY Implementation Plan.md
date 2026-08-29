@@ -334,6 +334,7 @@ ROS `/diagnostics` + 자체 수집(CPU/MEM/Disk/온도/네트워크) → 컴포�
 | P3-2 | 로봇별 API 격리 검증 | MAT-04 | M |
 | P3-3 | 동시 상태 모니터링 + 동시 상이 Goal | MAT-05, MAT-06 | M |
 | P3-4 | Core 독립성 검증 (Fleet 부재) | MAT-08 | S |
+| P3-5 | 회귀 벤치마크 시나리오 스크립트: 표준 3종(단일 목적지 주행 / 2대 동시 내비 / Leader-Follow) + `/metrics` 수집·결과 기록 (§8.4) | 시나리오 3종 스크립트화, 결과표 리포지토리화 | M |
 
 시뮬(`gz_multi`) 사전 검증 후 실물. **M3 완료 = MAT-01~06, 08 통과.**
 
@@ -361,7 +362,7 @@ ROS `/diagnostics` + 자체 수집(CPU/MEM/Disk/온도/네트워크) → 컴포�
 |---|---|---|---|
 | P5-1 | Formation 생성기: LINE/COLUMN/GRID/V/CIRCLE/FOLLOW 좌표 산출 + 파라미터 (FOR-001) | 6종 좌표 단위 테스트 | M |
 | P5-2 | Slot Assignment: 거리 기반 그리디 + 알고리즘 인터페이스(교체 가능) (FOR-002) | 재배정 시 교차 경로 최소 검증 | M |
-| P5-3 | Leader-Follower: Leader pose 중계 → Follower 목표 2 Hz 갱신 (FOR-003) | 추주 주행 시나리오 | M |
+| P5-3 | Leader-Follower v1 (하이브리드, D-20): 로봇측 follow 프리미티브(SWM-002, moving-goal ≤2 Hz) + Leader pose 스트림(SWM-003) + Fleet 릴레이(≥5 Hz) + 단절 HOLD(SWM-004) | FAT-06: 추종 주행 + Fleet WS 단절 주입 시 전원 HOLD | L |
 | P5-4 | Formation 안전: 로봇별 nav 상태 감시 → 중단+HOLD (FOR-004) | 1대 BLOCKED 주입 시 전체 HOLD | S |
 | P5-5 | Fleet UI Formation 컨트롤 (DASH) | 3대 시뮬 대형 전환 데모 | M |
 
@@ -403,6 +404,7 @@ ROS `/diagnostics` + 자체 수집(CPU/MEM/Disk/온도/네트워크) → 컴포�
 | MAT-01, 04~06, 08 | M3 | P3-1~P3-4 |
 | MAT-07 | M4 | P4-4 |
 | FAT-01~05 | M4 | P4-6~P4-8, P4-2 |
+| FAT-06 | M5 | P5-3 |
 
 ## 8.3 성능 목표 검증 (CORE SRS §25)
 
@@ -410,6 +412,16 @@ ROS `/diagnostics` + 자체 수집(CPU/MEM/Disk/온도/네트워크) → 컴포�
 - Teleop watchdog ≤500 ms (타임아웃 강제 주입)
 - API 처리 지연 p95 ≤100 ms (부하 스크립트)
 - 이벤트 전파 ≤200 ms (EVT 발행→WS 수신)
+- Swarm: pose 스트림 릴레이 ≥5 Hz·스트림 단절→HOLD ≤1 s (FAT-06, P4-6 적합성 포함)
+
+## 8.4 지속적 개선 루프 (Continuous Improvement)
+
+방법론 자체를 계속 다듬기 위한 구조. 각 마일스톤 종료 시 아래를 실행한다.
+
+1. **회귀 자동화 게이트** — 계약·적합성·API 시나리오 테스트(§8.1) 전량 통과가 다음 Phase 착수 조건
+2. **시뮬 벤치마크 축적** — 표준 시나리오 3종(P3-5)의 `/metrics` 결과(주기·지연·성공률)를 리포지토리에 버전 기록 → 마일스톤 간 비교로 성능 회귀 조기 발견
+3. **문서·의사결정 리뷰** — ADR Status 점검(Superseded 갱신), 추적 매트릭스(§11) 결행 확인, API Ref ↔ OpenAPI 불일치 점검(API-004)
+4. **확장 플레이북 (신규 기능 5단계)** — ① ADR 초안(왜/대안/결과) → ② API Ref 계약 추가(양측 합의·버전 노트) → ③ 플래그/CMD 소스 등록 뒤 구현 + 계약 테스트 → ④ 벤치마크 시나리오에 추가 → ⑤ 변경 이력·추적 매트릭스 갱신. *(D-20 swarm 추가가 본 플레이북의 첫 적용 사례)*
 
 ---
 
@@ -467,6 +479,7 @@ ROS `/diagnostics` + 자체 수집(CPU/MEM/Disk/온도/네트워크) → 컴포�
 | CFG-001/002 | CORE | P1-1 | 설정 로드 |
 | SEC-101~103 | CORE | P1-9 | 권한 테스트 |
 | NET-001~004 | CORE | P1-21 | AT-02 (릴레이 AP 경유) |
+| SWM-001~006 | CORE/FLEET | P5-3, P1-19(스키마) | FAT-06 |
 | LOG-001/002 | CORE | P1-9, P1-17 | 감사 검증 |
 | PRT-001~006 | API Ref | P1-19, P4-2, P4-6 | FAT-02, 03 |
 | REG / MON | FLEET | P4-1, P4-2 | MAT-05 |

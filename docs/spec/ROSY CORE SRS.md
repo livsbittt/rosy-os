@@ -487,6 +487,49 @@ Navigation 중 다음 조건이 지속되면 자동으로 Goal을 취소하고 �
 
 자동 재시도는 하지 않는다(재시도 판단은 상위 시스템 또는 운용자 책임).
 
+## 10.1 Swarm 지원 (로봇측 군집 모드)
+
+> 원칙(D-12 유지): 미션 오케스트레이션은 Fleet. 단 **폐루프 추종은 로봇이 직접 수행**한다(D-20).
+> Fleet-완전-중앙 방식의 지연(왕복 목표 갱신)과 Fleet 단일실패점을 제거하기 위한 하이브리드.
+
+### SWM-001 Swarm 명령 경로
+
+Swarm 추종은 별도 cmd_vel 소스가 아니라 **Navigation Manager의 이동 목표 스트림**(moving goal)으로 투입된다(Nav2 장애물 회피 그대로 활용). 모드는 `NAVIGATION`을 유지하고 상태로 군집 역할을 노출한다(SWM-006). v2에서 로컬 추종 컨트롤러(pure-pursuit) 소스로 대체 가능하도록 CMD-001 소스 등록 인터페이스를 예약한다.
+
+### SWM-002 Follow 프리미티브
+
+다음 원자 명령을 지원한다.
+
+```text
+POST /api/v1/swarm/follow    # {target_robot_id, distance, lateral, max_speed, stream_timeout_ms}
+POST /api/v1/swarm/cancel
+GET  /api/v1/swarm/state
+```
+
+- v1 구현: 목표 갱신 ≤2 Hz moving-goal Nav2 (속도 ≤0.2 m/s 군집 운용에 충분)
+- 종료 조건: cancel / 스트림 단결(`stream_timeout_ms`, 기본 1000 ms) → HOLD
+- SAF-004 속도 상한·NAV-006 stuck 감지가 그대로 적용된다
+
+### SWM-003 Leader 역할
+
+Leader로 지정된 로봇은 자신의 pose를 **≥10 Hz 전용 스트림**으로 Fleet에 발행한다(heartbeat 1 Hz와 별도, API Ref §7.8).
+
+### SWM-004 군집 단절 정책
+
+Swarm 활성 중 Fleet/스트림 단절 시 기본 정책은 **HOLD**(자리 유지)이다 — SAF-003 기본값(STOP)과 별도의 군집 전용 설정. 형상 붕괴 방지와 로컬 생존을 모두 고려한 값이며, 정책은 설정 가능하다.
+
+### SWM-005 Capability 선언
+
+```json
+"swarm": { "follow": true, "lead": true }
+```
+
+Robot Profile(HWA) 기반으로 선언하며, 미지원 로봇은 `CAPABILITY_NOT_SUPPORTED`로 응답한다(CAP-003).
+
+### SWM-006 상태·이벤트 노출
+
+상태 스냅샷에 `swarm` 필드를 추가한다(additive): `{role: leader|follower|none, formation, active}`. 이벤트: `swarm.role_assigned` / `swarm.hold` / `swarm.aborted`.
+
 ---
 
 # 11. Manual Teleoperation

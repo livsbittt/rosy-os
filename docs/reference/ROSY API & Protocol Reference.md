@@ -184,6 +184,9 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 |---|---|---|---|
 | POST | `/api/v1/teleop` | Operator | §11 |
 | POST | `/api/v1/mode` | Operator | `{mode: MANUAL\|NAVIGATION\|IDLE}` |
+| POST | `/api/v1/swarm/follow` | Operator | SWM-002 `{target_robot_id, distance, lateral, max_speed, stream_timeout_ms}` |
+| POST | `/api/v1/swarm/cancel` | Operator | SWM-002 |
+| GET | `/api/v1/swarm/state` | Viewer | SWM-006 |
 | POST | `/api/v1/safety/stop` | Viewer↑ | SAF-001 (누구나) |
 | POST | `/api/v1/safety/release` | Admin | SAF-001 |
 | GET | `/api/v1/safety/state` | Viewer | SAF-001 |
@@ -311,6 +314,18 @@ Fleet 타임아웃(기본 10초) 내 ack 없으면 `COMMAND_TIMEOUT`.
 
 `MAJOR.MINOR`. MINOR는 추가 전용. Fleet이 로봇보다 낮은 버전만 지원하면 Fleet 지원 최고 MINOR로 통신한다.
 
+## 7.8 Leader Pose Stream (Swarm, SWM-003)
+
+Leader 로봇 → Fleet ≥10 Hz, Fleet → Follower 릴레이 ≥5 Hz. envelope `type: "pose"`(v1.1 추가).
+
+```json
+{ "protocol_version": "1.0", "msg_id": "...", "type": "pose",
+  "ts": "2026-08-29T12:00:00.123Z",
+  "payload": { "robot_id": "rosy_01", "pose": { "x": 1.1, "y": 0.5, "yaw": 0.2 }, "seq": 8123 } }
+```
+
+Follower의 rosy_core은 스트림 수신 여부를 `stream_timeout_ms`(기본 1000 ms)로 감시하고 단절 시 SWM-004 정책(HOLD)을 적용한다.
+
 ---
 
 # 8. 이벤트 카탈로그
@@ -343,6 +358,9 @@ Fleet 타임아웃(기본 10초) 내 ack 없으면 `COMMAND_TIMEOUT`.
 | `mission.completed/failed/canceled` | info/error/info | Fleet | `{mission_id, reason}` |
 | `robot.online/offline` | info/warning | Fleet | `{robot_id}` |
 | `pairing.requested/approved/revoked` | warning | Fleet | `{robot_id}` |
+| `swarm.role_assigned` | info | Fleet | `{robot_id, role, formation}` |
+| `swarm.hold` | warning | 로봇 | `{robot_id, reason}` |
+| `swarm.aborted` | warning | Fleet | `{formation, reason, robots[]}` |
 
 ---
 
@@ -357,6 +375,7 @@ Fleet 타임아웃(기본 10초) 내 ack 없으면 `COMMAND_TIMEOUT`.
                   "max_linear_velocity": 0.2, "max_angular_velocity": 0.8 },
   "teleop": true,
   "slam": true,
+  "swarm": { "follow": true, "lead": true },
   "docking": { "supported": false },
   "sensors": ["lidar", "imu", "battery", "encoder"],
   "events": ["nav.*", "safety.*"],
@@ -473,4 +492,5 @@ Fleet(rosy_fleet)이 제공하는 엔드포인트. Base: `http://<fleet-host>:80
 
 | 버전 | 일자 | 내용 |
 |---|---|---|
+| v1.1 | 2026-08-29 | Additive: swarm 인터페이스 — `swarm/follow·cancel·state` REST, envelope `pose` 스트림(§7.8), 이벤트 `swarm.*`, capability `swarm` 필드 (D-20) |
 | v1.0 | 2026-08-29 | 최초 작성. PKY-CORE-SRS-001 v0.1의 API 산재 정의를 통합·확장 (버전·폐기 정책, 에러코드, 이벤트 카탈로그, Fleet↔Robot 프로토콜, 데이터 스키마, Fleet API 신설) |

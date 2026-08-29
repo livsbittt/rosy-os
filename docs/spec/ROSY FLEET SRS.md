@@ -264,11 +264,12 @@ Formation Parameter: Center Position / Orientation / Robot Spacing / Robot Selec
 특정 로봇을 Leader로 지정하고 다른 로봇이 추종한다.
 
 - Parameter: Leader ID / Follow Distance / Lateral Distance / Speed Limit / Formation Type
-- Fleet은 Leader의 pose 스트림을 구독해 Follower별 추종 목표를 산출·전달한다(로봇 간 직접 통신 없음).
+- **하이브리드 구조(D-20):** Fleet은 Leader pose 스트림(SWM-003, ≥10 Hz 수신)을 Follower들에게 WS로 릴레이(≥5 Hz)하고, Follower에는 `swarm/follow` 명령을 1회 전달한다. **폐루프 추종 계산은 로봇 탑재(SWM-002)** — Fleet은 목표를 반복 계산·전송하지 않는다.
+- 로봇 간 직접 통신은 발생하지 않는다.
 
 ### FOR-004 Formation 안전
 
-Formation 실행 중 로봇별 Navigation 상태를 감시하고, 로봇 1대라도 `BLOCKED`/`FAILED`/`nav.stuck` 발생 시 설정 정책(기본: 형성 중단 + 전체 HOLD)을 수행해야 한다.
+Formation 실행 중 로봇별 Navigation 상태를 감시하고, 로봇 1대라도 `BLOCKED`/`FAILED`/`nav.stuck` 발생 시 설정 정책(기본: 형성 중단 + 전체 HOLD)을 수행해야 한다. Fleet 단절 시 각 로봇은 SWM-004(로컬 HOLD)로 자보하고, Fleet은 재접속 후 형성 상태를 재평가한다.
 
 ---
 
@@ -404,6 +405,7 @@ Fleet 서버는 chrony로 시간 동기화한다(로봇 이벤트 상관 분석 
 | FAT-03 | 명령 `correlation_id` 추적 상태 전이 표시 (PRT-004) |
 | FAT-04 | Capability 미지원 명령 전달 시 로봇 `CAPABILITY_NOT_SUPPORTED` 응답 처리·UI 표시 (CAP-003) |
 | FAT-05 | Fleet에서 생성한 Waypoint가 로봇에 동기화되어 Goal로 사용 가능 (WPT-005) |
+| FAT-06 | Leader-Follower 실검: 리더 주행 중 팔로워가 로컬 폐루프로 추종(SWM-002) + Fleet WS 단절 주입 시 전원 HOLD(SWM-004) |
 
 ---
 
