@@ -55,6 +55,7 @@ def test_swarm_follow_params_defaults():
     p = SwarmFollowParams(target_robot_id="rosy_02")
     assert p.distance == 0.5 and p.lateral == 0.0
     assert p.max_speed == 0.15 and p.stream_timeout_ms == 1000
+    assert p.source.value == "fleet"  # v1.2 additive 기본값 — 기존 소비자 호환 (D-21)
 
 
 def test_pose_stream_envelope():

@@ -362,7 +362,7 @@ ROS `/diagnostics` + 자체 수집(CPU/MEM/Disk/온도/네트워크) → 컴포�
 |---|---|---|---|
 | P5-1 | Formation 생성기: LINE/COLUMN/GRID/V/CIRCLE/FOLLOW 좌표 산출 + 파라미터 (FOR-001) | 6종 좌표 단위 테스트 | M |
 | P5-2 | Slot Assignment: 거리 기반 그리디 + 알고리즘 인터페이스(교체 가능) (FOR-002) | 재배정 시 교차 경로 최소 검증 | M |
-| P5-3 | Leader-Follower v1 (하이브리드, D-20): 로봇측 follow 프리미티브(SWM-002, moving-goal ≤2 Hz) + Leader pose 스트림(SWM-003) + Fleet 릴레이(≥5 Hz) + 단절 HOLD(SWM-004) | FAT-06: 추종 주행 + Fleet WS 단절 주입 시 전원 HOLD | L |
+| P5-3 | Leader-Follower v1 (하이브리드, D-20/D-21): 로봇측 follow 프리미티브(SWM-002, moving-goal ≤2 Hz, `source: fleet`) + Leader pose 스트림(SWM-003) + Fleet 릴레이(≥5 Hz) + 단절 HOLD(SWM-004) | FAT-06: 추종 주행 + Fleet WS 단절 주입 시 전원 HOLD | L |
 | P5-4 | Formation 안전: 로봇별 nav 상태 감시 → 중단+HOLD (FOR-004) | 1대 BLOCKED 주입 시 전체 HOLD | S |
 | P5-5 | Fleet UI Formation 컨트롤 (DASH) | 3대 시뮬 대형 전환 데모 | M |
 
@@ -377,6 +377,7 @@ ROS `/diagnostics` + 자체 수집(CPU/MEM/Disk/온도/네트워크) → 컴포�
 | P6-3 | OTA: 버전 보고·업데이트 상태머신·롤백 정책 계약화 | 계약 문서화 | M |
 | P6-4 | AI 도구 스키마: 최소 도구 세트(로봇 목록/미션 생성/상태 조회/정지) OpenAPI 파생 (AIV-001~002) | 도구 스키마 + 데모 | M |
 | P6-5 | 예약 미션 스케줄러 (MSN-005) | cron 시나리오 | M |
+| P6-6 | 분산 군집(SWARM-DIRECT) 연구 확장: `source: peer` P2P 유니캐스트 참조 소스 — **D-21 재검토 트리거(≥20대/지연>200ms/Fleet-리스 요구/직접 링크 확보) 충족 시에만 착수** (SWM-007) | 트리거 충족 시 별도 ADR | M |
 
 ---
 

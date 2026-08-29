@@ -147,6 +147,13 @@ class SwarmStatus(BaseModel):
     active: bool = False
 
 
+class SwarmReferenceSource(str, enum.Enum):
+    """D-21 분산 진화 훅: 참조 pose 스트림 소스 (SWM-007)."""
+
+    FLEET = "fleet"  # 기본 — Fleet 릴레이 (API Ref §7.8)
+    PEER = "peer"    # 예약 — 로봇 간 P2P (재검토 트리거 발생 시 구현)
+
+
 class SwarmFollowParams(BaseModel):
     """POST /api/v1/swarm/follow payload (SWM-002)."""
 
@@ -155,6 +162,7 @@ class SwarmFollowParams(BaseModel):
     lateral: float = 0.0           # 측방 오프셋 (m)
     max_speed: float = 0.15        # m/s (SAF-004 상한과 별개 추가 제약)
     stream_timeout_ms: int = 1000  # pose 스트림 단절 판정 (SWM-004)
+    source: SwarmReferenceSource = SwarmReferenceSource.FLEET  # v1.2 additive
 
 
 class PoseSample(BaseModel):

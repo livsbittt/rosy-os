@@ -501,7 +501,7 @@ Swarm 추종은 별도 cmd_vel 소스가 아니라 **Navigation Manager의 이�
 다음 원자 명령을 지원한다.
 
 ```text
-POST /api/v1/swarm/follow    # {target_robot_id, distance, lateral, max_speed, stream_timeout_ms}
+POST /api/v1/swarm/follow    # {target_robot_id, distance, lateral, max_speed, stream_timeout_ms, source}
 POST /api/v1/swarm/cancel
 GET  /api/v1/swarm/state
 ```
@@ -509,6 +509,10 @@ GET  /api/v1/swarm/state
 - v1 구현: 목표 갱신 ≤2 Hz moving-goal Nav2 (속도 ≤0.2 m/s 군집 운용에 충분)
 - 종료 조건: cancel / 스트림 단결(`stream_timeout_ms`, 기본 1000 ms) → HOLD
 - SAF-004 속도 상한·NAV-006 stuck 감지가 그대로 적용된다
+
+### SWM-007 참조 소스 추상화 (분산 진화 훅, D-21)
+
+Follow 소비자는 참조 pose 스트림의 **소스를 묻지 않아야** 한다. `source` 파라미터(`fleet`(기본) | `peer`(예약))로 소스를 지정하며, `peer` 소스(로봇 간 P2P 유니캐스트)는 D-21 재검토 트리거 발생 시 구현한다. 소스 교체가 추종 로직·나머지 계약에 영향을 주어서는 안 된다.
 
 ### SWM-003 Leader 역할
 
