@@ -33,7 +33,7 @@ from launch.actions import (
 )
 from launch_ros.actions import Node, PushRosNamespace
 from launch.conditions import IfCondition
-from launch.launch_description_sources import AnyLaunchDescriptionSource, PythonLaunchDescription
+from launch.launch_description_sources import AnyLaunchDescriptionSource, PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
 import yaml
@@ -102,7 +102,7 @@ def _launch_setup(context):
     server_args = f"-r -s -v4 {world_path}"
     actions.append(
         IncludeLaunchDescription(
-            PythonLaunchDescription(
+            PythonLaunchDescriptionSource(
                 os.path.join(gz_sim_share, "launch", "gz_sim.launch.py")
             ),
             launch_arguments={"gz_args": server_args, "on_exit_shutdown": "true"}.items(),
@@ -111,7 +111,7 @@ def _launch_setup(context):
     if not headless:
         actions.append(
             IncludeLaunchDescription(
-                PythonLaunchDescription(
+                PythonLaunchDescriptionSource(
                     os.path.join(gz_sim_share, "launch", "gz_sim.launch.py")
                 ),
                 launch_arguments={"gz_args": "-g -v4"}.items(),
@@ -122,13 +122,13 @@ def _launch_setup(context):
     bridge_dir = tempfile.mkdtemp(prefix="rosy_gz_multi_")
 
     for i in range(1, robots + 1):
-        ns = f"{prefix}{i:02d}"
+        ns = f"{prefix}_{i:02d}"
         group_actions = []
 
         # 1) robot_state_publisher (namespace + frame_prefix)
         group_actions.append(
             IncludeLaunchDescription(
-                PythonLaunchDescription(
+                PythonLaunchDescriptionSource(
                     os.path.join(rosy_desc_share, "launch", "upload_robot.launch.py")
                 ),
                 launch_arguments={
