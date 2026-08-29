@@ -1,0 +1,476 @@
+# ROSY API & Protocol Reference
+## 공유 인터페이스 계약서
+
+**Document ID:** ROSY-API-REF-001
+**Version:** v1.0
+**Status:** Approved
+**대상 독자:** rosy_core 개발자, rosy_fleet 개발자, 외부 SDK·AI·연동 시스템
+
+> **거버넌스:** 본 문서는 로봇(rosy_core)과 Fleet(rosy_fleet)이 **공유하는 유일한 인터페이스 계약**이다.
+> 본 문서의 변경은 양측 합의 + 문서 버전 업을 통해서만 가능하며(일방 변경 금지), 구현은 본 문서에 명시된 스키마를 임의로 확장하지 않는다.
+> 구현 시 본 문서를 OpenAPI(YAML)로 기계 판독 가능하게 유지하는 것을 원칙으로 한다(계약 테스트의 원천).
+
+**관련 문서:** ROSY-CORE-SRS-001 / ROSY-FLEET-SRS-001 / ROSY-ADR-001 / ROSY-PLN-001
+
+---
+
+# 1. 버저닝 및 폐기 정책
+
+### API-001 경로 버저닝
+
+모든 REST API는 버전을 포함한다.
+
+```text
+/api/v1/...
+```
+
+Breaking Change 발생 시 `/api/v2/...`로 분리한다.
+
+### API-002 변경 분류
+
+| 분류 | 예 | 정책 |
+|---|---|---|
+| Additive | 신규 엔드포인트, 응답에 신규 선택 필드 추가 | 버전 유지, 버전 노트 기록 |
+| Breaking | 필드 제거/이름 변경, 의미 변경, 필수화 | 신규 major 버전 |
+
+소비자는 알 수 없는 응답 필드를 무시해야 한다(Must Ignore 원칙).
+
+### API-003 폐기(Deprecation) 정책
+
+- 폐기 예정 엔드포인트는 응답 헤더 `Deprecation: true` + `Sunset: <date>`와 버전 노트로 사전 공지한다.
+- 폐기까지 최소 **2개 마이너 릴리스 또는 6개월** 유지한다.
+- Fleet은 로봇 `api_versions`(Capability)를 확인하여 버전별 호출 경로를 선택할 수 있어야 한다.
+
+### API-004 원천 일관성
+
+본 문서와 구현 OpenAPI 간 불일치 발견 시 본 문서를 우선하고, 수정은 합의 후 양측에 동시 반영한다. 계약 테스트(Implementation Plan §테스트)가 불일치를 회귀 차단한다.
+
+---
+
+# 2. 인증 및 권한
+
+### AUTH-101 토큰
+
+- `Authorization: Bearer <token>` (REST)
+- `?token=<token>` 쿼리 (WebSocket)
+- 초기 버전: 설정 파일 발급 정적 토큰. 향후 발급·폐기 API로 확장 가능한 구조.
+- Fleet 접속용 로봇 토큰은 사용자 토큰과 분리한다(페어링, §7).
+
+### AUTH-102 권한
+
+| Role | 조회 | 제어 | 관리 |
+|---|---|---|---|
+| Viewer | 상태·맵·센서·이벤트 | — | — |
+| Operator | 조회 | Navigation·Teleop·Stop·Mission | — |
+| Administrator | 조회 | 제어 | 설정·ROS·네트워크·Robot ID·Update·페어링·토큰 |
+
+예외: `POST /api/v1/safety/stop`은 모든 Role 허용(E-Stop은 누구나).
+
+---
+
+# 3. 에러 응답 표준
+
+### ERR-101 형식
+
+```json
+{
+  "error": {
+    "code": "CAPABILITY_NOT_SUPPORTED",
+    "message": "docking is not supported on this robot",
+    "detail": { "capability": "docking" }
+  }
+}
+```
+
+### ERR-102 에러 코드 카탈로그
+
+| code | HTTP | 의미 | 발신 |
+|---|---|---|---|
+| `VALIDATION_ERROR` | 400 | 요청 스키마 위반 | 로봇/Fleet |
+| `UNAUTHORIZED` | 401 | 토큰 없음/무효 | 로봇/Fleet |
+| `FORBIDDEN` | 403 | 권한 부족 | 로봇/Fleet |
+| `NOT_FOUND` | 404 | 리소스 없음 | 로봇/Fleet |
+| `MODE_CONFLICT` | 409 | 현재 모드에서 수행 불가 (예: MANUAL 중 NAV goal) | 로봇 |
+| `EMERGENCY_ACTIVE` | 409 | E-Stop 활성 상태 | 로봇 |
+| `NAVIGATION_ACTIVE` | 409 | 이미 진행 중 (재정의 필요 시 cancel 먼저) | 로봇 |
+| `WAYPOINT_EXISTS` | 409 | Waypoint 이름 충돌 | 로봇/Fleet |
+| `CAPABILITY_NOT_SUPPORTED` | 501 | 로봇이 미지원하는 기능 (CAP-003) | 로봇 |
+| `MAP_MISMATCH` | 409 | Goal의 map_id 불일치 (MAP-002) | 로봇 |
+| `MAPPING_ACTIVE` | 409 | 매핑 세션 중 명령 거부 (NAV-005) | 로봇 |
+| `ROBOT_OFFLINE` | 503 | 대상 로봇 미접속 | Fleet |
+| `COMMAND_TIMEOUT` | 504 | 명령 추적 타임아웃 (PRT-004) | Fleet |
+| `PAIRING_INVALID` | 401 | 페어링 토큰 무효/만료 | Fleet |
+| `IDEMPOTENCY_CONFLICT` | 409 | 동일 key·다른 내용 | Fleet |
+| `INTERNAL_ERROR` | 500 | 내부 오류 | 로봇/Fleet |
+
+---
+
+# 4. 공용 데이터 모델
+
+### 공용 Enum
+
+| Enum | 값 |
+|---|---|
+| `mode` | `IDLE`, `MANUAL`, `NAVIGATION`, `DOCKING`, `EMERGENCY` |
+| `navigation_state` | `IDLE`, `PLANNING`, `NAVIGATING`, `ARRIVED`, `CANCELED`, `FAILED`, `BLOCKED` |
+| `health` | `OK`, `WARNING`, `ERROR`, `UNKNOWN` |
+| `severity` | `info`, `warning`, `error`, `critical` |
+| `command_priority` | 1=EMERGENCY, 2=SAFETY, 3=MANUAL, 4=DOCKING, 5=NAVIGATION, 6=FLEET, 7=IDLE |
+| `fleet_policy` | `STOP`, `HOLD`, `RETURN_HOME`, `CONTINUE` |
+
+### 좌표·계측
+
+```json
+{ "pose": { "x": 1.82, "y": 3.21, "yaw": 0.73 },
+  "velocity": { "linear": 0.12, "angular": 0.0 },
+  "battery": { "percent": 81, "voltage": 11.9 } }
+```
+
+`yaw`는 radian. 타임스탬프는 UTC ISO 8601.
+
+---
+
+# 5. Robot REST API 카탈로그
+
+로봇(rosy_core)이 제공하는 엔드포인트. Base: `http://<robot-host>:8080`
+
+## 5.1 System
+
+| Method | Path | Role | 요구사항 |
+|---|---|---|---|
+| GET | `/api/v1/system/info` | Viewer | IDN-003 |
+| GET | `/api/v1/system/capabilities` | Viewer | CAP-001 |
+
+## 5.2 Robot 상태·센서
+
+| Method | Path | Role | 요구사항 |
+|---|---|---|---|
+| GET | `/api/v1/robot/state` | Viewer | CORE-001 |
+| GET | `/api/v1/robot/pose` | Viewer | §12 센서 |
+| GET | `/api/v1/robot/battery` | Viewer | §12 |
+| GET | `/api/v1/robot/velocity` | Viewer | §12 |
+| GET | `/api/v1/sensors` | Viewer | §12 |
+| GET | `/api/v1/sensors/{lidar\|imu\|battery\|encoder\|motor}` | Viewer | §12 |
+
+## 5.3 Navigation·SLAM
+
+| Method | Path | Role | 요구사항 |
+|---|---|---|---|
+| POST | `/api/v1/navigation/goal` | Operator | NAV-001 (payload: `{x,y,yaw}` 또는 `{waypoint}`) |
+| POST | `/api/v1/navigation/cancel` | Operator | NAV-002 |
+| POST | `/api/v1/navigation/home` | Operator | NAV-003 |
+| GET | `/api/v1/navigation/state` | Viewer | NAV-004 |
+| GET | `/api/v1/navigation/path` | Viewer | MAP-003 |
+| POST | `/api/v1/localization/initialpose` | Operator | AMCL 초기화 |
+| POST | `/api/v1/slam/start` | Operator | NAV-005 |
+| POST | `/api/v1/slam/stop` | Operator | NAV-005 |
+| POST | `/api/v1/slam/save` | Operator | NAV-005 (응답에 `map_id`) |
+| POST | `/api/v1/slam/reset` | Operator | NAV-005 |
+
+## 5.4 Map·Waypoint
+
+| Method | Path | Role | 요구사항 |
+|---|---|---|---|
+| GET | `/api/v1/map` | Viewer | MAP-003 (응답에 `map_id` 포함) |
+| GET | `/api/v1/map/costmap?scope=global\|local` | Viewer | MAP-003 |
+| GET | `/api/v1/waypoints` | Viewer | WPT-002 |
+| POST | `/api/v1/waypoints` | Operator | WPT-002 |
+| PUT | `/api/v1/waypoints/{name}` | Operator | WPT-002 |
+| DELETE | `/api/v1/waypoints/{name}` | Operator | WPT-002 |
+
+## 5.5 제어·안전
+
+| Method | Path | Role | 요구사항 |
+|---|---|---|---|
+| POST | `/api/v1/teleop` | Operator | §11 |
+| POST | `/api/v1/mode` | Operator | `{mode: MANUAL\|NAVIGATION\|IDLE}` |
+| POST | `/api/v1/safety/stop` | Viewer↑ | SAF-001 (누구나) |
+| POST | `/api/v1/safety/release` | Admin | SAF-001 |
+| GET | `/api/v1/safety/state` | Viewer | SAF-001 |
+| PUT | `/api/v1/safety/limits` | Admin | SAF-004 |
+
+## 5.6 이벤트·진단·관리
+
+| Method | Path | Role | 요구사항 |
+|---|---|---|---|
+| GET | `/api/v1/events?since_seq=N&types=...` | Viewer | EVT-003 |
+| GET | `/api/v1/diagnostics` | Viewer | DIAG-001 |
+| GET | `/api/v1/diagnostics/{component}` | Viewer | DIAG-001 |
+| GET | `/api/v1/logs/audit` | Admin | LOG-001 |
+| GET | `/metrics` | 내부/모니터링 | OBS-101 (Prometheus 형식, 토큰 면제는 배포 정책) |
+| GET | `/api/v1/ros/nodes\|topics\|services` | Admin | ROS-102 |
+| POST | `/api/v1/ros/publish` | Admin + 설정 ON | ROS-102 (기본 비활성) |
+| POST | `/api/v1/docking/dock` | Operator | DNC-003 (미지원 시 501) |
+| POST | `/api/v1/docking/undock` | Operator | DNC-003 |
+
+---
+
+# 6. WebSocket 프로토콜 (로봇)
+
+## 6.1 `/ws/state` — 상태 스트림
+
+서버가 10 Hz(기본, 설정 가능)로 상태 JSON을 push한다.
+
+```json
+{
+  "robot_id": "rosy_01",
+  "online": true,
+  "mode": "NAVIGATION",
+  "navigation": "NAVIGATING",
+  "map_id": "warehouse_a",
+  "pose": { "x": 1.82, "y": 3.21, "yaw": 0.73 },
+  "velocity": { "linear": 0.12, "angular": 0.0 },
+  "battery": { "percent": 81 },
+  "safety": { "estop": false },
+  "diagnostics_summary": { "rosy_core": "OK", "nav2": "OK" },
+  "seq": 10241,
+  "timestamp": "2026-08-29T12:00:00.123Z"
+}
+```
+
+클라이언트→서버 선택 메시지(WS Teleop, Operator 권한):
+
+```json
+{ "type": "teleop", "linear": 0.1, "angular": -0.2 }
+```
+
+WS Teleop에도 Watchdog·감사 로그가 동일 적용된다(SAF-002).
+
+## 6.2 `/ws/events` — 이벤트 스트림
+
+구독 필터: `?types=nav.*,safety.estop` (콤마 구분, `*` 와일드카드).
+
+서버 메시지는 EVT-001 이벤트 모델 그대로 전송한다. 연결 끊김 후 재구독 시 `since_seq`로 갭을 보정한다(EVT-003).
+
+---
+
+# 7. Fleet ↔ Robot 프로토콜 (WS + REST)
+
+로봇이 Fleet WS endpoint(`wss://fleet:8081/ws/robots`)에 **outbound 접속**한다(ADR-D-5).
+
+## 7.1 Envelope (PRT-001)
+
+모든 WS 메시지의 공통 포장:
+
+```json
+{
+  "protocol_version": "1.0",
+  "msg_id": "uuid",
+  "correlation_id": "uuid|null",
+  "type": "hello|heartbeat|event|command|ack|error",
+  "ts": "2026-08-29T12:00:00.123Z",
+  "payload": { }
+}
+```
+
+## 7.2 핸드셰이크 (PRT-002)
+
+접속 후 로봇이 첫 메시지로 전송:
+
+```json
+{ "type": "hello",
+  "payload": { "robot_id": "rosy_01", "pairing_token": "pt_xxx",
+               "api_versions": ["v1"], "protocol_version": "1.0" } }
+```
+
+Fleet 응답: `welcome`(성공, 장기 토큰 발급) / `error(PAIRING_INVALID)`.
+
+## 7.3 Heartbeat (PRT-003)
+
+로봇 → Fleet, 1 Hz:
+
+```json
+{ "type": "heartbeat",
+  "payload": { "state_snapshot": { "...": "/ws/state 스키마 동일" } } }
+```
+
+## 7.4 이벤트 전달
+
+로봇은 내부 이벤트(EVT-001)를 `type: "event"`로 Fleet에 실시간 forward한다. 재접속 시 로봇은 미전송 이벤트를 `since_seq` 기준으로 재전송한다(PRT-005).
+
+## 7.5 명령 및 추적 (PRT-004)
+
+명령은 **REST**(Fleet → 로봇 §5 API)로 전달하고, WS는 추적 보조로 사용한다.
+
+```text
+Fleet → Robot (REST):  명령 헤더에 X-Correlation-Id 부여
+Robot → Fleet (WS):    { "type": "ack", "correlation_id": "...",
+                         "payload": { "status": "ACCEPTED|STARTED|COMPLETED|FAILED",
+                                      "error": "..." } }
+```
+
+Fleet 타임아웃(기본 10초) 내 ack 없으면 `COMMAND_TIMEOUT`.
+
+## 7.6 재접속 (로봇 측 의무)
+
+- Exponential backoff: 1s → 2s → 4s → ... 최대 30s
+- 재접속 즉시 `hello` → 마지막 전송 `seq` 이후 이벤트 재전송
+- 접속 단절 시 SAF-003 정책 적용
+
+## 7.7 프로토콜 버저닝 (PRT-006)
+
+`MAJOR.MINOR`. MINOR는 추가 전용. Fleet이 로봇보다 낮은 버전만 지원하면 Fleet 지원 최고 MINOR로 통신한다.
+
+---
+
+# 8. 이벤트 카탈로그
+
+> 소비자(Core 감사로그·Fleet·AI)가 의존하는 안정적 계약. 추가는 허용, 제거·의미 변경은 폐기 정책(API-003) 적용.
+
+| type | severity | 발신 | payload 예시 |
+|---|---|---|---|
+| `system.boot` | info | 로봇 | `{version}` |
+| `system.shutdown` | warning | 로봇 | `{reason}` |
+| `config.changed` | warning | 로봇 | `{key}` |
+| `mode.changed` | info | 로봇 | `{from, to, source}` |
+| `nav.started` | info | 로봇 | `{goal\|waypoint}` |
+| `nav.completed` | info | 로봇 | `{goal\|waypoint, duration_ms}` |
+| `nav.failed` | error | 로봇 | `{error_code}` |
+| `nav.canceled` | info | 로봇 | `{source}` |
+| `nav.stuck` | error | 로봇 | `{timeout_ms}` |
+| `nav.blocked` | warning | 로봇 | `{}` |
+| `safety.estop` | critical | 로봇 | `{source}` |
+| `safety.estop_released` | warning | 로봇 | `{by}` |
+| `safety.watchdog` | warning | 로봇 | `{timeout_ms}` |
+| `battery.low` | warning | 로봇 | `{percent}` |
+| `battery.critical` | critical | 로봇 | `{percent, policy}` |
+| `command.rejected` | warning | 로봇 | `{source, reason}` |
+| `waypoint.created/updated/deleted` | info | 로봇 | `{name}` |
+| `map.saved` | info | 로봇 | `{map_id}` |
+| `mission.assigned` | info | Fleet | `{mission_id, robot_id}` |
+| `mission.started` | info | Fleet | `{mission_id}` |
+| `mission.step_completed` | info | Fleet | `{mission_id, step_index}` |
+| `mission.completed/failed/canceled` | info/error/info | Fleet | `{mission_id, reason}` |
+| `robot.online/offline` | info/warning | Fleet | `{robot_id}` |
+| `pairing.requested/approved/revoked` | warning | Fleet | `{robot_id}` |
+
+---
+
+# 9. 데이터 스키마 카탈로그
+
+## 9.1 Capability Descriptor (CAP-001)
+
+```json
+{
+  "capability_version": 1,
+  "navigation": { "goal_navigation": true, "return_home": true,
+                  "max_linear_velocity": 0.2, "max_angular_velocity": 0.8 },
+  "teleop": true,
+  "slam": true,
+  "docking": { "supported": false },
+  "sensors": ["lidar", "imu", "battery", "encoder"],
+  "events": ["nav.*", "safety.*"],
+  "api_versions": ["v1"],
+  "protocol_version": "1.0"
+}
+```
+
+## 9.2 Waypoint (WPT-001)
+
+```json
+{ "name": "dock_1", "x": 2.5, "y": 1.8, "yaw": 1.57,
+  "map_id": "warehouse_a", "metadata": { "label": "충전독 앞" } }
+```
+
+## 9.3 Mission DSL v1 (MSN-001)
+
+```json
+{ "mission_id": "patrol_evening",
+  "target": { "robots": ["rosy_01"] },
+  "idempotency_key": "pe-20260829-01",
+  "steps": [
+    { "action": "goto", "waypoint": "zone_a" },
+    { "action": "home" },
+    { "action": "wait", "seconds": 30 },
+    { "action": "formation", "formation": "V", "robots": ["rosy_01","rosy_02"], "center": {"x":0,"y":0} }
+  ] }
+```
+
+v1 action: `goto`(waypoint|x,y,yaw) / `home` / `wait(seconds)` / `formation`. 상태머신은 FLEET SRS MSN-002.
+
+## 9.4 Robot Profile (HWA-001)
+
+```yaml
+profile:
+  model: Pinky Pro
+  drivetrain: differential
+  wheel_base: 0.15
+  max_linear_velocity: 0.20
+  max_angular_velocity: 0.80
+  sensors: [ {lidar: rplidar_c1}, {imu: bno055}, {battery: adc} ]
+```
+
+## 9.5 Command 추적 레코드 (PRT-004)
+
+```json
+{ "correlation_id": "uuid", "robot_id": "rosy_01",
+  "action": "goto", "params": { "waypoint": "zone_a" },
+  "status": "ACCEPTED|STARTED|COMPLETED|FAILED|TIMEOUT",
+  "issued_by": "user:admin|mission:m123|fleet:stop_all",
+  "ts_issued": "...", "ts_final": "..." }
+```
+
+---
+
+# 10. Fleet REST API 카탈로그
+
+Fleet(rosy_fleet)이 제공하는 엔드포인트. Base: `http://<fleet-host>:8081`
+
+## 10.1 로봇·페어링
+
+| Method | Path | Role | 요구사항 |
+|---|---|---|---|
+| GET | `/api/v1/fleet/robots` | Viewer | REG-002 (상태·Capability 포함) |
+| GET | `/api/v1/fleet/robots/{id}` | Viewer | REG-002 |
+| PATCH | `/api/v1/fleet/robots/{id}` | Admin | 이름·그룹 변경 (REG-003) |
+| DELETE | `/api/v1/fleet/robots/{id}` | Admin | 등록 해제 (REG-001a) |
+| POST | `/api/v1/fleet/pairing-tokens` | Admin | 1회용 발급 (SEC-201) |
+| DELETE | `/api/v1/fleet/pairing-tokens/{token}` | Admin | 폐기 (SEC-201) |
+| GET | `/api/v1/fleet/pending-robots` | Admin | 승인 대기 목록 (SEC-202) |
+| POST | `/api/v1/fleet/pending-robots/{id}/approve` | Admin | 승인 (SEC-202) |
+| POST | `/api/v1/fleet/robots/{id}/token/revoke` | Admin | 토큰 폐기 (SEC-203) |
+
+## 10.2 명령
+
+| Method | Path | Role | 요구사항 |
+|---|---|---|---|
+| POST | `/api/v1/fleet/commands` | Operator | 다중 로봇 명령 `{robot_ids, action, params}` (CTR-001, PRT-004) |
+| POST | `/api/v1/fleet/stop-all` | Operator | STOP ALL (CTR-002) |
+| GET | `/api/v1/fleet/commands/{correlation_id}` | Viewer | 추적 상태 조회 |
+
+`action`: `goto | home | stop | estop | estop_release | mode | formation`
+
+## 10.3 Mission·Formation
+
+| Method | Path | Role | 요구사항 |
+|---|---|---|---|
+| POST | `/api/v1/fleet/missions` | Operator | 생성·실행 (MSN-001/003) |
+| GET | `/api/v1/fleet/missions` | Viewer | 목록 |
+| GET | `/api/v1/fleet/missions/{id}` | Viewer | 상세(스텝 상태) |
+| POST | `/api/v1/fleet/missions/{id}/cancel` | Operator | 취소 (MSN-002) |
+| POST | `/api/v1/fleet/formations` | Operator | `{formation, robots, params}` (FOR-001) |
+
+## 10.4 Waypoint·맵·운영
+
+| Method | Path | Role | 요구사항 |
+|---|---|---|---|
+| GET | `/api/v1/fleet/waypoints?map_id=` | Viewer | 전체 로봇 Waypoint 조회 |
+| POST | `/api/v1/fleet/waypoints/sync` | Operator | `{robot_ids, waypoints}` 로봇 동기화 (WPT-005) |
+| GET | `/api/v1/fleet/maps` | Viewer | map_id·버전 목록 (MAP-003) |
+| POST | `/api/v1/fleet/robots/{id}/backup` | Admin | 스냅샷 수집 (OPS-001) |
+| POST | `/api/v1/fleet/robots/{id}/restore` | Admin | 복구 프로비저닝 (OPS-002) |
+
+## 10.5 이벤트·감사
+
+| Method | Path | Role | 요구사항 |
+|---|---|---|---|
+| GET | `/api/v1/fleet/events?robot_id=&type=&since=` | Viewer | 통합 이벤트 조회 (OBS-202) |
+| GET | `/api/v1/fleet/audit` | Admin | Fleet 감사 로그 |
+
+---
+
+# 11. 변경 이력
+
+| 버전 | 일자 | 내용 |
+|---|---|---|
+| v1.0 | 2026-08-29 | 최초 작성. PKY-CORE-SRS-001 v0.1의 API 산재 정의를 통합·확장 (버전·폐기 정책, 에러코드, 이벤트 카탈로그, Fleet↔Robot 프로토콜, 데이터 스키마, Fleet API 신설) |
