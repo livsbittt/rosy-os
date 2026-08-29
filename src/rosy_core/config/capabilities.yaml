@@ -8,6 +8,9 @@ navigation:
   max_angular_velocity: 0.80
 teleop: true
 slam: true
+swarm:                      # D-20 (SWM-005)
+  follow: true
+  lead: true
 docking:
   supported: false               # DNC-001 — Pinky Pro 미지원
 sensors: [lidar, imu, battery, encoder]

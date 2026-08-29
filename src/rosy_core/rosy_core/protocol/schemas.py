@@ -81,6 +81,7 @@ class EnvelopeType(str, enum.Enum):
     COMMAND = "command"
     ACK = "ack"
     ERROR = "error"
+    POSE = "pose"  # v1.1: Leader Pose Stream (SWM-003, API Ref §7.8)
 
 
 class Envelope(BaseModel):
@@ -130,6 +131,40 @@ class SafetySummary(BaseModel):
     estop: bool = False
 
 
+# --- Swarm (D-20, SWM-001~006, API Ref §7.8) --------------------------------
+
+class SwarmRole(str, enum.Enum):
+    NONE = "none"
+    LEADER = "leader"
+    FOLLOWER = "follower"
+
+
+class SwarmStatus(BaseModel):
+    """상태 스냅샷 additive 필드 (SWM-006)."""
+
+    role: SwarmRole = SwarmRole.NONE
+    formation: Optional[str] = None
+    active: bool = False
+
+
+class SwarmFollowParams(BaseModel):
+    """POST /api/v1/swarm/follow payload (SWM-002)."""
+
+    target_robot_id: str
+    distance: float = 0.5          # 종방향 유지 거리 (m)
+    lateral: float = 0.0           # 측방 오프셋 (m)
+    max_speed: float = 0.15        # m/s (SAF-004 상한과 별개 추가 제약)
+    stream_timeout_ms: int = 1000  # pose 스트림 단절 판정 (SWM-004)
+
+
+class PoseSample(BaseModel):
+    """Leader Pose Stream payload (SWM-003, ≥10 Hz)."""
+
+    robot_id: str
+    pose: Pose
+    seq: int
+
+
 class StateSnapshot(BaseModel):
     """로봇 상태 스냅샷 — /ws/state payload와 동일 (API Ref §6.1)."""
 
@@ -142,6 +177,7 @@ class StateSnapshot(BaseModel):
     velocity: Velocity = Field(default_factory=Velocity)
     battery: Battery = Field(default_factory=Battery)
     safety: SafetySummary = Field(default_factory=SafetySummary)
+    swarm: SwarmStatus = Field(default_factory=SwarmStatus)  # v1.1 additive (SWM-006)
     diagnostics_summary: dict[str, HealthState] = Field(default_factory=dict)
     seq: int = 0
     timestamp: str = Field(default_factory=utc_now_iso)

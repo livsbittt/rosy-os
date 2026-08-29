@@ -8,8 +8,12 @@ from rosy_core.protocol.schemas import (
     Envelope,
     EnvelopeType,
     EventMessage,
+    PoseSample,
     Severity,
     StateSnapshot,
+    SwarmFollowParams,
+    SwarmRole,
+    SwarmStatus,
 )
 
 
@@ -36,3 +40,26 @@ def test_state_snapshot_defaults():
     snap = StateSnapshot(robot_id="rosy_01")
     assert snap.mode.value == "IDLE"
     assert snap.navigation.value == "IDLE"
+
+
+def test_swarm_status_additive_default():
+    """v1.1 additive: swarm 필드 기본값 — 기존 소비자 영향 없음 (CAP-002)."""
+    snap = StateSnapshot(robot_id="rosy_01")
+    assert snap.swarm.role == SwarmRole.NONE
+    assert snap.swarm.active is False
+    snap2 = StateSnapshot.model_validate(snap.model_dump())  # 직렬화 왕복
+    assert snap2.swarm.role == SwarmRole.NONE
+
+
+def test_swarm_follow_params_defaults():
+    p = SwarmFollowParams(target_robot_id="rosy_02")
+    assert p.distance == 0.5 and p.lateral == 0.0
+    assert p.max_speed == 0.15 and p.stream_timeout_ms == 1000
+
+
+def test_pose_stream_envelope():
+    sample = PoseSample(robot_id="rosy_01", pose={"x": 1.0, "y": 0.0, "yaw": 0.1}, seq=1)
+    env = Envelope(type=EnvelopeType.POSE, payload=sample.model_dump())
+    assert Envelope.model_validate(env.model_dump()).type == EnvelopeType.POSE
+    parsed = PoseSample.model_validate(env.payload)
+    assert parsed.pose.x == 1.0 and parsed.seq == 1
