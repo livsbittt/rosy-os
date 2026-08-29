@@ -514,8 +514,10 @@ ROS `/diagnostics` + 자체 수집(CPU/MEM/Disk/온도/네트워크) → 컴포�
 # 13. 다음 액션 (즉시 착수분)
 
 > 진행 상황 (2026-08-29):
-> - **완료:** P0-1 (전면 리네임 + 리포 구성 + CI), P0-2 (`/scan`→`scan`), P0-3 (bringup.py `frame_prefix` 파라미터화), P0-4 (bringup_robot.launch.xml namespace 플러밍 + LiDAR frame prefix), P0-5 (DDS 격리: `rosy_env.sh` + CycloneDDS localhost 프로파일), P0-6 파일 작성 (`gz_multi.launch.py` — Gazebo 런타임 검증은 M0 환경 예정), P0-7 (동등성 체크리스트 `ROSY Flask Parity Checklist.md`), P1-1 (rosy_core 스캘폴딩), P1-19 (프로토콜 스키마 + 단위 테스트 4건 통과)
-> - **잔여:** M0 완료 기준 시험(MAT-02/03 조기 검증)
+> - **완료:** P0 전 태스크(파일 작업) / P1-1, P1-19
+> - **P1 1차 스프린트 완료 (2026-08-29):** P1-2(Identity), P1-4(State 10Hz), P1-5(Command 멀렉서·중재·모드머신·소스 레지스트리), P1-6(Safety: E-Stop·워치독·속도 클리핑·배터리 정책), P1-8(Teleop), P1-9(REST 핵심 + 3롤 인증 + ERR-101 표준), P1-10(WS /ws/state·/ws/events), P1-12(systemd 유닛 작성 — 실기기 설치 잔여), P1-15(Capability+Profile), P1-16(Waypoint), P1-17(Event Bus), P1-18(map_id+Goal 검증), P1-20(저배터리·stuck 로직)
+> - **검증 증거:** pytest 30/30 통과(중재·워치독·안전·웨이포인트·이벤트·네비·API 7영역) + 실기동 스모크: 노드 기동 → MANUAL 진입 → teleop 스트림 cmd_vel 반영(linear 0.05/angular 0.1) → 스트림 정지 0.7s 후 워치독 자동 zero(SAF-002 실증) / E-Stop 사이클·Waypoint CRUD·이벤트 로그·WS seq 증가 확인
+> - **잔여 (P1 2차):** P1-3 잔여(scan·IMU 구독, TF map 좌표 실환경 검증), P1-7 Nav2 액션 실환경 검증(로직은 단위테스트 검증 완료), P1-11(Diagnostics+/metrics), P1-13(SLAM 세션 API + 동등성 체크리스트 실행 → Flask 제거), P1-14(통합테스트 리포트), 실기기 systemd 설치(AT-01)
 >
 > 검증 기록 (2026-08-29, 로컬 ROS 2 Jazzy):
 > - **colcon build 11/11 패키지 통과** (C++ 3종 포함, stderr는 gz upstream deprecation 경고만)

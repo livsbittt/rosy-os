@@ -1,31 +1,45 @@
-"""rosy_core.api.app — FastAPI 팩토리 (P1-9 스캘폴딩, API-101).
-
-라우터는 v1/ 모듈에서 단계적으로 추가 (system → robot → navigation → ...).
-OpenAPI는 ROSY-API-REF-001과 계약 테스트로 동기화된다 (API-004).
-"""
+"""rosy_core.api.app — FastAPI 팩토리 (P1-9, API-101). 계약: ROSY-API-REF-001."""
 
 from __future__ import annotations
 
 from typing import Any
 
+from fastapi import FastAPI
 
-def create_app(config: dict[str, Any]):
-    from fastapi import FastAPI
+from rosy_core.api.errors import ApiError, register_exception_handlers
+from rosy_core.api.v1.routes import (
+    control_router,
+    events_router,
+    navigation_router,
+    robot_router,
+    safety_router,
+    system_router,
+    waypoints_router,
+)
+from rosy_core.api.ws import ws_router
+from rosy_core.services import CoreServices
 
+
+def create_app(config: dict[str, Any], services: CoreServices) -> FastAPI:
     app = FastAPI(
         title="ROSY CORE API",
         version="1.0.0",
-        description="로봇 미들웨어 API — 계약: ROSY-API-REF-001",
+        description="로봇 미들웨어 API — 계약: ROSY-API-REF-001 (v1.2)",
     )
+    app.state.core = services
+    register_exception_handlers(app)
 
-    @app.get("/api/v1/system/info", tags=["system"])
-    def system_info() -> dict:
-        """IDN-003 Robot Information (P1-2)."""
-        return {
-            "robot_id": config.get("robot", {}).get("id", "rosy_01"),
-            "robot_name": config.get("robot", {}).get("name", "Rosy 01"),
-            "software_version": "0.1.0",
-            "api_versions": ["v1"],
-        }
+    app.include_router(system_router)
+    app.include_router(robot_router)
+    app.include_router(control_router)
+    app.include_router(safety_router)
+    app.include_router(navigation_router)
+    app.include_router(waypoints_router)
+    app.include_router(events_router)
+    app.include_router(ws_router)
+
+    @app.get("/api/v1", tags=["system"])
+    def root() -> dict:
+        return {"name": "rosy_core", "api_versions": ["v1"]}
 
     return app

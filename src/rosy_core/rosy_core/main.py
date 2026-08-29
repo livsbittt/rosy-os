@@ -3,9 +3,6 @@
 프로세스 구조:
 - Main Thread: rclpy 노드 "rosy_core" (MultiThreadedExecutor)
 - Worker Thread: uvicorn + FastAPI
-
-P1-1 스캘폴딩 단계 — 각 매니저는 등록만 수행하고, 실제 구현은
-P1-3~P1-20 태스크에서 채운다 (ROSY-PLN-001 §7 Phase 1).
 """
 
 from __future__ import annotations
@@ -18,13 +15,23 @@ def main() -> None:
     from rosy_core.node import RosyCoreNode
 
     rclpy.init()
-    config = load_config()
-    node = RosyCoreNode(config)
+    node = None
     try:
+        config = load_config()
+        node = RosyCoreNode(config)
         node.run()
+    except KeyboardInterrupt:
+        pass
     finally:
-        node.shutdown()
-        rclpy.shutdown()
+        if node is not None:
+            try:
+                node.shutdown()
+            except Exception:
+                pass
+        try:
+            rclpy.shutdown()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

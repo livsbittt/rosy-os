@@ -2,27 +2,48 @@
 robot:
   id: rosy_01
   name: Rosy 01
+  frame_prefix: ""            # namespace 런치 시 rosy_01/ 로 주입 (§6.1)
 
 network:
+  api_host: 0.0.0.0
   api_port: 8080
 
+state:
+  rate_hz: 10                 # CORE-001 스냅샷/푸시 주기
+
 profile: profile.pinky_pro.yaml   # HWA-001 Robot Profile
+capabilities: capabilities.yaml
+
+auth:                         # SEC-101 정적 토큰 (운용 시 교체 필수)
+  tokens:
+    - token: rosy-dev-admin
+      role: administrator
+    - token: rosy-dev-operator
+      role: operator
+    - token: rosy-dev-viewer
+      role: viewer
 
 safety:
   teleop_timeout_ms: 500          # SAF-002
   battery_warning_percent: 20     # SAF-005
   battery_critical_percent: 10    # SAF-005
   battery_critical_policy: RETURN_HOME
+  battery_full_voltage: 12.6      # 전압→퍼센트 선형 변환 (HWA Profile 참조)
+  battery_empty_voltage: 10.0
   fleet_loss_policy: STOP         # SAF-003
+  stuck_timeout_s: 30             # NAV-006
+  manual_linear: 0.15
+  manual_angular: 0.60
+  fleet_linear: 0.20
+  fleet_angular: 0.80
 
 navigation:
-  max_linear_velocity: 0.20       # SAF-004 / HWA-001에서 주입
+  max_linear_velocity: 0.20       # HWA-001에서 주입 (여기值은 폴백)
   max_angular_velocity: 0.80
+  # map_id: warehouse_a           # 설정 or slam/save 로 갱신 (MAP-001, D-13)
 
 events:
   ring_buffer_size: 1000          # EVT-004
 
 fleet:
   enabled: false                  # P4-2에서 활성화 (PRT)
-  # server_url: ws://fleet.local:8081/ws/robots
-  # pairing_token: ""

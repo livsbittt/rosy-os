@@ -1,1 +1,141 @@
-"""NAV-001~006 Navigation Manager (P1-7, P1-20) — TODO(ROSY-PLN-001 Phase 1)."""
+"""rosy_core.navigation.manager — NAV-001~004/006 (P1-7, P1-20). ROS 무의존.
+
+실행(Nav2 액션)은 executor 인터페이스 뒤로 격리 — bridge가 구현 (ROS-101/HWA-002 원칙).
+"""
+
+from __future__ import annotations
+
+import math
+import time
+from dataclasses import dataclass
+from typing import Optional, Protocol
+
+from rosy_core.protocol.schemas import NavigationState
+
+
+@dataclass
+class NavGoalSpec:
+    x: float
+    y: float
+    yaw: float
+    frame: str = "map"
+
+
+class NavExecutor(Protocol):
+    def send_goal(self, spec: NavGoalSpec) -> None: ...
+    def cancel_goal(self) -> None: ...
+    def send_initial_pose(self, x: float, y: float, yaw: float) -> None: ...
+
+
+class NavigationError(Exception):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+_IDLE_STATES = {NavigationState.IDLE, NavigationState.ARRIVED,
+                NavigationState.CANCELED, NavigationState.FAILED}
+
+
+class NavigationManager:
+    def __init__(self, events, state_manager, waypoints, safety,
+                 map_id_provider=None, stuck_timeout_s: float = 30.0,
+                 stuck_min_progress: float = 0.05) -> None:
+        self._events = events
+        self._state = state_manager
+        self._waypoints = waypoints
+        self._safety = safety
+        self._map_id_provider = map_id_provider or (lambda: self._state.map_id)
+        self.executor: Optional[NavExecutor] = None
+        self._nav_state = NavigationState.IDLE
+        self.mapping_active = False
+        self._stuck_timeout = stuck_timeout_s
+        self._stuck_min_progress = stuck_min_progress
+        self._last_progress_pos: Optional[tuple[float, float]] = None
+        self._last_progress_ts: float = 0.0
+
+    @property
+    def nav_state(self) -> NavigationState:
+        return self._nav_state
+
+    def _set_state(self, new: NavigationState) -> None:
+        if new is not self._nav_state:
+            self._nav_state = new
+            self._state.set_navigation(new)
+
+    def _require_executor(self) -> NavExecutor:
+        if self.executor is None:
+            raise NavigationError("CAPABILITY_NOT_SUPPORTED", "navigation executor unavailable")
+        return self.executor
+
+    def resolve_goal(self, *, x=None, y=None, yaw=None, waypoint=None) -> NavGoalSpec:
+        if waypoint is not None:
+            wp = self._waypoints.get(waypoint)
+            current_map = self._map_id_provider()
+            if wp.map_id and current_map and wp.map_id != current_map:
+                raise NavigationError("MAP_MISMATCH",
+                                      f"waypoint map '{wp.map_id}' != current '{current_map}'")
+            return NavGoalSpec(x=wp.x, y=wp.y, yaw=wp.yaw)
+        if x is None or y is None:
+            raise NavigationError("VALIDATION_ERROR", "x,y or waypoint required")
+        return NavGoalSpec(x=float(x), y=float(y), yaw=float(yaw or 0.0))
+
+    def goal(self, spec: NavGoalSpec, source: str = "api") -> None:
+        executor = self._require_executor()
+        if self._safety.estop:
+            raise NavigationError("EMERGENCY_ACTIVE", "e-stop is active")
+        if self.mapping_active:
+            raise NavigationError("MAPPING_ACTIVE", "mapping session active")
+        if self._nav_state not in _IDLE_STATES:
+            raise NavigationError("NAVIGATION_ACTIVE",
+                                  f"navigation in progress ({self._nav_state.value}) — cancel first")
+        executor.send_goal(spec)
+        self._set_state(NavigationState.PLANNING)
+        self._events.publish("nav.started", source="navigation_manager",
+                             data={"goal": {"x": spec.x, "y": spec.y, "yaw": spec.yaw}, "by": source})
+
+    def home(self, source: str = "api") -> None:
+        spec = self.resolve_goal(waypoint="__home__")
+        self.goal(spec, source=source)
+
+    def cancel(self, source: str = "api") -> None:
+        if self._nav_state in _IDLE_STATES:
+            return
+        if self.executor is not None:
+            self.executor.cancel_goal()
+        self._set_state(NavigationState.CANCELED)
+        self._events.publish("nav.canceled", source="navigation_manager", data={"source": source})
+
+    def on_goal_accepted(self) -> None:
+        self._set_state(NavigationState.NAVIGATING)
+        self._last_progress_pos = None
+        self._last_progress_ts = time.monotonic()
+
+    def on_result(self, succeeded: bool, error: Optional[str] = None) -> None:
+        if succeeded:
+            self._set_state(NavigationState.ARRIVED)
+            self._events.publish("nav.completed", source="navigation_manager")
+        else:
+            self._set_state(NavigationState.FAILED)
+            self._events.publish("nav.failed", severity="error", source="navigation_manager",
+                                 data={"error_code": error or "UNKNOWN"})
+
+    def on_pose_progress(self, x: float, y: float) -> None:
+        """NAV-006 stuck: NAVIGATING 중 진척 없으면 자동 취소."""
+        if self._nav_state is not NavigationState.NAVIGATING:
+            return
+        now = time.monotonic()
+        if self._last_progress_pos is not None:
+            dist = math.hypot(x - self._last_progress_pos[0], y - self._last_progress_pos[1])
+            if dist >= self._stuck_min_progress:
+                self._last_progress_pos = (x, y)
+                self._last_progress_ts = now
+                return
+        else:
+            self._last_progress_pos = (x, y)
+            self._last_progress_ts = now
+            return
+        if now - self._last_progress_ts > self._stuck_timeout:
+            self.cancel(source="stuck_detector")
+            self._events.publish("nav.stuck", severity="error", source="navigation_manager",
+                                 data={"timeout_s": self._stuck_timeout})
