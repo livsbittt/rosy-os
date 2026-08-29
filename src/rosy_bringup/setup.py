@@ -19,8 +19,8 @@ setup(
     zip_safe=True,
     maintainer='pl3',
     maintainer_email='kyung133851@pinklab.art',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    description='ROSY bringup: motor/odometry/battery drivers for Pinky Pro',
+    license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [

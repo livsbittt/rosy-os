@@ -15,10 +15,10 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='pinklab',
+    maintainer='pl3',
     maintainer_email='kyung133851@pinklab.art',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    description='ROSY emotion display server',
+    license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
