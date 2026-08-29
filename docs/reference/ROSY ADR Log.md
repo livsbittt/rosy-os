@@ -27,6 +27,8 @@
 | D-15 | 플랫폼명 Rosy 확정 | Accepted |
 | D-16 | 전면 리네임 (upstream 자동 병합 포기) | Accepted |
 | D-17 | 문서 3+2 구조 및 계약 중심 거버넌스 | Accepted |
+| D-18 | 프로토콜 스키마 재사용 — rosy_core 단일 소스 유지 | Accepted |
+| D-19 | 접속 토폴로지: 로봇 WiFi 릴레이(AP+STA) 지원 | Accepted |
 
 ---
 
@@ -231,3 +233,27 @@
 **Decision:** 문서를 5개로 분리한다 — ① CORE SRS(로봇 책임) ② FLEET SRS(플릿 책임) ③ API & Protocol Reference(공유 계약, 양측 합의 시에만 변경) ④ ADR Log(의사결정) ⑤ Implementation Plan(실행·추적). 문서 간 참조는 섹션 번호가 아닌 **요구사항 ID** 기반.
 
 **Consequences:** 책임 경계 명확, 양측 독립 개발 가능(계약 문서만 공유). 원본 PKY 문서 2종은 재배치 후 삭제(이력은 각 문서 변경 이력에 승계).
+
+---
+
+## D-18 프로토콜 스키마 재사용 — rosy_core 단일 소스 유지
+
+**Status:** Accepted (2026-08-29)
+
+**Context:** P1-19에서 `rosy_core/protocol/schemas.py`(envelope·이벤트·ack)를 고정했다. Phase 4의 rosy_fleet도 동일 스키마가 필요하다. 독립 공유 패키지(예: rosy_protocol) 분리도 선택지였다.
+
+**Decision:** 별도 패키지 분리는 보류하고, rosy_fleet이 `rosy_core`(ament_python 의존)를 import하여 재사용한다. 스키마 변경 시나리오는 양측이 같은 리포 내에서 동시 컴파일되므로 계약 파열이 구조적으로 차단된다.
+
+**Consequences:** 초기 복잡도 최소화, 중복 제거. 단 rosy_fleet Docker 이미지에 rosy_core가 포함되는 부피와, 로봇 패키지 의존이 fleet 서버에 끼치는 영향은 P4 패키징 시 재검토(3번째 소비자 등장 시 분리 재고).
+
+---
+
+## D-19 접속 토폴로지: 로봇 WiFi 릴레이(AP+STA) 지원
+
+**Status:** Accepted (2026-08-29)
+
+**Context:** 현장 네트워크 구성이 "로봇이 상위 WiFi에 연결된 채 AP처럼 동작해 무선을 릴레이"하는 방식으로 확인됨. 사용자 기기는 로봇 AP를 통해 로봇에 직접 접속한다.
+
+**Decision:** 해당 토폴로지를 표준 배포 시나리오로 수용한다(NET-001~004). NetworkManager AP+shared 프로비저닝, 진입점은 mDNS(`rosy-01.local:8080`) + 게이트웨이 IP 폴백, 업링크 단절 시 AP 서브넷 내 제어 유지, Fleet은 로봇 아웃바운드 접속(D-5)으로 NAT 무관 동작.
+
+**Consequences:** 단일 라디오의 AP+STA 동시 운용 제약(동일 채널)과 릴레이 대역폭 공유로 텔레옵 지연 변동 가능 — SAF-002 워치독과 속도 상한(SAF-004)이 완충. 상위 공유기 교체/채널 변경 시 로봇 AP 채널도 따라가므로 접속 가이드에 유의사항 기재.

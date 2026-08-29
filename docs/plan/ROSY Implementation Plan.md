@@ -45,7 +45,7 @@
 |---|---|---|---|
 | A-1 | `nav2_params.yaml` (obstacle_layer scan) | `topic: /scan` 절대경로 2곳 | 상대경로 `scan`으로 변경 |
 | A-2 | `bringup.py` 모듈 상수 | `ODOM_FRAME_ID = "odom"` 하드코딩 | 파라미터화(frame_prefix) |
-| A-3 | `bringup_robot.launch.xml` | namespace 인자 없음 | namespace/frame_prefix 플러밍 |
+| A-3 | `bringup_robot.launch`(XML) | namespace 인자 없음 | **Python launch로 전환 + namespace/frame_prefix 플러밍** (검증 완료) |
 | A-4 | LiDAR 런치 include | `frame_id: rplidar_link` 고정 | prefix 적용 |
 | A-5 | `gz_bringup_launch.xml` | namespace + `/tf→tf` 리매핑 이미 구현 | **참조 패턴으로 활용** |
 | A-6 | 전체 | DDS 도메인 분리 정책 없음 | 로봇별 `ROS_DOMAIN_ID` + localhost-only 프로파일 (D-6) |
@@ -307,6 +307,7 @@ ROS `/diagnostics` + 자체 수집(CPU/MEM/Disk/온도/네트워크) → 컴포�
 | P1-18 | map_id 노출 + Goal 검증 (MAP-001, MAP-002, D-13) | 불일치 Goal `MAP_MISMATCH` 거부 | S |
 | P1-19 | **프로토콜 스키마 패키지 고정** (D-10): envelope/이벤트 스키마(PRT-001, API Ref §7·8)를 `rosy_core/protocol/`에 구현·버전화 | 스키마 단위 테스트 통과 | S |
 | P1-20 | 저배터리 정책 + Stuck 감지 (SAF-005, NAV-006) | 임계값 주입 시나리오 통과 | M |
+| P1-21 | 네트워크 프로비저닝: WiFi 릴레이(AP+STA) NetworkManager 프로파일 스크립트 + 접속 가이드(SSID·게이트웨이 IP 폴백) (NET-001~004, D-19) | 릴레이 AP 접속 기기에서 `rosy-01.local:8080` 접근 확인 | S |
 
 **M1 완료 기준:** ROS CLI 없이 API만으로 기본 기능 제어. **AT 16건 중 API 계열 12건 통과**(브라우저 4건: AT-02, 05, 09, 11은 M2).
 
@@ -465,6 +466,7 @@ ROS `/diagnostics` + 자체 수집(CPU/MEM/Disk/온도/네트워크) → 컴포�
 | SRV-001 | CORE | P1-12 | AT-01 |
 | CFG-001/002 | CORE | P1-1 | 설정 로드 |
 | SEC-101~103 | CORE | P1-9 | 권한 테스트 |
+| NET-001~004 | CORE | P1-21 | AT-02 (릴레이 AP 경유) |
 | LOG-001/002 | CORE | P1-9, P1-17 | 감사 검증 |
 | PRT-001~006 | API Ref | P1-19, P4-2, P4-6 | FAT-02, 03 |
 | REG / MON | FLEET | P4-1, P4-2 | MAT-05 |
@@ -499,7 +501,13 @@ ROS `/diagnostics` + 자체 수집(CPU/MEM/Disk/온도/네트워크) → 컴포�
 
 > 진행 상황 (2026-08-29):
 > - **완료:** P0-1 (전면 리네임 + 리포 구성 + CI), P0-2 (`/scan`→`scan`), P0-3 (bringup.py `frame_prefix` 파라미터화), P0-4 (bringup_robot.launch.xml namespace 플러밍 + LiDAR frame prefix), P0-5 (DDS 격리: `rosy_env.sh` + CycloneDDS localhost 프로파일), P0-6 파일 작성 (`gz_multi.launch.py` — Gazebo 런타임 검증은 M0 환경 예정), P0-7 (동등성 체크리스트 `ROSY Flask Parity Checklist.md`), P1-1 (rosy_core 스캘폴딩), P1-19 (프로토콜 스키마 + 단위 테스트 4건 통과)
-> - **잔여:** P0-3~P0-6 런타임 검증(ROS/Gazebo 환경 필요 — `$(eval ...)` 런치 치환·네임스페이스 주행 확인), M0 완료 기준 시험(MAT-02/03 조기 검증)
+> - **잔여:** M0 완료 기준 시험(MAT-02/03 조기 검증)
+>
+> 검증 기록 (2026-08-29, 로컬 ROS 2 Jazzy):
+> - **colcon build 11/11 패키지 통과** (C++ 3종 포함, stderr는 gz upstream deprecation 경고만)
+> - **launch smoke test 통과**: `bringup_robot.launch.py`(namespace 그래프 로드), `rosy_core.launch.py`, `gz_multi` OpaqueFunction 로직(액션 수·브리지 YAML prefix·clock 단일화·nav 모드 include — 단위 실행으로 검증)
+> - 런타임 수정: bringup XML→Python 전환(XML `$(eval)` 프론트엔드 한계), `gz_multi` import 오류(`PythonLaunchDescriptionSource`)·namespace 규약 버그(`rosy01`→`rosy_01`) 수정
+> - 개발환경 참고: 이 머신에 `sllidar_ros2`(LiDAR 드라이버) 미설치 — 스텁으로 include 그래프만 검증, 실기기/시뮬 환경에서 전체 구동 확인 필요
 
 1. **P0 런타임 검증** (ROS 2 Jazzy 환경): `bringup_robot.launch.xml namespace:=rosy_01` 실물 1대, `gz_multi.launch.py robots:=2 mode:=nav` 시뮬 — MAT-02/03 조기 검증
 2. **P1-2~P1-14** rosy_core 본구현 착수 (Identity → ROS Bridge → State → Command → Safety → Navigation 순)
