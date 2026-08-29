@@ -498,13 +498,11 @@ ROS `/diagnostics` + 자체 수집(CPU/MEM/Disk/온도/네트워크) → 컴포�
 # 13. 다음 액션 (즉시 착수분)
 
 > 진행 상황 (2026-08-29):
-> - **완료:** P0-1 (전면 리네임 + 리포 구성 + CI), P0-2 (`/scan`→`scan`), P0-6 (`gz_multi.launch.py` 작성 — Gazebo 런타임 검증은 M0 환경에서 예정), P1-1 (rosy_core 스캘폴딩), P1-19 (프로토콜 스키마 + 단위 테스트 4건 통과)
-> - **잔여:** P0-3~P0-5 (bringup 파라미터화·namespace 플러밍·DDS 격리), P0-7 (Flask 동등성 체크리스트), P0-6 런타임 검증, M0 완료 기준 시험
+> - **완료:** P0-1 (전면 리네임 + 리포 구성 + CI), P0-2 (`/scan`→`scan`), P0-3 (bringup.py `frame_prefix` 파라미터화), P0-4 (bringup_robot.launch.xml namespace 플러밍 + LiDAR frame prefix), P0-5 (DDS 격리: `rosy_env.sh` + CycloneDDS localhost 프로파일), P0-6 파일 작성 (`gz_multi.launch.py` — Gazebo 런타임 검증은 M0 환경 예정), P0-7 (동등성 체크리스트 `ROSY Flask Parity Checklist.md`), P1-1 (rosy_core 스캘폴딩), P1-19 (프로토콜 스키마 + 단위 테스트 4건 통과)
+> - **잔여:** P0-3~P0-6 런타임 검증(ROS/Gazebo 환경 필요 — `$(eval ...)` 런치 치환·네임스페이스 주행 확인), M0 완료 기준 시험(MAT-02/03 조기 검증)
 
-1. ~~P0-1~~ / ~~P0-2~~ / ~~P0-6 파일 작성~~ / ~~P1-1 + P1-19~~ — 완료
-2. **P0-3~P0-5** 착수 (bringup 파라미터화 → namespace 플러밍 → DDS 격리)
-3. **P0-6 런타임 검증**: Gazebo 환경에서 `gz_multi.launch.py robots:=2 mode:=nav` — MAT-02/03 조기 검증
-4. **P1-2~P1-14** rosy_core 본구현 착수
+1. **P0 런타임 검증** (ROS 2 Jazzy 환경): `bringup_robot.launch.xml namespace:=rosy_01` 실물 1대, `gz_multi.launch.py robots:=2 mode:=nav` 시뮬 — MAT-02/03 조기 검증
+2. **P1-2~P1-14** rosy_core 본구현 착수 (Identity → ROS Bridge → State → Command → Safety → Navigation 순)
 
 ---
 
