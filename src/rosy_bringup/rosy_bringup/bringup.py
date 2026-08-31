@@ -12,6 +12,7 @@ from tf2_ros import TransformBroadcaster
 from tf_transformations import quaternion_from_euler
 from std_msgs.msg import Float32
 
+from .command_deadman import CommandDeadman
 from .dynamixel_driver import DynamixelDriver
 
 TWIST_SUB_TOPIC_NAME = "cmd_vel"
@@ -42,10 +43,15 @@ class Rosy(Node):
         
         self.declare_parameter('wheel_radius', 0.027)
         self.declare_parameter('wheel_separation', 0.0961)
+        self.declare_parameter('cmd_vel_timeout_s', 0.5)
         self.declare_parameter('frame_prefix', '')  # P0-3 (A-2): namespace 기반 프레임 식별
 
         self.wheel_radius = self.get_parameter('wheel_radius').get_parameter_value().double_value
         self.wheel_separation = self.get_parameter('wheel_separation').get_parameter_value().double_value
+        self.cmd_vel_timeout_s = (
+            self.get_parameter('cmd_vel_timeout_s').get_parameter_value().double_value
+        )
+        self.command_deadman = CommandDeadman(self.cmd_vel_timeout_s)
         frame_prefix = self.get_parameter('frame_prefix').get_parameter_value().string_value
         if frame_prefix and not frame_prefix.endswith('/'):
             frame_prefix += '/'
@@ -55,6 +61,7 @@ class Rosy(Node):
         
         self.get_logger().info(f'Wheel radius: {self.wheel_radius}')
         self.get_logger().info(f'Wheel separation: {self.wheel_separation}')
+        self.get_logger().info(f'cmd_vel deadman: {self.cmd_vel_timeout_s:.3f}s')
         
         self.circumference = 2 * math.pi * self.wheel_radius
         self.driver = DynamixelDriver(SERIAL_PORT_NAME, BAUDRATE, DYNAMIXEL_IDS)
@@ -62,13 +69,14 @@ class Rosy(Node):
         self.get_logger().info("1. Opening serial port...")
         if not self.driver.begin():
             self.get_logger().error("Failed to open serial port! Shutting down.")
-            return
+            self.driver.terminate()
+            raise RuntimeError("failed to open Dynamixel serial port")
 
         self.get_logger().info("2. Initializing motors...")
         if not self.driver.initialize_motors():
             self.get_logger().error("Failed to initialize motors! Shutting down.")
             self.driver.terminate()
-            return
+            raise RuntimeError("failed to initialize Dynamixel motors")
         
         self.get_logger().info("Waiting for motors to be ready...")
         time.sleep(1.0)
@@ -77,14 +85,14 @@ class Rosy(Node):
         if not self.driver.set_double_rpm(0, 0):
             self.get_logger().error("Failed to set initial RPM! Shutting down.")
             self.driver.terminate()
-            return
+            raise RuntimeError("failed to set initial zero RPM")
 
         self.get_logger().info("4. Reading initial encoder values...")
         _, _, self.last_encoder_l, self.last_encoder_r = self.driver.get_feedback()
         if self.last_encoder_l is None:
             self.get_logger().error("Failed to read initial encoder position! Shutting down.")
             self.driver.terminate()
-            return
+            raise RuntimeError("failed to read initial encoder position")
 
         self.get_logger().info(f"Initial Encoder read: L={self.last_encoder_l}, R={self.last_encoder_r}. Controller is responsive.")
             
@@ -130,8 +138,22 @@ class Rosy(Node):
 
         if not self.driver.set_double_rpm(rpm_l, rpm_r):
             self.get_logger().warn("Failed to send motor command.")
+            return
+        self.command_deadman.mark_command()
 
     def update_and_publish(self):
+        stop_result = self.command_deadman.attempt_stop(
+            lambda: self.driver.set_double_rpm(0, 0)
+        )
+        if stop_result is True:
+            self.get_logger().warn(
+                "cmd_vel stream expired; driver forced both motors to zero RPM."
+            )
+        elif stop_result is False:
+            self.get_logger().error(
+                "cmd_vel stream expired but zero-RPM command failed; retrying."
+            )
+
         current_time = self.get_clock().now()
         dt = (current_time - self.last_time).nanoseconds / 1e9
         if dt <= 0: return
@@ -221,8 +243,9 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        node.driver.terminate()
-        node.destroy_node()
+        if node is not None:
+            node.driver.terminate()
+            node.destroy_node()
         rclpy.shutdown()
 
 if __name__ == '__main__':

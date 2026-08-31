@@ -27,7 +27,7 @@ rosy/ (이 리포지토리)
 | `docs/spec/ROSY CORE SRS.md` | 로봇(엣지) 요구사항 |
 | `docs/spec/ROSY FLEET SRS.md` | 중앙 서버 요구사항 |
 | `docs/reference/ROSY API & Protocol Reference.md` | 공유 API/프로토콜 계약 |
-| `docs/reference/ROSY ADR Log.md` | 의사결정 기록 (D-1~D-17) |
+| `docs/reference/ROSY ADR Log.md` | 의사결정 기록 (D-1~D-22) |
 | `docs/plan/ROSY Implementation Plan.md` | 실행 계획·추적 매트릭스 |
 
 ## 빌드
@@ -42,6 +42,22 @@ ros2 launch rosy_gz_sim gz_multi.launch.py robots:=2
 # rosy_core (Phase 1 구현 예정)
 ros2 launch rosy_core rosy_core.launch.py
 ```
+
+## Raspberry Pi 5 런타임
+
+Raspberry Pi OS Lite 64-bit에서는 ROS 2 Jazzy 실행환경을 두 서비스로
+분리한다. `rosy-core`는 FastAPI/rclpy만 소유하고, 장치 권한은 모터·LiDAR
+어댑터를 실행하는 `rosy-io`에만 부여한다.
+
+```bash
+cd deploy/robot
+cp .env.example .env
+docker compose --env-file .env --profile hardware build
+docker compose --env-file .env --profile hardware up -d
+```
+
+설치, 장치 권한 및 물리 인수시험 절차는
+`docs/deployment/raspberry-pi-runtime.md`를 따른다.
 
 ## 로드맵
 

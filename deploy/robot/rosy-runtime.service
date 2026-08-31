@@ -1,0 +1,17 @@
+[Unit]
+Description=ROSY Raspberry Pi robot runtime
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/rosy/deploy/robot
+ExecStart=/usr/bin/docker compose --profile hardware up -d --remove-orphans
+ExecStop=/usr/bin/docker compose --profile hardware down --timeout 10
+TimeoutStartSec=0
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

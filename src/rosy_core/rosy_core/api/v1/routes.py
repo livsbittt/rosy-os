@@ -154,6 +154,7 @@ class GoalRequest(BaseModel):
 @navigation_router.post("/navigation/goal")
 def navigation_goal(body: GoalRequest, auth: AuthContext = Depends(operator),
                     svc: CoreServices = Depends(get_services)):
+    svc.capability.require("navigation.goal_navigation")
     spec = svc.nav.resolve_goal(x=body.x, y=body.y, yaw=body.yaw, waypoint=body.waypoint)
     svc.nav.goal(spec, source=f"api:{auth.role}")
     return {"accepted": True, "goal": {"x": spec.x, "y": spec.y, "yaw": spec.yaw}}
@@ -169,6 +170,7 @@ def navigation_cancel(auth: AuthContext = Depends(operator),
 @navigation_router.post("/navigation/home")
 def navigation_home(auth: AuthContext = Depends(operator),
                     svc: CoreServices = Depends(get_services)):
+    svc.capability.require("navigation.return_home")
     svc.nav.home(source=f"api:{auth.role}")
     return {"accepted": True}
 
@@ -187,6 +189,7 @@ class InitialPoseRequest(BaseModel):
 @navigation_router.post("/localization/initialpose")
 def initialpose(body: InitialPoseRequest, auth: AuthContext = Depends(operator),
                 svc: CoreServices = Depends(get_services)):
+    svc.capability.require("navigation.goal_navigation")
     if svc.nav.executor is None:
         raise ApiError("CAPABILITY_NOT_SUPPORTED", 501, "localization executor unavailable")
     svc.nav.executor.send_initial_pose(body.x, body.y, body.yaw)

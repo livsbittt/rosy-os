@@ -1,0 +1,47 @@
+robot:
+  id: rosy_01
+  name: Rosy 01
+  frame_prefix: ""
+
+network:
+  api_host: 0.0.0.0
+  api_port: 8080
+
+state:
+  rate_hz: 10
+
+profile: /etc/rosy/profile.yaml
+capabilities: /etc/rosy/capabilities.yaml
+
+auth:
+  tokens:
+    - token: CHANGE_ME_ADMIN
+      role: administrator
+    - token: CHANGE_ME_OPERATOR
+      role: operator
+    - token: CHANGE_ME_VIEWER
+      role: viewer
+
+safety:
+  teleop_timeout_ms: 500
+  battery_warning_percent: 20
+  battery_critical_percent: 10
+  battery_critical_policy: STOP
+  battery_full_voltage: 12.6
+  battery_empty_voltage: 10.0
+  fleet_loss_policy: STOP
+  stuck_timeout_s: 30
+  manual_linear: 0.15
+  manual_angular: 0.60
+  fleet_linear: 0.20
+  fleet_angular: 0.80
+
+navigation:
+  max_linear_velocity: 0.20
+  max_angular_velocity: 0.80
+
+events:
+  ring_buffer_size: 1000
+
+fleet:
+  enabled: false

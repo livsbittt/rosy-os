@@ -13,7 +13,8 @@ import os
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription, Shutdown
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 
@@ -26,6 +27,7 @@ def generate_launch_description():
 
     namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
+    enable_battery = LaunchConfiguration('enable_battery')
 
     # namespace 있으면 'ns/' 프레임 접두, 없으면 '' (upload_robot와 동일 패턴)
     frame_prefix = PythonExpression([
@@ -39,8 +41,14 @@ def generate_launch_description():
         DeclareLaunchArgument('namespace', default_value='',
                               description='로봇 namespace (예: rosy_01)'),
         DeclareLaunchArgument('use_sim_time', default_value='false'),
+        DeclareLaunchArgument('enable_battery', default_value='false',
+                              description='Enable optional rosylib ADC battery publisher'),
         DeclareLaunchArgument('wheel_radius', default_value='0.027'),
         DeclareLaunchArgument('wheel_separation', default_value='0.0961'),
+        DeclareLaunchArgument(
+            'cmd_vel_timeout_s', default_value='0.5',
+            description='Driver-side stale cmd_vel timeout in seconds',
+        ),
 
         # robot_state_publisher (namespace + frame_prefix 지원)
         IncludeLaunchDescription(
@@ -75,11 +83,13 @@ def generate_launch_description():
                 package='rosy_bringup',
                 executable='bringup',
                 output='screen',
+                on_exit=Shutdown(reason='rosy motor node exited'),
                 parameters=[{
                     'use_sim_time': use_sim_time,
                 }, os.path.join(bringup_share, 'config', 'rosy_params.yaml'), {
                     'wheel_radius': LaunchConfiguration('wheel_radius'),
                     'wheel_separation': LaunchConfiguration('wheel_separation'),
+                    'cmd_vel_timeout_s': LaunchConfiguration('cmd_vel_timeout_s'),
                     'frame_prefix': frame_prefix,
                 }],
             ),
@@ -88,6 +98,7 @@ def generate_launch_description():
                 executable='battery_publisher',
                 output='screen',
                 parameters=[{'use_sim_time': use_sim_time}],
+                condition=IfCondition(enable_battery),
             ),
         ]),
     ])

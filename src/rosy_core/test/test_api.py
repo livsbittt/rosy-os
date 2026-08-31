@@ -100,6 +100,24 @@ def test_waypoints_crud_and_goal(client):
     assert missing.status_code == 404 and missing.json()["error"]["code"] == "NOT_FOUND"
 
 
+def test_disabled_navigation_capabilities_return_501(client):
+    tc, svc = client
+    svc.capability._data["navigation"]["goal_navigation"] = False
+    svc.capability._data["navigation"]["return_home"] = False
+
+    goal = tc.post(
+        "/api/v1/navigation/goal",
+        json={"x": 1.0, "y": 2.0, "yaw": 0.0},
+        headers=OPERATOR,
+    )
+    home = tc.post("/api/v1/navigation/home", headers=OPERATOR)
+
+    assert goal.status_code == 501
+    assert goal.json()["error"]["code"] == "CAPABILITY_NOT_SUPPORTED"
+    assert home.status_code == 501
+    assert home.json()["error"]["code"] == "CAPABILITY_NOT_SUPPORTED"
+
+
 def test_events_since_seq(client):
     tc, svc = client
     svc.events.publish("nav.completed")

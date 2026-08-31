@@ -54,4 +54,8 @@ def load_config(explicit_path: Optional[str] = None) -> dict[str, Any]:
         with open(override_path, encoding="utf-8") as f:
             config = _deep_merge(config, yaml.safe_load(f) or {})
 
+    namespace = os.environ.get("ROSY_NAMESPACE", "").strip().strip("/")
+    if namespace:
+        config.setdefault("robot", {})["frame_prefix"] = f"{namespace}/"
+
     return config

@@ -1,0 +1,17 @@
+**
+!deploy/
+!deploy/robot/
+!deploy/robot/**
+!src/
+!src/rosy_interfaces/
+!src/rosy_interfaces/**
+!src/rosy_core/
+!src/rosy_core/**
+!src/rosy_description/
+!src/rosy_description/**
+!src/rosy_bringup/
+!src/rosy_bringup/**
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+src/rosy_description/meshes/**

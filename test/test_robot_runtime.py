@@ -1,0 +1,119 @@
+"""Static contract tests for the Raspberry Pi robot runtime."""
+
+from pathlib import Path
+
+import yaml
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DEPLOY = ROOT / "deploy" / "robot"
+
+
+def _compose() -> dict:
+    return yaml.safe_load((DEPLOY / "compose.yaml").read_text(encoding="utf-8"))
+
+
+def test_runtime_separates_core_from_hardware_devices():
+    services = _compose()["services"]
+
+    assert set(services) == {"rosy-core", "rosy-io"}
+    assert "devices" not in services["rosy-core"]
+    assert services["rosy-core"].get("privileged", False) is False
+    assert services["rosy-io"].get("privileged", False) is False
+    assert services["rosy-io"]["devices"] == [
+        "${ROSY_MOTOR_DEVICE:-/dev/ttyAMA4}:/dev/ttyAMA4",
+        "${ROSY_LIDAR_DEVICE:-/dev/ttyAMA0}:/dev/ttyAMA0",
+    ]
+
+
+def test_runtime_uses_local_ros_network_and_bounded_logs():
+    services = _compose()["services"]
+
+    for service in services.values():
+        assert service["network_mode"] == "host"
+        assert service["restart"] == "unless-stopped"
+        assert service["logging"]["driver"] == "local"
+        assert service["logging"]["options"] == {
+            "max-size": "10m",
+            "max-file": "3",
+        }
+        assert service["environment"]["ROS_DOMAIN_ID"] == "${ROS_DOMAIN_ID:-42}"
+
+
+def test_runtime_uses_one_namespace_and_a_real_core_health_endpoint():
+    services = _compose()["services"]
+    namespace_arg = "__ns:=/${ROSY_NAMESPACE:-rosy_01}"
+
+    assert namespace_arg in services["rosy-core"]["command"]
+    assert "namespace:=${ROSY_NAMESPACE:-rosy_01}" in services["rosy-io"]["command"]
+    assert "/api/v1" in " ".join(services["rosy-core"]["healthcheck"]["test"])
+
+
+def test_runtime_builds_distinct_targets_from_shared_dockerfile():
+    services = _compose()["services"]
+    dockerfile = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
+
+    assert services["rosy-core"]["build"]["target"] == "core"
+    assert services["rosy-io"]["build"]["target"] == "io"
+    assert "AS core" in dockerfile
+    assert "AS io" in dockerfile
+    assert "ros:jazzy-ros-base" in dockerfile
+    assert "ros-jazzy-rmw-cyclonedds-cpp" in dockerfile
+    assert "ros-jazzy-joint-state-publisher" in dockerfile
+    assert "SLLIDAR_COMMIT=34300099fadfc772965962dec837bf436706188f" in dockerfile
+    assert "git checkout --detach ${SLLIDAR_COMMIT}" in dockerfile
+    assert "COPY --from=core-build /opt/rosy_ws/install" in dockerfile
+    assert "COPY --from=io-build /opt/rosy_ws/install" in dockerfile
+    dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
+    assert "src/rosy_description/meshes/**" in dockerignore
+
+
+def test_initial_io_slice_disables_unavailable_adc_battery_driver():
+    compose_command = _compose()["services"]["rosy-io"]["command"]
+    launch = (
+        ROOT / "src" / "rosy_bringup" / "launch" / "bringup_robot.launch.py"
+    ).read_text(encoding="utf-8")
+
+    assert "enable_battery:=false" in compose_command
+    assert "DeclareLaunchArgument('enable_battery', default_value='false'" in launch
+    assert "condition=IfCondition(enable_battery)" in launch
+    assert "on_exit=Shutdown(" in launch
+
+
+def test_io_health_requires_the_motor_node_to_be_discoverable():
+    io = _compose()["services"]["rosy-io"]
+
+    assert "healthcheck" in io
+    assert "/${ROSY_NAMESPACE:-rosy_01}/rosy_bringup" in " ".join(
+        io["healthcheck"]["test"]
+    )
+
+
+def test_core_data_is_a_host_owned_bind_and_capabilities_match_the_slice():
+    compose = _compose()
+    core = compose["services"]["rosy-core"]
+    capabilities = yaml.safe_load(
+        (DEPLOY / "config" / "capabilities.pi5-lite.yaml").read_text(encoding="utf-8")
+    )
+    profile = yaml.safe_load(
+        (DEPLOY / "config" / "profile.pi5-lite.yaml").read_text(encoding="utf-8")
+    )
+
+    assert "${ROSY_DATA_PATH:-/var/lib/rosy}:/var/lib/rosy" in core["volumes"]
+    assert "volumes" not in compose
+    assert capabilities["sensors"] == ["lidar", "encoder"]
+    assert capabilities["navigation"]["goal_navigation"] is False
+    assert capabilities["navigation"]["return_home"] is False
+    assert capabilities["slam"] is False
+    assert profile["profile"]["sensors"] == [
+        {"lidar": "rplidar_c1"},
+        {"encoder": "dynamixel"},
+    ]
+
+
+def test_systemd_unit_delegates_to_compose_hardware_profile():
+    unit = (DEPLOY / "rosy-runtime.service").read_text(encoding="utf-8")
+
+    assert "Requires=docker.service" in unit
+    assert "docker compose --profile hardware up -d" in unit
+    assert "docker compose --profile hardware down" in unit
