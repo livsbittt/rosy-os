@@ -193,15 +193,15 @@ class TestNavigation:
         types = [ev.type for ev in bus.history()]
         assert "nav.started" in types and "nav.completed" in types
 
-    def test_stuck_detection(self, bus, safety, tmp_path):
+    def test_stuck_detection(self, bus, safety, tmp_path, monkeypatch):
         nav, _, _ = self._make(bus, safety, tmp_path)
         nav._stuck_timeout = 0.05
         nav.goal(nav.resolve_goal(x=1.0, y=1.0))
         nav.on_goal_accepted()
         import rosy_core.navigation.manager as nm
-        nm.time.monotonic = lambda: 0.0                               # 동일 시각 고정
+        monkeypatch.setattr(nm.time, "monotonic", lambda: 0.0)        # 동일 시각 고정
         nav.on_pose_progress(0.0, 0.0)
-        nm.time.monotonic = lambda: 1.0                               # 진척 없이 시간 경과
+        monkeypatch.setattr(nm.time, "monotonic", lambda: 1.0)        # 진척 없이 시간 경과
         nav.on_pose_progress(0.0, 0.0)
         assert nav.nav_state.value == "CANCELED"                       # NAV-006
         assert "nav.stuck" in [ev.type for ev in bus.history()]
