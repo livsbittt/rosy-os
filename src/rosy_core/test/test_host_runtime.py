@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import socket
 
 import pytest
 
@@ -104,3 +105,34 @@ def test_snapshot_does_not_expose_process_environment(tmp_path, monkeypatch):
 
     assert "ROSY_ADMIN_TOKEN" not in snapshot_text
     assert "must-not-leak" not in snapshot_text
+
+
+def test_default_address_lookup_uses_routes_without_hostname_dns(monkeypatch):
+    class FakeSocket:
+        def __init__(self, family, _kind):
+            self.family = family
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def connect(self, _target):
+            return None
+
+        def getsockname(self):
+            if self.family == socket.AF_INET:
+                return ("192.168.0.42", 54321)
+            return ("2001:db8::42", 54321, 0, 0)
+
+    def fail_dns(*_args, **_kwargs):
+        raise AssertionError("hostname DNS must not block runtime telemetry")
+
+    monkeypatch.setattr(socket, "socket", FakeSocket)
+    monkeypatch.setattr(socket, "getaddrinfo", fail_dns)
+
+    assert HostRuntimeProbe._resolve_addresses("unresolvable-host") == [
+        "192.168.0.42",
+        "2001:db8::42",
+    ]

@@ -145,3 +145,11 @@ def test_systemd_unit_delegates_to_compose_hardware_profile():
     assert "Requires=docker.service" in unit
     assert "docker compose --profile hardware up -d" in unit
     assert "docker compose --profile hardware down" in unit
+
+
+def test_container_entrypoint_is_forced_to_unix_line_endings():
+    entrypoint = (DEPLOY / "entrypoint.sh").read_bytes()
+    attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+
+    assert b"\r\n" not in entrypoint
+    assert "*.sh text eol=lf" in attributes

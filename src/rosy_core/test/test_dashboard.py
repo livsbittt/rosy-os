@@ -1,8 +1,12 @@
 from types import SimpleNamespace
+from pathlib import Path
 
 import pytest
 
 from rosy_core.api.app import create_app
+
+
+WEB_ROOT = Path(__file__).parent.parent / "rosy_core" / "web"
 
 
 @pytest.fixture
@@ -48,3 +52,7 @@ def test_root_redirects_to_operator_dashboard(dashboard_client):
 
     assert response.status_code in (302, 307)
     assert response.headers["location"] == "/dashboard"
+
+
+def test_dashboard_asset_directory_is_an_explicit_python_package():
+    assert (WEB_ROOT / "__init__.py").is_file()

@@ -102,15 +102,21 @@ class HostRuntimeProbe:
         }
 
     @staticmethod
-    def _resolve_addresses(hostname: Optional[str]) -> list[str]:
+    def _resolve_addresses(_hostname: Optional[str]) -> list[str]:
         addresses: set[str] = set()
-        try:
-            for result in socket.getaddrinfo(hostname or socket.gethostname(), None):
-                address = result[4][0]
-                if address not in {"127.0.0.1", "::1"}:
-                    addresses.add(address)
-        except OSError:
-            return []
+        routes = (
+            (socket.AF_INET, ("192.0.2.1", 9)),
+            (socket.AF_INET6, ("2001:db8::1", 9, 0, 0)),
+        )
+        for family, target in routes:
+            try:
+                with socket.socket(family, socket.SOCK_DGRAM) as connection:
+                    connection.connect(target)
+                    address = connection.getsockname()[0]
+                    if address not in {"127.0.0.1", "::1"}:
+                        addresses.add(address)
+            except OSError:
+                continue
         return sorted(addresses)
 
     def snapshot(self) -> dict:

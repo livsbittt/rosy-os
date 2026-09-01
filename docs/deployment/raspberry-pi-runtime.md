@@ -98,7 +98,39 @@ Docker restart policies own container restarts. The systemd unit owns only the
 whole Compose application lifecycle; it must not also restart individual
 containers.
 
-## 5. Physical acceptance gates
+## 5. Rosy OS dashboard
+
+Open the dashboard from a machine on the robot network:
+
+```text
+http://<raspberry-pi-ip>:8080/dashboard
+```
+
+Enter a configured viewer, operator, or administrator API token. The token is
+stored only in the browser tab's `sessionStorage`; closing the tab removes it.
+Viewer can inspect all dashboard status and trigger the safety stop, operator
+can also change robot mode, and only administrator can release an emergency
+stop. API authorization remains authoritative even if a UI control is visible.
+
+The dashboard reads host telemetry through these bounded read-only mounts:
+`/proc/{uptime,loadavg,stat,meminfo}`, `/sys/class/thermal`,
+`/etc/os-release`, and `/etc/hostname`. It does not mount the host root,
+Docker socket, systemd control socket, or any additional device. Missing host
+files appear as unavailable fields instead of failing `rosy-core`.
+
+Useful checks:
+
+```bash
+curl http://127.0.0.1:8080/dashboard
+curl -H 'Authorization: Bearer <viewer-token>' \
+  http://127.0.0.1:8080/api/v1/system/runtime
+```
+
+Do not place tokens in shell history on production equipment; the commands
+above are diagnostic examples. Use a protected environment or interactive
+prompt when collecting real evidence.
+
+## 6. Physical acceptance gates
 
 Run tests with the wheels lifted before any floor test.
 
@@ -106,6 +138,7 @@ Run tests with the wheels lifted before any floor test.
 |---|---|---|
 | Configuration | `docker compose --profile hardware config` | two services; only `rosy-io` has devices; neither is privileged |
 | Core health | query `/api/v1` and authenticated `/api/v1/robot/state` | healthy container; state stream at least 5 Hz |
+| Dashboard | open `/dashboard`, authenticate, then inspect `/api/v1/system/runtime` | UI loads without external assets; Pi OS/CPU/RAM/disk/temp values agree with host commands or are explicitly unavailable |
 | Motor command | send a bounded low-speed command | expected wheel direction and RPM |
 | Driver deadman | stop `rosy-core` while wheels turn | measured stop latency is recorded and meets the site safety requirement; expected software threshold is 500 ms plus poll/serial latency |
 | DDS loss | temporarily give `rosy-core` a different domain | `rosy-io` stops the motors within the timeout |
@@ -120,7 +153,7 @@ Run tests with the wheels lifted before any floor test.
 The deployment gate remains **HOLD** until the physical deadman, abrupt-failure,
 UART, boot, thermal, and storage rows have recorded device evidence.
 
-## 6. Stop and rollback
+## 7. Stop and rollback
 
 ```bash
 cd /opt/rosy/deploy/robot
