@@ -96,7 +96,35 @@ def test_motor_only_profile_excludes_lidar_and_passes_uart_parameters():
     assert "motor_device:=/dev/rosy-motor" in command
     assert "motor_baudrate:=${ROSY_MOTOR_BAUDRATE:-1000000}" in command
     assert "motor_ids:=${ROSY_MOTOR_IDS:-[1,2]}" in command
+    assert "max_linear_mps:=${ROSY_MAX_LINEAR_MPS:-0.25}" in command
+    assert "max_angular_rps:=${ROSY_MAX_ANGULAR_RPS:-2.5}" in command
+    assert "max_wheel_rpm:=${ROSY_MAX_WHEEL_RPM:-100.0}" in command
+    assert (
+        "motor_profile_acceleration:=${ROSY_MOTOR_PROFILE_ACCELERATION:-200}"
+        in command
+    )
     assert all("ttyAMA0" not in device for device in motor["devices"])
+
+
+def test_hardware_profile_passes_the_same_motor_safety_limits():
+    command = _compose()["services"]["rosy-io"]["command"]
+
+    assert "max_linear_mps:=${ROSY_MAX_LINEAR_MPS:-0.25}" in command
+    assert "max_angular_rps:=${ROSY_MAX_ANGULAR_RPS:-2.5}" in command
+    assert "max_wheel_rpm:=${ROSY_MAX_WHEEL_RPM:-100.0}" in command
+    assert (
+        "motor_profile_acceleration:=${ROSY_MOTOR_PROFILE_ACCELERATION:-200}"
+        in command
+    )
+
+
+def test_example_environment_exposes_motor_limits_as_data_only_values():
+    environment = (DEPLOY / ".env.example").read_text(encoding="utf-8")
+
+    assert "ROSY_MAX_LINEAR_MPS=0.25" in environment
+    assert "ROSY_MAX_ANGULAR_RPS=2.5" in environment
+    assert "ROSY_MAX_WHEEL_RPM=100.0" in environment
+    assert "ROSY_MOTOR_PROFILE_ACCELERATION=200" in environment
 
 
 def test_io_health_requires_the_motor_node_to_be_discoverable():

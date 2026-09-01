@@ -192,9 +192,20 @@ sudo /opt/rosy/deploy/robot/verify-motors.sh
 
 sudoedit /opt/rosy/deploy/robot/.env
 # ROSY_RUNTIME_MODE=motor 로 변경
+# 초기 벤치 제한값을 확인:
+# ROSY_MAX_LINEAR_MPS=0.25
+# ROSY_MAX_ANGULAR_RPS=2.5
+# ROSY_MAX_WHEEL_RPM=100.0
+# ROSY_MOTOR_PROFILE_ACCELERATION=200
 sudo systemctl restart rosy-runtime.service
 sudo /opt/rosy/deploy/robot/verify-pi.sh
 ```
+
+모터 명령은 `APPLIED`, `LIMITED`, `REJECTED`, `DRIVER_ERROR` 중 하나로
+판정된다. 제한을 넘은 정상 숫자는 좌우 바퀴 비율을 유지한 채 축소되고,
+NaN·무한대·숫자가 아닌 값은 UART 쓰기 전에 거부된다. 거부 또는 드라이버
+오류가 발생하면 별도의 zero-RPM 정지를 즉시 시도하고, 확인되지 않으면
+deadman이 계속 재시도한다.
 
 `motor` 모드는 `rosy-core`와 모터 노드만 실행하므로 LiDAR가 없어도 대시보드의
 저속 직접 제어를 시험할 수 있다. operator 토큰으로 접속해 `MANUAL` 모드로

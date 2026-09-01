@@ -69,3 +69,17 @@ def test_failed_stop_is_retried_until_driver_acknowledges():
 def test_timeout_must_be_positive():
     with pytest.raises(ValueError, match="timeout_s must be positive"):
         CommandDeadman(timeout_s=0.0)
+
+
+def test_unconfirmed_stop_arms_an_immediate_retry_from_disarmed_state():
+    clock = FakeClock()
+    deadman = CommandDeadman(0.5, clock=clock)
+    attempts = iter([False, True])
+
+    deadman.mark_stop_required()
+
+    assert deadman.should_stop() is True
+    assert deadman.attempt_stop(lambda: next(attempts)) is False
+    assert deadman.should_stop() is True
+    assert deadman.attempt_stop(lambda: next(attempts)) is True
+    assert deadman.should_stop() is False

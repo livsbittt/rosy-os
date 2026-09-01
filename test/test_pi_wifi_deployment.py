@@ -60,6 +60,13 @@ def test_installer_generates_device_local_tokens_and_preserves_config():
     assert "set_env_default" in script
     assert "set_env_default \"$env_file\" ROSY_MOTOR_BAUDRATE 1000000" in script
     assert "set_env_default \"$env_file\" ROSY_MOTOR_IDS '[1,2]'" in script
+    assert "set_env_default \"$env_file\" ROSY_MAX_LINEAR_MPS 0.25" in script
+    assert "set_env_default \"$env_file\" ROSY_MAX_ANGULAR_RPS 2.5" in script
+    assert "set_env_default \"$env_file\" ROSY_MAX_WHEEL_RPM 100.0" in script
+    assert (
+        "set_env_default \"$env_file\" ROSY_MOTOR_PROFILE_ACCELERATION 200"
+        in script
+    )
 
 
 def test_installer_guards_destructive_paths_and_activates_systemd():

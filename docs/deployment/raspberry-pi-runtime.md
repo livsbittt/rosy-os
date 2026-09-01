@@ -85,6 +85,38 @@ packaged and physically accepted.
 For a released robot, replace development image tags with immutable image
 digests that were built and accepted for the exact source revision.
 
+### Motor command contract
+
+`rosy_bringup.motor_control.MotorController` is the single command boundary
+between ROS `cmd_vel` and the two-wheel DYNAMIXEL write. Every call returns one
+of four statuses:
+
+| Status | Meaning |
+|---|---|
+| `APPLIED` | The requested command was valid and the driver accepted it |
+| `LIMITED` | The driver accepted a bounded command; the reason and applied twist are logged |
+| `REJECTED` | The input was non-numeric, NaN, or infinite; no motion write was attempted |
+| `DRIVER_ERROR` | The UART/driver rejected the wheel-RPM transaction |
+
+The planner limits translation and rotation first, then scales both wheels by
+the same ratio if either wheel would exceed the RPM ceiling. This preserves the
+requested curvature. The DYNAMIXEL driver independently enforces the wheel RPM
+ceiling, so bypassing the planner cannot send an excessive direct command.
+
+Configure the conservative commissioning bounds in `.env`:
+
+```dotenv
+ROSY_MAX_LINEAR_MPS=0.25
+ROSY_MAX_ANGULAR_RPS=2.5
+ROSY_MAX_WHEEL_RPM=100.0
+ROSY_MOTOR_PROFILE_ACCELERATION=200
+```
+
+`ROSY_MOTOR_PROFILE_ACCELERATION` is the raw DYNAMIXEL Profile Acceleration
+register value, accepted only from 1 through 32767. It is not an SI acceleration
+measurement. Tune it only on the lifted-wheel bench and record the accepted
+value for the exact motor model and load.
+
 ## 4. Build and start
 
 Keep `ROSY_RUNTIME_MODE=core` until the UART read-only preflight passes. It
@@ -174,6 +206,9 @@ Run tests with the wheels lifted before any floor test.
 | Core health | query `/api/v1` and authenticated `/api/v1/robot/state` | healthy container; state stream at least 5 Hz |
 | Dashboard | open `/dashboard`, authenticate, then inspect `/api/v1/system/runtime` | UI loads without external assets; Pi OS/CPU/RAM/disk/temp values agree with host commands or are explicitly unavailable |
 | Motor command | send a bounded low-speed command | expected wheel direction and RPM |
+| Command limits | request each axis above its configured limit | log reports `LIMITED`; both wheel RPM values remain at or below the ceiling and preserve curvature |
+| Invalid command | inject NaN/infinity in a test publisher | log reports `REJECTED`; immediate zero is attempted and no invalid UART write occurs |
+| Encoder rollover | replay values across signed 32-bit rollover | odometry advances by the small wrapped delta without a pose jump |
 | Driver deadman | stop `rosy-core` while wheels turn | measured stop latency is recorded and meets the site safety requirement; expected software threshold is 500 ms plus poll/serial latency |
 | DDS loss | temporarily give `rosy-core` a different domain | `rosy-io` stops the motors within the timeout |
 | I/O failure | stop `rosy-io` while wheels turn | orderly shutdown sends zero RPM and disables torque |

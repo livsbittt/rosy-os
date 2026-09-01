@@ -51,6 +51,10 @@ def generate_launch_description():
         DeclareLaunchArgument('motor_device', default_value='/dev/ttyAMA4'),
         DeclareLaunchArgument('motor_baudrate', default_value='1000000'),
         DeclareLaunchArgument('motor_ids', default_value='[1, 2]'),
+        DeclareLaunchArgument('max_linear_mps', default_value='0.25'),
+        DeclareLaunchArgument('max_angular_rps', default_value='2.5'),
+        DeclareLaunchArgument('max_wheel_rpm', default_value='100.0'),
+        DeclareLaunchArgument('motor_profile_acceleration', default_value='200'),
         DeclareLaunchArgument(
             'cmd_vel_timeout_s', default_value='0.5',
             description='Driver-side stale cmd_vel timeout in seconds',
@@ -101,6 +105,12 @@ def generate_launch_description():
                     'motor_device': LaunchConfiguration('motor_device'),
                     'motor_baudrate': LaunchConfiguration('motor_baudrate'),
                     'motor_ids': LaunchConfiguration('motor_ids'),
+                    'max_linear_mps': LaunchConfiguration('max_linear_mps'),
+                    'max_angular_rps': LaunchConfiguration('max_angular_rps'),
+                    'max_wheel_rpm': LaunchConfiguration('max_wheel_rpm'),
+                    'motor_profile_acceleration': LaunchConfiguration(
+                        'motor_profile_acceleration'
+                    ),
                 }],
             ),
             Node(

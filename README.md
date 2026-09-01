@@ -61,6 +61,12 @@ docker compose --env-file .env build rosy-core
 비상정지, 기능 계약과 Raspberry Pi OS의 CPU·메모리·디스크·온도를 한 화면에서
 확인할 수 있다. 화면은 FastAPI에 내장되어 별도 Node.js 서버가 필요 없다.
 
+모터 명령은 ROS와 분리된 `MotorController` 함수 계층에서 유효성 검사,
+차동구동 변환, 선속도·각속도·바퀴 RPM 제한을 거친다. 결과는
+`APPLIED / LIMITED / REJECTED / DRIVER_ERROR`로 명확히 남으며, 잘못된 입력이나
+UART 오류에는 즉시 zero-RPM 정지를 시도한다. DYNAMIXEL 드라이버도 동일한
+RPM 상한을 독립적으로 검사하고 엔코더 32비트 롤오버를 안전하게 처리한다.
+
 유선 LAN 없는 SD 카드 굽기, Wi-Fi·SSH 설정, Windows 배포 및 첫 접속은
 [`docs/deployment/raspberry-pi-wifi-image.md`](docs/deployment/raspberry-pi-wifi-image.md)를
 따른다. 장치 권한과 물리 인수시험은

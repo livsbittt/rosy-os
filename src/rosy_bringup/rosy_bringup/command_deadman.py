@@ -34,6 +34,11 @@ class CommandDeadman:
         """Disarm only after the driver accepted a zero-RPM command."""
         self._armed = False
 
+    def mark_stop_required(self) -> None:
+        """Arm an immediate retry when a zero-RPM command was not confirmed."""
+        self._last_command_at = self._clock() - self._timeout_s
+        self._armed = True
+
     def attempt_stop(self, stop_command: Callable[[], bool]) -> bool | None:
         """Try an expired stop, preserving expiry when the driver rejects it."""
         if not self.should_stop():

@@ -13,7 +13,18 @@ from tf_transformations import quaternion_from_euler
 from std_msgs.msg import Float32
 
 from .command_deadman import CommandDeadman
-from .dynamixel_driver import DynamixelDriver
+from .dynamixel_driver import (
+    DynamixelDriver,
+    validate_motor_ids,
+    validate_profile_acceleration,
+    wrapped_encoder_delta,
+)
+from .motor_control import (
+    CommandStatus,
+    DriveGeometry,
+    DriveLimits,
+    MotorController,
+)
 
 TWIST_SUB_TOPIC_NAME = "cmd_vel"
 ODOM_PUB_TOPIC_NAME = "odom"
@@ -48,6 +59,10 @@ class Rosy(Node):
         self.declare_parameter('motor_device', DEFAULT_SERIAL_PORT_NAME)
         self.declare_parameter('motor_baudrate', DEFAULT_BAUDRATE)
         self.declare_parameter('motor_ids', DEFAULT_DYNAMIXEL_IDS)
+        self.declare_parameter('max_linear_mps', 0.25)
+        self.declare_parameter('max_angular_rps', 2.5)
+        self.declare_parameter('max_wheel_rpm', 100.0)
+        self.declare_parameter('motor_profile_acceleration', 200)
 
         self.wheel_radius = self.get_parameter('wheel_radius').get_parameter_value().double_value
         self.wheel_separation = self.get_parameter('wheel_separation').get_parameter_value().double_value
@@ -57,9 +72,17 @@ class Rosy(Node):
         self.command_deadman = CommandDeadman(self.cmd_vel_timeout_s)
         self.motor_device = self.get_parameter('motor_device').value
         self.motor_baudrate = int(self.get_parameter('motor_baudrate').value)
-        self.motor_ids = [int(value) for value in self.get_parameter('motor_ids').value]
-        if len(self.motor_ids) != 2 or len(set(self.motor_ids)) != 2:
-            raise ValueError('motor_ids must contain two distinct Dynamixel IDs')
+        raw_motor_ids = list(self.get_parameter('motor_ids').value)
+        self.motor_ids = list(validate_motor_ids(raw_motor_ids))
+        self.max_linear_mps = float(self.get_parameter('max_linear_mps').value)
+        self.max_angular_rps = float(self.get_parameter('max_angular_rps').value)
+        self.max_wheel_rpm = float(self.get_parameter('max_wheel_rpm').value)
+        raw_profile_acceleration = self.get_parameter(
+            'motor_profile_acceleration'
+        ).value
+        self.motor_profile_acceleration = validate_profile_acceleration(
+            raw_profile_acceleration
+        )
         if not self.motor_device.startswith('/dev/'):
             raise ValueError('motor_device must be an absolute /dev path')
         if self.motor_baudrate <= 0:
@@ -84,86 +107,111 @@ class Rosy(Node):
             self.motor_device,
             self.motor_baudrate,
             self.motor_ids,
+            max_rpm=self.max_wheel_rpm,
+        )
+        self.motor_controller = MotorController(
+            DriveGeometry(
+                wheel_radius_m=self.wheel_radius,
+                wheel_separation_m=self.wheel_separation,
+            ),
+            DriveLimits(
+                max_linear_mps=self.max_linear_mps,
+                max_angular_rps=self.max_angular_rps,
+                max_wheel_rpm=self.max_wheel_rpm,
+            ),
+            self.driver.set_double_rpm,
         )
 
-        self.get_logger().info("1. Opening serial port...")
-        if not self.driver.begin():
-            self.get_logger().error("Failed to open serial port! Shutting down.")
+        try:
+            self.get_logger().info('1. Opening serial port...')
+            if not self.driver.begin():
+                self.get_logger().error('Failed to open serial port! Shutting down.')
+                raise RuntimeError('failed to open Dynamixel serial port')
+
+            self.get_logger().info('2. Initializing motors...')
+            if not self.driver.initialize_motors(
+                profile_accel=self.motor_profile_acceleration
+            ):
+                self.get_logger().error('Failed to initialize motors! Shutting down.')
+                raise RuntimeError('failed to initialize Dynamixel motors')
+
+            self.get_logger().info('Waiting for motors to be ready...')
+            time.sleep(1.0)
+
+            self.get_logger().info('3. Setting initial RPM to zero...')
+            if not self.driver.set_double_rpm(0, 0):
+                self.get_logger().error('Failed to set initial RPM! Shutting down.')
+                raise RuntimeError('failed to set initial zero RPM')
+
+            self.get_logger().info('4. Reading initial encoder values...')
+            _, _, self.last_encoder_l, self.last_encoder_r = self.driver.get_feedback()
+            if self.last_encoder_l is None:
+                self.get_logger().error(
+                    'Failed to read initial encoder position! Shutting down.'
+                )
+                raise RuntimeError('failed to read initial encoder position')
+
+            self.get_logger().info(
+                f'Initial Encoder read: L={self.last_encoder_l}, '
+                f'R={self.last_encoder_r}. Controller is responsive.'
+            )
+
+            self.odom_pub = self.create_publisher(Odometry, ODOM_PUB_TOPIC_NAME, 10)
+            self.joint_pub = self.create_publisher(JointState, JOINT_PUB_TOPIC_NAME, 10)
+            self.twist_sub = self.create_subscription(
+                Twist, TWIST_SUB_TOPIC_NAME, self.twist_callback, 10
+            )
+            self.tf_broadcaster = TransformBroadcaster(self)
+            self.timer = self.create_timer(1.0 / 30.0, self.update_and_publish)
+
+            self.battery_sub = self.create_subscription(
+                Float32,
+                BATTERY_VOLTAGE_TOPIC,
+                self.battery_voltage_callback,
+                10
+            )
+
+            self.x = 0.0
+            self.y = 0.0
+            self.theta = 0.0
+            self.last_time = self.get_clock().now()
+            self.is_initialized = True
+            self.get_logger().info(
+                'Rosy Bringup with Dynamixel has been started successfully.'
+            )
+        except Exception:
             self.driver.terminate()
-            raise RuntimeError("failed to open Dynamixel serial port")
-
-        self.get_logger().info("2. Initializing motors...")
-        if not self.driver.initialize_motors():
-            self.get_logger().error("Failed to initialize motors! Shutting down.")
-            self.driver.terminate()
-            raise RuntimeError("failed to initialize Dynamixel motors")
-        
-        self.get_logger().info("Waiting for motors to be ready...")
-        time.sleep(1.0)
-
-        self.get_logger().info("3. Setting initial RPM to zero...")
-        if not self.driver.set_double_rpm(0, 0):
-            self.get_logger().error("Failed to set initial RPM! Shutting down.")
-            self.driver.terminate()
-            raise RuntimeError("failed to set initial zero RPM")
-
-        self.get_logger().info("4. Reading initial encoder values...")
-        _, _, self.last_encoder_l, self.last_encoder_r = self.driver.get_feedback()
-        if self.last_encoder_l is None:
-            self.get_logger().error("Failed to read initial encoder position! Shutting down.")
-            self.driver.terminate()
-            raise RuntimeError("failed to read initial encoder position")
-
-        self.get_logger().info(f"Initial Encoder read: L={self.last_encoder_l}, R={self.last_encoder_r}. Controller is responsive.")
-            
-        self.odom_pub = self.create_publisher(Odometry, ODOM_PUB_TOPIC_NAME, 10)
-        self.joint_pub = self.create_publisher(JointState, JOINT_PUB_TOPIC_NAME, 10)
-        self.twist_sub = self.create_subscription(Twist, TWIST_SUB_TOPIC_NAME, self.twist_callback, 10)
-        self.tf_broadcaster = TransformBroadcaster(self)
-        self.timer = self.create_timer(1.0 / 30.0, self.update_and_publish)
-
-        self.battery_sub = self.create_subscription(
-            Float32,
-            BATTERY_VOLTAGE_TOPIC,
-            self.battery_voltage_callback,
-            10
-        )
-
-        self.x = 0.0
-        self.y = 0.0
-        self.theta = 0.0
-        self.last_time = self.get_clock().now()
-        self.is_initialized = True
-        self.get_logger().info('Rosy Bringup with Dynamixel has been started successfully.')
+            raise
 
     def twist_callback(self, msg: Twist):
-        linear_x = msg.linear.x
-        angular_z = msg.angular.z
-
-        v_l = linear_x - (angular_z * self.wheel_separation / 2.0)
-        v_r = linear_x + (angular_z * self.wheel_separation / 2.0)
-
-        wheel_rads_l = v_l / self.wheel_radius
-        wheel_rads_r = v_r / self.wheel_radius
-
-        rpm_l = wheel_rads_l * 60.0 / (2 * math.pi)
-        rpm_r = -wheel_rads_r * 60.0 / (2 * math.pi)
-
-        max_val = max(abs(rpm_l), abs(rpm_r))
-        MAX_RPM = 100.0
-        if max_val > MAX_RPM:
-            scale = MAX_RPM / max_val
-            rpm_l *= scale
-            rpm_r *= scale
-
-        if not self.driver.set_double_rpm(rpm_l, rpm_r):
-            self.get_logger().warn("Failed to send motor command.")
+        outcome = self.motor_controller.command_twist(msg.linear.x, msg.angular.z)
+        if not outcome.accepted:
+            self.get_logger().error(
+                f'Motor command {outcome.status.value}: {outcome.reason}'
+            )
+            stop_outcome = self.motor_controller.stop()
+            if stop_outcome.accepted:
+                self.command_deadman.mark_stopped()
+            else:
+                self.command_deadman.mark_stop_required()
+                self.get_logger().error(
+                    f'Immediate motor stop failed: {stop_outcome.reason}'
+                )
             return
-        self.command_deadman.mark_command()
+        if outcome.status is CommandStatus.LIMITED:
+            self.get_logger().warn(
+                f'Motor command LIMITED: {outcome.reason}; '
+                f'applied=({outcome.plan.applied_linear_mps:.3f} m/s, '
+                f'{outcome.plan.applied_angular_rps:.3f} rad/s)'
+            )
+        if outcome.plan.is_stop:
+            self.command_deadman.mark_stopped()
+        else:
+            self.command_deadman.mark_command()
 
     def update_and_publish(self):
         stop_result = self.command_deadman.attempt_stop(
-            lambda: self.driver.set_double_rpm(0, 0)
+            lambda: self.motor_controller.stop().accepted
         )
         if stop_result is True:
             self.get_logger().warn(
@@ -184,8 +232,8 @@ class Rosy(Node):
             return
         rpm_l, rpm_r, encoder_l, encoder_r = feedback
 
-        delta_l = encoder_l - self.last_encoder_l
-        delta_r = -(encoder_r - self.last_encoder_r)
+        delta_l = wrapped_encoder_delta(encoder_l, self.last_encoder_l)
+        delta_r = -wrapped_encoder_delta(encoder_r, self.last_encoder_r)
         
         self.last_encoder_l = encoder_l
         self.last_encoder_r = encoder_r
