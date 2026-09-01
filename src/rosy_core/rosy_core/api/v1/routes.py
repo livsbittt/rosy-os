@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from rosy_core.api.deps import AuthContext, auth_dependency, get_services, require_role
 from rosy_core.api.errors import ApiError
 from rosy_core.command.arbitration import Mode
-from rosy_core.protocol.schemas import RobotMode
+from rosy_core.protocol.schemas import PowerMode, RobotMode
 from rosy_core.services import CoreServices
 from rosy_core.waypoints.manager import Waypoint
 
@@ -323,3 +323,33 @@ def metrics(svc: CoreServices = Depends(get_services)):
         lines.append(f'rosy_diagnostics_health{{component="{component}"}} {_HEALTH_VALUE[health.value]}')
     from fastapi.responses import PlainTextResponse
     return PlainTextResponse("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
+
+
+power_router = APIRouter(prefix="/api/v1/power", tags=["power"])
+
+
+class PowerModeRequest(BaseModel):
+    mode: PowerMode
+
+
+@power_router.get("")
+def power_status(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
+    """PWR-001: 현재 절전 모드·프레즌스·샘플링 주기."""
+    return svc.power.status().model_dump()
+
+
+@power_router.post("/wake")
+def power_wake(auth: AuthContext = Depends(operator), svc: CoreServices = Depends(get_services)):
+    """PWR-004: 원격 웨이크 — 로봇 앞에 서지 않고 정보 화면을 띄운다."""
+    svc.power.wake("api")
+    svc.state.set_power(svc.power.status())
+    return svc.power.status().model_dump()
+
+
+@power_router.post("/mode")
+def power_set_mode(body: PowerModeRequest, auth: AuthContext = Depends(operator),
+                   svc: CoreServices = Depends(get_services)):
+    """운영자 강제 전환. 활동이 감지되면 정책이 다시 ACTIVE로 되돌린다."""
+    svc.power.request_mode(body.mode, source=f"api:{auth.role}")
+    svc.state.set_power(svc.power.status())
+    return svc.power.status().model_dump()

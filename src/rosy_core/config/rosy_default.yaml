@@ -42,6 +42,23 @@ navigation:
   max_angular_velocity: 0.80
   # map_id: warehouse_a           # 설정 or slam/save 로 갱신 (MAP-001, D-13)
 
+power:                            # PWR-001~004 절전/근접 웨이크 (D-24)
+  enabled: true                   # false 이면 항상 ACTIVE — 기존 동작과 동일
+  idle_after_s: 60                # 무활동 이 시간 후 IDLE
+  standby_after_s: 300            # 무활동 이 시간 후 STANDBY
+  info_hold_s: 15                 # 웨이크 후 정보 화면 유지 시간 (s)
+  active_rate_hz: 20              # rosy_sensor_adc ADC 폴링 주기 (모드별)
+  idle_rate_hz: 5
+  standby_rate_hz: 2
+  presence:                       # 초음파 프레즌스 판정 (단위 m / 표본 수)
+    near_m: 0.25                  # 이보다 가까우면 접근
+    contact_m: 0.05               # 이보다 가까우면 접촉으로 간주
+    hysteresis_m: 0.10            # near_m + 이 값을 넘어야 해제 판정 시작
+    detect_samples: 2             # 검출에 필요한 연속 표본 수
+    release_samples: 3            # 해제에 필요한 연속 표본 수
+    min_valid_m: 0.02             # 센서 min_range — 미만은 무효 표본
+    max_valid_m: 3.0              # 센서 max_range — 초과는 무효 표본
+
 events:
   ring_buffer_size: 1000          # EVT-004
 

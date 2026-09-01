@@ -1,8 +1,16 @@
 """PWR-001~004 절전/근접 웨이크 단위 테스트 — 주입 클럭 기반 순수 로직."""
 
 import math
+import tempfile
+from pathlib import Path
 
 import pytest
+import yaml
+from fastapi.testclient import TestClient
+
+from rosy_core.api.app import create_app
+from rosy_core.profile import RobotProfile
+from rosy_core.services import CoreServices
 
 from rosy_core.power.manager import (
     PowerConfig,
@@ -360,3 +368,63 @@ class TestStatusSnapshot:
         snapshot = sm.snapshot()
         assert snapshot.power.mode == PowerMode.STANDBY
         assert snapshot.power.sample_rate_hz == 2.0
+
+
+CONFIG_DIR = Path(__file__).parent.parent / "config"
+
+
+@pytest.fixture
+def client():
+    config = yaml.safe_load((CONFIG_DIR / "rosy_default.yaml").read_text(encoding="utf-8"))
+    profile = RobotProfile.load(CONFIG_DIR / config["profile"])
+    caps = yaml.safe_load((CONFIG_DIR / "capabilities.yaml").read_text(encoding="utf-8"))
+    svc = CoreServices.build(config, profile, caps, Path(tempfile.mkdtemp()) / "waypoints.json")
+    return TestClient(create_app(config, svc)), svc
+
+
+ADMIN = {"Authorization": "Bearer rosy-dev-admin"}
+VIEWER = {"Authorization": "Bearer rosy-dev-viewer"}
+
+
+class TestPowerApi:
+    def test_get_power_requires_auth(self, client):
+        api, _ = client
+        assert api.get("/api/v1/power").status_code == 401
+
+    def test_get_power_reports_status(self, client):
+        api, _ = client
+        body = api.get("/api/v1/power", headers=VIEWER).json()
+        assert body["mode"] == "ACTIVE"
+        assert body["presence"] == "none"
+        assert body["sample_rate_hz"] == 20.0
+
+    def test_viewer_cannot_wake(self, client):
+        api, _ = client
+        assert api.post("/api/v1/power/wake", headers=VIEWER).status_code == 403
+
+    def test_operator_can_wake(self, client):
+        api, svc = client
+        svc.power.request_mode(PowerMode.STANDBY, source="test")
+        assert svc.power.mode == PowerMode.STANDBY
+
+        body = api.post("/api/v1/power/wake", headers=ADMIN).json()
+        assert body["mode"] == "ACTIVE"
+        assert body["info_visible"] is True
+        assert svc.power.last_wake_reason == "api"
+
+    def test_force_standby(self, client):
+        api, svc = client
+        body = api.post("/api/v1/power/mode", json={"mode": "STANDBY"}, headers=ADMIN).json()
+        assert body["mode"] == "STANDBY"
+        assert svc.power.sample_rate_hz == 2.0
+
+    def test_unknown_mode_is_rejected(self, client):
+        api, _ = client
+        response = api.post("/api/v1/power/mode", json={"mode": "HIBERNATE"}, headers=ADMIN)
+        assert response.status_code == 400          # API Ref §5 VALIDATION_ERROR
+        assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+    def test_state_snapshot_carries_power(self, client):
+        api, _ = client
+        body = api.get("/api/v1/robot/state", headers=VIEWER).json()
+        assert body["power"]["mode"] == "ACTIVE"
