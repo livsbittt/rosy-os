@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_ROOT="${ROSY_SOURCE_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
@@ -19,6 +20,10 @@ require_root() {
 }
 
 preflight_host() {
+    [[ "$INSTALL_ROOT" == "/opt/rosy" ]] || fail "ROSY_INSTALL_ROOT must be /opt/rosy"
+    [[ "$ROSY_CONFIG" == "/etc/rosy/rosy.yaml" ]] || fail "ROSY_CONFIG_PATH must be /etc/rosy/rosy.yaml"
+    [[ "$ROSY_DATA" == "/var/lib/rosy" ]] || fail "ROSY_DATA_PATH must be /var/lib/rosy"
+    [[ "$RUN_USER" != "root" ]] || fail "Rosy must run as the non-root user created in Raspberry Pi Imager"
     [[ -r /proc/device-tree/model ]] || fail "Raspberry Pi model information is unavailable"
     local model
     model="$(tr -d '\0' </proc/device-tree/model)"
@@ -118,16 +123,18 @@ set_env_value() {
 }
 
 write_runtime_environment() {
-    local env_file run_group
+    local env_file run_group dialout_gid
     env_file="$INSTALL_ROOT/deploy/robot/.env"
     run_group="$(id -gn "$RUN_USER")"
+    dialout_gid="$(getent group dialout | cut -d: -f3)"
+    [[ -n "$dialout_gid" ]] || fail "the dialout group is unavailable"
     if [[ ! -f "$env_file" ]]; then
         install -o root -g "$run_group" -m 0640 \
             "$INSTALL_ROOT/deploy/robot/.env.example" "$env_file"
     fi
     set_env_value "$env_file" ROSY_UID "$(id -u "$RUN_USER")"
     set_env_value "$env_file" ROSY_GID "$(id -g "$RUN_USER")"
-    set_env_value "$env_file" ROSY_DIALOUT_GID "$(getent group dialout | cut -d: -f3)"
+    set_env_value "$env_file" ROSY_DIALOUT_GID "$dialout_gid"
     set_env_value "$env_file" ROSY_CONFIG_PATH "$ROSY_CONFIG"
     set_env_value "$env_file" ROSY_DATA_PATH "$ROSY_DATA"
     set_env_value "$env_file" ROSY_RUNTIME_MODE core
@@ -156,7 +163,7 @@ enable_boot_service() {
     install -m 0644 "$INSTALL_ROOT/deploy/robot/rosy-runtime.service" \
         /etc/systemd/system/rosy-runtime.service
     systemctl daemon-reload
-    systemctl enable rosy-runtime.service
+    systemctl enable --now rosy-runtime.service
 }
 
 main() {

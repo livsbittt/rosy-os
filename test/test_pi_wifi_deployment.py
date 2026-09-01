@@ -48,6 +48,16 @@ def test_installer_generates_device_local_tokens_and_preserves_config():
     assert "SSID=" not in script
 
 
+def test_installer_guards_destructive_paths_and_activates_systemd():
+    script = _text(INSTALLER)
+
+    assert '[[ "$INSTALL_ROOT" == "/opt/rosy" ]]' in script
+    assert '[[ "$ROSY_CONFIG" == "/etc/rosy/rosy.yaml" ]]' in script
+    assert '[[ "$ROSY_DATA" == "/var/lib/rosy" ]]' in script
+    assert "umask 077" in script
+    assert "systemctl enable --now rosy-runtime.service" in script
+
+
 def test_runtime_defaults_to_core_only_and_rejects_unknown_modes():
     environment = _text(DEPLOY / ".env.example")
     wrapper = _text(RUNTIME_MODE)

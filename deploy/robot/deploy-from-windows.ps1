@@ -81,7 +81,7 @@ try {
     }
 
     $remoteCommand = @(
-        "set -Eeuo pipefail"
+        "set -eu"
         "cd /tmp"
         "sha256sum -c rosy-release.tar.gz.sha256"
         "rm -rf -- /tmp/rosy-release"

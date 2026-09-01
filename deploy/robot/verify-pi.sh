@@ -71,10 +71,15 @@ else
   wlan_ipv4="$(ip -4 -o addr show dev wlan0 scope global 2>/dev/null | awk 'NR == 1 {split($4, address, "/"); print address[1]}' || true)"
   if [[ -z "$wlan_ipv4" ]]; then
     fail "LAN" "wlan0 has no IPv4 address"
-  elif ip route show default 2>/dev/null | grep -q '^default '; then
-    pass "LAN" "wlan0 IPv4: $wlan_ipv4; default route present"
   else
-    fail "LAN" "wlan0 IPv4: $wlan_ipv4; no default route"
+    pass "LAN" "wlan0 IPv4: $wlan_ipv4"
+    if ip route show default 2>/dev/null | grep -q '^default '; then
+      pass "ROUTE" "default route present"
+    elif ((require_internet)); then
+      fail "ROUTE" "no default route (--require-internet enabled)"
+    else
+      warn "ROUTE" "no default route; same-WLAN dashboard may still work"
+    fi
   fi
 fi
 
