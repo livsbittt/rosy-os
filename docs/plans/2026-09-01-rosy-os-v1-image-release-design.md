@@ -29,9 +29,11 @@ Raspberry Pi OS 위에 ROS 2 하드웨어 어댑터, `rosy_core`, 장비 런타�
 5. v1에는 전체 OS 원격 OTA와 A/B 루트 파일시스템 전환을 포함하지 않는다.
 6. 이미지와 번들은 동일한 Release Manifest와 ARM64 컨테이너 digest를 사용한다.
 7. 이미지에는 장비별 Wi-Fi 암호, API 토큰, SSH 개인키와 Robot ID를 넣지 않는다.
-8. 정상 운용은 사업장 Wi-Fi의 STA 모드로 한다.
-9. Wi-Fi가 설정되지 않았거나 연결 복구가 필요할 때만 임시 설정 AP를 연다.
-10. 상시 AP+STA 릴레이는 v1 기본이 아니며 후속 Capability로 보류한다.
+8. 운용 네트워크 모드는 `SITE_STA`와 `RELAY_AP_STA` 두 가지이며 기본은 `SITE_STA`다.
+9. Wi-Fi가 설정되지 않았거나 연결 복구가 필요할 때만 임시 설정 AP를 연다. 설정 AP는
+   두 운용 모드 어느 쪽으로도 프로비저닝할 수 있으며 운용 AP와 수명주기가 다르다.
+10. AP+STA 릴레이는 v1 범위에 포함하되 장비별 옵트인으로 한다. 후속 Capability로
+    미루지 않는다.
 11. 첫 부팅, 업데이트와 자동 롤백 뒤에는 항상 `core-only`로 기동한다.
 12. 모터 또는 전체 hardware 모드는 현장 점검 후 별도로 승인한다.
 13. CORE는 호스트 root, Docker socket, systemd와 UART 장치를 직접 소유하지 않는다.
@@ -298,10 +300,11 @@ CLI로 SD에 기록한다. 압축 이미지 자체의 metadata가 달라도 서�
 UNPROVISIONED
   -> PROVISIONING_AP
   -> VERIFYING_SITE_WIFI
-       -> SITE_STA
+       -> SITE_STA          (network.mode = site_sta, 기본)
+       -> RELAY_AP_STA      (network.mode = relay, 장비별 옵트인)
        -> PROVISIONING_AP
 
-SITE_STA 연결 실패
+SITE_STA / RELAY_AP_STA 업링크 연결 실패
   -> NETWORK_HOLD
 
 명시적 one-shot recovery 요청 + 재부팅
@@ -309,13 +312,22 @@ SITE_STA 연결 실패
   -> VERIFYING_SITE_WIFI
 ```
 
-정상 운용은 `SITE_STA`다. 작업자 단말, Site Fleet와 1~10대 로봇은 하나의
-사업장 공유기 또는 모바일 라우터 WLAN에 접속한다. 인터넷은 선택 사항이며 같은
-WLAN 안의 로컬 API와 대시보드는 인터넷 단절에도 유지한다.
+운용 모드는 두 가지이고 기본은 `SITE_STA`다. 이 모드에서 작업자 단말, Site Fleet와
+1~10대 로봇은 하나의 사업장 공유기 또는 모바일 라우터 WLAN에 접속한다. 인터넷은
+선택 사항이며 같은 WLAN 안의 로컬 API와 대시보드는 인터넷 단절에도 유지한다.
 
-`PROVISIONING_AP`와 `RECOVERY_AP`는 설정을 위한 임시 모드다. 상시 AP+STA는
-라디오 채널, NAT, 보안과 다수 로봇 간 간섭 문제 때문에 v1 기본 요구에서 제외한다.
-기존 D-19/NET-001~004는 이 결정에 맞게 후속 ADR/SRS 개정이 필요하다.
+`RELAY_AP_STA`는 장비별 설정(`network.mode = relay`)으로 켜는 옵트인 모드다. 로봇이
+상위 WiFi에 STA로 붙은 채 동시에 자체 AP를 열어 릴레이하고, 사용자 단말은 로봇 AP를
+통해 접속한다. 상위 공유기가 없거나 신뢰할 수 없는 현장과 시운전에 쓴다. 단일 라디오
+제약(AP는 상위와 동일 채널)과 다수 로봇 동시 운용 시의 간섭은 이 모드를 켠 장비에
+국한되며 접속 가이드에 명시한다. 릴레이 업링크가 끊겨도 로봇 AP 서브넷 안의 로컬
+제어는 유지한다.
+
+`PROVISIONING_AP`와 `RECOVERY_AP`는 설정을 위한 임시 모드이며 `RELAY_AP_STA`의 운용
+AP와 별개 프로파일이다. 설정 AP의 자격정보를 운용 AP가 재사용하지 않는다. 두 운용
+모드 어느 쪽으로 갈지는 프로비저닝 단계에서 선택하고 장비별 설정에 기록한다.
+
+이 결정은 ADR D-26이며 D-19을 대체한다. SRS NET-001~005가 함께 개정되었다.
 
 프로비저닝 AP는 첫 부팅에만 자동으로 열린다. 이미 provisioned인 장비에서는 짧은
 WLAN 단절만으로 recovery AP를 열지 않는다. v1 recovery AP는 다음 중 하나로만
@@ -464,7 +476,7 @@ health 확인을 끝내기 전까지 runtime 기동을 허용하지 않는다. r
 
 ### 10.2 네트워크
 
-- 현재 모드: PROVISIONING_AP / SITE_STA / RECOVERY_AP
+- 현재 모드: PROVISIONING_AP / SITE_STA / RELAY_AP_STA / RECOVERY_AP / NETWORK_HOLD
 - SSID는 표시할 수 있으나 password와 secret은 절대 표시하지 않는다.
 - WLAN IPv4, default route, DNS와 Internet 상태
 - peer dashboard 접근을 위한 주소와 client-isolation 안내
@@ -664,8 +676,8 @@ CLI는 machine-readable JSON 출력 옵션을 제공해야 하며 성공/실패�
 
 ## 15. 구현 시 반드시 함께 개정할 문서
 
-- `docs/reference/ROSY ADR Log.md`: D-19의 기본 AP+STA를 SITE_STA + 임시 AP로 대체
-- `docs/spec/ROSY CORE SRS.md`: NET-001~004와 Host Agent/Release 책임 경계
+- `docs/reference/ROSY ADR Log.md`: D-19를 D-26으로 대체 (SITE_STA 기본 + 릴레이 옵트인)
+- `docs/spec/ROSY CORE SRS.md`: NET-001~005와 Host Agent/Release 책임 경계
 - `docs/reference/ROSY API & Protocol Reference.md`: network/release typed contract
 - `docs/deployment/raspberry-pi-wifi-image.md`: custom ROSY image와 setup AP 절차
 - `docs/deployment/raspberry-pi-runtime.md`: versioned release layout과 rollback
@@ -679,7 +691,7 @@ ROSY OS v1 이미지 작업은 다음 조건을 모두 만족할 때 완료다.
 
 - 고정된 입력에서 release image와 manifest/signature/SBOM/checksum 생성
 - 이미지에 장비별 secret이 없음
-- 첫 부팅 setup AP에서 SITE_STA로 안전하게 전환
+- 첫 부팅 setup AP에서 선택한 운용 모드(`SITE_STA` 또는 `RELAY_AP_STA`)로 안전하게 전환
 - 인터넷 없이 CORE와 대시보드 기동
 - 다른 WLAN 단말에서 상태 확인
 - 정상 Release Bundle update와 실패 rollback
@@ -688,5 +700,7 @@ ROSY OS v1 이미지 작업은 다음 조건을 모두 만족할 때 완료다.
 - 실제 Pi 5의 BUILD/BOOT/NETWORK/UPDATE gate 증거 기록
 - UART·모터 미승인 상태는 정직하게 `MOTOR_HOLD`로 유지
 
-전체 OS A/B OTA, 상시 AP+STA relay와 도메인별 응용 기능은 이 완료 정의에
-포함하지 않는다.
+릴레이 모드를 켠 장비에서는 사용자 단말이 로봇 AP를 경유해 대시보드에 접속하고,
+업링크가 끊겨도 로봇 AP 서브넷 안의 로컬 제어가 유지됨을 함께 확인한다.
+
+전체 OS A/B OTA와 도메인별 응용 기능은 이 완료 정의에 포함하지 않는다.
