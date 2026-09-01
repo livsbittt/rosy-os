@@ -8,8 +8,9 @@ Requires=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/rosy/deploy/robot
-ExecStart=/usr/bin/docker compose --profile hardware up -d --remove-orphans
-ExecStop=/usr/bin/docker compose --profile hardware down --timeout 10
+EnvironmentFile=-/opt/rosy/deploy/robot/.env
+ExecStart=/opt/rosy/deploy/robot/runtime-mode.sh up
+ExecStop=/opt/rosy/deploy/robot/runtime-mode.sh down
 TimeoutStartSec=0
 TimeoutStopSec=30
 
