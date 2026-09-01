@@ -9,6 +9,10 @@
 from __future__ import annotations
 
 import math
+import hashlib
+import threading
+import time
+from pathlib import Path
 from typing import Optional
 
 import rclpy
@@ -18,12 +22,22 @@ from rclpy.node import Node
 from geometry_msgs.msg import PoseWithCovarianceStamped, Twist
 from nav_msgs.msg import Odometry
 from nav2_msgs.action import NavigateToPose
+from sensor_msgs.msg import Imu, LaserScan
+from slam_toolbox.srv import SaveMap
 from std_msgs.msg import Float32
 import tf2_ros
 from tf2_ros import Buffer, TransformListener
 
 from rosy_core.command.manager import Twist as CoreTwist
+from rosy_core.diagnostics.collector import (
+    CpuLoadProvider,
+    DiagnosticsCollector,
+    MemoryAvailableProvider,
+    disk_provider,
+    topic_freshness_provider,
+)
 from rosy_core.navigation.manager import NavGoalSpec
+from rosy_core.protocol.schemas import HealthState
 
 
 class RosBridge:
@@ -49,15 +63,23 @@ class RosBridge:
         node.create_subscription(Odometry, "odom", self._on_odom, 10)
         node.create_subscription(Float32, "battery/voltage", self._on_battery, 10)
         node.create_subscription(Twist, "nav_cmd_vel", self._on_nav_cmd_vel, 10)
+        node.create_subscription(LaserScan, "scan", self._on_scan, 10)
+        node.create_subscription(Imu, "imu_raw", self._on_imu, 10)
 
         self._cmd_timer = node.create_timer(1.0 / 50.0, self._publish_cmd_vel)
         self._state_timer = node.create_timer(1.0 / self._state_hz, self._tick_state)
+        self._diag_timer = node.create_timer(1.0, self._tick_diagnostics)
 
         self._goal_handle = None
+        self._last_odom_ts = 0.0
+        self._slam_client = node.create_client(SaveMap, "slam_toolbox/save_map")
+
+        self._setup_diagnostics()
         self._svc.nav.executor = self
         self._node.get_logger().info("ros_bridge ready (cmd_vel sole publisher @50Hz)")
 
     def _on_odom(self, msg: Odometry) -> None:
+        self._last_odom_ts = time.monotonic()
         pose = msg.pose.pose
         yaw = math.atan2(
             2.0 * (pose.orientation.w * pose.orientation.z + pose.orientation.x * pose.orientation.y),
@@ -102,6 +124,42 @@ class RosBridge:
         except tf2_ros.TransformException:
             pass
         self._svc.state.snapshot()
+
+    def _on_scan(self, msg: LaserScan) -> None:
+        self._svc.state.set_sensor("lidar", {
+            "frame_id": msg.header.frame_id,
+            "range_min": msg.range_min,
+            "range_max": msg.range_max,
+            "angle_min": msg.angle_min,
+            "angle_max": msg.angle_max,
+            "num_ranges": len(msg.ranges),
+            "ranges": list(msg.ranges),
+            "received_at": time.time(),
+        })
+
+    def _on_imu(self, msg: Imu) -> None:
+        q = msg.orientation
+        yaw = math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y ** 2 + q.z ** 2))
+        self._svc.state.set_sensor("imu", {
+            "orientation_yaw": yaw,
+            "angular_velocity_z": msg.angular_velocity.z,
+            "linear_accel_x": msg.linear_acceleration.x,
+            "received_at": time.time(),
+        })
+
+    def _setup_diagnostics(self) -> None:
+        self.diagnostics = DiagnosticsCollector()
+        self.diagnostics.register("rosy_core", lambda: HealthState.OK)
+        self.diagnostics.register("cpu", CpuLoadProvider())
+        self.diagnostics.register("memory", MemoryAvailableProvider())
+        self.diagnostics.register("disk", disk_provider("/"))
+        self.diagnostics.register("odom_topic", topic_freshness_provider(
+            lambda: self._last_odom_ts, stale_s=2.0))
+
+    def _tick_diagnostics(self) -> None:
+        results = self.diagnostics.collect()
+        for component, health in results.items():
+            self._svc.state.set_diagnostic(component, health)
 
     # --- NavExecutor 구현 (navigation.manager와 계약) -------------------------
 
@@ -153,3 +211,34 @@ class RosBridge:
         msg.pose.pose.orientation.z = math.sin(yaw / 2.0)
         msg.pose.pose.orientation.w = math.cos(yaw / 2.0)
         self.initialpose_pub.publish(msg)
+
+    def save_map(self, name: str) -> str:
+        """NAV-005: slam_toolbox SaveMap 호출 → map_id 발급 (D-13).
+
+        파일을 찾으면 내용 체크섬, 못 찾으면 name+시각 해시로 대체 map_id.
+        """
+        if not self._slam_client.wait_for_service(timeout_sec=1.0):
+            raise RuntimeError("slam_toolbox save_map service unavailable")
+        request = SaveMap.Request()
+        request.name = name
+        future = self._slam_client.call_async(request)
+        done = threading.Event()
+
+        def _cb(_):
+            done.set()
+
+        future.add_done_callback(_cb)
+        if not done.wait(timeout=15.0):
+            raise RuntimeError("save_map service timeout")
+        if future.result() is None or not getattr(future.result(), "result", True):
+            raise RuntimeError("save_map service failed")
+
+        digest_source = name
+        for candidate in (Path(f"{name}.pgm"), Path(name)):
+            if candidate.exists():
+                digest_source = hashlib.sha1(candidate.read_bytes()).hexdigest()
+                break
+        else:
+            digest_source = hashlib.sha1(
+                f"{name}:{time.time()}".encode()).hexdigest()
+        return f"{name}:{digest_source[:8]}"

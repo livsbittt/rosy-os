@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from rosy_core.capability import Capability
@@ -34,6 +35,7 @@ class CoreServices:
     waypoints: WaypointManager
     nav: NavigationManager
     runtime_probe: HostRuntimeProbe
+    started_at: float = field(default_factory=time.time)
 
     @classmethod
     def build(cls, config: dict[str, Any], profile: RobotProfile,

@@ -12,9 +12,12 @@ from rosy_core.api.errors import ApiError, register_exception_handlers
 from rosy_core.api.v1.routes import (
     control_router,
     events_router,
+    metrics_router,
     navigation_router,
     robot_router,
     safety_router,
+    sensors_router,
+    slam_router,
     system_router,
     waypoints_router,
 )
@@ -44,6 +47,9 @@ def create_app(config: dict[str, Any], services: CoreServices) -> FastAPI:
     app.include_router(navigation_router)
     app.include_router(waypoints_router)
     app.include_router(events_router)
+    app.include_router(sensors_router)
+    app.include_router(slam_router)
+    app.include_router(metrics_router)
     app.include_router(ws_router)
 
     @app.get("/api/v1", tags=["system"])

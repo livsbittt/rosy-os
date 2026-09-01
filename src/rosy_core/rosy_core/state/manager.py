@@ -33,6 +33,7 @@ class StateManager:
         self._map_id: Optional[str] = None
         self._diagnostics: dict[str, HealthState] = {}
         self._errors: list[str] = []
+        self._sensors: dict[str, dict] = {}
 
     def set_mode(self, mode: RobotMode) -> None:
         with self._lock:
@@ -75,6 +76,19 @@ class StateManager:
     def set_diagnostic(self, component: str, health: HealthState) -> None:
         with self._lock:
             self._diagnostics[component] = health
+
+    def set_sensor(self, key: str, data: dict) -> None:
+        with self._lock:
+            self._sensors[key] = data
+
+    def get_sensors(self) -> dict:
+        with self._lock:
+            return {k: dict(v) for k, v in self._sensors.items()}
+
+    def get_sensor(self, key: str) -> Optional[dict]:
+        with self._lock:
+            data = self._sensors.get(key)
+            return dict(data) if data else None
 
     def push_error(self, message: str) -> None:
         with self._lock:

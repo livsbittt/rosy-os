@@ -25,6 +25,7 @@ class NavExecutor(Protocol):
     def send_goal(self, spec: NavGoalSpec) -> None: ...
     def cancel_goal(self) -> None: ...
     def send_initial_pose(self, x: float, y: float, yaw: float) -> None: ...
+    def save_map(self, name: str) -> str: ...   # map_id 반환 (D-13, 브리지가 체크섬/대체 해시 산출)
 
 
 class NavigationError(Exception):
@@ -97,6 +98,38 @@ class NavigationManager:
     def home(self, source: str = "api") -> None:
         spec = self.resolve_goal(waypoint="__home__")
         self.goal(spec, source=source)
+
+    # --- NAV-005 Mapping 세션 -------------------------------------------------
+
+    def start_mapping(self, source: str = "api") -> None:
+        if self._safety.estop:
+            raise NavigationError("EMERGENCY_ACTIVE", "e-stop is active")
+        if self._nav_state not in _IDLE_STATES:
+            raise NavigationError("NAVIGATION_ACTIVE",
+                                  f"navigation in progress ({self._nav_state.value})")
+        self.mapping_active = True
+        self._events.publish("slam.started", source="navigation_manager", data={"by": source})
+
+    def stop_mapping(self, source: str = "api") -> None:
+        self.mapping_active = False
+        self._events.publish("slam.stopped", source="navigation_manager", data={"by": source})
+
+    def save_map(self, name: str = "rosy_map", source: str = "api") -> str:
+        executor = self._require_executor()
+        if not self.mapping_active:
+            raise NavigationError("VALIDATION_ERROR", "no active mapping session")
+        map_id = executor.save_map(name)
+        self._state.set_map_id(map_id)
+        self._events.publish("map.saved", source="navigation_manager", data={"map_id": map_id})
+        return map_id
+
+    def reset_mapping(self, source: str = "api") -> None:
+        if not self.mapping_active:
+            return
+        if self.executor is not None and hasattr(self.executor, "reset_mapping"):
+            self.executor.reset_mapping()
+        self._events.publish("slam.started", source="navigation_manager",
+                             data={"by": source, "reset": True})
 
     def cancel(self, source: str = "api") -> None:
         if self._nav_state in _IDLE_STATES:

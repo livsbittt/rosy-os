@@ -31,3 +31,7 @@ reference/src/*.zip
 # 도구 캐시
 .codegraph/
 .omo/
+
+# OMC 운영 산출물 (.omc/skills 제외)
+.omc/
+!.omc/skills/

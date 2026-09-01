@@ -351,6 +351,7 @@ Follower의 rosy_core은 스트림 수신 여부를 `stream_timeout_ms`(기본 1
 | `battery.critical` | critical | 로봇 | `{percent, policy}` |
 | `command.rejected` | warning | 로봇 | `{source, reason}` |
 | `waypoint.created/updated/deleted` | info | 로봇 | `{name}` |
+| `slam.started` / `slam.stopped` | info | 로봇 | `{by, reset?}` (NAV-005 세션) |
 | `map.saved` | info | 로봇 | `{map_id}` |
 | `mission.assigned` | info | Fleet | `{mission_id, robot_id}` |
 | `mission.started` | info | Fleet | `{mission_id}` |
@@ -492,6 +493,7 @@ Fleet(rosy_fleet)이 제공하는 엔드포인트. Base: `http://<fleet-host>:80
 
 | 버전 | 일자 | 내용 |
 |---|---|---|
+| v1.3 | 2026-08-29 | Additive: 이벤트 `slam.started`/`slam.stopped` (NAV-005 세션 API 구현에 수반) |
 | v1.2 | 2026-08-29 | Additive: `swarm/follow`에 `source` 필드(fleet 기본, peer 예약 — D-21 분산 진화 훅), SWM-007 |
 | v1.1 | 2026-08-29 | Additive: swarm 인터페이스 — `swarm/follow·cancel·state` REST, envelope `pose` 스트림(§7.8), 이벤트 `swarm.*`, capability `swarm` 필드 (D-20) |
 | v1.0 | 2026-08-29 | 최초 작성. PKY-CORE-SRS-001 v0.1의 API 산재 정의를 통합·확장 (버전·폐기 정책, 에러코드, 이벤트 카탈로그, Fleet↔Robot 프로토콜, 데이터 스키마, Fleet API 신설) |
