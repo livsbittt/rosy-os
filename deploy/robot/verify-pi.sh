@@ -97,7 +97,7 @@ else
 fi
 
 install_root="${ROSY_INSTALL_ROOT:-/opt/rosy}"
-compose_file="$install_root/deploy/robot/docker-compose.yml"
+compose_file="$install_root/deploy/robot/compose.yaml"
 env_file="$install_root/deploy/robot/.env"
 
 runtime_ok=1
