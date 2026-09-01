@@ -168,6 +168,10 @@ class PowerManager:
             return self._last_wake_reason
 
     @property
+    def info_hold_s(self) -> float:
+        return float(self._cfg.info_hold_s)
+
+    @property
     def sample_rate_hz(self) -> float:
         with self._lock:
             return self._rate_for(self._mode)

@@ -2,14 +2,18 @@
 
 - 유일한 cmd_vel 퍼블리셔 (D-2): 50 Hz select_output → publish
 - 구독: odom / battery/voltage / nav_cmd_vel(Nav2 출력 리매핑 입력)
+       / us_sensor/range, batt_state (PWR-002 근접 웨이크·배터리 표시)
+- 발행: power/mode, display/info (PWR-003) — LED는 set_led 서비스로 구동
 - Nav2 NavigateToPose 액션 클라이언트 (NavExecutor 구현)
 - TF: map → base pose 조회 (frame_prefix 반영, §6.1)
 """
 
 from __future__ import annotations
 
+import json
 import math
 import hashlib
+import socket
 import threading
 import time
 from pathlib import Path
@@ -22,9 +26,12 @@ from rclpy.node import Node
 from geometry_msgs.msg import PoseWithCovarianceStamped, Twist
 from nav_msgs.msg import Odometry
 from nav2_msgs.action import NavigateToPose
-from sensor_msgs.msg import Imu, LaserScan
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+from sensor_msgs.msg import BatteryState, Imu, LaserScan, Range
 from slam_toolbox.srv import SaveMap
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, String
+
+from rosy_interfaces.srv import SetLed
 import tf2_ros
 from tf2_ros import Buffer, TransformListener
 
@@ -38,6 +45,16 @@ from rosy_core.diagnostics.collector import (
 )
 from rosy_core.navigation.manager import NavGoalSpec
 from rosy_core.protocol.schemas import HealthState
+
+# 늦게 뜬 노드도 현재 모드를 즉시 받도록 latch 한다 (PWR-003).
+_LATCHED = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
+                      durability=DurabilityPolicy.TRANSIENT_LOCAL)
+
+# 정보 창이 열려 있는 동안 display/info 재발행 간격 (s).
+_INFO_REPUBLISH_S = 1.0
+
+# 배터리 잔량 → LED 색 (percent 하한, R, G, B).
+_LED_STEPS = ((60.0, 0, 60, 0), (30.0, 60, 40, 0), (0.0, 60, 0, 0))
 
 
 class RosBridge:
@@ -65,14 +82,27 @@ class RosBridge:
         node.create_subscription(Twist, "nav_cmd_vel", self._on_nav_cmd_vel, 10)
         node.create_subscription(LaserScan, "scan", self._on_scan, 10)
         node.create_subscription(Imu, "imu_raw", self._on_imu, 10)
+        node.create_subscription(Range, "us_sensor/range", self._on_us_range, 10)
+        node.create_subscription(BatteryState, "batt_state", self._on_batt_state, 10)
+
+        self.power_mode_pub = node.create_publisher(String, "power/mode", _LATCHED)
+        self.display_info_pub = node.create_publisher(String, "display/info", 10)
+        self._led_client = node.create_client(SetLed, "set_led")
 
         self._cmd_timer = node.create_timer(1.0 / 50.0, self._publish_cmd_vel)
         self._state_timer = node.create_timer(1.0 / self._state_hz, self._tick_state)
         self._diag_timer = node.create_timer(1.0, self._tick_diagnostics)
+        self._power_timer = node.create_timer(1.0 / 5.0, self._tick_power)
 
         self._goal_handle = None
         self._last_odom_ts = 0.0
         self._slam_client = node.create_client(SaveMap, "slam_toolbox/save_map")
+
+        self._published_power_mode: Optional[str] = None
+        self._info_was_visible = False
+        self._info_last_pub = 0.0
+        self._voltage_topic_seen = False
+        self._api_address: Optional[str] = None
 
         self._setup_diagnostics()
         self._svc.nav.executor = self
@@ -90,10 +120,16 @@ class RosBridge:
         self._svc.nav.on_pose_progress(pose.position.x, pose.position.y)
 
     def _on_battery(self, msg: Float32) -> None:
-        voltage = float(msg.data)
+        self._voltage_topic_seen = True
+        self._apply_voltage(float(msg.data))
+
+    def _apply_voltage(self, voltage: float) -> None:
+        if not math.isfinite(voltage):
+            return
         span = max(self._battery_full - self._battery_empty, 1e-6)
         percent = max(0.0, min(100.0, (voltage - self._battery_empty) / span * 100.0))
         self._svc.state.set_battery(percent, voltage)
+        self._svc.power.on_battery_alert(self._battery_alert_state(percent))
         action = self._svc.safety.on_battery_percent(percent)
         if action == "RETURN_HOME":
             try:
@@ -103,11 +139,24 @@ class RosBridge:
         elif action in ("STOP",):
             self._svc.safety.trigger_estop("battery_policy")
 
+    def _battery_alert_state(self, percent: float) -> str:
+        """SAF-005 임계와 동일한 구간 판정 — 경보 시 화면을 깨우기 위한 입력."""
+        policy = self._svc.safety.battery_policy
+        if percent <= policy.critical_percent:
+            return "critical"
+        if percent <= policy.warning_percent:
+            return "warning"
+        return "ok"
+
     def _on_nav_cmd_vel(self, msg: Twist) -> None:
         self._svc.command.set_nav_twist(CoreTwist(linear=msg.linear.x, angular=msg.angular.z))
 
     def _publish_cmd_vel(self) -> None:
         out = self._svc.command.select_output()
+        if out.linear != 0.0 or out.angular != 0.0:
+            # 절전 정책은 모터 경로에 개입하지 않는다. 명령이 나가는 것을
+            # 관측만 하고 센서·화면을 즉시 ACTIVE로 되돌린다 (안전 인터록).
+            self._svc.power.on_activity("cmd_vel")
         msg = Twist()
         msg.linear.x = out.linear
         msg.angular.z = out.angular
@@ -123,7 +172,9 @@ class RosBridge:
             self._svc.state.set_pose(t.x, t.y, yaw)
         except tf2_ros.TransformException:
             pass
-        self._svc.state.snapshot()
+        snapshot = self._svc.state.snapshot()
+        # 로봇 모드가 IDLE이 아니면 절전 진입을 막는다 (PWR-001 안전 인터록).
+        self._svc.power.on_robot_mode(snapshot.mode)
 
     def _on_scan(self, msg: LaserScan) -> None:
         self._svc.state.set_sensor("lidar", {
@@ -146,6 +197,111 @@ class RosBridge:
             "linear_accel_x": msg.linear_acceleration.x,
             "received_at": time.time(),
         })
+
+    # --- PWR-002~004 근접 웨이크 --------------------------------------------
+
+    def _on_us_range(self, msg: Range) -> None:
+        range_m = float(msg.range)
+        self._svc.state.set_sensor("ultrasonic", {
+            "frame_id": msg.header.frame_id,
+            "range": range_m,
+            "min_range": msg.min_range,
+            "max_range": msg.max_range,
+            "field_of_view": msg.field_of_view,
+            "received_at": time.time(),
+        })
+        # 센서가 스스로 보고한 유효 구간 밖 표본은 정책에 넣지 않는다.
+        if math.isfinite(range_m) and msg.min_range <= range_m <= msg.max_range:
+            self._svc.power.on_range(range_m)
+
+    def _on_batt_state(self, msg: BatteryState) -> None:
+        voltage = float(msg.voltage)
+        self._svc.state.set_sensor("battery", {
+            "voltage": voltage,
+            "percentage": float(msg.percentage),
+            "power_supply_status": int(msg.power_supply_status),
+            "location": msg.location,
+            "received_at": time.time(),
+        })
+        # battery/voltage 퍼블리셔가 없는 구성(ADC 노드 단독)에서는 이 토픽이
+        # 유일한 전압원이므로 SAF-005 경로를 그대로 태운다.
+        if not self._voltage_topic_seen:
+            self._apply_voltage(voltage)
+
+    def _tick_power(self) -> None:
+        power = self._svc.power
+        power.tick()
+        status = power.status()
+        self._svc.state.set_power(status)
+
+        if status.mode.value != self._published_power_mode:
+            self._published_power_mode = status.mode.value
+            self.power_mode_pub.publish(String(data=status.mode.value.lower()))
+
+        now = time.monotonic()
+        if status.info_visible:
+            if not self._info_was_visible or (now - self._info_last_pub) >= _INFO_REPUBLISH_S:
+                self._publish_display_info(status)
+                self._info_last_pub = now
+            if not self._info_was_visible:
+                self._set_led_gauge(self._svc.state.snapshot().battery.percent)
+        elif self._info_was_visible:
+            self._clear_led()
+        self._info_was_visible = status.info_visible
+
+    def _publish_display_info(self, status) -> None:
+        snapshot = self._svc.state.snapshot()
+        payload = {
+            "battery_percent": round(snapshot.battery.percent, 1),
+            "battery_voltage": (round(snapshot.battery.voltage, 2)
+                                if snapshot.battery.voltage is not None else None),
+            "robot_id": snapshot.robot_id,
+            "mode": snapshot.mode.value,
+            "navigation": snapshot.navigation.value,
+            "health": self.diagnostics.summary_health().value,
+            "estop": snapshot.safety.estop,
+            "address": self._api_endpoint(),
+            "reason": status.last_wake_reason,
+            "presence": status.presence.value,
+            "hold_s": round(self._svc.power.info_hold_s, 1),
+        }
+        self.display_info_pub.publish(String(data=json.dumps(payload)))
+
+    def _api_endpoint(self) -> str:
+        """정보 화면에 띄울 접속 주소. 실패해도 화면을 막지 않는다."""
+        if self._api_address is not None:
+            return self._api_address
+        port = self._svc.config.get("network", {}).get("api_port", 8080)
+        host = socket.gethostname()
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            probe.connect(("8.8.8.8", 80))       # 패킷은 나가지 않는다 — 경로 조회용
+            host = probe.getsockname()[0]
+        except OSError:
+            pass
+        finally:
+            probe.close()
+        self._api_address = f"http://{host}:{port}"
+        return self._api_address
+
+    def _set_led_gauge(self, percent: float) -> None:
+        for floor, r, g, b in _LED_STEPS:
+            if percent >= floor:
+                self._call_led("fill", r, g, b)
+                return
+
+    def _clear_led(self) -> None:
+        self._call_led("clear", 0, 0, 0)
+
+    def _call_led(self, command: str, r: int, g: int, b: int) -> None:
+        """LED는 부가 표시다 — 서비스가 없으면 조용히 건너뛴다."""
+        if not self._led_client.service_is_ready():
+            return
+        request = SetLed.Request()
+        request.command = command
+        request.pixels = []
+        request.r, request.g, request.b = r, g, b
+        self._led_client.call_async(request)
 
     def _setup_diagnostics(self) -> None:
         self.diagnostics = DiagnosticsCollector()
