@@ -39,6 +39,7 @@ services:
       <<: *ros-environment
       HOME: /var/lib/rosy
       ROSY_CONFIG: /etc/rosy/rosy.yaml
+      ROSY_HOST_ROOT: "${ROSY_HOST_ROOT:-/host}"
     command:
       - ros2
       - run
@@ -52,6 +53,14 @@ services:
       - "./config/profile.pi5-lite.yaml:/etc/rosy/profile.yaml:ro"
       - "./config/capabilities.pi5-lite.yaml:/etc/rosy/capabilities.yaml:ro"
       - "${ROSY_DATA_PATH:-/var/lib/rosy}:/var/lib/rosy"
+      - "/proc/uptime:/host/proc/uptime:ro"
+      - "/proc/loadavg:/host/proc/loadavg:ro"
+      - "/proc/stat:/host/proc/stat:ro"
+      - "/proc/meminfo:/host/proc/meminfo:ro"
+      - "/sys/class/thermal:/host/sys/class/thermal:ro"
+      - "/sys/devices/virtual/thermal:/host/sys/devices/virtual/thermal:ro"
+      - "/etc/os-release:/host/etc/os-release:ro"
+      - "/etc/hostname:/host/etc/hostname:ro"
     healthcheck:
       test:
         - CMD

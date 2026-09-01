@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111614">
+  <title>Rosy OS — Field Runtime</title>
+  <link rel="stylesheet" href="/dashboard/assets/styles.css">
+  <script type="module" src="/dashboard/assets/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#dashboard-main">상태 화면으로 건너뛰기</a>
+  <div class="ambient-grid" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="/dashboard" aria-label="Rosy OS 대시보드 홈">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span><b>ROSY</b><small>FIELD RUNTIME / 01</small></span>
+    </a>
+    <div class="topbar-status">
+      <span id="clock" class="clock">--:--:--</span>
+      <span id="connection-badge" class="status-badge status-unknown">
+        <i aria-hidden="true"></i><span>인증 대기</span>
+      </span>
+      <button id="open-auth" class="quiet-button" type="button">접속 키</button>
+    </div>
+  </header>
+
+  <aside id="auth-drawer" class="auth-drawer" aria-labelledby="auth-title">
+    <div>
+      <p class="eyebrow">SECURE SESSION</p>
+      <h2 id="auth-title">Rosy에 연결</h2>
+      <p>viewer, operator 또는 administrator 토큰을 입력하세요. 키는 이 탭이 열려 있는 동안에만 보관됩니다.</p>
+    </div>
+    <form id="auth-form">
+      <label for="token-input">API 토큰</label>
+      <div class="auth-row">
+        <input id="token-input" name="token" type="password" autocomplete="off" spellcheck="false" placeholder="rosy-…" required>
+        <button type="submit" class="primary-button">연결</button>
+      </div>
+      <p id="auth-message" class="form-message" role="status" aria-live="polite"></p>
+    </form>
+    <button id="close-auth" class="drawer-close" type="button" aria-label="접속 키 창 닫기">×</button>
+  </aside>
+
+  <main id="dashboard-main" class="dashboard" aria-label="Rosy OS 상태">
+    <section class="hero-strip" aria-labelledby="robot-heading">
+      <div class="hero-copy">
+        <p class="eyebrow">ROBOT STATUS</p>
+        <h1 id="robot-heading"><span id="robot-name">Rosy</span><em id="robot-id">연결 대기</em></h1>
+        <p id="hero-message">접속 키를 입력하면 Raspberry Pi와 로봇 상태를 확인합니다.</p>
+      </div>
+      <div class="hero-state">
+        <span class="hero-label">CURRENT MODE</span>
+        <strong id="robot-mode">—</strong>
+        <span id="state-sequence" class="sequence">SEQ —</span>
+      </div>
+      <div class="hero-safety" id="safety-indicator">
+        <span class="hero-label">SAFETY CIRCUIT</span>
+        <strong id="safety-label">UNKNOWN</strong>
+        <span id="safety-source">상태 없음</span>
+      </div>
+    </section>
+
+    <section class="panel system-panel" aria-labelledby="system-heading">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">RASPBERRY PI OS</p>
+          <h2 id="system-heading">호스트 상태</h2>
+        </div>
+        <span id="host-name" class="machine-tag">—</span>
+      </div>
+      <div class="system-identity">
+        <div><span>운영체제</span><strong id="os-name">—</strong></div>
+        <div><span>커널 / 아키텍처</span><strong id="kernel-name">—</strong></div>
+        <div><span>IP 주소</span><strong id="network-address">—</strong></div>
+        <div><span>업타임</span><strong id="uptime">—</strong></div>
+      </div>
+      <div class="meter-stack">
+        <article class="meter" data-tone="rose">
+          <header><span>CPU</span><b id="cpu-value">—</b></header>
+          <div class="meter-rail"><i id="cpu-bar"></i></div>
+          <footer id="cpu-detail">표본 수집 대기</footer>
+        </article>
+        <article class="meter" data-tone="lime">
+          <header><span>MEMORY</span><b id="memory-value">—</b></header>
+          <div class="meter-rail"><i id="memory-bar"></i></div>
+          <footer id="memory-detail">—</footer>
+        </article>
+        <article class="meter" data-tone="amber">
+          <header><span>STORAGE</span><b id="storage-value">—</b></header>
+          <div class="meter-rail"><i id="storage-bar"></i></div>
+          <footer id="storage-detail">Rosy 데이터 영역</footer>
+        </article>
+        <article class="temperature-card">
+          <span>CORE TEMP</span>
+          <strong id="temperature">—</strong>
+          <small id="temperature-state">센서 확인 중</small>
+        </article>
+      </div>
+      <p id="runtime-warning" class="runtime-warning" role="status"></p>
+    </section>
+
+    <section class="panel motion-panel" aria-labelledby="motion-heading">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">MOTION VECTOR</p>
+          <h2 id="motion-heading">로봇 텔레메트리</h2>
+        </div>
+        <span id="state-age" class="machine-tag">—</span>
+      </div>
+      <div class="telemetry-grid">
+        <article><span>X</span><strong id="pose-x">0.000</strong><small>metres</small></article>
+        <article><span>Y</span><strong id="pose-y">0.000</strong><small>metres</small></article>
+        <article><span>YAW</span><strong id="pose-yaw">0.000</strong><small>radians</small></article>
+        <article><span>LINEAR</span><strong id="velocity-linear">0.000</strong><small>m/s</small></article>
+        <article><span>ANGULAR</span><strong id="velocity-angular">0.000</strong><small>rad/s</small></article>
+        <article><span>BATTERY</span><strong id="battery-value">—</strong><small id="battery-voltage">voltage —</small></article>
+      </div>
+      <div class="navigation-line">
+        <span>NAVIGATION</span><b id="navigation-state">—</b><small id="map-id">map —</small>
+      </div>
+    </section>
+
+    <section class="panel control-panel" aria-labelledby="control-heading">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">CONTROL AUTHORITY</p>
+          <h2 id="control-heading">운영 제어</h2>
+        </div>
+        <a class="docs-link" href="/docs" target="_blank" rel="noreferrer">API 문서 ↗</a>
+      </div>
+      <div class="mode-control" role="group" aria-label="로봇 운전 모드">
+        <button type="button" data-mode="IDLE">IDLE</button>
+        <button type="button" data-mode="MANUAL">MANUAL</button>
+        <button type="button" data-mode="NAVIGATION" disabled title="기능 확인 중">NAV</button>
+      </div>
+      <div class="safety-actions">
+        <button id="emergency-stop" class="stop-button" type="button">
+          <span>즉시 정지</span><small>모든 역할에서 실행 가능</small>
+        </button>
+        <button id="release-stop" class="release-button" type="button">
+          <span>정지 해제</span><small>관리자 권한 필요</small>
+        </button>
+      </div>
+      <p id="action-message" class="action-message" role="status" aria-live="assertive">제어 명령 대기 중</p>
+    </section>
+
+    <section class="panel capability-panel" aria-labelledby="capability-heading">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">HARDWARE CONTRACT</p>
+          <h2 id="capability-heading">기능 가용성</h2>
+        </div>
+        <span id="capability-count" class="machine-tag">—</span>
+      </div>
+      <div id="capability-list" class="capability-list" aria-live="polite">
+        <p class="empty-state">연결 후 기능 계약을 표시합니다.</p>
+      </div>
+    </section>
+
+    <section class="panel event-panel" aria-labelledby="event-heading">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">EVENT TAPE</p>
+          <h2 id="event-heading">최근 이벤트</h2>
+        </div>
+        <button id="refresh-events" class="quiet-button" type="button">새로고침</button>
+      </div>
+      <ol id="event-list" class="event-list">
+        <li class="empty-state">수신된 이벤트가 없습니다.</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    <span>ROSY OS / FASTAPI EDGE CONSOLE</span>
+    <span id="last-sync">마지막 동기화 —</span>
+  </footer>
+</body>
+</html>

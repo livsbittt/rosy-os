@@ -35,6 +35,8 @@ class CommandManager:
         self.watchdog = TeleopWatchdog(timeout_ms=500)
         self._manual_twist: Optional[Twist] = None
         self._nav_twist: Optional[Twist] = None
+        self._nav_updated_at: Optional[float] = None
+        self._nav_timeout_s = 0.5
 
     def _reject(self, source: str, reason: str) -> None:
         if self._events is not None:
@@ -56,8 +58,14 @@ class CommandManager:
         self.watchdog.refresh()
         return True, ""
 
-    def set_nav_twist(self, twist: Optional[Twist]) -> None:
+    def set_nav_twist(self, twist: Optional[Twist], now: Optional[float] = None) -> None:
         self._nav_twist = twist
+        self._nav_updated_at = (
+            (now if now is not None else time.monotonic()) if twist is not None else None
+        )
+
+    def clear_navigation(self) -> None:
+        self.set_nav_twist(None)
 
     def clear_manual(self) -> None:
         self._manual_twist = None
@@ -72,7 +80,13 @@ class CommandManager:
                 l, a = self._safety.clip(self._manual_twist.linear, self._manual_twist.angular, "manual")
                 return Twist(l, a)
             return ZERO
-        if self._modes.mode is Mode.NAVIGATION and self._nav_twist is not None:
+        nav_age = current - self._nav_updated_at if self._nav_updated_at is not None else None
+        if (
+            self._modes.mode is Mode.NAVIGATION
+            and self._nav_twist is not None
+            and nav_age is not None
+            and 0.0 <= nav_age <= self._nav_timeout_s
+        ):
             l, a = self._safety.clip(self._nav_twist.linear, self._nav_twist.angular, "nav")
             return Twist(l, a)
         return ZERO

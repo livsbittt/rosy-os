@@ -66,6 +66,18 @@ class TestCommandManager:
         assert cmd.select_output(now=t0).linear == pytest.approx(0.1)
         assert cmd.select_output(now=t0 + 0.6).linear == 0.0          # SAF-002 만료
 
+    def test_navigation_twist_expires_instead_of_replaying_stale_motion(self, bus, safety):
+        reg = SourceRegistry()
+        modes = ModeMachine()
+        modes.transition(Mode.NAVIGATION)
+        cmd = CommandManager(reg, modes, safety, events=bus)
+        t0 = time.monotonic()
+
+        cmd.set_nav_twist(Twist(0.2, 0.0), now=t0)
+
+        assert cmd.select_output(now=t0 + 0.1).linear == pytest.approx(0.2)
+        assert cmd.select_output(now=t0 + 0.6).linear == 0.0
+
     def test_teleop_rejected_outside_manual(self, bus, safety):
         reg = SourceRegistry()
         modes = ModeMachine()

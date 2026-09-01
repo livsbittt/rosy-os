@@ -31,6 +31,11 @@ def capabilities(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(g
     return svc.capability.to_dict()
 
 
+@system_router.get("/runtime")
+def system_runtime(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
+    return svc.runtime_probe.snapshot()
+
+
 robot_router = APIRouter(prefix="/api/v1/robot", tags=["robot"])
 
 
@@ -73,6 +78,10 @@ class TeleopRequest(BaseModel):
 def set_mode(body: ModeRequest, auth: AuthContext = Depends(operator),
              svc: CoreServices = Depends(get_services)):
     new_mode = Mode(body.mode)
+    if new_mode is Mode.NAVIGATION:
+        svc.capability.require("navigation.goal_navigation")
+        if svc.modes.mode is not Mode.NAVIGATION:
+            svc.command.clear_navigation()
     if new_mode is Mode.MANUAL and svc.nav.nav_state.value not in ("IDLE", "ARRIVED", "CANCELED", "FAILED"):
         svc.nav.cancel(source=f"mode:{auth.role}")
     ok, reason = svc.modes.transition(new_mode)

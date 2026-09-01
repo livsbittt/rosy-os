@@ -26,6 +26,7 @@ RUN apt-get -o Acquire::Retries=5 update \
     && python3 -m pip install --break-system-packages --no-cache-dir \
         -r /tmp/requirements-core.txt \
     && mkdir -p /var/lib/rosy/.rosy \
+    && mkdir -p /host/proc /host/etc /host/sys/class/thermal /host/sys/devices/virtual/thermal \
     && chown -R 1000:1000 /var/lib/rosy \
     && rm -rf /var/lib/apt/lists/* /tmp/requirements-core.txt
 

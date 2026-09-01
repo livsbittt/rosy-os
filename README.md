@@ -27,7 +27,7 @@ rosy/ (이 리포지토리)
 | `docs/spec/ROSY CORE SRS.md` | 로봇(엣지) 요구사항 |
 | `docs/spec/ROSY FLEET SRS.md` | 중앙 서버 요구사항 |
 | `docs/reference/ROSY API & Protocol Reference.md` | 공유 API/프로토콜 계약 |
-| `docs/reference/ROSY ADR Log.md` | 의사결정 기록 (D-1~D-22) |
+| `docs/reference/ROSY ADR Log.md` | 의사결정 기록 (D-1~D-23) |
 | `docs/plan/ROSY Implementation Plan.md` | 실행 계획·추적 매트릭스 |
 
 ## 빌드
@@ -55,6 +55,11 @@ cp .env.example .env
 docker compose --env-file .env --profile hardware build
 docker compose --env-file .env --profile hardware up -d
 ```
+
+기동 후 같은 네트워크의 브라우저에서 `http://<raspberry-pi-ip>:8080/dashboard`
+를 연다. Rosy API viewer/operator/administrator 토큰으로 로그인하면 로봇 상태,
+비상정지, 기능 계약과 Raspberry Pi OS의 CPU·메모리·디스크·온도를 한 화면에서
+확인할 수 있다. 화면은 FastAPI에 내장되어 별도 Node.js 서버가 필요 없다.
 
 설치, 장치 권한 및 물리 인수시험 절차는
 `docs/deployment/raspberry-pi-runtime.md`를 따른다.

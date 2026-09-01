@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse, RedirectResponse
 
 from rosy_core.api.errors import ApiError, register_exception_handlers
 from rosy_core.api.v1.routes import (
@@ -29,6 +31,12 @@ def create_app(config: dict[str, Any], services: CoreServices) -> FastAPI:
     app.state.core = services
     register_exception_handlers(app)
 
+    web_root = Path(__file__).resolve().parent.parent / "web"
+    dashboard_assets = {
+        "styles.css": "text/css",
+        "app.js": "application/javascript",
+    }
+
     app.include_router(system_router)
     app.include_router(robot_router)
     app.include_router(control_router)
@@ -41,5 +49,35 @@ def create_app(config: dict[str, Any], services: CoreServices) -> FastAPI:
     @app.get("/api/v1", tags=["system"])
     def root() -> dict:
         return {"name": "rosy_core", "api_versions": ["v1"]}
+
+    @app.get("/", include_in_schema=False)
+    def dashboard_redirect():
+        return RedirectResponse("/dashboard")
+
+    @app.get("/dashboard", include_in_schema=False)
+    def dashboard():
+        return FileResponse(
+            web_root / "index.html",
+            media_type="text/html",
+            headers={
+                "Cache-Control": "no-cache",
+                "Content-Security-Policy": (
+                    "default-src 'self'; connect-src 'self' ws: wss:; "
+                    "img-src 'self' data:; style-src 'self'; script-src 'self'; "
+                    "frame-ancestors 'none'; base-uri 'self'"
+                ),
+            },
+        )
+
+    @app.get("/dashboard/assets/{asset_name:path}", include_in_schema=False)
+    def dashboard_asset(asset_name: str):
+        media_type = dashboard_assets.get(asset_name)
+        if media_type is None:
+            raise HTTPException(status_code=404, detail="dashboard asset not found")
+        return FileResponse(
+            web_root / asset_name,
+            media_type=media_type,
+            headers={"Cache-Control": "public, max-age=300"},
+        )
 
     return app
