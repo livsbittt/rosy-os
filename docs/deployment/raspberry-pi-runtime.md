@@ -31,12 +31,14 @@ independent controller/watchdog outside the Raspberry Pi.
 
 ## 2. Host preparation
 
-1. Install Raspberry Pi OS Lite 64-bit and apply system updates.
-2. Install Docker Engine and the Compose plugin using Docker's Debian arm64
-   instructions.
-3. Enable the required UARTs in the Raspberry Pi boot configuration. Disable
+1. Follow the [Wi-Fi deployment guide](raspberry-pi-wifi-image.md) to flash
+   Raspberry Pi OS Lite 64-bit, configure SSH/Wi-Fi, and run the versioned
+   installer. The installer owns `/opt/rosy` as `root:root`; do not change that
+   tree to the login user's ownership because systemd executes its runtime
+   wrapper as root.
+2. Enable the required UARTs in the Raspberry Pi boot configuration. Disable
    the login console on UARTs assigned to the robot.
-4. Verify the real device nodes; do not assume numbering from another Pi:
+3. Verify the real device nodes; do not assume numbering from another Pi:
 
    ```bash
    ls -l /dev/ttyAMA0 /dev/ttyAMA4
@@ -44,31 +46,23 @@ independent controller/watchdog outside the Raspberry Pi.
    id rosy
    ```
 
-5. Install this repository at `/opt/rosy` and create the protected robot
-   configuration:
-
-   ```bash
-   sudo install -d -o rosy -g rosy /opt/rosy /var/lib/rosy
-   sudo install -d -o root -g rosy /etc/rosy
-   sudo cp deploy/robot/config/rosy.pi5.example.yaml /etc/rosy/rosy.yaml
-   sudo chown root:rosy /etc/rosy/rosy.yaml
-   sudo chmod 0640 /etc/rosy/rosy.yaml
-   ```
-
-Replace every development API token in `/etc/rosy/rosy.yaml` before connecting
-the robot to a network.
+The installer creates `/etc/rosy/rosy.yaml` with device-local tokens and mode
+`0640`, preserving and revalidating it on later runs. Do not copy the example
+configuration over that file. Retrieve the one-time credential handoff as
+described in the Wi-Fi guide.
 
 ## 3. Runtime configuration
 
+Edit the installer-managed environment as root:
+
 ```bash
-cd /opt/rosy/deploy/robot
-cp .env.example .env
+sudoedit /opt/rosy/deploy/robot/.env
 ```
 
-Set the robot identity, per-robot `ROS_DOMAIN_ID`, actual UART paths, service
-UID/GID, `ROSY_DATA_PATH`, and `dialout` GID in `.env`. The data directory must
-be owned by that UID/GID (`sudo chown -R <uid>:<gid> /var/lib/rosy`). Do not use
-`privileged: true`. Only `rosy-io` receives the two UART devices.
+Set the robot identity, per-robot `ROS_DOMAIN_ID`, actual UART paths, and image
+pins in `.env`. The installer manages service UID/GID, `ROSY_DATA_PATH`,
+`dialout` GID, file ownership, and the safe `ROSY_RUNTIME_MODE=core` default.
+Do not use `privileged: true`. Only `rosy-io` receives the two UART devices.
 
 `ROSY_NAMESPACE` is also applied to the core TF frame prefix, so topics and
 frames stay aligned. The mounted Pi 5 Lite profile advertises only the motor,
@@ -81,20 +75,24 @@ digests that were built and accepted for the exact source revision.
 
 ## 4. Build and start
 
+Keep `ROSY_RUNTIME_MODE=core` until the physical gates below are accepted. To
+prepare and promote the hardware profile afterward:
+
 ```bash
 cd /opt/rosy/deploy/robot
-docker compose --env-file .env --profile hardware build
-docker compose --env-file .env --profile hardware up -d
-docker compose --env-file .env --profile hardware ps
-docker compose --env-file .env logs --tail 100 rosy-core rosy-io
+sudo docker compose --env-file .env --profile hardware build
+sudoedit /opt/rosy/deploy/robot/.env
+# Set ROSY_RUNTIME_MODE=hardware, save, then:
+sudo systemctl restart rosy-runtime.service
+sudo docker compose --env-file .env --profile hardware ps
+sudo docker compose --env-file .env logs --tail 100 rosy-core rosy-io
 ```
 
-Install boot-time supervision after the interactive run succeeds:
+The installer already installs boot-time supervision. Verify it after the
+interactive checks:
 
 ```bash
-sudo install -m 0644 rosy-runtime.service /etc/systemd/system/rosy-runtime.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now rosy-runtime.service
+systemctl is-enabled rosy-runtime.service
 systemctl status rosy-runtime.service
 ```
 
@@ -167,7 +165,7 @@ UART, boot, thermal, and storage rows have recorded device evidence.
 
 ```bash
 cd /opt/rosy/deploy/robot
-docker compose --env-file .env --profile hardware down --timeout 10
+sudo docker compose --env-file .env --profile hardware down --timeout 10
 ```
 
 For an image rollback, set `ROSY_CORE_IMAGE` and `ROSY_IO_IMAGE` to the last

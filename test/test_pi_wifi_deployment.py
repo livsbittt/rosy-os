@@ -61,6 +61,9 @@ def test_installer_guards_destructive_paths_and_activates_systemd():
     assert "--chown=root:root" in script
     assert "--exclude 'deploy/robot/.env'" in script
     assert "systemctl stop rosy-runtime.service" in script
+    assert "trap on_install_exit EXIT" in script
+    assert "systemctl disable --now rosy-runtime.service" in script
+    assert "Rosy remains quarantined in core-off state" in script
     assert "systemctl enable --now rosy-runtime.service" in script
     assert 'grep -Eq "CHANGE_ME|rosy-dev-" "$ROSY_CONFIG"' in script
     assert 'chown root:"$run_group" "$ROSY_CONFIG"' in script
@@ -148,3 +151,6 @@ def test_wifi_runbook_is_linked_from_runtime_guide():
     assert runbook.is_file()
     assert "raspberry-pi-wifi-image.md" in runtime_guide
     assert "raspberry-pi-wifi-image.md" in readme
+    assert "sudoedit /opt/rosy/deploy/robot/.env" in runtime_guide
+    assert "sudo install -d -o rosy -g rosy /opt/rosy" not in runtime_guide
+    assert "cp .env.example .env" not in runtime_guide

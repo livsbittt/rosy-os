@@ -10,11 +10,54 @@ ROSY_DATA="${ROSY_DATA_PATH:-/var/lib/rosy}"
 RUN_USER="${ROSY_RUN_USER:-${SUDO_USER:-rosy}}"
 INITIAL_CREDENTIALS="/etc/rosy/initial-credentials.txt"
 INITIAL_CREDENTIALS_CREATED=0
+UPGRADE_GUARD_ACTIVE=0
 
 fail() {
     echo "FAIL: $*" >&2
     exit 1
 }
+
+on_install_exit() {
+    local exit_code="$?" quarantine_ok=1
+    local -a project_containers=()
+
+    if ((exit_code == 0 || UPGRADE_GUARD_ACTIVE == 0)); then
+        return "$exit_code"
+    fi
+
+    set +e
+    if systemctl list-unit-files rosy-runtime.service --no-legend 2>/dev/null \
+        | grep -q '^rosy-runtime.service'; then
+        systemctl disable --now rosy-runtime.service >/dev/null 2>&1 || quarantine_ok=0
+    fi
+    if command -v docker >/dev/null 2>&1; then
+        if docker info >/dev/null 2>&1; then
+            mapfile -t project_containers < <(
+                docker ps -aq --filter label=com.docker.compose.project=rosy-runtime
+            )
+            if ((${#project_containers[@]} > 0)); then
+                docker stop --time 10 "${project_containers[@]}" >/dev/null 2>&1 || quarantine_ok=0
+                docker rm "${project_containers[@]}" >/dev/null 2>&1 || quarantine_ok=0
+            fi
+        else
+            quarantine_ok=0
+        fi
+    fi
+
+    echo "RECOVERY: Rosy installation failed after the runtime safety gate." >&2
+    if ((quarantine_ok)); then
+        echo "Rosy remains quarantined in core-off state; boot startup is disabled." >&2
+    else
+        echo "WARNING: quarantine could not be fully verified; keep the hardware E-stop engaged." >&2
+    fi
+    echo "After correcting the reported error, rerun:" >&2
+    echo "  sudo bash $SOURCE_ROOT/deploy/robot/install-pi.sh" >&2
+    echo "Or rerun deploy/robot/deploy-from-windows.ps1 from the release PC." >&2
+    echo "Do not enable hardware mode until this installer reports PASS." >&2
+    return "$exit_code"
+}
+
+trap on_install_exit EXIT
 
 require_root() {
     [[ "${EUID:-$(id -u)}" -eq 0 ]] || fail "run with sudo: sudo bash deploy/robot/install-pi.sh"
@@ -74,8 +117,13 @@ EOF
 stop_existing_runtime() {
     local -a project_containers=()
 
+    UPGRADE_GUARD_ACTIVE=1
     if systemctl is-active --quiet rosy-runtime.service 2>/dev/null; then
         systemctl stop rosy-runtime.service
+    fi
+    if systemctl list-unit-files rosy-runtime.service --no-legend 2>/dev/null \
+        | grep -q '^rosy-runtime.service'; then
+        systemctl disable rosy-runtime.service
     fi
     if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
         mapfile -t project_containers < <(
@@ -224,6 +272,7 @@ main() {
     write_runtime_environment
     build_and_start_core
     enable_boot_service
+    UPGRADE_GUARD_ACTIVE=0
     echo "PASS: Rosy core-only runtime is installed and healthy"
     if ((INITIAL_CREDENTIALS_CREATED)); then
         echo "Credentials: sudo cat $INITIAL_CREDENTIALS"
