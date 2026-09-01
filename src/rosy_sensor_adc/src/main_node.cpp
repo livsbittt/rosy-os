@@ -1,12 +1,21 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/range.hpp"
+#include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/u_int16_multi_array.hpp"
 #include "sensor_msgs/msg/battery_state.hpp"
 #include "realtime_tools/realtime_publisher.hpp"
 
+#include <cmath>
+
 #include "wiringPiI2C.h"
 
 using realtime_tools::RealtimePublisher;
+
+// ADC channel layout: 0..2 IR, 3 ultrasonic, 4 battery.
+static constexpr int CH_IR_FIRST = 0;
+static constexpr int CH_ULTRASONIC = 3;
+static constexpr int CH_BATTERY = 4;
+static constexpr int CH_COUNT = 5;
 
 class RosySensorADC : public rclcpp::Node
 {
@@ -15,6 +24,13 @@ class RosySensorADC : public rclcpp::Node
         {
             this->declare_parameter<std::string>("interface", "/dev/i2c-1");
             this->declare_parameter<double>("rate", 20.0);
+
+            // PWR-001 duty cycling. rosy_core publishes power/mode; until a valid
+            // message arrives the node keeps its full startup rate, so a rosy_core
+            // outage can never leave the sensors slow.
+            this->declare_parameter<double>("rate_active", 20.0);
+            this->declare_parameter<double>("rate_idle", 5.0);
+            this->declare_parameter<double>("rate_standby", 2.0);
 
             auto interface = this->get_parameter("interface").get_parameter_value().get<std::string>();
 
@@ -28,21 +44,70 @@ class RosySensorADC : public rclcpp::Node
             pub_ir_sensor_ = this->create_publisher<std_msgs::msg::UInt16MultiArray>("ir_sensor/range", 10);
             pub_batt_state_ = this->create_publisher<sensor_msgs::msg::BatteryState>("batt_state", 10);
 
-            // Timer Loop (100Hz)
-            auto period = std::chrono::duration<double>(1.0 / this->get_parameter("rate").as_double());
-            timer_ = this->create_wall_timer(period, std::bind(&RosySensorADC::timer_callback, this));
+            sub_power_mode_ = this->create_subscription<std_msgs::msg::String>(
+                "power/mode", rclcpp::QoS(1).transient_local().reliable(),
+                std::bind(&RosySensorADC::power_mode_callback, this, std::placeholders::_1));
+
+            current_rate_ = this->get_parameter("rate").as_double();
+            restart_timer(current_rate_);
 
             RCLCPP_INFO(this->get_logger(), "%s initialized...", this->get_name());
         }
         ~RosySensorADC() {}
 
     private:
+        void restart_timer(double rate)
+        {
+            if(timer_) {
+                timer_->cancel();
+            }
+            auto period = std::chrono::duration<double>(1.0 / rate);
+            timer_ = this->create_wall_timer(period, std::bind(&RosySensorADC::timer_callback, this));
+        }
+
+        void power_mode_callback(const std_msgs::msg::String::SharedPtr msg)
+        {
+            double rate = current_rate_;
+            bool standby = false;
+
+            if(msg->data == "active") {
+                rate = this->get_parameter("rate_active").as_double();
+            } else if(msg->data == "idle") {
+                rate = this->get_parameter("rate_idle").as_double();
+            } else if(msg->data == "standby") {
+                rate = this->get_parameter("rate_standby").as_double();
+                standby = true;
+            } else {
+                // Unknown mode: keep the current rate rather than guessing.
+                RCLCPP_WARN(this->get_logger(), "ignoring unknown power mode");
+                return;
+            }
+
+            if(rate <= 0.0 || !std::isfinite(rate)) {
+                RCLCPP_WARN(this->get_logger(), "ignoring non-positive rate for mode");
+                return;
+            }
+
+            standby_ = standby;
+            if(rate == current_rate_) {
+                return;
+            }
+
+            current_rate_ = rate;
+            restart_timer(rate);
+            RCLCPP_INFO(this->get_logger(), "power mode '%s' -> %.1f Hz", msg->data.c_str(), rate);
+        }
+
         void timer_callback()
         {
-            uint8_t registers[5] = {0x88, 0xC8, 0x98, 0xD8, 0xF8};
-            uint16_t adc_result[5] = {0, 0, 0, 0, 0};
+            uint8_t registers[CH_COUNT] = {0x88, 0xC8, 0x98, 0xD8, 0xF8};
+            uint16_t adc_result[CH_COUNT] = {0, 0, 0, 0, 0};
 
-            for(int i = 0; i < 5; i++)
+            // In standby only the wake sensor and the battery are worth the bus
+            // time: two round trips per cycle instead of five.
+            const int first = standby_ ? CH_ULTRASONIC : CH_IR_FIRST;
+
+            for(int i = first; i < CH_COUNT; i++)
             {
                 uint8_t data[2] = {0, };
 
@@ -60,22 +125,25 @@ class RosySensorADC : public rclcpp::Node
             us_result.field_of_view = 0.26;
             us_result.min_range = 0.02;
             us_result.max_range = 3.0;
-            us_result.range = 1.0 * (adc_result[3] / 4096.0) - 0.03;
+            us_result.range = 1.0 * (adc_result[CH_ULTRASONIC] / 4096.0) - 0.03;
             us_result.variance = 0;
 
             pub_us_sensor_->publish(us_result);
 
 
-            auto ir_result = std_msgs::msg::UInt16MultiArray();
-            ir_result.data.push_back(adc_result[2]);
-            ir_result.data.push_back(adc_result[1]);
-            ir_result.data.push_back(adc_result[0]);
+            if(!standby_)
+            {
+                auto ir_result = std_msgs::msg::UInt16MultiArray();
+                ir_result.data.push_back(adc_result[2]);
+                ir_result.data.push_back(adc_result[1]);
+                ir_result.data.push_back(adc_result[0]);
 
-            pub_ir_sensor_->publish(ir_result);
+                pub_ir_sensor_->publish(ir_result);
+            }
 
             auto batt_result = sensor_msgs::msg::BatteryState();
             batt_result.header.stamp = this->now();
-            batt_result.voltage = (adc_result[4] / 4096.0) * 4.096 / (13.0 / 28.0);
+            batt_result.voltage = (adc_result[CH_BATTERY] / 4096.0) * 4.096 / (13.0 / 28.0);
             batt_result.temperature  = std::nan("");
             batt_result.current = std::nan("");
             batt_result.charge = std::nan("");
@@ -94,7 +162,10 @@ class RosySensorADC : public rclcpp::Node
 
     private:
         int fd_;
+        double current_rate_ = 20.0;
+        bool standby_ = false;
         rclcpp::TimerBase::SharedPtr timer_;
+        rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_power_mode_;
         rclcpp::Publisher<sensor_msgs::msg::Range>::SharedPtr pub_us_sensor_;
         rclcpp::Publisher<std_msgs::msg::UInt16MultiArray>::SharedPtr pub_ir_sensor_;
         rclcpp::Publisher<sensor_msgs::msg::BatteryState>::SharedPtr pub_batt_state_;
