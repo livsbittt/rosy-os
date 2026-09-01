@@ -370,3 +370,44 @@ Docker socket, systemd 제어 및 OS 설정 변경은 대시보드 범위에서 
 묶여 사각지대가 남는다. ADC 노드는 유효한 `power/mode`를 받기 전까지 기동
 주기를 유지하므로 `rosy_core` 장애가 센서를 느리게 만들지는 못한다.
 IR·IMU 기반 보조 웨이크가 필요하면 별도 ADR로 다룬다.
+
+---
+
+## D-25 절전 계층은 STANDBY에서 끝난다 — Pi 5 하이버네이트는 채택하지 않는다
+
+**Status:** Accepted (2026-09-01)
+
+**Context:** D-24의 듀티 사이클링 아래로 한 단계 더 내려갈 수 있는지 조사했다.
+Raspberry Pi 5는 2026년 중반 기준 suspend-to-RAM(`mem`)도 하이버네이트(`disk`)도
+지원하지 않는다. BCM2712에 상시 도메인 하드웨어는 있으나 Broadcom SDRAM PHY
+self-refresh 시퀀스가 공개되지 않아 펌웨어 경로가 막혀 있다. 실제로 존재하는
+유일한 딥 상태는 `POWER_OFF_ON_HALT=1` + `halt`로 PMIC를 STANDBY에 넣는 약 3 mA
+상태이며, Pi 5에서는 `WAKE_ON_GPIO`가 의미를 잃어 전원 버튼과 RTC 알람만이 웨이크
+소스다. 즉 Pi 5의 전력 상태는 상시 약 2.7 W 아니면 사실상 꺼짐이고 중간 단계가
+없다. 한편 세워둔 로봇의 소비는 DYNAMIXEL 홀딩 토크, 상시 회전하는 RPLIDAR C1
+모터, LCD 백라이트, SoC 순이라 SoC는 목록의 맨 위가 아니다.
+
+**Decision:** 절전 계층을 ACTIVE/IDLE/STANDBY에서 끝내고 딥 halt를 그 아래
+단계로 채택하지 않는다. 네 가지가 D-24의 계약과 충돌하기 때문이다. (1) 웨이크
+센서가 함께 죽는다 — halt된 Pi는 초음파를 샘플링하지 못하므로 D-24의 유일한
+웨이크 트리거가 사라지고 RTC 예약과 물리 버튼만 남는다. (2) 복귀가 resume이
+아니라 부팅이라 Docker/ROS 2 그래프 재기동까지 수십 초가 걸려 500 ms 목표와
+자릿수가 다르다. (3) E-Stop, 50 Hz `cmd_vel`, teleop 워치독, SAF-005가 모두
+멈춰 "절전은 모터 권한이 없다"는 경계를 깬다. (4) DDS 디스커버리·오도메트리·
+SLAM 세션·진행 중 목표가 소실된다. 대신 실효 절감을 LiDAR 모터로 돌린다
+(PWR-005): `sllidar_ros2`의 `stop_motor`/`start_motor`를 STANDBY에 연결하되
+`power.lidar.standby_stop`은 기본 `false`로 출하해 벤치 승인 뒤 켠다. 모터 토크
+오프는 절감이 가장 크지만 전력 정책이 액추에이터 상태를 지시하게 되어 경계를
+넘으므로 별도 ADR로 유보한다.
+
+**Consequences:** 세워둔 로봇에서 Pi의 2.7 W는 회수 대상이 아니며, 남은 절감은
+주변장치에서만 나온다. LiDAR 정지는 코드 경로가 완성·단위 검증되었지만 기본
+비활성이라 실측 이득은 벤치 승인 전까지 0이고, 스캔 단절이 실행 중 Nav2
+라이프사이클에 주는 영향은 실기 관찰 항목으로 남는다. 정지 상태에서 재기동
+후 스캔을 신뢰하기까지의 창은 `lidar_ready`로 노출되며 `spinup_s: 2.0`은
+아직 추정값이다. 근접 웨이크를 유지한 채 호스트를 재우려면 초음파를 쥐고
+전원 버튼/`GLOBAL_EN`을 구동하는 상시 MCU가 필요해 보드 변경 사안이 된다.
+Jetson·x86처럼 서스펜드가 제대로 되는 컨트롤러로 확장할 때는 `PowerManager`를
+정책 소유자로 두고 `PlatformPowerBackend`가 자기 능력을 선언하는 형태로 가며,
+그 시점에 별도 ADR로 다룬다. 조사 근거와 출처는
+`docs/plans/2026-09-01-deep-power-states-design.md`에 있다.
