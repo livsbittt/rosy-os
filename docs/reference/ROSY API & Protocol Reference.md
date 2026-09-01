@@ -150,7 +150,10 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 | GET | `/api/v1/robot/battery` | Viewer | §12 |
 | GET | `/api/v1/robot/velocity` | Viewer | §12 |
 | GET | `/api/v1/sensors` | Viewer | §12 |
-| GET | `/api/v1/sensors/{lidar\|imu\|battery\|encoder\|motor}` | Viewer | §12 |
+| GET | `/api/v1/sensors/{lidar\|imu\|ultrasonic\|battery\|encoder\|motor}` | Viewer | §12 |
+| GET | `/api/v1/power` | Viewer | PWR-001 (절전 모드·프레즌스·샘플링 주기) |
+| POST | `/api/v1/power/wake` | Operator | PWR-004 (원격 웨이크 — 정보 화면 표시) |
+| POST | `/api/v1/power/mode` | Operator | PWR-001 (payload: `{mode: ACTIVE\|IDLE\|STANDBY}`) |
 
 ## 5.3 Navigation·SLAM
 
@@ -225,6 +228,14 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
   "velocity": { "linear": 0.12, "angular": 0.0 },
   "battery": { "percent": 81 },
   "safety": { "estop": false },
+  "power": {
+    "mode": "STANDBY",
+    "presence": "none",
+    "info_visible": false,
+    "sample_rate_hz": 2.0,
+    "last_wake_reason": null,
+    "idle_seconds": 412.5
+  },
   "diagnostics_summary": { "rosy_core": "OK", "nav2": "OK" },
   "seq": 10241,
   "timestamp": "2026-08-29T12:00:00.123Z"
@@ -352,6 +363,9 @@ Follower의 rosy_core은 스트림 수신 여부를 `stream_timeout_ms`(기본 1
 | `command.rejected` | warning | 로봇 | `{source, reason}` |
 | `waypoint.created/updated/deleted` | info | 로봇 | `{name}` |
 | `slam.started` / `slam.stopped` | info | 로봇 | `{by, reset?}` (NAV-005 세션) |
+| `power.mode_changed` | info | 로봇 | `{from, to, reason, sample_rate_hz}` (PWR-001) |
+| `power.wake` | info | 로봇 | `{reason}` — `proximity\|contact\|api\|battery` (PWR-004) |
+| `presence.detected` / `presence.cleared` | info | 로봇 | `{state, range}` (PWR-002) |
 | `map.saved` | info | 로봇 | `{map_id}` |
 | `mission.assigned` | info | Fleet | `{mission_id, robot_id}` |
 | `mission.started` | info | Fleet | `{mission_id}` |
@@ -493,6 +507,7 @@ Fleet(rosy_fleet)이 제공하는 엔드포인트. Base: `http://<fleet-host>:80
 
 | 버전 | 일자 | 내용 |
 |---|---|---|
+| v1.4 | 2026-09-01 | Additive: 절전/근접 웨이크 — `power/*` REST, 스냅샷 `power` 필드, 이벤트 `power.*`·`presence.*`, 센서 `ultrasonic` (PWR-001~004, D-24) |
 | v1.3 | 2026-08-29 | Additive: 이벤트 `slam.started`/`slam.stopped` (NAV-005 세션 API 구현에 수반) |
 | v1.2 | 2026-08-29 | Additive: `swarm/follow`에 `source` 필드(fleet 기본, peer 예약 — D-21 분산 진화 훅), SWM-007 |
 | v1.1 | 2026-08-29 | Additive: swarm 인터페이스 — `swarm/follow·cancel·state` REST, envelope `pose` 스트림(§7.8), 이벤트 `swarm.*`, capability `swarm` 필드 (D-20) |
