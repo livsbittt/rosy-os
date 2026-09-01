@@ -2,6 +2,10 @@
 
 **Target:** Raspberry Pi 5 8GB, Raspberry Pi OS Lite 64-bit, ROSY Phase 1
 
+유선 LAN 없이 SD 카드를 굽고 Wi-Fi로 설치·접속하는 전체 절차는
+[Rosy Raspberry Pi 5 Wi-Fi 배포 가이드](raspberry-pi-wifi-image.md)를 먼저
+따른다. 이 문서는 하드웨어 런타임과 물리 승인 항목을 상세히 설명한다.
+
 This deployment keeps Raspberry Pi OS as the host and runs the ROS 2 Jazzy
 userland in two containers. `rosy-core` owns the FastAPI/rclpy middleware and
 has no device access. `rosy-io` owns the Pinky Pro motor and LiDAR adapters.
