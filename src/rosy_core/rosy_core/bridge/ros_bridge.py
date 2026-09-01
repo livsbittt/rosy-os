@@ -29,7 +29,6 @@ from nav_msgs.msg import Odometry
 from nav2_msgs.action import NavigateToPose
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import BatteryState, Imu, LaserScan, Range
-from slam_toolbox.srv import SaveMap
 from std_msgs.msg import Float32, String
 from std_srvs.srv import Empty
 
@@ -101,7 +100,19 @@ class RosBridge:
 
         self._goal_handle = None
         self._last_odom_ts = 0.0
-        self._slam_client = node.create_client(SaveMap, "slam_toolbox/save_map")
+        # slam_toolbox 를 모듈 최상단에서 임포트하면 브리지 임포트가, 따라서
+        # 노드 기동 전체가 실패한다. core 이미지에는 설치되지 않고 pi5-lite
+        # capabilities 도 slam: false 다. 여기서 시도하고 부재는 기록만 해서
+        # SLAM 을 실제로 쓰는 경로에서만 드러나게 한다. 클라이언트를 생성자에서
+        # 만들어야 DDS 엔드포인트 매칭에 노드 수명만큼의 시간이 주어진다.
+        self._slam_client = None
+        try:
+            from slam_toolbox.srv import SaveMap
+        except ImportError as exc:
+            node.get_logger().warning(
+                f"slam_toolbox unavailable; map saving disabled ({exc})")
+        else:
+            self._slam_client = node.create_client(SaveMap, "slam_toolbox/save_map")
 
         self._published_power_mode: Optional[str] = None
         # 드라이버는 core보다 먼저 떠서 이미 회전 중이다 — 기동 시 불필요한 호출 방지.
@@ -399,9 +410,12 @@ class RosBridge:
 
         파일을 찾으면 내용 체크섬, 못 찾으면 name+시각 해시로 대체 map_id.
         """
+        if self._slam_client is None:
+            raise RuntimeError(
+                "slam_toolbox is not installed in this runtime; map saving is unavailable")
         if not self._slam_client.wait_for_service(timeout_sec=1.0):
             raise RuntimeError("slam_toolbox save_map service unavailable")
-        request = SaveMap.Request()
+        request = self._slam_client.srv_type.Request()
         request.name = name
         future = self._slam_client.call_async(request)
         done = threading.Event()
