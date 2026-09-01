@@ -52,8 +52,8 @@ Raspberry Pi OS Lite 64-bit에서는 ROS 2 Jazzy 실행환경을 두 서비스�
 ```bash
 cd deploy/robot
 cp .env.example .env
-docker compose --env-file .env --profile hardware build
-docker compose --env-file .env --profile hardware up -d
+docker compose --env-file .env build rosy-core
+./runtime-mode.sh up
 ```
 
 기동 후 같은 네트워크의 브라우저에서 `http://<raspberry-pi-ip>:8080/dashboard`
@@ -61,8 +61,11 @@ docker compose --env-file .env --profile hardware up -d
 비상정지, 기능 계약과 Raspberry Pi OS의 CPU·메모리·디스크·온도를 한 화면에서
 확인할 수 있다. 화면은 FastAPI에 내장되어 별도 Node.js 서버가 필요 없다.
 
-설치, 장치 권한 및 물리 인수시험 절차는
-`docs/deployment/raspberry-pi-runtime.md`를 따른다.
+유선 LAN 없는 SD 카드 굽기, Wi-Fi·SSH 설정, Windows 배포 및 첫 접속은
+[`docs/deployment/raspberry-pi-wifi-image.md`](docs/deployment/raspberry-pi-wifi-image.md)를
+따른다. 장치 권한과 물리 인수시험은
+[`docs/deployment/raspberry-pi-runtime.md`](docs/deployment/raspberry-pi-runtime.md)에
+정리되어 있다.
 
 ## 로드맵
 

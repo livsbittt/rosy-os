@@ -98,6 +98,11 @@ write_initial_config() {
             -e "s/CHANGE_ME_OPERATOR/$operator_token/" \
             -e "s/CHANGE_ME_VIEWER/$viewer_token/" \
             "$INSTALL_ROOT/deploy/robot/config/rosy.pi5.example.yaml" >"$config_tmp"
+        if grep -q "CHANGE_ME" "$config_tmp"; then
+            rm -f "$config_tmp"
+            trap - RETURN
+            fail "generated configuration still contains placeholder credentials"
+        fi
         install -o root -g "$run_group" -m 0640 "$config_tmp" "$ROSY_CONFIG"
         {
             echo "Rosy initial API credentials — remove this file after recording them"
@@ -144,6 +149,10 @@ build_and_start_core() {
     local runtime_dir container_id status attempt
     runtime_dir="$INSTALL_ROOT/deploy/robot"
     cd "$runtime_dir"
+    if systemctl is-active --quiet rosy-runtime.service 2>/dev/null; then
+        systemctl stop rosy-runtime.service
+    fi
+    ROSY_RUNTIME_MODE=core "$runtime_dir/runtime-mode.sh" down
     docker compose --env-file .env build rosy-core
     ROSY_RUNTIME_MODE=core "$runtime_dir/runtime-mode.sh" up
     container_id="$(docker compose --env-file .env ps -q rosy-core)"

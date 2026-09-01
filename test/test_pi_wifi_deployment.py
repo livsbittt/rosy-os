@@ -55,7 +55,9 @@ def test_installer_guards_destructive_paths_and_activates_systemd():
     assert '[[ "$ROSY_CONFIG" == "/etc/rosy/rosy.yaml" ]]' in script
     assert '[[ "$ROSY_DATA" == "/var/lib/rosy" ]]' in script
     assert "umask 077" in script
+    assert "systemctl stop rosy-runtime.service" in script
     assert "systemctl enable --now rosy-runtime.service" in script
+    assert 'grep -q "CHANGE_ME"' in script
 
 
 def test_runtime_defaults_to_core_only_and_rejects_unknown_modes():
@@ -121,6 +123,8 @@ def test_pi_profile_binds_dashboard_to_wifi_reachable_interface():
 def test_wifi_runbook_is_linked_from_runtime_guide():
     runbook = ROOT / "docs" / "deployment" / "raspberry-pi-wifi-image.md"
     runtime_guide = _text(ROOT / "docs" / "deployment" / "raspberry-pi-runtime.md")
+    readme = _text(ROOT / "README.md")
 
     assert runbook.is_file()
     assert "raspberry-pi-wifi-image.md" in runtime_guide
+    assert "raspberry-pi-wifi-image.md" in readme
