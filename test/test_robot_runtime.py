@@ -140,12 +140,14 @@ def test_core_image_prepares_dashboard_and_host_mount_directories():
     assert "web/*.js" in setup
 
 
-def test_systemd_unit_delegates_to_compose_hardware_profile():
+def test_systemd_unit_delegates_to_runtime_mode_wrapper():
     unit = (DEPLOY / "rosy-runtime.service").read_text(encoding="utf-8")
 
     assert "Requires=docker.service" in unit
-    assert "docker compose --profile hardware up -d" in unit
-    assert "docker compose --profile hardware down" in unit
+    assert "EnvironmentFile=-/opt/rosy/deploy/robot/.env" in unit
+    assert "runtime-mode.sh up" in unit
+    assert "runtime-mode.sh down" in unit
+    assert "docker compose" not in unit
 
 
 def test_container_entrypoint_is_forced_to_unix_line_endings():
