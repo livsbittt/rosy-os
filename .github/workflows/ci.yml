@@ -20,7 +20,7 @@ jobs:
         run: |
           apt-get update -qq
           apt-get install -y -qq python3-colcon-common-extensions python3-pip
-          pip3 install --no-cache-dir flake8 pydantic fastapi uvicorn httpx websockets
+          pip3 install --no-cache-dir flake8 pydantic fastapi uvicorn httpx websockets pyyaml
 
       - name: Build (colcon)
         run: |
@@ -36,6 +36,13 @@ jobs:
         run: |
           cd src/rosy_core
           python3 -m pytest test/ -v
+
+      # 루트 test/ 는 배포·릴리스 계약을 담고 있으면서도 지금까지 CI 에서 한 번도
+      # 실행되지 않았다. 위 스텝이 src/rosy_core/test 만 돌기 때문이다. 그래서
+      # compose 권한 경계와 Wi-Fi 배포 계약이 검증 없이 지나갔다.
+      # ROS 오버레이는 필요 없다 — test_motor_control.py 가 직접 sys.path 를 잡는다.
+      - name: Test (deployment and release contracts)
+        run: python3 -m pytest test/ -v
 
       # 호스트 테스트는 ros_bridge 를 임포트하지 않으므로, 모듈 최상단의 ROS
       # 임포트가 노드 생성자를 죽이는 결함을 잡지 못한다. 이 러너에는

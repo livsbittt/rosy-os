@@ -12,7 +12,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[1]
 ADR = ROOT / "docs" / "reference" / "ROSY ADR Log.md"
 SRS = ROOT / "docs" / "spec" / "ROSY CORE SRS.md"
