@@ -86,9 +86,9 @@ Pi에서 네트워크를 직접 진단할 때는 다음 항목을 따로 확인�
 nmcli radio wifi
 nmcli -t -f GENERAL.CONNECTION device show wlan0
 ip -4 -o addr show dev wlan0 scope global
-ip route show default
+ip route show default dev wlan0
 getent ahosts www.raspberrypi.com
-curl -fsSIL --max-time 8 https://www.raspberrypi.com/
+curl --interface wlan0 -fsSIL --max-time 8 https://www.raspberrypi.com/
 ```
 
 `wlan0` 주소만 있고 마지막 두 명령이 실패하면 로컬 접속은 가능하지만 DNS

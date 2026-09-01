@@ -55,9 +55,26 @@ def test_installer_guards_destructive_paths_and_activates_systemd():
     assert '[[ "$ROSY_CONFIG" == "/etc/rosy/rosy.yaml" ]]' in script
     assert '[[ "$ROSY_DATA" == "/var/lib/rosy" ]]' in script
     assert "umask 077" in script
+    assert '[[ ! -L "$INSTALL_ROOT" ]]' in script
+    assert '[[ "$install_real" == "$INSTALL_ROOT" ]]' in script
+    assert '[[ "$source_real" != "$INSTALL_ROOT/"* ]]' in script
+    assert "--chown=root:root" in script
+    assert "--exclude 'deploy/robot/.env'" in script
     assert "systemctl stop rosy-runtime.service" in script
     assert "systemctl enable --now rosy-runtime.service" in script
-    assert 'grep -q "CHANGE_ME"' in script
+    assert 'grep -Eq "CHANGE_ME|rosy-dev-" "$ROSY_CONFIG"' in script
+    assert 'chown root:"$run_group" "$ROSY_CONFIG"' in script
+    assert 'chmod 0640 "$ROSY_CONFIG"' in script
+    assert 'chown root:"$run_group" "$env_file"' in script
+    assert 'chmod 0640 "$env_file"' in script
+    assert "preflight_host\n    stop_existing_runtime\n    install_host_packages" in script
+
+
+def test_installer_uses_private_temporary_docker_key_file():
+    script = _text(INSTALLER)
+
+    assert "mktemp" in script
+    assert "/tmp/rosy-docker.asc" not in script
 
 
 def test_runtime_defaults_to_core_only_and_rejects_unknown_modes():
@@ -94,6 +111,8 @@ def test_network_verifier_separates_wifi_lan_internet_and_dashboard():
     for gate in ("WIFI", "LAN", "DNS", "INTERNET", "RUNTIME", "DASHBOARD"):
         assert gate in script
     assert "WIFI_PASSWORD" not in script
+    assert "ip route show default dev wlan0" in script
+    assert "curl --interface wlan0" in script
 
 
 def test_windows_uploader_archives_only_git_head_and_keeps_ssh_host_checks():

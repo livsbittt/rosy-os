@@ -73,8 +73,8 @@ else
     fail "LAN" "wlan0 has no IPv4 address"
   else
     pass "LAN" "wlan0 IPv4: $wlan_ipv4"
-    if ip route show default 2>/dev/null | grep -q '^default '; then
-      pass "ROUTE" "default route present"
+    if ip route show default dev wlan0 2>/dev/null | grep -q '^default '; then
+      pass "ROUTE" "default route through wlan0 present"
     elif ((require_internet)); then
       fail "ROUTE" "no default route (--require-internet enabled)"
     else
@@ -92,7 +92,7 @@ else
 fi
 
 internet_ok=0
-if has_command curl && curl -fsSIL --max-time 8 https://www.raspberrypi.com/ >/dev/null 2>&1; then
+if has_command curl && curl --interface wlan0 -fsSIL --max-time 8 https://www.raspberrypi.com/ >/dev/null 2>&1; then
   internet_ok=1
   pass "INTERNET" "outbound HTTPS succeeded"
 elif ((require_internet)); then
