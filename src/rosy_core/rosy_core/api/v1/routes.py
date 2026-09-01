@@ -267,12 +267,14 @@ class SlamSaveRequest(BaseModel):
 
 @slam_router.post("/start")
 def slam_start(auth: AuthContext = Depends(operator), svc: CoreServices = Depends(get_services)):
+    svc.capability.require("slam")
     svc.nav.start_mapping(source=f"api:{auth.role}")
     return {"mapping": True}
 
 
 @slam_router.post("/stop")
 def slam_stop(auth: AuthContext = Depends(operator), svc: CoreServices = Depends(get_services)):
+    svc.capability.require("slam")
     svc.nav.stop_mapping(source=f"api:{auth.role}")
     return {"mapping": False}
 
@@ -280,6 +282,7 @@ def slam_stop(auth: AuthContext = Depends(operator), svc: CoreServices = Depends
 @slam_router.post("/save")
 def slam_save(body: SlamSaveRequest, auth: AuthContext = Depends(operator),
               svc: CoreServices = Depends(get_services)):
+    svc.capability.require("slam")
     try:
         map_id = svc.nav.save_map(body.name, source=f"api:{auth.role}")
     except RuntimeError as exc:
@@ -289,6 +292,7 @@ def slam_save(body: SlamSaveRequest, auth: AuthContext = Depends(operator),
 
 @slam_router.post("/reset")
 def slam_reset(auth: AuthContext = Depends(operator), svc: CoreServices = Depends(get_services)):
+    svc.capability.require("slam")
     svc.nav.reset_mapping(source=f"api:{auth.role}")
     return {"reset": True}
 

@@ -167,3 +167,52 @@ class TestNewApi:
         assert "rosy_uptime_seconds" in r.text
         assert "rosy_events_published_total" in r.text
         assert "text/plain" in r.headers["content-type"]
+
+
+class TestSlamCapabilityGate:
+    """CAP-003: capabilities 가 slam: false 면 ROS 작업 전에 501 로 거절한다.
+
+    pi5-lite 배포는 slam: false 를 마운트하는데, 게이트가 없으면 API 가
+    slam 을 지원한다고 광고해 놓고 저장 시점에야 실패한다.
+    """
+
+    @pytest.fixture
+    def no_slam(self, tmp_path):
+        config = yaml.safe_load((CONFIG_DIR / "rosy_default.yaml").read_text(encoding="utf-8"))
+        profile = RobotProfile.load(CONFIG_DIR / "profile.pinky_pro.yaml")
+        caps = yaml.safe_load((CONFIG_DIR / "capabilities.yaml").read_text(encoding="utf-8"))
+        caps["slam"] = False                      # capabilities.pi5-lite.yaml 과 동일
+        services = CoreServices.build(config, profile, caps, tmp_path / "wp.json")
+        services.nav.executor = FakeExecutor()
+        return TestClient(create_app(config, services)), services
+
+    @pytest.mark.parametrize("path,body", [
+        ("/api/v1/slam/start", None),
+        ("/api/v1/slam/stop", None),
+        ("/api/v1/slam/save", {"name": "m"}),
+        ("/api/v1/slam/reset", None),
+    ])
+    def test_route_rejected_without_capability(self, no_slam, path, body):
+        tc, _ = no_slam
+        response = tc.post(path, json=body, headers=OPERATOR)
+        assert response.status_code == 501
+        assert response.json()["error"]["code"] == "CAPABILITY_NOT_SUPPORTED"
+
+    def test_rejection_precedes_any_mapping_work(self, no_slam):
+        """게이트가 앞단이어야 한다 — 매핑 세션이 열리지 않는다."""
+        tc, svc = no_slam
+        tc.post("/api/v1/slam/start", headers=OPERATOR)
+        assert svc.nav.mapping_active is False
+
+    def test_capability_declaration_matches_behavior(self, no_slam):
+        """광고와 동작이 일치해야 한다 — 이번 불일치의 핵심."""
+        tc, _ = no_slam
+        caps = tc.get("/api/v1/system/capabilities", headers=OPERATOR).json()
+        assert caps["slam"] is False
+        assert tc.post("/api/v1/slam/start", headers=OPERATOR).status_code == 501
+
+    def test_enabled_capability_still_works(self, client):
+        """slam: true 인 기본 구성은 종전대로 동작한다 (회귀 방지)."""
+        tc, svc = client
+        assert tc.post("/api/v1/slam/start", headers=OPERATOR).status_code == 200
+        assert svc.nav.mapping_active is True
