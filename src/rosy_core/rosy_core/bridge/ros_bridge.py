@@ -416,7 +416,8 @@ class RosBridge:
         if not self._slam_client.wait_for_service(timeout_sec=1.0):
             raise RuntimeError("slam_toolbox save_map service unavailable")
         request = self._slam_client.srv_type.Request()
-        request.name = name
+        # SaveMap.srv 의 name 은 string 이 아니라 std_msgs/String 이다.
+        request.name = String(data=name)
         future = self._slam_client.call_async(request)
         done = threading.Event()
 
@@ -426,8 +427,14 @@ class RosBridge:
         future.add_done_callback(_cb)
         if not done.wait(timeout=15.0):
             raise RuntimeError("save_map service timeout")
-        if future.result() is None or not getattr(future.result(), "result", True):
+        response = future.result()
+        if response is None:
             raise RuntimeError("save_map service failed")
+        # slam_toolbox 는 RESULT_SUCCESS=0, 실패가 1/255 다. 참/거짓으로 보면
+        # 성공을 실패로, 실패를 성공으로 뒤집게 된다.
+        code = response.result
+        if code != 0:
+            raise RuntimeError(f"save_map service failed (result={code})")
 
         digest_source = name
         for candidate in (Path(f"{name}.pgm"), Path(name)):
