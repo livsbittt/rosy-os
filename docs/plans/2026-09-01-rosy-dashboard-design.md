@@ -15,4 +15,4 @@ Rosy OS Dashboard는 Raspberry Pi OS 위에서 실행되는 `rosy_core`의 현�
 3. `/api/v1/system/runtime`, `/system/info`, `/system/capabilities`, `/robot/state`, `/safety/state`, `/events`를 조회한다.
 4. `/ws/state`를 연결해 로봇 상태를 갱신하며 실패 시 2초 REST 폴링으로 전환한다.
 5. 제어 버튼은 기존 `/mode`, `/safety/stop`, `/safety/release`만 호출한다.
-6. 모든 위험 동작은 확인 절차와 서버 역할 검사를 모두 거친다.
+6. 모든 위험 동작은 확인 절차와 서버 역할 검사를 모두 거친다. 모드 변경은 요청 중 재입력을 잠그고, NAV는 capability가 활성화된 경우에만 표시·허용하며, 서버는 진입 전에 오래된 navigation twist를 제거한다.

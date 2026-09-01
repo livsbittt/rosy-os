@@ -94,6 +94,20 @@ def test_snapshot_degrades_to_null_when_host_files_are_missing(tmp_path):
     }
 
 
+def test_temperature_reads_the_mounted_sysfs_symlink_target_tree(tmp_path):
+    _write(tmp_path, "sys/devices/virtual/thermal/thermal_zone0/temp", "48750\n")
+    data_path = tmp_path / "data"
+    data_path.mkdir()
+
+    probe = HostRuntimeProbe(
+        host_root=tmp_path,
+        data_path=data_path,
+        address_resolver=lambda _hostname: [],
+    )
+
+    assert probe._temperature() == pytest.approx(48.75)
+
+
 def test_snapshot_does_not_expose_process_environment(tmp_path, monkeypatch):
     _host_tree(tmp_path)
     data_path = tmp_path / "data"

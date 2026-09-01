@@ -7,6 +7,8 @@ const session = {
   socket: null,
   fallbackTimer: null,
   refreshTimer: null,
+  capabilities: null,
+  modeChangePending: false,
 };
 
 const authHeaders = () => ({
@@ -157,6 +159,7 @@ function flattenCapabilities(value, prefix = "") {
 }
 
 function renderCapabilities(capabilities) {
+  session.capabilities = capabilities;
   const rows = flattenCapabilities(capabilities);
   elements["capability-list"].replaceChildren();
   rows.forEach(([name, enabled]) => {
@@ -171,6 +174,16 @@ function renderCapabilities(capabilities) {
     elements["capability-list"].append(row);
   });
   setText("capability-count", `${rows.filter((row) => row[1]).length} / ${rows.length} ON`);
+  updateModeButtons();
+}
+
+function updateModeButtons() {
+  const navigationAvailable = session.capabilities?.navigation?.goal_navigation === true;
+  document.querySelectorAll("[data-mode]").forEach((button) => {
+    const unsupported = button.dataset.mode === "NAVIGATION" && !navigationAvailable;
+    button.disabled = session.modeChangePending || unsupported;
+    button.title = unsupported ? "이 프로필에서는 내비게이션이 비활성화되어 있습니다." : "";
+  });
 }
 
 function renderEvents(payload) {
@@ -273,12 +286,20 @@ elements["refresh-events"].addEventListener("click", () => api("/api/v1/events?l
 
 document.querySelectorAll("[data-mode]").forEach((button) => {
   button.addEventListener("click", async () => {
+    if (button.disabled || session.modeChangePending) return;
+    const requestedMode = button.dataset.mode;
+    if (!window.confirm(`${requestedMode} 모드로 변경할까요? 주변 안전을 확인하세요.`)) return;
+    session.modeChangePending = true;
+    updateModeButtons();
     try {
-      await api("/api/v1/mode", { method: "POST", body: JSON.stringify({ mode: button.dataset.mode }) });
-      setText("action-message", `${button.dataset.mode} 모드 요청을 전송했습니다.`);
+      await api("/api/v1/mode", { method: "POST", body: JSON.stringify({ mode: requestedMode }) });
+      setText("action-message", `${requestedMode} 모드 요청을 전송했습니다.`);
       await refreshRobotState();
     } catch (error) {
       setText("action-message", `모드 변경 실패: ${error.message}`);
+    } finally {
+      session.modeChangePending = false;
+      updateModeButtons();
     }
   });
 });

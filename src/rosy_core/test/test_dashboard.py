@@ -26,6 +26,7 @@ def test_dashboard_shell_is_served_with_accessible_landmarks(dashboard_client):
     assert "Rosy OS" in response.text
     assert "<main" in response.text
     assert 'aria-label="Rosy OS 상태"' in response.text
+    assert 'data-mode="NAVIGATION" disabled' in response.text
     assert "https://" not in response.text
 
 
@@ -45,6 +46,18 @@ def test_dashboard_assets_are_local_and_reference_runtime_contract(dashboard_cli
     assert "/api/v1/robot/state" in script.text
     assert "/api/v1/safety/stop" in script.text
     assert "/ws/state" in script.text
+    assert "modeChangePending" in script.text
+    assert "window.confirm" in script.text
+    assert "navigation?.goal_navigation" in script.text
+
+
+def test_dashboard_html_cannot_bypass_security_headers_through_assets(dashboard_client):
+    response = dashboard_client.get("/dashboard/assets/index.html")
+
+    assert response.status_code == 404
+
+    dashboard = dashboard_client.get("/dashboard")
+    assert "frame-ancestors 'none'" in dashboard.headers["content-security-policy"]
 
 
 def test_root_redirects_to_operator_dashboard(dashboard_client):

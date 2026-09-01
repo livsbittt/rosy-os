@@ -86,10 +86,14 @@ class HostRuntimeProbe:
         }
 
     def _temperature(self) -> float:
-        thermal_root = self.host_root / "sys/class/thermal"
-        for path in sorted(thermal_root.glob("thermal_zone*/temp")):
-            value = float(path.read_text(encoding="utf-8").strip())
-            return round(value / 1000.0 if abs(value) >= 1000.0 else value, 2)
+        thermal_roots = (
+            self.host_root / "sys/class/thermal",
+            self.host_root / "sys/devices/virtual/thermal",
+        )
+        for thermal_root in thermal_roots:
+            for path in sorted(thermal_root.glob("thermal_zone*/temp")):
+                value = float(path.read_text(encoding="utf-8").strip())
+                return round(value / 1000.0 if abs(value) >= 1000.0 else value, 2)
         raise FileNotFoundError("thermal zone unavailable")
 
     def _storage(self) -> dict[str, Optional[float | int | str]]:

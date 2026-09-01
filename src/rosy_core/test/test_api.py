@@ -9,6 +9,7 @@ fastapi_test = importlib.import_module  # noqa: F841
 from pathlib import Path
 
 from rosy_core.api.app import create_app
+from rosy_core.command.manager import Twist
 from rosy_core.profile import RobotProfile
 from rosy_core.services import CoreServices
 
@@ -81,6 +82,31 @@ def test_teleop_flow_and_watchdog_zero(client):
     assert r.status_code == 200
     assert svc.command.select_output().linear == pytest.approx(0.1)
     svc.command.clear_manual()
+    assert svc.command.select_output().linear == 0.0
+
+
+def test_navigation_mode_requires_capability_and_clears_stale_twist(client):
+    tc, svc = client
+    svc.command.set_nav_twist(Twist(0.2, 0.0))
+    svc.capability._data["navigation"]["goal_navigation"] = False
+
+    unsupported = tc.post(
+        "/api/v1/mode",
+        json={"mode": "NAVIGATION"},
+        headers=OPERATOR,
+    )
+
+    assert unsupported.status_code == 501
+    assert svc.modes.mode.value == "IDLE"
+
+    svc.capability._data["navigation"]["goal_navigation"] = True
+    accepted = tc.post(
+        "/api/v1/mode",
+        json={"mode": "NAVIGATION"},
+        headers=OPERATOR,
+    )
+
+    assert accepted.status_code == 200
     assert svc.command.select_output().linear == 0.0
 
 

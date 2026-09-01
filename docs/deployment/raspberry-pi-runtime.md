@@ -113,10 +113,16 @@ can also change robot mode, and only administrator can release an emergency
 stop. API authorization remains authoritative even if a UI control is visible.
 
 The dashboard reads host telemetry through these bounded read-only mounts:
-`/proc/{uptime,loadavg,stat,meminfo}`, `/sys/class/thermal`,
-`/etc/os-release`, and `/etc/hostname`. It does not mount the host root,
+`/proc/{uptime,loadavg,stat,meminfo}`, `/sys/class/thermal`, its sysfs target
+`/sys/devices/virtual/thermal`, `/etc/os-release`, and `/etc/hostname`. It does not mount the host root,
 Docker socket, systemd control socket, or any additional device. Missing host
 files appear as unavailable fields instead of failing `rosy-core`.
+
+Mode changes require confirmation in the dashboard and are serialized while a
+request is in flight. The NAV button is disabled when
+`navigation.goal_navigation` is unavailable; the API enforces the same gate.
+Navigation velocity samples expire after 500 ms, so changing modes cannot
+reactivate an old motion sample.
 
 Useful checks:
 
