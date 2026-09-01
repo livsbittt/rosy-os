@@ -4,6 +4,7 @@
 - 구독: odom / battery/voltage / nav_cmd_vel(Nav2 출력 리매핑 입력)
        / us_sensor/range, batt_state (PWR-002 근접 웨이크·배터리 표시)
 - 발행: power/mode, display/info (PWR-003) — LED는 set_led 서비스로 구동
+- LiDAR 모터: start_motor / stop_motor 서비스로 STANDBY 듀티 조정 (PWR-005)
 - Nav2 NavigateToPose 액션 클라이언트 (NavExecutor 구현)
 - TF: map → base pose 조회 (frame_prefix 반영, §6.1)
 """
@@ -30,6 +31,7 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import BatteryState, Imu, LaserScan, Range
 from slam_toolbox.srv import SaveMap
 from std_msgs.msg import Float32, String
+from std_srvs.srv import Empty
 
 from rosy_interfaces.srv import SetLed
 import tf2_ros
@@ -88,6 +90,9 @@ class RosBridge:
         self.power_mode_pub = node.create_publisher(String, "power/mode", _LATCHED)
         self.display_info_pub = node.create_publisher(String, "display/info", 10)
         self._led_client = node.create_client(SetLed, "set_led")
+        # sllidar_ros2가 제공하는 모터 제어 서비스 (PWR-005).
+        self._lidar_start_client = node.create_client(Empty, "start_motor")
+        self._lidar_stop_client = node.create_client(Empty, "stop_motor")
 
         self._cmd_timer = node.create_timer(1.0 / 50.0, self._publish_cmd_vel)
         self._state_timer = node.create_timer(1.0 / self._state_hz, self._tick_state)
@@ -99,6 +104,8 @@ class RosBridge:
         self._slam_client = node.create_client(SaveMap, "slam_toolbox/save_map")
 
         self._published_power_mode: Optional[str] = None
+        # 드라이버는 core보다 먼저 떠서 이미 회전 중이다 — 기동 시 불필요한 호출 방지.
+        self._applied_lidar_spinning = True
         self._info_was_visible = False
         self._info_last_pub = 0.0
         self._voltage_topic_seen = False
@@ -238,6 +245,8 @@ class RosBridge:
             self._published_power_mode = status.mode.value
             self.power_mode_pub.publish(String(data=status.mode.value.lower()))
 
+        self._reconcile_lidar(status.lidar_spinning)
+
         now = time.monotonic()
         if status.info_visible:
             if not self._info_was_visible or (now - self._info_last_pub) >= _INFO_REPUBLISH_S:
@@ -292,6 +301,23 @@ class RosBridge:
 
     def _clear_led(self) -> None:
         self._call_led("clear", 0, 0, 0)
+
+    def _reconcile_lidar(self, spinning: bool) -> None:
+        """PowerManager가 선언한 회전 의도에 LiDAR 모터를 맞춘다 (PWR-005).
+
+        LED와 달리 조용히 포기하지 않는다. LiDAR는 내비게이션 입력이므로 서비스가
+        아직 준비되지 않았으면 latch 없이 다음 틱(5 Hz)에 재시도한다. 그래야
+        드라이버가 늦게 떠도 정지 상태로 방치되지 않는다.
+        """
+        if spinning == self._applied_lidar_spinning:
+            return
+        client = self._lidar_start_client if spinning else self._lidar_stop_client
+        if not client.service_is_ready():
+            return
+        client.call_async(Empty.Request())
+        self._applied_lidar_spinning = spinning
+        self._node.get_logger().info(
+            "lidar motor %s requested by power policy" % ("start" if spinning else "stop"))
 
     def _call_led(self, command: str, r: int, g: int, b: int) -> None:
         """LED는 부가 표시다 — 서비스가 없으면 조용히 건너뛴다."""

@@ -13,7 +13,12 @@ from rosy_core.command.manager import CommandManager
 from rosy_core.events.bus import EventBus
 from rosy_core.identity import RobotIdentity
 from rosy_core.navigation.manager import NavigationManager
-from rosy_core.power.manager import PowerConfig, PowerManager, PresenceConfig
+from rosy_core.power.manager import (
+    LidarPolicy,
+    PowerConfig,
+    PowerManager,
+    PresenceConfig,
+)
 from rosy_core.profile import RobotProfile
 from rosy_core.safety.manager import BatteryPolicy, SafetyManager, SpeedLimits
 from rosy_core.state.manager import StateManager
@@ -24,7 +29,13 @@ from rosy_core.waypoints.manager import WaypointManager
 def _power_config(raw: dict[str, Any]) -> PowerConfig:
     """rosy_default.yaml의 power 블록 → PowerConfig (누락 키는 기본값 유지)."""
     presence_raw = raw.get("presence", {}) or {}
+    lidar_raw = raw.get("lidar", {}) or {}
     defaults, presence_defaults = PowerConfig(), PresenceConfig()
+    lidar_defaults = LidarPolicy()
+    lidar = LidarPolicy(
+        standby_stop=bool(lidar_raw.get("standby_stop", lidar_defaults.standby_stop)),
+        spinup_s=float(lidar_raw.get("spinup_s", lidar_defaults.spinup_s)),
+    )
     presence = PresenceConfig(
         near_m=float(presence_raw.get("near_m", presence_defaults.near_m)),
         contact_m=float(presence_raw.get("contact_m", presence_defaults.contact_m)),
@@ -43,6 +54,7 @@ def _power_config(raw: dict[str, Any]) -> PowerConfig:
         idle_rate_hz=float(raw.get("idle_rate_hz", defaults.idle_rate_hz)),
         standby_rate_hz=float(raw.get("standby_rate_hz", defaults.standby_rate_hz)),
         presence=presence,
+        lidar=lidar,
     )
 
 

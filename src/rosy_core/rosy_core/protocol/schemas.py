@@ -156,6 +156,8 @@ class PowerStatus(BaseModel):
     sample_rate_hz: float = 20.0
     last_wake_reason: Optional[str] = None
     idle_seconds: float = 0.0
+    lidar_spinning: bool = True     # PWR-005 LiDAR 모터 회전 의도
+    lidar_ready: bool = True        # 스핀업 완료 — 스캔을 신뢰할 수 있는가
 
 
 # --- Swarm (D-20, SWM-001~006, API Ref §7.8) --------------------------------

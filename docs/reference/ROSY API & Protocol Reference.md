@@ -234,7 +234,9 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
     "info_visible": false,
     "sample_rate_hz": 2.0,
     "last_wake_reason": null,
-    "idle_seconds": 412.5
+    "idle_seconds": 412.5,
+    "lidar_spinning": false,
+    "lidar_ready": false
   },
   "diagnostics_summary": { "rosy_core": "OK", "nav2": "OK" },
   "seq": 10241,
@@ -366,6 +368,7 @@ Follower의 rosy_core은 스트림 수신 여부를 `stream_timeout_ms`(기본 1
 | `power.mode_changed` | info | 로봇 | `{from, to, reason, sample_rate_hz}` (PWR-001) |
 | `power.wake` | info | 로봇 | `{reason}` — `proximity\|contact\|api\|battery` (PWR-004) |
 | `presence.detected` / `presence.cleared` | info | 로봇 | `{state, range}` (PWR-002) |
+| `power.lidar_changed` | info | 로봇 | `{spinning, reason, spinup_s}` (PWR-005 STANDBY LiDAR 정지) |
 | `map.saved` | info | 로봇 | `{map_id}` |
 | `mission.assigned` | info | Fleet | `{mission_id, robot_id}` |
 | `mission.started` | info | Fleet | `{mission_id}` |

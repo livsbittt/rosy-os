@@ -10,9 +10,10 @@ from fastapi.testclient import TestClient
 
 from rosy_core.api.app import create_app
 from rosy_core.profile import RobotProfile
-from rosy_core.services import CoreServices
+from rosy_core.services import CoreServices, _power_config
 
 from rosy_core.power.manager import (
+    LidarPolicy,
     PowerConfig,
     PowerManager,
     PresenceConfig,
@@ -370,6 +371,151 @@ class TestStatusSnapshot:
         assert snapshot.power.sample_rate_hz == 2.0
 
 
+class TestLidarStandby:
+    """PWR-005 STANDBY LiDAR 모터 정지 — 정책 계층은 의도만 선언한다."""
+
+    @pytest.fixture
+    def bus(self):
+        return EventBus("rosy_01", buffer_size=64)
+
+    @pytest.fixture
+    def lidar_config(self, config):
+        config.lidar = LidarPolicy(standby_stop=True, spinup_s=2.0)
+        return config
+
+    @pytest.fixture
+    def lidar_manager(self, lidar_config, clock, bus):
+        return PowerManager(lidar_config, events=bus, clock=clock)
+
+    @staticmethod
+    def _to_standby(manager, clock):
+        clock.advance(400.0)
+        manager.tick()
+
+    # --- 기본값: 비활성 ---------------------------------------------------
+
+    def test_default_policy_leaves_lidar_spinning(self, manager, clock):
+        """standby_stop 기본값은 false — 기존 동작을 그대로 보존한다."""
+        self._to_standby(manager, clock)
+        assert manager.mode == PowerMode.STANDBY
+        assert manager.lidar_spinning is True
+        assert manager.lidar_ready() is True
+
+    def test_disabled_power_keeps_lidar_spinning(self, lidar_config, clock):
+        lidar_config.enabled = False
+        manager = PowerManager(lidar_config, clock=clock)
+        self._to_standby(manager, clock)
+        assert manager.lidar_spinning is True
+
+    # --- 모드별 의도 ------------------------------------------------------
+
+    def test_standby_stops_lidar(self, lidar_manager, clock):
+        self._to_standby(lidar_manager, clock)
+        assert lidar_manager.lidar_spinning is False
+
+    def test_idle_keeps_lidar_spinning(self, lidar_manager, clock):
+        clock.advance(61.0)
+        lidar_manager.tick()
+        assert lidar_manager.mode == PowerMode.IDLE
+        assert lidar_manager.lidar_spinning is True
+
+    def test_stopped_lidar_is_never_ready(self, lidar_manager, clock):
+        self._to_standby(lidar_manager, clock)
+        assert lidar_manager.lidar_ready() is False
+
+    # --- 복귀와 스핀업 ----------------------------------------------------
+
+    def test_wake_restarts_lidar_after_spinup(self, lidar_manager, clock):
+        self._to_standby(lidar_manager, clock)
+        lidar_manager.wake("api")
+        assert lidar_manager.lidar_spinning is True
+        assert lidar_manager.lidar_ready() is False        # 아직 스핀업 중
+
+        clock.advance(1.9)
+        assert lidar_manager.lidar_ready() is False
+        clock.advance(0.2)
+        assert lidar_manager.lidar_ready() is True
+
+    def test_activity_restarts_lidar(self, lidar_manager, clock):
+        self._to_standby(lidar_manager, clock)
+        lidar_manager.on_activity("cmd_vel")
+        assert lidar_manager.lidar_spinning is True
+
+    def test_proximity_restarts_lidar(self, lidar_manager, clock):
+        self._to_standby(lidar_manager, clock)
+        lidar_manager.on_range(0.20)
+        lidar_manager.on_range(0.20)
+        assert lidar_manager.lidar_spinning is True
+
+    def test_non_idle_robot_mode_restarts_lidar(self, lidar_manager, clock):
+        self._to_standby(lidar_manager, clock)
+        lidar_manager.on_robot_mode(RobotMode.NAVIGATION)
+        assert lidar_manager.lidar_spinning is True
+
+    def test_battery_alert_restarts_lidar(self, lidar_manager, clock):
+        self._to_standby(lidar_manager, clock)
+        lidar_manager.on_battery_alert("critical")
+        assert lidar_manager.lidar_spinning is True
+
+    def test_spinup_clock_does_not_restart_while_already_spinning(
+            self, lidar_manager, clock):
+        """이미 회전 중이면 재기동 취급하지 않는다 — ready가 되돌아가지 않는다."""
+        self._to_standby(lidar_manager, clock)
+        lidar_manager.wake("api")
+        clock.advance(3.0)
+        assert lidar_manager.lidar_ready() is True
+
+        lidar_manager.on_activity("cmd_vel")
+        assert lidar_manager.lidar_ready() is True
+
+    def test_startup_lidar_is_ready_without_spinup(self, lidar_manager):
+        """core 기동 시점에 드라이버는 이미 돌고 있다 — 스핀업 페널티 없음."""
+        assert lidar_manager.lidar_spinning is True
+        assert lidar_manager.lidar_ready() is True
+
+    # --- 이벤트와 상태 ----------------------------------------------------
+
+    def test_lidar_change_emits_once_per_transition(self, lidar_manager, clock, bus):
+        self._to_standby(lidar_manager, clock)
+        lidar_manager.tick()
+        lidar_manager.tick()
+        types = [e.type for e in bus.history(limit=100)]
+        assert types.count("power.lidar_changed") == 1
+
+        event = [e for e in bus.history(limit=100) if e.type == "power.lidar_changed"][-1]
+        assert event.data["spinning"] is False
+
+    def test_lidar_restart_emits_change(self, lidar_manager, clock, bus):
+        self._to_standby(lidar_manager, clock)
+        lidar_manager.wake("api")
+        events = [e for e in bus.history(limit=100) if e.type == "power.lidar_changed"]
+        assert [e.data["spinning"] for e in events] == [False, True]
+
+    def test_default_policy_emits_no_lidar_events(self, manager, clock, config):
+        bus = EventBus("rosy_01", buffer_size=64)
+        quiet = PowerManager(config, events=bus, clock=clock)
+        self._to_standby(quiet, clock)
+        assert "power.lidar_changed" not in [e.type for e in bus.history(limit=100)]
+
+    def test_status_carries_lidar_fields(self, lidar_manager, clock):
+        self._to_standby(lidar_manager, clock)
+        status = lidar_manager.status()
+        assert status.lidar_spinning is False
+        assert status.lidar_ready is False
+
+        lidar_manager.wake("api")
+        clock.advance(2.5)
+        status = lidar_manager.status()
+        assert status.lidar_spinning is True
+        assert status.lidar_ready is True
+
+    def test_state_manager_carries_lidar_status(self, lidar_manager, clock):
+        sm = StateManager("rosy_01")
+        self._to_standby(lidar_manager, clock)
+        sm.set_power(lidar_manager.status())
+        assert sm.snapshot().power.lidar_spinning is False
+
+
 CONFIG_DIR = Path(__file__).parent.parent / "config"
 
 
@@ -380,6 +526,27 @@ def client():
     caps = yaml.safe_load((CONFIG_DIR / "capabilities.yaml").read_text(encoding="utf-8"))
     svc = CoreServices.build(config, profile, caps, Path(tempfile.mkdtemp()) / "waypoints.json")
     return TestClient(create_app(config, svc)), svc
+
+
+class TestLidarConfigPlumbing:
+    """rosy_default.yaml의 power.lidar 블록이 PowerConfig까지 도달하는가."""
+
+    def test_yaml_block_maps_to_policy(self):
+        raw = {"lidar": {"standby_stop": True, "spinup_s": 3.5}}
+        cfg = _power_config(raw)
+        assert cfg.lidar.standby_stop is True
+        assert cfg.lidar.spinup_s == 3.5
+
+    def test_missing_block_keeps_safe_defaults(self):
+        cfg = _power_config({})
+        assert cfg.lidar.standby_stop is False
+        assert cfg.lidar.spinup_s == 2.0
+
+    def test_shipped_default_config_disables_standby_stop(self):
+        raw = yaml.safe_load((CONFIG_DIR / "rosy_default.yaml").read_text(encoding="utf-8"))
+        cfg = _power_config(raw.get("power", {}))
+        assert cfg.lidar.standby_stop is False       # 벤치 승인 전까지 비활성
+        assert cfg.lidar.spinup_s > 0.0
 
 
 ADMIN = {"Authorization": "Bearer rosy-dev-admin"}

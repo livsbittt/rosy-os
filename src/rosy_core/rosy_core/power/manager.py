@@ -43,6 +43,19 @@ class PresenceConfig:
 
 
 @dataclass
+class LidarPolicy:
+    """STANDBY LiDAR 모터 정지 (PWR-005).
+
+    기본 비활성이다. 인터록상 안전하지만(STANDBY는 로봇 모드 IDLE에서만 진입,
+    모든 웨이크가 재기동을 선행한다) 5분간 스캔이 끊겼을 때 Nav2 라이프사이클이
+    어떻게 반응하는지는 실기에서 관찰해야 할 통합 동작이다. 벤치 승인 후 켠다.
+    """
+
+    standby_stop: bool = False      # STANDBY에서 stop_motor 호출 여부
+    spinup_s: float = 2.0           # start_motor 후 스캔을 신뢰하기까지의 시간
+
+
+@dataclass
 class PowerConfig:
     enabled: bool = True
     idle_after_s: float = 60.0
@@ -52,6 +65,7 @@ class PowerConfig:
     idle_rate_hz: float = 5.0
     standby_rate_hz: float = 2.0
     presence: PresenceConfig = field(default_factory=PresenceConfig)
+    lidar: LidarPolicy = field(default_factory=LidarPolicy)
 
 
 _RATE_ATTR = {
@@ -151,6 +165,11 @@ class PowerManager:
         self._last_wake_reason: Optional[str] = None
         self._hold_active = False       # 로봇 모드가 IDLE이 아닐 때 절전 금지
 
+        # LiDAR는 core 기동 시점에 이미 돌고 있다 — 스핀업 페널티 없이 시작한다.
+        # None = 정상 회전 중, 실수 = 그 시각에 재기동을 요청했다.
+        self._lidar_spinning = True
+        self._lidar_spinup_at: Optional[float] = None
+
     # --- 조회 -----------------------------------------------------------------
 
     @property
@@ -179,6 +198,29 @@ class PowerManager:
     def _rate_for(self, mode: PowerMode) -> float:
         return float(getattr(self._cfg, _RATE_ATTR[mode]))
 
+    @property
+    def lidar_spinning(self) -> bool:
+        """LiDAR 모터 회전 의도 (PWR-005). 실제 구동은 ros_bridge가 조정한다."""
+        with self._lock:
+            return self._lidar_spinning
+
+    def lidar_ready(self, now: Optional[float] = None) -> bool:
+        """스캔을 신뢰할 수 있는가 — 회전 중이며 스핀업이 끝났을 때만 참."""
+        current = self._clock() if now is None else now
+        with self._lock:
+            return self._lidar_ready_locked(current)
+
+    def _lidar_ready_locked(self, now: float) -> bool:
+        if not self._lidar_spinning:
+            return False
+        if self._lidar_spinup_at is None:
+            return True
+        return now - self._lidar_spinup_at >= self._cfg.lidar.spinup_s
+
+    def _lidar_desired(self, mode: PowerMode) -> bool:
+        cfg = self._cfg
+        return not (cfg.enabled and cfg.lidar.standby_stop and mode == PowerMode.STANDBY)
+
     def info_visible(self, now: Optional[float] = None) -> bool:
         current = self._clock() if now is None else now
         with self._lock:
@@ -194,6 +236,8 @@ class PowerManager:
                 sample_rate_hz=self._rate_for(self._mode),
                 last_wake_reason=self._last_wake_reason,
                 idle_seconds=max(0.0, current - self._last_activity),
+                lidar_spinning=self._lidar_spinning,
+                lidar_ready=self._lidar_ready_locked(current),
             )
 
     # --- 입력 -----------------------------------------------------------------
@@ -301,15 +345,27 @@ class PowerManager:
                 else:
                     target = PowerMode.ACTIVE
 
-            if target == self._mode:
-                return
-            previous, self._mode = self._mode, target
-            rate = self._rate_for(target)
+            pending: list[tuple] = []
+            if target != self._mode:
+                previous, self._mode = self._mode, target
+                pending.append(("power.mode_changed", Severity.INFO, {
+                    "from": previous.value, "to": target.value,
+                    "reason": reason, "sample_rate_hz": self._rate_for(target),
+                }))
 
-        self._emit_all([("power.mode_changed", Severity.INFO, {
-            "from": previous.value, "to": target.value,
-            "reason": reason, "sample_rate_hz": rate,
-        })])
+            # LiDAR 의도는 모드의 순수 함수다. 모드가 그대로여도 설정 변경으로
+            # 어긋날 수 있으므로 조기 반환 없이 매번 조정한다.
+            desired = self._lidar_desired(self._mode)
+            if desired != self._lidar_spinning:
+                self._lidar_spinning = desired
+                # 재기동일 때만 스핀업 시계를 건다. 이미 회전 중이면 손대지 않는다.
+                self._lidar_spinup_at = now if desired else None
+                pending.append(("power.lidar_changed", Severity.INFO, {
+                    "spinning": desired, "reason": reason,
+                    "spinup_s": self._cfg.lidar.spinup_s if desired else 0.0,
+                }))
+
+        self._emit_all(pending)
 
     def _emit_all(self, pending: list[tuple]) -> None:
         if self._events is None:
