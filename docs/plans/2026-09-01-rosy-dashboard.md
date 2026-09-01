@@ -118,4 +118,3 @@ Expected before: FAIL. Expected after: PASS.
 2. 전체 pytest, compileall, Compose config, Docker core build를 실행한다.
 3. 실제 FastAPI를 기동해 API와 UI를 브라우저 크기별로 확인하고 콘솔 오류·접근성·반응형 레이아웃을 검증한다.
 4. `git diff --check`와 최종 코드 리뷰 후 커밋한다.
-
