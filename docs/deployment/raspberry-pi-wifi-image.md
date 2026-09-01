@@ -115,6 +115,8 @@ powershell -ExecutionPolicy Bypass -File deploy/robot/deploy-from-windows.ps1 `
 5. `/opt/rosy`에 릴리스를 설치하고 장비 내부에서 API 토큰을 생성한다.
 6. 기본 `core` 모드로 `rosy-core`만 빌드·기동한다.
 7. Wi-Fi, LAN, DNS, 인터넷, 런타임, API, 대시보드를 검증한다.
+8. 배포 PC에서 Pi의 `wlan0` 주소로 API와 대시보드에 다시 요청해 다른
+   Wi-Fi 단말의 접속까지 검증한다.
 
 배포 스크립트는 기존 `/etc/rosy/rosy.yaml`과 데이터 디렉터리를 보존한다.
 작업 트리가 더럽더라도 커밋된 버전만 의도적으로 배포하려면
@@ -178,14 +180,29 @@ sudo /opt/rosy/deploy/robot/verify-pi.sh
 첫 설치의 `ROSY_RUNTIME_MODE=core`는 FastAPI, 대시보드, ROS 미들웨어만
 기동하고 UART 장치에 접근하는 `rosy-io`는 시작하지 않는다. UART 경로,
 모터 방향, 하드웨어 E-stop, 소프트웨어 deadman을 실제 장비에서 승인한 뒤에만
-전환한다.
+전환한다. Raspberry Pi GPIO UART는 3.3 V 신호이므로 DYNAMIXEL 버스에 전기적으로
+직결하지 말고 Pinky Pro의 검증된 half-duplex 인터페이스/레벨 변환 보드를
+사용한다. 아래 단계에서는 바퀴를 띄우고 물리 전원 차단을 손 닿는 곳에 둔다.
 
 ```bash
+sudo /opt/rosy/deploy/robot/configure-uart-pi5.sh
+sudo reboot
+# 재접속 후 motor runtime이 꺼진 core 상태에서 무토크 ping/read:
+sudo /opt/rosy/deploy/robot/verify-motors.sh
+
 sudoedit /opt/rosy/deploy/robot/.env
-# ROSY_RUNTIME_MODE=hardware 로 변경
+# ROSY_RUNTIME_MODE=motor 로 변경
 sudo systemctl restart rosy-runtime.service
 sudo /opt/rosy/deploy/robot/verify-pi.sh
 ```
+
+`motor` 모드는 `rosy-core`와 모터 노드만 실행하므로 LiDAR가 없어도 대시보드의
+저속 직접 제어를 시험할 수 있다. operator 토큰으로 접속해 `MANUAL` 모드로
+전환하고 벤치 안전 확인란을 선택한 다음 방향 버튼을 누르고 있는 동안만
+명령을 보낸다. 버튼 해제, 포인터 이탈, 탭 숨김, 브라우저 포커스 상실 또는
+통신 오류에는 zero 명령을 보내며 core와 driver의 500 ms watchdog도 유지된다.
+
+모터와 LiDAR를 모두 승인한 뒤에만 `.env`의 모드를 `hardware`로 승격한다.
 
 문제가 있으면 즉시 core 모드로 되돌린다.
 
@@ -207,6 +224,9 @@ UART, 재부팅 복구, 열, SD 카드 로그 증가 시험이 끝날 때까지 
 | 인터넷은 되지만 대시보드 접속 실패 | 게스트/AP isolation 해제, 운영 단말이 같은 WLAN인지 확인 |
 | 대시보드는 되지만 인터넷 실패 | `ip route`, DNS, Captive Portal 또는 핫스팟 데이터 상태 확인 |
 | 8080 포트 응답 없음 | `systemctl status rosy-runtime`, `docker compose ... ps`, 검증 스크립트 실행 |
+| `/dev/ttyAMA4` 없음 | `configure-uart-pi5.sh` 실행 후 재부팅, `/boot/firmware/config.txt`의 `uart4-pi5` 확인 |
+| 모터 ping 실패 | 모터 전원, 3.3 V 인터페이스 보드, baud 1 Mbps, ID 1·2, 배선 방향 확인 |
+| motor 모드에서 LiDAR 오류 | `.env`가 `motor`인지 확인; `hardware`는 LiDAR도 요구함 |
 | 배포 후 기존 설정이 유지됨 | 정상 동작; 설치기는 기존 `/etc/rosy/rosy.yaml`을 덮어쓰지 않음 |
 
 여러 Pi에 반복 배포할 커스텀 `.img`가 필요해지면 공식 `pi-gen`으로 OS와

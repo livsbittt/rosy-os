@@ -45,9 +45,9 @@ ros2 launch rosy_core rosy_core.launch.py
 
 ## Raspberry Pi 5 런타임
 
-Raspberry Pi OS Lite 64-bit에서는 ROS 2 Jazzy 실행환경을 두 서비스로
-분리한다. `rosy-core`는 FastAPI/rclpy만 소유하고, 장치 권한은 모터·LiDAR
-어댑터를 실행하는 `rosy-io`에만 부여한다.
+Raspberry Pi OS Lite 64-bit에서는 ROS 2 Jazzy 실행환경을 단계별 서비스로
+분리한다. `rosy-core`는 FastAPI/rclpy만 소유하고, `rosy-motor`는 LiDAR 없는
+벤치 커미셔닝, `rosy-io`는 승인된 모터·LiDAR 통합 운용에 사용한다.
 
 ```bash
 cd deploy/robot

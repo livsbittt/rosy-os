@@ -16,12 +16,16 @@ def _compose() -> dict:
 def test_runtime_separates_core_from_hardware_devices():
     services = _compose()["services"]
 
-    assert set(services) == {"rosy-core", "rosy-io"}
+    assert set(services) == {"rosy-core", "rosy-motor", "rosy-io"}
     assert "devices" not in services["rosy-core"]
     assert services["rosy-core"].get("privileged", False) is False
+    assert services["rosy-motor"].get("privileged", False) is False
     assert services["rosy-io"].get("privileged", False) is False
+    assert services["rosy-motor"]["devices"] == [
+        "${ROSY_MOTOR_DEVICE:-/dev/ttyAMA4}:/dev/rosy-motor",
+    ]
     assert services["rosy-io"]["devices"] == [
-        "${ROSY_MOTOR_DEVICE:-/dev/ttyAMA4}:/dev/ttyAMA4",
+        "${ROSY_MOTOR_DEVICE:-/dev/ttyAMA4}:/dev/rosy-motor",
         "${ROSY_LIDAR_DEVICE:-/dev/ttyAMA0}:/dev/ttyAMA0",
     ]
 
@@ -45,6 +49,7 @@ def test_runtime_uses_one_namespace_and_a_real_core_health_endpoint():
     namespace_arg = "__ns:=/${ROSY_NAMESPACE:-rosy_01}"
 
     assert namespace_arg in services["rosy-core"]["command"]
+    assert "namespace:=${ROSY_NAMESPACE:-rosy_01}" in services["rosy-motor"]["command"]
     assert "namespace:=${ROSY_NAMESPACE:-rosy_01}" in services["rosy-io"]["command"]
     assert "/api/v1" in " ".join(services["rosy-core"]["healthcheck"]["test"])
 
@@ -54,6 +59,7 @@ def test_runtime_builds_distinct_targets_from_shared_dockerfile():
     dockerfile = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
 
     assert services["rosy-core"]["build"]["target"] == "core"
+    assert services["rosy-motor"]["build"]["target"] == "io"
     assert services["rosy-io"]["build"]["target"] == "io"
     assert "AS core" in dockerfile
     assert "AS io" in dockerfile
@@ -78,6 +84,19 @@ def test_initial_io_slice_disables_unavailable_adc_battery_driver():
     assert "DeclareLaunchArgument('enable_battery', default_value='false'" in launch
     assert "condition=IfCondition(enable_battery)" in launch
     assert "on_exit=Shutdown(" in launch
+
+
+def test_motor_only_profile_excludes_lidar_and_passes_uart_parameters():
+    services = _compose()["services"]
+    motor = services["rosy-motor"]
+    command = motor["command"]
+
+    assert motor["profiles"] == ["motor"]
+    assert "enable_lidar:=false" in command
+    assert "motor_device:=/dev/rosy-motor" in command
+    assert "motor_baudrate:=${ROSY_MOTOR_BAUDRATE:-1000000}" in command
+    assert "motor_ids:=${ROSY_MOTOR_IDS:-[1,2]}" in command
+    assert all("ttyAMA0" not in device for device in motor["devices"])
 
 
 def test_io_health_requires_the_motor_node_to_be_discoverable():

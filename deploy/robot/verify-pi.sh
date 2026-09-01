@@ -106,6 +106,27 @@ compose_file="$install_root/deploy/robot/compose.yaml"
 env_file="$install_root/deploy/robot/.env"
 
 runtime_ok=1
+configured_mode="$(sed -n 's/^ROSY_RUNTIME_MODE=//p' "$env_file" 2>/dev/null | tail -n 1)"
+configured_mode="${configured_mode%$'\r'}"
+configured_mode="${configured_mode:-core}"
+runtime_profile=()
+runtime_service=""
+case "$configured_mode" in
+  core)
+    ;;
+  motor)
+    runtime_profile=(--profile motor)
+    runtime_service="rosy-motor"
+    ;;
+  hardware)
+    runtime_profile=(--profile hardware)
+    runtime_service="rosy-io"
+    ;;
+  *)
+    fail "RUNTIME" "unknown ROSY_RUNTIME_MODE in .env: $configured_mode"
+    runtime_ok=0
+    ;;
+esac
 if ! systemctl is-active --quiet rosy-runtime.service 2>/dev/null; then
   fail "RUNTIME" "rosy-runtime.service is not active"
   runtime_ok=0
@@ -113,8 +134,14 @@ elif ! docker compose --env-file "$env_file" -f "$compose_file" ps --status runn
   fail "RUNTIME" "rosy-core container is not running"
   runtime_ok=0
 fi
+if [[ -n "$runtime_service" ]] && ! docker compose --env-file "$env_file" \
+  -f "$compose_file" "${runtime_profile[@]}" ps --status running --services "$runtime_service" \
+  2>/dev/null | grep -Fxq "$runtime_service"; then
+  fail "RUNTIME" "$configured_mode mode requires running $runtime_service"
+  runtime_ok=0
+fi
 if ((runtime_ok)); then
-  pass "RUNTIME" "systemd service and rosy-core container are active"
+  pass "RUNTIME" "systemd and $configured_mode runtime containers are active"
 fi
 
 if has_command curl && curl -fsS --max-time 5 http://127.0.0.1:8080/api/v1 >/dev/null 2>&1; then

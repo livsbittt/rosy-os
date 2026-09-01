@@ -21,9 +21,9 @@ JOINT_PUB_TOPIC_NAME = "joint_states"
 DEFAULT_ODOM_FRAME_ID = "odom"
 DEFAULT_ODOM_CHILD_FRAME_ID = "base_footprint"
 
-SERIAL_PORT_NAME = "/dev/ttyAMA4"
-BAUDRATE = 1000000
-DYNAMIXEL_IDS = [1, 2] # [왼쪽 바퀴 ID, 오른쪽 바퀴 ID]
+DEFAULT_SERIAL_PORT_NAME = "/dev/ttyAMA4"
+DEFAULT_BAUDRATE = 1000000
+DEFAULT_DYNAMIXEL_IDS = [1, 2]  # [왼쪽 바퀴 ID, 오른쪽 바퀴 ID]
 
 JOINT_NAME_WHEEL_L = "left_wheel_joint"
 JOINT_NAME_WHEEL_R = "right_wheel_joint"
@@ -45,6 +45,9 @@ class Rosy(Node):
         self.declare_parameter('wheel_separation', 0.0961)
         self.declare_parameter('cmd_vel_timeout_s', 0.5)
         self.declare_parameter('frame_prefix', '')  # P0-3 (A-2): namespace 기반 프레임 식별
+        self.declare_parameter('motor_device', DEFAULT_SERIAL_PORT_NAME)
+        self.declare_parameter('motor_baudrate', DEFAULT_BAUDRATE)
+        self.declare_parameter('motor_ids', DEFAULT_DYNAMIXEL_IDS)
 
         self.wheel_radius = self.get_parameter('wheel_radius').get_parameter_value().double_value
         self.wheel_separation = self.get_parameter('wheel_separation').get_parameter_value().double_value
@@ -52,6 +55,15 @@ class Rosy(Node):
             self.get_parameter('cmd_vel_timeout_s').get_parameter_value().double_value
         )
         self.command_deadman = CommandDeadman(self.cmd_vel_timeout_s)
+        self.motor_device = self.get_parameter('motor_device').value
+        self.motor_baudrate = int(self.get_parameter('motor_baudrate').value)
+        self.motor_ids = [int(value) for value in self.get_parameter('motor_ids').value]
+        if len(self.motor_ids) != 2 or len(set(self.motor_ids)) != 2:
+            raise ValueError('motor_ids must contain two distinct Dynamixel IDs')
+        if not self.motor_device.startswith('/dev/'):
+            raise ValueError('motor_device must be an absolute /dev path')
+        if self.motor_baudrate <= 0:
+            raise ValueError('motor_baudrate must be positive')
         frame_prefix = self.get_parameter('frame_prefix').get_parameter_value().string_value
         if frame_prefix and not frame_prefix.endswith('/'):
             frame_prefix += '/'
@@ -62,9 +74,17 @@ class Rosy(Node):
         self.get_logger().info(f'Wheel radius: {self.wheel_radius}')
         self.get_logger().info(f'Wheel separation: {self.wheel_separation}')
         self.get_logger().info(f'cmd_vel deadman: {self.cmd_vel_timeout_s:.3f}s')
+        self.get_logger().info(
+            f'Motor transport: {self.motor_device} at {self.motor_baudrate} baud, '
+            f'IDs {self.motor_ids}'
+        )
         
         self.circumference = 2 * math.pi * self.wheel_radius
-        self.driver = DynamixelDriver(SERIAL_PORT_NAME, BAUDRATE, DYNAMIXEL_IDS)
+        self.driver = DynamixelDriver(
+            self.motor_device,
+            self.motor_baudrate,
+            self.motor_ids,
+        )
 
         self.get_logger().info("1. Opening serial port...")
         if not self.driver.begin():

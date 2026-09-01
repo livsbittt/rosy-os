@@ -24,9 +24,9 @@ compose() {
 }
 
 case "$MODE" in
-    "core"|"hardware") ;;
+    "core"|"motor"|"hardware") ;;
     *)
-        echo "error: unknown ROSY_RUNTIME_MODE '$MODE' (expected core or hardware)" >&2
+        echo "error: unknown ROSY_RUNTIME_MODE '$MODE' (expected core, motor, or hardware)" >&2
         exit 2
         ;;
 esac
@@ -35,15 +35,17 @@ case "$ACTION" in
     up)
         if [[ "$MODE" == "core" ]]; then
             compose up -d --remove-orphans rosy-core
+        elif [[ "$MODE" == "motor" ]]; then
+            compose --profile motor up -d --remove-orphans rosy-core rosy-motor
         else
             compose --profile hardware up -d --remove-orphans
         fi
         ;;
     down)
-        compose --profile hardware down --timeout 10
+        compose --profile motor --profile hardware down --timeout 10
         ;;
     status)
-        compose --profile hardware ps
+        compose --profile motor --profile hardware ps
         ;;
     *)
         echo "usage: $0 {up|down|status}" >&2

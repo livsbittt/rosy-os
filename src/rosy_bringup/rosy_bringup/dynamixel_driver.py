@@ -36,24 +36,77 @@ class DynamixelDriver:
     def terminate(self):
         self.set_double_rpm(0, 0)
         time.sleep(0.1)
-        for dxl_id in self.DXL_IDS:
-            self.packetHandler.write1ByteTxRx(self.portHandler, dxl_id, self.ADDR_TORQUE_ENABLE, 0)
-            self.packetHandler.write1ByteTxRx(self.portHandler, dxl_id, self.ADDR_LED_RED, 0) # LED OFF
+        self._disable_all()
         time.sleep(0.1)
         self.portHandler.closePort()
 
+    @staticmethod
+    def _packet_ok(result):
+        return len(result) >= 2 and result[-2] == COMM_SUCCESS and result[-1] == 0
+
+    def _disable_all(self):
+        for dxl_id in self.DXL_IDS:
+            self.packetHandler.write1ByteTxRx(self.portHandler, dxl_id, self.ADDR_TORQUE_ENABLE, 0)
+            self.packetHandler.write1ByteTxRx(self.portHandler, dxl_id, self.ADDR_LED_RED, 0) # LED OFF
+
     def initialize_motors(self, profile_accel=200):
         for dxl_id in self.DXL_IDS:
-            try: 
-                self.packetHandler.reboot(self.portHandler, dxl_id)
+            try:
+                reboot_result = self.packetHandler.reboot(self.portHandler, dxl_id)
+                if not self._packet_ok(reboot_result):
+                    self._disable_all()
+                    return False
                 time.sleep(0.5)
             except Exception as e:
                 print(f"Warning: Could not reboot motor {dxl_id}. Error: {e}")
+                self._disable_all()
+                return False
 
-            if self.packetHandler.write1ByteTxRx(self.portHandler, dxl_id, self.ADDR_OPERATING_MODE, 1)[0] != COMM_SUCCESS: return False
-            if self.packetHandler.write4ByteTxRx(self.portHandler, dxl_id, self.ADDR_PROFILE_ACCEL, profile_accel)[0] != COMM_SUCCESS: return False
-            if self.packetHandler.write1ByteTxRx(self.portHandler, dxl_id, self.ADDR_TORQUE_ENABLE, 1)[0] != COMM_SUCCESS: return False
-            if self.packetHandler.write1ByteTxRx(self.portHandler, dxl_id, self.ADDR_LED_RED, 1)[0] != COMM_SUCCESS: return False
+        for dxl_id in self.DXL_IDS:
+            steps = (
+                self.packetHandler.write1ByteTxRx(
+                    self.portHandler, dxl_id, self.ADDR_TORQUE_ENABLE, 0
+                ),
+                self.packetHandler.write1ByteTxRx(
+                    self.portHandler, dxl_id, self.ADDR_OPERATING_MODE, 1
+                ),
+                self.packetHandler.write4ByteTxRx(
+                    self.portHandler, dxl_id, self.ADDR_PROFILE_ACCEL, profile_accel
+                ),
+            )
+            if not all(self._packet_ok(result) for result in steps):
+                self._disable_all()
+                return False
+
+        # A retained goal must never become live when drive torque is enabled.
+        if not self.set_double_rpm(0, 0):
+            self._disable_all()
+            return False
+        for dxl_id in self.DXL_IDS:
+            goal, comm_result, packet_error = self.packetHandler.read4ByteTxRx(
+                self.portHandler,
+                dxl_id,
+                self.ADDR_GOAL_VELOCITY,
+            )
+            if comm_result != COMM_SUCCESS or packet_error != 0 or goal != 0:
+                self._disable_all()
+                return False
+
+        for dxl_id in self.DXL_IDS:
+            if not self._packet_ok(
+                self.packetHandler.write1ByteTxRx(
+                    self.portHandler, dxl_id, self.ADDR_TORQUE_ENABLE, 1
+                )
+            ):
+                self._disable_all()
+                return False
+            if not self._packet_ok(
+                self.packetHandler.write1ByteTxRx(
+                    self.portHandler, dxl_id, self.ADDR_LED_RED, 1
+                )
+            ):
+                self._disable_all()
+                return False
         return True
 
     def set_double_rpm(self, rpm_l, rpm_r):

@@ -244,6 +244,28 @@ button { color: inherit; }
 .mode-control button:hover { background: rgba(238, 233, 220, 0.06); color: var(--paper); }
 .mode-control button.active { background: var(--paper); color: var(--ink); }
 .mode-control button:disabled { cursor: not-allowed; opacity: 0.35; background: transparent; color: var(--muted); }
+.teleop-commissioning { margin-top: 20px; border: 1px solid var(--line); padding: 18px; }
+.teleop-copy { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.teleop-copy h3 { margin: 0; font: 1.25rem/1 var(--display); }
+.teleop-copy > span { color: var(--muted); font: 0.58rem/1.4 var(--mono); text-align: right; }
+.bench-confirmation { display: flex; align-items: flex-start; gap: 10px; margin: 18px 0; color: var(--muted); font: 0.68rem/1.45 var(--mono); cursor: pointer; }
+.bench-confirmation input { width: 18px; height: 18px; margin: 0; accent-color: var(--signal-lime); }
+.teleop-pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.teleop-pad button {
+  min-height: 72px;
+  border: 1px solid var(--line-strong);
+  color: var(--paper);
+  background: rgba(117, 184, 200, 0.08);
+  font: 1.45rem/1 var(--mono);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+.teleop-pad button small { display: block; margin-top: 8px; color: var(--muted); font: 0.55rem/1 var(--mono); }
+.teleop-pad button.active { color: var(--ink); background: var(--signal-blue); }
+.teleop-pad button.active small { color: var(--ink); }
+.teleop-pad button:disabled { cursor: not-allowed; opacity: 0.3; }
+.teleop-message { min-height: 1.4em; margin: 12px 0 0; color: var(--muted); font: 0.62rem/1.4 var(--mono); }
 .safety-actions { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 12px; margin-top: 20px; }
 .stop-button, .release-button { min-height: 92px; border: 1px solid transparent; padding: 18px; text-align: left; cursor: pointer; }
 .stop-button { color: #260b0c; background: var(--signal-danger); }
@@ -297,6 +319,9 @@ button { color: inherit; }
   .navigation-line { grid-template-columns: 1fr auto; }
   .navigation-line small { grid-column: 1 / -1; }
   .safety-actions { grid-template-columns: 1fr; }
+  .teleop-copy { display: grid; }
+  .teleop-copy > span { text-align: left; }
+  .teleop-pad { grid-template-columns: repeat(2, 1fr); }
   .event-list li:not(.empty-state) { grid-template-columns: 62px 1fr; }
   .event-severity { grid-column: 2; }
   .page-footer { width: calc(100% - 24px); gap: 15px; flex-direction: column; }

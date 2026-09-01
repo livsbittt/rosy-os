@@ -156,7 +156,9 @@ install_release() {
     chmod 0755 "$INSTALL_ROOT/deploy/robot/entrypoint.sh" \
         "$INSTALL_ROOT/deploy/robot/runtime-mode.sh" \
         "$INSTALL_ROOT/deploy/robot/install-pi.sh" \
-        "$INSTALL_ROOT/deploy/robot/verify-pi.sh"
+        "$INSTALL_ROOT/deploy/robot/verify-pi.sh" \
+        "$INSTALL_ROOT/deploy/robot/configure-uart-pi5.sh" \
+        "$INSTALL_ROOT/deploy/robot/verify-motors.sh"
 }
 
 write_initial_config() {
@@ -214,6 +216,13 @@ set_env_value() {
     fi
 }
 
+set_env_default() {
+    local file="$1" key="$2" value="$3"
+    if ! grep -q "^${key}=" "$file"; then
+        printf '%s=%s\n' "$key" "$value" >>"$file"
+    fi
+}
+
 write_runtime_environment() {
     local env_file run_group dialout_gid
     env_file="$INSTALL_ROOT/deploy/robot/.env"
@@ -228,6 +237,8 @@ write_runtime_environment() {
     set_env_value "$env_file" ROSY_UID "$(id -u "$RUN_USER")"
     set_env_value "$env_file" ROSY_GID "$(id -g "$RUN_USER")"
     set_env_value "$env_file" ROSY_DIALOUT_GID "$dialout_gid"
+    set_env_default "$env_file" ROSY_MOTOR_BAUDRATE 1000000
+    set_env_default "$env_file" ROSY_MOTOR_IDS '[1,2]'
     set_env_value "$env_file" ROSY_CONFIG_PATH "$ROSY_CONFIG"
     set_env_value "$env_file" ROSY_DATA_PATH "$ROSY_DATA"
     set_env_value "$env_file" ROSY_RUNTIME_MODE core
@@ -236,7 +247,7 @@ write_runtime_environment() {
 }
 
 build_and_start_core() {
-    local runtime_dir container_id status attempt
+    local runtime_dir container_id status
     runtime_dir="$INSTALL_ROOT/deploy/robot"
     cd "$runtime_dir"
     ROSY_RUNTIME_MODE=core "$runtime_dir/runtime-mode.sh" down
@@ -244,7 +255,7 @@ build_and_start_core() {
     ROSY_RUNTIME_MODE=core "$runtime_dir/runtime-mode.sh" up
     container_id="$(docker compose --env-file .env ps -q rosy-core)"
     [[ -n "$container_id" ]] || fail "rosy-core container was not created"
-    for attempt in $(seq 1 45); do
+    for _ in {1..45}; do
         status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
         [[ "$status" == "healthy" ]] && break
         [[ "$status" == "exited" || "$status" == "dead" ]] && fail "rosy-core entered state: $status"

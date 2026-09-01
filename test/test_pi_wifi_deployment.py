@@ -11,6 +11,9 @@ INSTALLER = DEPLOY / "install-pi.sh"
 VERIFIER = DEPLOY / "verify-pi.sh"
 RUNTIME_MODE = DEPLOY / "runtime-mode.sh"
 WINDOWS_DEPLOY = DEPLOY / "deploy-from-windows.ps1"
+WINDOWS_VERIFY = DEPLOY / "verify-from-windows.ps1"
+UART_CONFIG = DEPLOY / "configure-uart-pi5.sh"
+MOTOR_VERIFY = DEPLOY / "verify-motors.sh"
 
 
 def _text(path: Path) -> str:
@@ -18,7 +21,15 @@ def _text(path: Path) -> str:
 
 
 def test_deployment_kit_files_exist():
-    for path in (INSTALLER, VERIFIER, RUNTIME_MODE, WINDOWS_DEPLOY):
+    for path in (
+        INSTALLER,
+        VERIFIER,
+        RUNTIME_MODE,
+        WINDOWS_DEPLOY,
+        WINDOWS_VERIFY,
+        UART_CONFIG,
+        MOTOR_VERIFY,
+    ):
         assert path.is_file(), f"missing deployment file: {path.relative_to(ROOT)}"
 
 
@@ -46,6 +57,9 @@ def test_installer_generates_device_local_tokens_and_preserves_config():
     assert "rosy-dev-admin" not in script
     assert "WIFI_PASSWORD" not in script
     assert "SSID=" not in script
+    assert "set_env_default" in script
+    assert "set_env_default \"$env_file\" ROSY_MOTOR_BAUDRATE 1000000" in script
+    assert "set_env_default \"$env_file\" ROSY_MOTOR_IDS '[1,2]'" in script
 
 
 def test_installer_guards_destructive_paths_and_activates_systemd():
@@ -88,7 +102,8 @@ def test_runtime_defaults_to_core_only_and_rejects_unknown_modes():
     assert "ROSY_RUNTIME_MODE=core" in environment
     assert '${ROSY_RUNTIME_MODE:-core}' in wrapper
     assert "s/^ROSY_RUNTIME_MODE=//p" in wrapper
-    assert '"core"|"hardware")' in wrapper
+    assert '"core"|"motor"|"hardware")' in wrapper
+    assert '--profile motor up -d --remove-orphans rosy-core rosy-motor' in wrapper
     assert "unknown ROSY_RUNTIME_MODE" in wrapper
     assert "runtime-mode.sh up" in unit
     assert "runtime-mode.sh down" in unit
@@ -116,6 +131,9 @@ def test_network_verifier_separates_wifi_lan_internet_and_dashboard():
     assert "WIFI_PASSWORD" not in script
     assert "ip route show default dev wlan0" in script
     assert "curl --interface wlan0" in script
+    assert 'runtime_service="rosy-motor"' in script
+    assert 'runtime_service="rosy-io"' in script
+    assert "requires running $runtime_service" in script
 
 
 def test_windows_uploader_archives_only_git_head_and_keeps_ssh_host_checks():
@@ -129,10 +147,65 @@ def test_windows_uploader_archives_only_git_head_and_keeps_ssh_host_checks():
     assert "StrictHostKeyChecking=no" not in script
     assert "WifiPassword" not in script
     assert "CHANGE_ME" not in script
+    assert "verify-from-windows.ps1" in script
+
+
+def test_uart4_configuration_is_explicit_idempotent_and_does_not_move_motors():
+    script = _text(UART_CONFIG)
+
+    assert "/boot/firmware/config.txt" in script
+    assert "dtoverlay=uart4-pi5" in script
+    assert "[all]" in script
+    assert "overlay_applies_to_pi5" in script
+    assert '"[pi5]"' in script
+    assert "grep -Fqx" in script
+    assert "mktemp" in script
+    assert "goal velocity" not in script.lower()
+    assert "torque" not in script.lower()
+
+
+def test_motor_preflight_checks_uart_and_runs_torque_free_dynamixel_probe():
+    script = _text(MOTOR_VERIFY)
+    probe = _text(ROOT / "src" / "rosy_bringup" / "rosy_bringup" / "dynamixel_probe.py")
+
+    assert "/proc/device-tree/model" in script
+    assert "dtoverlay=uart4-pi5" in script
+    assert "overlay_applies_to_pi5" in script
+    assert "ttyAMA4" in script
+    assert "console=ttyAMA4" in script
+    assert "dynamixel_probe" in script
+    assert "--profile motor" in script
+    assert "build rosy-motor" in script
+    assert 'source "$ENV_FILE"' not in script
+    assert "ROSY_DIALOUT_GID" in script
+    assert "stat -c '%g'" in script
+    assert ".ping(" in probe
+    assert "ADDR_TORQUE_ENABLE" in probe
+    assert "read1ByteTxRx" in probe
+    assert "write1ByteTxRx" not in probe
+    assert "write4ByteTxRx" not in probe
+
+
+def test_windows_peer_verifier_checks_api_and_dashboard_over_wlan():
+    script = _text(WINDOWS_VERIFY)
+
+    assert "ip -4 -o addr show dev wlan0" in script
+    assert "Invoke-WebRequest" in script
+    assert "/api/v1" in script
+    assert "/dashboard" in script
+    assert "StrictHostKeyChecking=no" not in script
+    assert "Authorization" not in script
 
 
 def test_shell_scripts_are_lf_only():
-    for path in (INSTALLER, VERIFIER, RUNTIME_MODE, DEPLOY / "entrypoint.sh"):
+    for path in (
+        INSTALLER,
+        VERIFIER,
+        RUNTIME_MODE,
+        UART_CONFIG,
+        MOTOR_VERIFY,
+        DEPLOY / "entrypoint.sh",
+    ):
         assert b"\r\n" not in path.read_bytes(), f"CRLF is unsafe in container/Pi shell: {path.name}"
 
 

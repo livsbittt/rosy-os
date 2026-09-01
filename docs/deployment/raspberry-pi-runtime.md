@@ -7,8 +7,9 @@
 따른다. 이 문서는 하드웨어 런타임과 물리 승인 항목을 상세히 설명한다.
 
 This deployment keeps Raspberry Pi OS as the host and runs the ROS 2 Jazzy
-userland in two containers. `rosy-core` owns the FastAPI/rclpy middleware and
-has no device access. `rosy-io` owns the Pinky Pro motor and LiDAR adapters.
+userland in isolated containers. `rosy-core` owns the FastAPI/rclpy middleware
+and has no device access. `rosy-motor` owns only the motor bus for commissioning,
+while `rosy-io` owns the Pinky Pro motor and LiDAR adapters in full hardware mode.
 
 > This first runtime slice does not yet package the wiringPi/ws2811 based IMU,
 > ADC, LCD, LED, or lamp nodes. Those drivers need a separate Raspberry Pi 5
@@ -36,8 +37,18 @@ independent controller/watchdog outside the Raspberry Pi.
    installer. The installer owns `/opt/rosy` as `root:root`; do not change that
    tree to the login user's ownership because systemd executes its runtime
    wrapper as root.
-2. Enable the required UARTs in the Raspberry Pi boot configuration. Disable
-   the login console on UARTs assigned to the robot.
+2. Configure the Pi 5 UART4 overlay and reboot. The script does not start the
+   motor runtime:
+
+   ```bash
+   sudo /opt/rosy/deploy/robot/configure-uart-pi5.sh
+   sudo reboot
+   ```
+
+   `/dev/ttyAMA4` uses GPIO12/GPIO13. Raspberry Pi UART pins are 3.3 V only;
+   use the robot's verified DYNAMIXEL half-duplex interface and never connect
+   a 5 V bus signal directly to a GPIO pin. Disable any login console assigned
+   to the motor UART.
 3. Verify the real device nodes; do not assume numbering from another Pi:
 
    ```bash
@@ -62,7 +73,8 @@ sudoedit /opt/rosy/deploy/robot/.env
 Set the robot identity, per-robot `ROS_DOMAIN_ID`, actual UART paths, and image
 pins in `.env`. The installer manages service UID/GID, `ROSY_DATA_PATH`,
 `dialout` GID, file ownership, and the safe `ROSY_RUNTIME_MODE=core` default.
-Do not use `privileged: true`. Only `rosy-io` receives the two UART devices.
+Do not use `privileged: true`. `rosy-motor` receives only the motor UART;
+`rosy-io` receives the motor and LiDAR UARTs.
 
 `ROSY_NAMESPACE` is also applied to the core TF frame prefix, so topics and
 frames stay aligned. The mounted Pi 5 Lite profile advertises only the motor,
@@ -75,18 +87,23 @@ digests that were built and accepted for the exact source revision.
 
 ## 4. Build and start
 
-Keep `ROSY_RUNTIME_MODE=core` until the physical gates below are accepted. To
-prepare and promote the hardware profile afterward:
+Keep `ROSY_RUNTIME_MODE=core` until the UART read-only preflight passes. It
+checks the Pi model, `uart4-pi5`, serial-console conflicts, device node, IDs,
+and drive-torque state without issuing a movement command:
 
 ```bash
 cd /opt/rosy/deploy/robot
-sudo docker compose --env-file .env --profile hardware build
+sudo ./verify-motors.sh
+sudo docker compose --env-file .env --profile motor build rosy-motor
 sudoedit /opt/rosy/deploy/robot/.env
-# Set ROSY_RUNTIME_MODE=hardware, save, then:
+# Set ROSY_RUNTIME_MODE=motor, save, then:
 sudo systemctl restart rosy-runtime.service
-sudo docker compose --env-file .env --profile hardware ps
-sudo docker compose --env-file .env logs --tail 100 rosy-core rosy-io
+sudo docker compose --env-file .env --profile motor ps
+sudo docker compose --env-file .env logs --tail 100 rosy-core rosy-motor
 ```
+
+After motor-only physical acceptance, build the hardware profile and change
+`ROSY_RUNTIME_MODE=hardware` to add LiDAR.
 
 The installer already installs boot-time supervision. Verify it after the
 interactive checks:
@@ -126,6 +143,13 @@ request is in flight. The NAV button is disabled when
 Navigation velocity samples expire after 500 ms, so changing modes cannot
 reactivate an old motion sample.
 
+For bench commissioning, operator selects `MANUAL`, confirms that the wheels
+are lifted and hardware power cut is reachable, and holds a direction button.
+The dashboard sends 0.05 m/s translation or 0.35 rad/s rotation at 10 Hz only
+while held. Release, pointer cancellation/leave, page hide, focus loss, and
+network errors request zero immediately; the core and driver watchdogs remain
+the authoritative fallback.
+
 Useful checks:
 
 ```bash
@@ -144,7 +168,9 @@ Run tests with the wheels lifted before any floor test.
 
 | Gate | Procedure | Pass evidence |
 |---|---|---|
-| Configuration | `docker compose --profile hardware config` | two services; only `rosy-io` has devices; neither is privileged |
+| Configuration | `docker compose --profile motor config` | core plus motor service; only `rosy-motor` has one device; neither is privileged |
+| WLAN peer | run `verify-from-windows.ps1` on another Wi-Fi client | Pi `wlan0` IPv4 serves `/api/v1` and `/dashboard` |
+| UART preflight | run `verify-motors.sh` while runtime is core-only | IDs 1 and 2 respond at 1 Mbps and report drive torque disabled |
 | Core health | query `/api/v1` and authenticated `/api/v1/robot/state` | healthy container; state stream at least 5 Hz |
 | Dashboard | open `/dashboard`, authenticate, then inspect `/api/v1/system/runtime` | UI loads without external assets; Pi OS/CPU/RAM/disk/temp values agree with host commands or are explicitly unavailable |
 | Motor command | send a bounded low-speed command | expected wheel direction and RPM |
@@ -165,7 +191,7 @@ UART, boot, thermal, and storage rows have recorded device evidence.
 
 ```bash
 cd /opt/rosy/deploy/robot
-sudo docker compose --env-file .env --profile hardware down --timeout 10
+sudo ./runtime-mode.sh down
 ```
 
 For an image rollback, set `ROSY_CORE_IMAGE` and `ROSY_IO_IMAGE` to the last

@@ -102,6 +102,10 @@ try {
 
     Write-Host "Deployment complete: http://${PiHost}:8080/dashboard"
     Write-Host "Release revision: $revision"
+
+    $peerVerifier = Join-Path $repoRoot "deploy/robot/verify-from-windows.ps1"
+    Write-Host "Verifying API and dashboard from this Wi-Fi client"
+    & $peerVerifier -PiHost $PiHost -PiUser $PiUser
 }
 finally {
     $cleanupPath = [IO.Path]::GetFullPath($tempDir)

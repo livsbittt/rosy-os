@@ -8,7 +8,12 @@ const session = {
   fallbackTimer: null,
   refreshTimer: null,
   capabilities: null,
+  robotState: null,
   modeChangePending: false,
+  teleopTimer: null,
+  teleopActive: false,
+  teleopPending: null,
+  teleopIntervalMs: 100,
 };
 
 const authHeaders = () => ({
@@ -86,6 +91,7 @@ function renderRobotInfo(info) {
 }
 
 function renderRobotState(state) {
+  session.robotState = state;
   setText("robot-id", state.robot_id || "—");
   setText("robot-mode", state.mode);
   setText("state-sequence", `SEQ ${state.seq ?? "—"}`);
@@ -111,13 +117,20 @@ function renderRobotState(state) {
   setText("safety-source", stopped ? "비상정지 활성" : "주행 회로 정상");
   setConnection("online", "상태 스트림 연결");
   setText("last-sync", `마지막 동기화 ${new Date().toLocaleTimeString("ko-KR")}`);
+  if (session.teleopActive && !teleopEligible()) stopTeleop("운전 조건이 변경되어 정지했습니다.");
+  updateTeleopControls();
 }
 
 function renderSafety(safety) {
+  session.robotState = {
+    ...(session.robotState || {}),
+    safety: { ...(session.robotState?.safety || {}), estop: Boolean(safety.estop) },
+  };
   const stopped = Boolean(safety.estop);
   elements["safety-indicator"].className = `hero-safety ${stopped ? "danger" : "safe"}`;
   setText("safety-label", stopped ? "STOPPED" : "READY");
   setText("safety-source", safety.source || (stopped ? "source unknown" : "주행 회로 정상"));
+  updateTeleopControls();
 }
 
 function renderRuntime(runtime) {
@@ -175,6 +188,105 @@ function renderCapabilities(capabilities) {
   });
   setText("capability-count", `${rows.filter((row) => row[1]).length} / ${rows.length} ON`);
   updateModeButtons();
+  updateTeleopControls();
+}
+
+function teleopEligible() {
+  return Boolean(
+    session.token
+    && session.capabilities?.teleop === true
+    && session.robotState?.mode === "MANUAL"
+    && session.robotState?.safety?.estop !== true
+    && elements["bench-safety-confirmed"]?.checked,
+  );
+}
+
+function updateTeleopControls() {
+  const enabled = teleopEligible();
+  document.querySelectorAll("[data-teleop]").forEach((button) => {
+    button.disabled = !enabled;
+  });
+  if (!session.token) {
+    setText("teleop-message", "operator 접속 키가 필요합니다.");
+  } else if (session.capabilities && session.capabilities.teleop !== true) {
+    setText("teleop-message", "현재 하드웨어 프로필에서 teleop을 사용할 수 없습니다.");
+  } else if (session.robotState?.safety?.estop) {
+    setText("teleop-message", "비상정지가 활성화되어 있습니다.");
+  } else if (session.robotState?.mode !== "MANUAL") {
+    setText("teleop-message", "MANUAL 모드로 전환해야 합니다.");
+  } else if (!elements["bench-safety-confirmed"]?.checked) {
+    setText("teleop-message", "벤치 안전 확인이 필요합니다.");
+  } else if (!session.teleopActive) {
+    setText("teleop-message", "버튼을 누르고 있는 동안만 저속 명령을 보냅니다.");
+  }
+}
+
+function sendTeleop(linear, angular, keepalive = false) {
+  return api("/api/v1/teleop", {
+    method: "POST",
+    body: JSON.stringify({ linear, angular }),
+    keepalive,
+  });
+}
+
+function queueTerminalZero(immediate = false) {
+  const prior = session.teleopPending || Promise.resolve();
+  if (immediate) {
+    const immediateZero = sendTeleop(0, 0, true);
+    immediateZero.catch(() => null);
+  }
+  const terminal = prior
+    .catch(() => null)
+    .then(() => sendTeleop(0, 0, true));
+  session.teleopPending = terminal;
+  terminal
+    .catch((error) => {
+      setText("teleop-message", `정지 전송 실패 · watchdog 대기: ${error.message}`);
+    })
+    .finally(() => {
+      if (session.teleopPending === terminal) session.teleopPending = null;
+    });
+}
+
+function stopTeleop(message = "정지 명령을 전송했습니다.", immediate = false) {
+  const wasActive = session.teleopActive;
+  session.teleopActive = false;
+  clearInterval(session.teleopTimer);
+  session.teleopTimer = null;
+  document.querySelectorAll("[data-teleop]").forEach((button) => button.classList.remove("active"));
+  if (wasActive && session.token) {
+    queueTerminalZero(immediate);
+  }
+  setText("teleop-message", message);
+  updateTeleopControls();
+}
+
+async function transmitTeleop(linear, angular) {
+  if (!session.teleopActive || session.teleopPending) return;
+  const request = sendTeleop(linear, angular);
+  session.teleopPending = request;
+  try {
+    await request;
+  } catch (error) {
+    if (session.teleopActive) stopTeleop(`주행 명령 실패: ${error.message}`);
+  } finally {
+    if (session.teleopPending === request) session.teleopPending = null;
+  }
+}
+
+function startTeleop(button, event) {
+  event.preventDefault();
+  if (!teleopEligible() || session.teleopActive) return;
+  const linear = Number(button.dataset.linear);
+  const angular = Number(button.dataset.angular);
+  if (!Number.isFinite(linear) || !Number.isFinite(angular)) return;
+
+  session.teleopActive = true;
+  button.classList.add("active");
+  setText("teleop-message", `${button.querySelector("small")?.textContent || "주행"} 명령 전송 중…`);
+  const transmit = () => transmitTeleop(linear, angular);
+  transmit();
+  session.teleopTimer = setInterval(transmit, session.teleopIntervalMs);
 }
 
 function updateModeButtons() {
@@ -251,6 +363,7 @@ function connectStateSocket() {
 }
 
 function showConnectionError(error) {
+  stopTeleop("연결 오류로 정지했습니다.");
   setConnection("error", "연결 확인 필요");
   setText("hero-message", error.message || "Rosy API에 연결할 수 없습니다.");
 }
@@ -288,6 +401,7 @@ document.querySelectorAll("[data-mode]").forEach((button) => {
   button.addEventListener("click", async () => {
     if (button.disabled || session.modeChangePending) return;
     const requestedMode = button.dataset.mode;
+    stopTeleop("모드 변경 전에 정지했습니다.");
     if (!window.confirm(`${requestedMode} 모드로 변경할까요? 주변 안전을 확인하세요.`)) return;
     session.modeChangePending = true;
     updateModeButtons();
@@ -304,8 +418,28 @@ document.querySelectorAll("[data-mode]").forEach((button) => {
   });
 });
 
+document.querySelectorAll("[data-teleop]").forEach((button) => {
+  button.addEventListener("pointerdown", (event) => startTeleop(button, event));
+  button.addEventListener("pointerup", () => stopTeleop());
+  button.addEventListener("pointercancel", () => stopTeleop("포인터 취소로 정지했습니다."));
+  button.addEventListener("pointerleave", () => stopTeleop("버튼 이탈로 정지했습니다."));
+  button.addEventListener("contextmenu", (event) => event.preventDefault());
+});
+
+elements["bench-safety-confirmed"].addEventListener("change", () => {
+  if (!elements["bench-safety-confirmed"].checked) stopTeleop("안전 확인이 해제되어 정지했습니다.");
+  updateTeleopControls();
+});
+window.addEventListener("pointerup", () => stopTeleop());
+window.addEventListener("blur", () => stopTeleop("화면 포커스가 해제되어 정지했습니다."));
+window.addEventListener("pagehide", () => stopTeleop("페이지를 벗어나 정지했습니다.", true));
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopTeleop("화면이 숨겨져 정지했습니다.");
+});
+
 elements["emergency-stop"].addEventListener("click", async () => {
   if (!window.confirm("Rosy를 즉시 정지할까요?")) return;
+  stopTeleop("비상정지를 요청했습니다.");
   try {
     await api("/api/v1/safety/stop", { method: "POST" });
     setText("action-message", "비상정지가 활성화되었습니다.");

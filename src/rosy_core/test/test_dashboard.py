@@ -49,6 +49,45 @@ def test_dashboard_assets_are_local_and_reference_runtime_contract(dashboard_cli
     assert "modeChangePending" in script.text
     assert "window.confirm" in script.text
     assert "navigation?.goal_navigation" in script.text
+    assert "/api/v1/teleop" in script.text
+    assert "pointerdown" in script.text
+    assert "pointerup" in script.text
+    assert "pointercancel" in script.text
+    assert "pointerleave" in script.text
+    assert "visibilitychange" in script.text
+    assert "pagehide" in script.text
+    assert "window.addEventListener(\"blur\"" in script.text
+    assert "sendTeleop(0, 0, true)" in script.text
+    assert "teleopIntervalMs: 100" in script.text
+
+
+def test_dashboard_requires_local_bench_acknowledgement_for_motion():
+    html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+
+    assert 'id="bench-safety-confirmed"' in html
+    assert 'data-teleop="forward"' in html
+    assert 'data-teleop="backward"' in html
+    assert 'data-teleop="left"' in html
+    assert 'data-teleop="right"' in html
+    assert "누르고 있는 동안만" in html
+
+
+def test_dashboard_motion_fails_to_zero_on_release_and_page_loss():
+    script = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+
+    assert "/api/v1/teleop" in script
+    assert "sendTeleop(0, 0, true)" in script
+    assert "pointerdown" in script
+    assert "pointerup" in script
+    assert "pointercancel" in script
+    assert "pointerleave" in script
+    assert "visibilitychange" in script
+    assert "pagehide" in script
+    assert 'window.addEventListener("blur"' in script
+    assert "teleopIntervalMs: 100" in script
+    assert "teleopPending" in script
+    assert "AbortController" not in script
+    assert "immediateZero" in script
 
 
 def test_dashboard_html_cannot_bypass_security_headers_through_assets(dashboard_client):

@@ -135,6 +135,26 @@
         <button type="button" data-mode="MANUAL">MANUAL</button>
         <button type="button" data-mode="NAVIGATION" disabled title="기능 확인 중">NAV</button>
       </div>
+      <div class="teleop-commissioning" aria-labelledby="teleop-heading">
+        <div class="teleop-copy">
+          <div>
+            <p class="eyebrow">BENCH TELEOP</p>
+            <h3 id="teleop-heading">저속 직접 제어</h3>
+          </div>
+          <span>직진 0.05 m/s · 회전 0.35 rad/s</span>
+        </div>
+        <label class="bench-confirmation" for="bench-safety-confirmed">
+          <input id="bench-safety-confirmed" type="checkbox">
+          <span>바퀴를 띄웠고 물리 전원 차단을 준비했습니다.</span>
+        </label>
+        <div class="teleop-pad" role="group" aria-label="저속 수동 주행">
+          <button type="button" data-teleop="forward" data-linear="0.05" data-angular="0" aria-label="전진">↑<small>전진</small></button>
+          <button type="button" data-teleop="left" data-linear="0" data-angular="0.35" aria-label="좌회전">←<small>좌회전</small></button>
+          <button type="button" data-teleop="backward" data-linear="-0.05" data-angular="0" aria-label="후진">↓<small>후진</small></button>
+          <button type="button" data-teleop="right" data-linear="0" data-angular="-0.35" aria-label="우회전">→<small>우회전</small></button>
+        </div>
+        <p id="teleop-message" class="teleop-message" role="status" aria-live="assertive">MANUAL 모드에서 버튼을 누르고 있는 동안만 움직입니다.</p>
+      </div>
       <div class="safety-actions">
         <button id="emergency-stop" class="stop-button" type="button">
           <span>즉시 정지</span><small>모든 역할에서 실행 가능</small>

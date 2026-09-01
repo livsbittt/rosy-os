@@ -28,6 +28,7 @@ def generate_launch_description():
     namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
     enable_battery = LaunchConfiguration('enable_battery')
+    enable_lidar = LaunchConfiguration('enable_lidar')
 
     # namespace 있으면 'ns/' 프레임 접두, 없으면 '' (upload_robot와 동일 패턴)
     frame_prefix = PythonExpression([
@@ -43,8 +44,13 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='false'),
         DeclareLaunchArgument('enable_battery', default_value='false',
                               description='Enable optional rosylib ADC battery publisher'),
+        DeclareLaunchArgument('enable_lidar', default_value='true',
+                              description='Enable the serial LiDAR driver'),
         DeclareLaunchArgument('wheel_radius', default_value='0.027'),
         DeclareLaunchArgument('wheel_separation', default_value='0.0961'),
+        DeclareLaunchArgument('motor_device', default_value='/dev/ttyAMA4'),
+        DeclareLaunchArgument('motor_baudrate', default_value='1000000'),
+        DeclareLaunchArgument('motor_ids', default_value='[1, 2]'),
         DeclareLaunchArgument(
             'cmd_vel_timeout_s', default_value='0.5',
             description='Driver-side stale cmd_vel timeout in seconds',
@@ -78,6 +84,7 @@ def generate_launch_description():
                     'angle_compensate': 'true',
                     'scan_mode': 'DenseBoost',
                 }.items(),
+                condition=IfCondition(enable_lidar),
             ),
             Node(
                 package='rosy_bringup',
@@ -91,6 +98,9 @@ def generate_launch_description():
                     'wheel_separation': LaunchConfiguration('wheel_separation'),
                     'cmd_vel_timeout_s': LaunchConfiguration('cmd_vel_timeout_s'),
                     'frame_prefix': frame_prefix,
+                    'motor_device': LaunchConfiguration('motor_device'),
+                    'motor_baudrate': LaunchConfiguration('motor_baudrate'),
+                    'motor_ids': LaunchConfiguration('motor_ids'),
                 }],
             ),
             Node(
