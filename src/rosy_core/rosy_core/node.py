@@ -49,6 +49,12 @@ class RosyCoreNode(Node):
         waypoints_path = Path.home() / ".rosy" / "waypoints.json"
         self.core = CoreServices.build(config, profile, capability_data, waypoints_path)
 
+        from rosy_core.system.ros_graph import RosGraphMonitor
+        self.ros_graph_monitor = RosGraphMonitor(self)
+        self.core.runtime_probe.attach_ros_graph_provider(
+            self.ros_graph_monitor.snapshot
+        )
+
         from rosy_core.bridge.ros_bridge import RosBridge
         self.bridge = RosBridge(self, self.core)
 

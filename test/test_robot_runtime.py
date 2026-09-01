@@ -167,6 +167,7 @@ def test_core_reads_only_bounded_host_telemetry_paths():
         "/proc/uptime:/host/proc/uptime:ro",
         "/proc/loadavg:/host/proc/loadavg:ro",
         "/proc/stat:/host/proc/stat:ro",
+        "/proc/net/dev:/host/proc/net/dev:ro",
         "/proc/meminfo:/host/proc/meminfo:ro",
         "/sys/class/thermal:/host/sys/class/thermal:ro",
         "/sys/devices/virtual/thermal:/host/sys/devices/virtual/thermal:ro",
@@ -181,7 +182,10 @@ def test_core_image_prepares_dashboard_and_host_mount_directories():
     dockerfile = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
     setup = (ROOT / "src" / "rosy_core" / "setup.py").read_text(encoding="utf-8")
 
-    assert "mkdir -p /host/proc /host/etc /host/sys/class/thermal /host/sys/devices/virtual/thermal" in dockerfile
+    assert (
+        "mkdir -p /host/proc/net /host/etc /host/sys/class/thermal "
+        "/host/sys/devices/virtual/thermal"
+    ) in dockerfile
     assert "web/*.html" in setup
     assert "web/*.css" in setup
     assert "web/*.js" in setup

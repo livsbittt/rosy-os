@@ -108,3 +108,35 @@ def test_root_redirects_to_operator_dashboard(dashboard_client):
 
 def test_dashboard_asset_directory_is_an_explicit_python_package():
     assert (WEB_ROOT / "__init__.py").is_file()
+
+
+def test_dashboard_exposes_ros_domain_bandwidth_and_topology_panel():
+    html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+    script = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+    css = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+    for element_id in (
+        "ros-network-panel",
+        "ros-domain-id",
+        "dds-isolation",
+        "ros-node-count",
+        "ros-topic-count",
+        "network-rx-rate",
+        "network-tx-rate",
+        "network-sparkline-rx",
+        "network-sparkline-tx",
+        "ros-graph-map",
+        "ros-risk-list",
+    ):
+        assert f'id="{element_id}"' in html
+
+    assert 'aria-label="ROS 노드와 토픽 연결 지도"' in html
+    assert "renderRosNetwork" in script
+    assert "renderSparkline" in script
+    assert "renderRosGraph" in script
+    assert "networkHistory" in script
+    assert "runtime.ros" in script
+    assert "createElementNS" in script
+    assert "https://" not in script
+    assert ".ros-network-panel" in css
+    assert ".ros-graph-map" in css

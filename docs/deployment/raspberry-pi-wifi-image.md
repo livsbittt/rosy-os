@@ -151,6 +151,19 @@ http://192.168.1.42:8080/dashboard
 FastAPI가 HTML/CSS/JavaScript를 직접 제공하므로 Pi에 별도 Node.js 서버는
 필요하지 않다. 토큰은 브라우저 탭의 `sessionStorage`에만 보관된다.
 
+대시보드의 `DDS / ROS GRAPH` 패널에서는 다음을 함께 확인한다.
+
+- `DOMAIN ID`와 `NAMESPACE`가 장비 배포 대장 값과 같은지
+- `DDS ISOLATION`이 `LOOPBACK ONLY`인지
+- 예상하지 않은 namespace 또는 중복 노드 경고가 없는지
+- 노드·토픽 수가 기동 전후 기대 범위인지
+- RX/TX 그래프가 Wi-Fi 사용량 급증을 보이는지
+
+DDNS 또는 `rosy-01.local`은 브라우저 접속 주소만 해결한다. ROS 장비 간
+충돌은 장비별 `ROS_DOMAIN_ID`, 고유 namespace, loopback CycloneDDS 설정으로
+막는다. 외부 노트북이 ROS DDS에 직접 접속하도록 `wlan0`로 DDS 인터페이스를
+변경하지 않는다. 원격 상태 확인은 FastAPI 대시보드를 사용한다.
+
 ## 6. 설치 후 재검증
 
 Pi에서 인터넷까지 필수로 판정한다.

@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import os
 import platform
 import shutil
 import socket
-from datetime import datetime, timezone
+import threading
+import time
 from pathlib import Path
 from typing import Callable, Optional
 
 
 AddressResolver = Callable[[Optional[str]], list[str]]
+RosGraphProvider = Callable[[], dict]
 
 
 class HostRuntimeProbe:
@@ -22,11 +25,22 @@ class HostRuntimeProbe:
         host_root: str | Path = "/",
         data_path: str | Path = "/var/lib/rosy",
         address_resolver: Optional[AddressResolver] = None,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         self.host_root = Path(host_root)
         self.data_path = Path(data_path)
         self._address_resolver = address_resolver or self._resolve_addresses
+        self._monotonic = monotonic
         self._last_cpu: Optional[tuple[int, int]] = None
+        self._last_network: Optional[tuple[float, int, int]] = None
+        self._network_lock = threading.Lock()
+        self._ros_graph_provider: Optional[RosGraphProvider] = None
+
+    def attach_ros_graph_provider(self, provider: RosGraphProvider) -> None:
+        """Attach a read-only ROS graph source after the rclpy node exists."""
+        if not callable(provider):
+            raise TypeError("ROS graph provider must be callable")
+        self._ros_graph_provider = provider
 
     def _read_text(self, relative: str) -> str:
         return (self.host_root / relative).read_text(encoding="utf-8").strip()
@@ -105,6 +119,45 @@ class HostRuntimeProbe:
             "used_percent": round(usage.used / usage.total * 100.0, 2) if usage.total else None,
         }
 
+    def _network_throughput(self) -> dict[str, Optional[float] | list[str]]:
+        with self._network_lock:
+            return self._network_throughput_locked()
+
+    def _network_throughput_locked(self) -> dict[str, Optional[float] | list[str]]:
+        counters: dict[str, tuple[int, int]] = {}
+        for line in self._read_text("proc/net/dev").splitlines()[2:]:
+            if ":" not in line:
+                continue
+            interface, payload = line.split(":", 1)
+            name = interface.strip()
+            fields = payload.split()
+            if name == "lo" or len(fields) < 9:
+                continue
+            counters[name] = (int(fields[0]), int(fields[8]))
+        if not counters:
+            raise ValueError("network counters unavailable")
+
+        now = self._monotonic()
+        received = sum(values[0] for values in counters.values())
+        transmitted = sum(values[1] for values in counters.values())
+        previous = self._last_network
+        self._last_network = (now, received, transmitted)
+
+        rx_rate: Optional[float] = None
+        tx_rate: Optional[float] = None
+        if previous is not None:
+            elapsed = now - previous[0]
+            rx_delta = received - previous[1]
+            tx_delta = transmitted - previous[2]
+            if elapsed > 0 and rx_delta >= 0 and tx_delta >= 0:
+                rx_rate = round(rx_delta / elapsed, 2)
+                tx_rate = round(tx_delta / elapsed, 2)
+        return {
+            "rx_bytes_per_second": rx_rate,
+            "tx_bytes_per_second": tx_rate,
+            "interfaces": sorted(counters),
+        }
+
     @staticmethod
     def _resolve_addresses(_hostname: Optional[str]) -> list[str]:
         addresses: set[str] = set()
@@ -125,7 +178,6 @@ class HostRuntimeProbe:
 
     def snapshot(self) -> dict:
         """Return all available values and name every unavailable source."""
-
         unavailable: list[str] = []
 
         try:
@@ -181,6 +233,30 @@ class HostRuntimeProbe:
             }
             unavailable.append("storage")
 
+        try:
+            network_throughput = self._network_throughput()
+        except (OSError, ValueError, IndexError):
+            network_throughput = {
+                "rx_bytes_per_second": None,
+                "tx_bytes_per_second": None,
+                "interfaces": [],
+            }
+            unavailable.append("network_counters")
+
+        ros_graph = None
+        if self._ros_graph_provider is not None:
+            try:
+                ros_graph = self._ros_graph_provider()
+            except Exception:
+                ros_graph = {
+                    "status": "UNAVAILABLE",
+                    "risks": [{
+                        "code": "GRAPH_UNAVAILABLE",
+                        "message": "ROS graph provider failed",
+                    }],
+                }
+                unavailable.append("ros_graph")
+
         return {
             "source": "host",
             "os": os_release,
@@ -200,7 +276,9 @@ class HostRuntimeProbe:
             "temperature_c": temperature,
             "network": {
                 "addresses": self._address_resolver(hostname),
+                "throughput": network_throughput,
             },
+            "ros": ros_graph,
             "unavailable": unavailable,
             "collected_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         }

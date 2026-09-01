@@ -85,6 +85,33 @@ packaged and physically accepted.
 For a released robot, replace development image tags with immutable image
 digests that were built and accepted for the exact source revision.
 
+### ROS domain isolation and graph visibility
+
+DDNS and ROS DDS domains solve different problems. DDNS gives the dashboard a
+stable hostname when an IP address changes. `ROS_DOMAIN_ID` controls which ROS 2
+participants discover each other. A DDNS name must never be used as a substitute
+for a per-robot DDS domain assignment.
+
+Keep a small deployment registry with one unique `ROS_DOMAIN_ID` and
+`ROSY_NAMESPACE` per robot. Linux deployments use domain IDs `0` through `101`;
+Rosy rejects values outside that commissioning range. The bundled CycloneDDS
+profile binds discovery to `lo`, so the core and I/O containers on one Pi can
+communicate while Wi-Fi peers cannot join the DDS graph. Browser and fleet
+clients use FastAPI instead.
+
+The dashboard communication panel reports the configured domain, expected
+namespace, loopback isolation, discovered node/topic counts, and a bounded
+node-topic map. It warns on duplicate fully-qualified node names, nodes outside
+the expected namespace, an invalid domain, or a network-visible DDS profile.
+These are collision indicators rather than proof of a remote robot. If a warning
+appears, stop motion, compare the device with the deployment registry, correct
+`.env`, and restart the complete Rosy runtime so every container receives the
+same values.
+
+RX/TX charts are aggregate non-loopback host traffic sampled from
+`/proc/net/dev`; they are useful for detecting a busy link but are not per-topic
+DDS bandwidth measurements.
+
 ### Motor command contract
 
 `rosy_bringup.motor_control.MotorController` is the single command boundary

@@ -227,6 +227,49 @@ button { color: inherit; }
 .temperature-card strong { margin: 7px 0; font: 2.3rem/1 var(--mono); }
 .runtime-warning { min-height: 1.2em; margin: 18px 0 0; color: var(--signal-amber); font: 0.65rem/1.5 var(--mono); }
 
+.ros-network-panel { grid-column: 1 / -1; overflow: hidden; }
+.ros-network-panel::before { width: 160px; background: linear-gradient(90deg, var(--signal-lime), var(--signal-amber)); }
+.ros-network-facts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.ros-network-facts article { min-width: 0; padding: 17px 18px; background: rgba(11, 17, 15, 0.96); }
+.ros-network-facts span, .traffic-card span { display: block; color: var(--muted); font: 0.62rem/1 var(--mono); letter-spacing: 0.12em; }
+.ros-network-facts strong { display: block; margin-top: 10px; overflow: hidden; color: var(--paper); font: 1.15rem/1.1 var(--display); text-overflow: ellipsis; white-space: nowrap; }
+.ros-network-facts small { display: block; margin-top: 7px; color: var(--muted); font: 0.65rem/1.2 var(--mono); }
+[data-status="OK"] { color: var(--signal-lime); border-color: rgba(196, 219, 118, 0.45); }
+[data-status="WARNING"] { color: var(--signal-amber); border-color: rgba(244, 186, 84, 0.45); }
+[data-status="ERROR"], [data-status="UNAVAILABLE"] { color: var(--signal-danger); border-color: rgba(255, 107, 111, 0.45); }
+.network-traffic-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 12px; }
+.traffic-card { position: relative; min-height: 106px; padding: 16px 18px 10px; overflow: hidden; border: 1px solid var(--line); background: rgba(9, 14, 12, 0.84); }
+.traffic-card header { position: relative; z-index: 1; display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.traffic-card strong { color: var(--paper); font: 1.15rem/1 var(--mono); }
+.network-sparkline { position: absolute; inset: 42px 12px 6px; width: calc(100% - 24px); height: 58px; overflow: visible; }
+.network-sparkline polyline { fill: none; stroke-width: 2; stroke-linecap: square; stroke-linejoin: bevel; }
+.traffic-rx .network-sparkline polyline { stroke: var(--signal-lime); filter: drop-shadow(0 0 4px rgba(196, 219, 118, 0.45)); }
+.traffic-tx .network-sparkline polyline { stroke: var(--signal-amber); filter: drop-shadow(0 0 4px rgba(244, 186, 84, 0.4)); }
+.ros-graph-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(230px, 0.72fr); gap: 12px; margin-top: 12px; }
+.graph-stage, .risk-tape { border: 1px solid var(--line); background: rgba(9, 14, 12, 0.84); }
+.graph-stage { position: relative; min-height: 330px; padding: 24px 10px 6px; }
+.graph-legend { position: absolute; top: 11px; left: 18px; display: flex; align-items: center; gap: 8px; color: var(--muted); font: 0.58rem/1 var(--mono); letter-spacing: 0.1em; }
+.graph-legend i { width: 32px; height: 1px; background: var(--line-strong); }
+.ros-graph-map { width: 100%; height: 300px; }
+.graph-edge { stroke: rgba(173, 192, 184, 0.25); stroke-width: 1; }
+.graph-edge.publishes { stroke: rgba(196, 219, 118, 0.38); }
+.graph-edge.subscribes { stroke-dasharray: 4 4; }
+.graph-node { fill: #111a17; stroke: rgba(196, 219, 118, 0.55); stroke-width: 1; }
+.graph-node.foreign { fill: rgba(255, 107, 111, 0.1); stroke: var(--signal-danger); }
+.graph-topic { fill: var(--signal-amber); stroke: #111614; stroke-width: 3; }
+.graph-node-label, .graph-topic-label, .graph-empty { fill: var(--paper); font: 11px var(--mono); text-anchor: middle; }
+.graph-topic-label { fill: var(--muted); text-anchor: end; }
+.graph-empty { fill: var(--muted); }
+.risk-tape { padding: 20px; }
+.risk-tape h3 { margin: 0 0 14px; color: var(--paper); font: 1rem/1 var(--display); }
+.risk-tape ul { display: grid; gap: 8px; min-height: 150px; margin: 0; padding: 0; list-style: none; }
+.risk-tape li { padding: 10px; border-left: 2px solid var(--signal-danger); background: rgba(255, 107, 111, 0.07); }
+.risk-tape li strong, .risk-tape li span { display: block; }
+.risk-tape li strong { color: var(--signal-danger); font: 0.6rem/1 var(--mono); letter-spacing: 0.08em; }
+.risk-tape li span { margin-top: 5px; color: var(--paper); font: 0.7rem/1.45 var(--mono); }
+.risk-tape li.risk-clear { color: var(--signal-lime); border-left-color: var(--signal-lime); background: rgba(196, 219, 118, 0.06); font: 0.7rem/1.5 var(--mono); }
+.risk-tape > p { margin: 18px 0 0; color: var(--muted); font: 0.65rem/1.5 var(--mono); }
+
 .telemetry-grid { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
 .telemetry-grid article { min-width: 0; padding: 18px 14px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .telemetry-grid span, .telemetry-grid strong, .telemetry-grid small { display: block; }
@@ -297,6 +340,8 @@ button { color: inherit; }
 @keyframes drawer-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 
 @media (max-width: 1040px) {
+  .ros-network-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ros-graph-layout { grid-template-columns: 1fr; }
   .dashboard { grid-template-columns: 1fr; }
   .hero-strip { grid-template-columns: 1.2fr 0.8fr; }
   .hero-safety { grid-column: 1 / -1; min-height: 115px; border-top: 1px solid var(--line); border-left: 0; }
@@ -305,6 +350,10 @@ button { color: inherit; }
 }
 
 @media (max-width: 680px) {
+  .ros-network-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .network-traffic-grid { grid-template-columns: 1fr; }
+  .graph-stage { min-height: 260px; }
+  .ros-graph-map { height: 240px; }
   .topbar { min-height: 66px; }
   .clock, .status-badge span { display: none; }
   .status-badge { min-width: 31px; justify-content: center; padding: 0; }

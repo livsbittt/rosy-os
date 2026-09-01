@@ -63,7 +63,11 @@ def test_delayed_positive_request_cannot_arrive_after_release_zero():
                   pose: {x: 0, y: 0, yaw: 0}, velocity: {linear: 0, angular: 0},
                   battery: {percent: 90, voltage: 7.5}, safety: {estop: false}, seq: 1,
                 },
-                '/api/v1/system/runtime': {os: {}, cpu: {}, memory: {}, storage: {}, network: {}},
+                '/api/v1/system/runtime': {
+                  os: {}, cpu: {}, memory: {}, storage: {},
+                  network: {throughput: {rx_bytes_per_second: null, tx_bytes_per_second: null}},
+                  ros: null,
+                },
                 '/api/v1/system/info': {name: 'Rosy', robot_id: 'rosy_01', hardware_model: 'test'},
                 '/api/v1/system/capabilities': {teleop: true, navigation: {goal_navigation: false}},
                 '/api/v1/safety/state': {estop: false, source: null},
@@ -86,6 +90,10 @@ def test_delayed_positive_request_cannot_arrive_after_release_zero():
             """
         )
         page.goto("http://rosy.test/dashboard", wait_until="domcontentloaded", timeout=5_000)
+        assert page.locator("#network-rx-rate").inner_text() == "—"
+        assert page.locator("#network-tx-rate").inner_text() == "—"
+        assert "그래프 수집 불가" in page.locator("#ros-risk-list").inner_text()
+        assert page.locator("#ros-risk-list .risk-clear").count() == 0
         page.locator("#bench-safety-confirmed").check()
         forward = page.locator('[data-teleop="forward"]')
         assert forward.is_enabled()
