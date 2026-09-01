@@ -67,6 +67,7 @@ def test_runtime_defaults_to_core_only_and_rejects_unknown_modes():
 
     assert "ROSY_RUNTIME_MODE=core" in environment
     assert '${ROSY_RUNTIME_MODE:-core}' in wrapper
+    assert "s/^ROSY_RUNTIME_MODE=//p" in wrapper
     assert '"core"|"hardware")' in wrapper
     assert "unknown ROSY_RUNTIME_MODE" in wrapper
     assert "runtime-mode.sh up" in unit

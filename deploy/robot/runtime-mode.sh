@@ -11,6 +11,12 @@ if [[ ! -f "$ENV_FILE" ]]; then
     exit 1
 fi
 
+if [[ -z "${ROSY_RUNTIME_MODE+x}" ]]; then
+    configured_mode="$(sed -n 's/^ROSY_RUNTIME_MODE=//p' "$ENV_FILE" | tail -n 1)"
+    configured_mode="${configured_mode%$'\r'}"
+    MODE="${configured_mode:-core}"
+fi
+
 cd "$SCRIPT_DIR"
 
 compose() {
