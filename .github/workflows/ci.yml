@@ -36,3 +36,61 @@ jobs:
         run: |
           cd src/rosy_core
           python3 -m pytest test/ -v
+
+      # 호스트 테스트는 ros_bridge 를 임포트하지 않으므로, 모듈 최상단의 ROS
+      # 임포트가 노드 생성자를 죽이는 결함을 잡지 못한다. 이 러너에는
+      # slam_toolbox 가 없어 그 조건이 그대로 재현된다.
+      - name: Smoke (node boots without optional ROS packages)
+        run: |
+          # ROS setup.sh 는 미정의 변수를 참조하므로 -u 를 쓰지 않는다.
+          set -eo pipefail
+          . /opt/ros/jazzy/setup.sh
+          . src/install/setup.sh
+          export HOME=/tmp ROS_LOG_DIR=/tmp/ros-logs
+          timeout 60 ros2 run rosy_core rosy_core > /tmp/boot.log 2>&1 &
+          node_pid=$!
+          for _ in $(seq 1 60); do
+            grep -q 'rosy_core up' /tmp/boot.log && break
+            kill -0 "$node_pid" 2>/dev/null || break
+            sleep 1
+          done
+          kill "$node_pid" 2>/dev/null || true
+          cat /tmp/boot.log
+          if ! grep -q 'rosy_core up' /tmp/boot.log; then
+            echo '::error::rosy_core did not reach startup'
+            exit 1
+          fi
+          # 러너가 slam_toolbox 를 갖게 되면 이 검사는 의도한 조건을 더 이상
+          # 재현하지 못한다. 조용히 통과하지 말고 드러내야 한다.
+          if ! grep -q 'slam_toolbox unavailable' /tmp/boot.log; then
+            echo '::error::precondition lost: runner now has slam_toolbox'
+            exit 1
+          fi
+
+      # save_map 의 두 수정(std_msgs/String, RESULT_SUCCESS=0)은 실패하면 예외가
+      # 아니라 SIGABRT 다. 호스트 테스트로는 잡히지 않으므로 실제 타입으로 검사한다.
+      # 전체 설치(Qt/assimp 의존성)는 무겁다 — deb 만 받아 풀면 바인딩이 임포트된다.
+      - name: Guard (SaveMap request type and result codes)
+        run: |
+          set -eo pipefail
+          . /opt/ros/jazzy/setup.sh
+          cd /tmp
+          apt-get update -qq
+          apt-get download ros-jazzy-slam-toolbox
+          dpkg -x ros-jazzy-slam-toolbox_*.deb /
+          python3 - <<'PY'
+          from slam_toolbox.srv import SaveMap
+          from std_msgs.msg import String
+          from rclpy.serialization import serialize_message
+
+          fields = SaveMap.Request.get_fields_and_field_types()
+          assert fields['name'] == 'std_msgs/String', fields
+          assert SaveMap.Response.RESULT_SUCCESS == 0, 'success code changed'
+
+          # ros_bridge.save_map 이 만드는 형태 그대로. 원시 str 이었다면 여기서
+          # convert_from_py assertion 으로 프로세스가 죽는다.
+          request = SaveMap.Request()
+          request.name = String(data='ci-map')
+          assert serialize_message(request)
+          print('SaveMap guard OK')
+          PY
