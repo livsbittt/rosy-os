@@ -131,6 +131,33 @@ class SafetySummary(BaseModel):
     estop: bool = False
 
 
+# --- 절전/근접 웨이크 (PWR-001~004, D-24) -----------------------------------
+
+class PowerMode(str, enum.Enum):
+    """센서·디스플레이 듀티 사이클 모드. 모터 안전 경로와 무관하다."""
+
+    ACTIVE = "ACTIVE"      # 상시 — 활동 중이거나 깨어 있음
+    IDLE = "IDLE"          # 저속 샘플링, LCD 디밍
+    STANDBY = "STANDBY"    # 최저 샘플링, LCD 소등
+
+
+class PresenceState(str, enum.Enum):
+    """초음파 근접 판정 결과 (표시 전용 — 장애물 회피는 Nav2 담당)."""
+
+    NONE = "none"
+    NEAR = "near"          # near_m 이내 접근
+    CONTACT = "contact"    # contact_m 이내 — 접촉으로 간주
+
+
+class PowerStatus(BaseModel):
+    mode: PowerMode = PowerMode.ACTIVE
+    presence: PresenceState = PresenceState.NONE
+    info_visible: bool = False
+    sample_rate_hz: float = 20.0
+    last_wake_reason: Optional[str] = None
+    idle_seconds: float = 0.0
+
+
 # --- Swarm (D-20, SWM-001~006, API Ref §7.8) --------------------------------
 
 class SwarmRole(str, enum.Enum):
