@@ -10,6 +10,7 @@ from rosy_core.protocol.schemas import (
     HealthState,
     NavigationState,
     Pose,
+    PowerStatus,
     RobotMode,
     SafetySummary,
     StateSnapshot,
@@ -30,6 +31,7 @@ class StateManager:
         self._battery = Battery()
         self._safety = SafetySummary()
         self._swarm = SwarmStatus()
+        self._power = PowerStatus()
         self._map_id: Optional[str] = None
         self._diagnostics: dict[str, HealthState] = {}
         self._errors: list[str] = []
@@ -77,6 +79,10 @@ class StateManager:
         with self._lock:
             self._diagnostics[component] = health
 
+    def set_power(self, status: PowerStatus) -> None:
+        with self._lock:
+            self._power = status
+
     def set_sensor(self, key: str, data: dict) -> None:
         with self._lock:
             self._sensors[key] = data
@@ -109,6 +115,7 @@ class StateManager:
                 battery=self._battery.model_copy(),
                 safety=self._safety.model_copy(),
                 swarm=self._swarm.model_copy(),
+                power=self._power.model_copy(),
                 diagnostics_summary=dict(self._diagnostics),
                 errors=list(self._errors),
                 seq=self._seq,

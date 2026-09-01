@@ -10,7 +10,9 @@ from rosy_core.power.manager import (
     PresenceConfig,
     PresenceDetector,
 )
-from rosy_core.protocol.schemas import PowerMode, PresenceState
+from rosy_core.events.bus import EventBus
+from rosy_core.protocol.schemas import PowerMode, PresenceState, RobotMode
+from rosy_core.state.manager import StateManager
 
 
 class FakeClock:
@@ -235,3 +237,126 @@ class TestSampleRateMapping:
             manager.tick()
             assert math.isfinite(manager.sample_rate_hz)
             assert manager.sample_rate_hz > 0.0
+
+
+class TestEvents:
+    @pytest.fixture
+    def bus(self):
+        return EventBus("rosy_01", buffer_size=64)
+
+    @pytest.fixture
+    def manager(self, config, clock, bus):
+        return PowerManager(config, events=bus, clock=clock)
+
+    @staticmethod
+    def _types(bus):
+        return [e.type for e in bus.history(limit=100)]
+
+    def test_mode_change_emits_once(self, manager, clock, bus):
+        clock.advance(61.0)
+        manager.tick()
+        manager.tick()
+        manager.tick()
+        assert self._types(bus).count("power.mode_changed") == 1
+
+    def test_mode_change_carries_from_to_and_rate(self, manager, clock, bus):
+        clock.advance(61.0)
+        manager.tick()
+        event = bus.history(limit=100)[-1]
+        assert event.data["from"] == "ACTIVE"
+        assert event.data["to"] == "IDLE"
+        assert event.data["sample_rate_hz"] == 5.0
+
+    def test_presence_detected_and_cleared(self, manager, clock, bus):
+        clock.advance(400.0)
+        manager.tick()
+        manager.on_range(0.20)
+        manager.on_range(0.20)
+        assert "presence.detected" in self._types(bus)
+        assert "power.wake" in self._types(bus)
+
+        for _ in range(3):
+            manager.on_range(1.50)
+        assert "presence.cleared" in self._types(bus)
+
+    def test_presence_does_not_repeat_while_held(self, manager, clock, bus):
+        clock.advance(400.0)
+        manager.tick()
+        for _ in range(10):
+            manager.on_range(0.20)
+        assert self._types(bus).count("presence.detected") == 1
+
+    def test_escalation_emits_second_detection(self, manager, clock, bus):
+        clock.advance(400.0)
+        manager.tick()
+        manager.on_range(0.20)
+        manager.on_range(0.20)
+        manager.on_range(0.03)
+        manager.on_range(0.03)
+        assert self._types(bus).count("presence.detected") == 2
+
+
+class TestSafetyInterlocks:
+    def test_non_idle_robot_mode_blocks_standby(self, manager, clock):
+        manager.on_robot_mode(RobotMode.NAVIGATION)
+        clock.advance(1000.0)
+        manager.tick()
+        assert manager.mode == PowerMode.ACTIVE
+
+    def test_returning_to_idle_releases_the_hold(self, manager, clock):
+        manager.on_robot_mode(RobotMode.NAVIGATION)
+        clock.advance(1000.0)
+        manager.tick()
+        manager.on_robot_mode(RobotMode.IDLE)
+        clock.advance(400.0)
+        manager.tick()
+        assert manager.mode == PowerMode.STANDBY
+
+    def test_emergency_mode_keeps_display_active(self, manager, clock):
+        clock.advance(400.0)
+        manager.tick()
+        assert manager.mode == PowerMode.STANDBY
+        manager.on_robot_mode(RobotMode.EMERGENCY)
+        assert manager.mode == PowerMode.ACTIVE
+
+    def test_forced_standby_via_request_mode(self, manager, clock):
+        manager.request_mode(PowerMode.STANDBY, source="api")
+        assert manager.mode == PowerMode.STANDBY
+
+    def test_forced_standby_is_overridden_by_activity(self, manager):
+        manager.request_mode(PowerMode.STANDBY, source="api")
+        manager.on_activity("cmd_vel")
+        assert manager.mode == PowerMode.ACTIVE
+
+    def test_forced_active_via_request_mode(self, manager, clock):
+        clock.advance(400.0)
+        manager.tick()
+        manager.request_mode(PowerMode.ACTIVE, source="api")
+        assert manager.mode == PowerMode.ACTIVE
+        assert manager.info_visible() is True
+
+
+class TestStatusSnapshot:
+    def test_status_reports_full_shape(self, manager, clock):
+        clock.advance(400.0)
+        manager.tick()
+        manager.on_range(0.20)
+        manager.on_range(0.20)
+        status = manager.status()
+        assert status.mode == PowerMode.ACTIVE
+        assert status.presence == PresenceState.NEAR
+        assert status.info_visible is True
+        assert status.sample_rate_hz == 20.0
+        assert status.last_wake_reason == "proximity"
+        assert status.idle_seconds == pytest.approx(0.0)
+
+    def test_state_manager_carries_power_status(self, manager, clock):
+        sm = StateManager("rosy_01")
+        assert sm.snapshot().power.mode == PowerMode.ACTIVE
+
+        clock.advance(400.0)
+        manager.tick()
+        sm.set_power(manager.status())
+        snapshot = sm.snapshot()
+        assert snapshot.power.mode == PowerMode.STANDBY
+        assert snapshot.power.sample_rate_hz == 2.0

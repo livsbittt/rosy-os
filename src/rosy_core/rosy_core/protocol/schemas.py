@@ -213,6 +213,7 @@ class StateSnapshot(BaseModel):
     battery: Battery = Field(default_factory=Battery)
     safety: SafetySummary = Field(default_factory=SafetySummary)
     swarm: SwarmStatus = Field(default_factory=SwarmStatus)  # v1.1 additive (SWM-006)
+    power: PowerStatus = Field(default_factory=PowerStatus)  # v1.4 additive (PWR-001)
     diagnostics_summary: dict[str, HealthState] = Field(default_factory=dict)
     seq: int = 0
     timestamp: str = Field(default_factory=utc_now_iso)
