@@ -43,6 +43,28 @@ def test_system_info_and_capabilities(client):
     assert r.json()["swarm"] == {"follow": True, "lead": True}
 
 
+def test_system_runtime_requires_viewer_and_returns_safe_snapshot(client):
+    tc, svc = client
+
+    class FakeRuntimeProbe:
+        def snapshot(self):
+            return {
+                "hostname": "rosy-pi",
+                "temperature_c": 51.2,
+                "unavailable": [],
+            }
+
+    svc.runtime_probe = FakeRuntimeProbe()
+
+    assert tc.get("/api/v1/system/runtime").status_code == 401
+    response = tc.get("/api/v1/system/runtime", headers=VIEWER)
+
+    assert response.status_code == 200
+    assert response.json()["hostname"] == "rosy-pi"
+    assert response.json()["temperature_c"] == 51.2
+    assert "rosy-dev-admin" not in response.text
+
+
 def test_auth_roles(client):
     tc, _ = client
     assert tc.get("/api/v1/robot/state").status_code == 401            # UNAUTHORIZED

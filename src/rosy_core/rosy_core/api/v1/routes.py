@@ -31,6 +31,11 @@ def capabilities(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(g
     return svc.capability.to_dict()
 
 
+@system_router.get("/runtime")
+def system_runtime(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
+    return svc.runtime_probe.snapshot()
+
+
 robot_router = APIRouter(prefix="/api/v1/robot", tags=["robot"])
 
 

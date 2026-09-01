@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -14,6 +15,7 @@ from rosy_core.navigation.manager import NavigationManager
 from rosy_core.profile import RobotProfile
 from rosy_core.safety.manager import BatteryPolicy, SafetyManager, SpeedLimits
 from rosy_core.state.manager import StateManager
+from rosy_core.system.runtime import HostRuntimeProbe
 from rosy_core.waypoints.manager import WaypointManager
 
 
@@ -31,6 +33,7 @@ class CoreServices:
     safety: SafetyManager
     waypoints: WaypointManager
     nav: NavigationManager
+    runtime_probe: HostRuntimeProbe
 
     @classmethod
     def build(cls, config: dict[str, Any], profile: RobotProfile,
@@ -66,6 +69,11 @@ class CoreServices:
         waypoints = WaypointManager(waypoints_path, events=events)
         nav = NavigationManager(events, state, waypoints, safety,
                                 stuck_timeout_s=float(safety_cfg.get("stuck_timeout_s", 30.0)))
+        runtime_probe = HostRuntimeProbe(
+            host_root=os.environ.get("ROSY_HOST_ROOT", "/"),
+            data_path=waypoints_path.parent,
+        )
         return cls(config=config, identity=identity, profile=profile, capability=capability,
                    events=events, state=state, registry=registry, modes=modes,
-                   command=command, safety=safety, waypoints=waypoints, nav=nav)
+                   command=command, safety=safety, waypoints=waypoints, nav=nav,
+                   runtime_probe=runtime_probe)
