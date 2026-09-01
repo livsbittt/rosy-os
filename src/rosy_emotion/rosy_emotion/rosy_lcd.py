@@ -142,6 +142,18 @@ class LCD():
         if value > 100: value = 100
         self.bl.ChangeDutyCycle(value)
 
+    def sleep(self):
+        """디스플레이 OFF + Sleep In (0x28/0x10). 대기 전력 절감용."""
+        self._write_cmd(0x28)
+        self._write_cmd(0x10)
+        time.sleep(0.005)
+
+    def wake(self):
+        """Sleep Out + 디스플레이 ON (0x11/0x29). 데이터시트상 120 ms 대기 필요."""
+        self._write_cmd(0x11)
+        time.sleep(0.12)
+        self._write_cmd(0x29)
+
     def close(self):
         self.spi.close()
         self.bl.stop()
