@@ -315,3 +315,312 @@ class TestSimulatedDetector:
     def test_it_satisfies_the_detector_protocol(self, clock):
         from rosy_core.docking.detector import DockDetector
         assert isinstance(self._detector(clock, script=[]), DockDetector)
+
+
+# --- 도크 에이전트 클라이언트 --------------------------------------------------
+#
+# 도크가 밀어넣지 않고 로봇이 폴링한다. 도크는 어느 로봇이 오는지 모르고,
+# 로봇은 자기가 갈 도크를 안다. 그리고 Fleet 이 죽어도 충전은 되어야 한다.
+
+import json as _json
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+
+class _StubDock:
+    """도크 에이전트 대역. body/status/delay 를 테스트가 지정한다."""
+
+    def __init__(self, body=None, status=200, delay_s=0.0, raw=None):
+        self.body = body
+        self.status = status
+        self.delay_s = delay_s
+        self.raw = raw
+        self.requests = 0
+        outer = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                outer.requests += 1
+                if outer.delay_s:
+                    import time as _t
+                    _t.sleep(outer.delay_s)
+                payload = (outer.raw if outer.raw is not None
+                           else _json.dumps(outer.body).encode())
+                self.send_response(outer.status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def log_message(self, *args):
+                pass
+
+        self._server = HTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self._server.server_port}"
+
+    def __enter__(self):
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self._server.shutdown()
+        self._server.server_close()
+
+
+HEALTHY = {
+    "dock_id": "dock_1",
+    "firmware": "1.0.0",
+    "output_enabled": True,
+    "load_present": True,
+    "charging": True,
+    "current_a": 1.42,
+    "output_voltage_v": 8.31,
+    "faults": [],
+}
+
+
+def an_agent(url, **kwargs):
+    from rosy_core.docking.agent import DockAgent
+    return DockAgent(url, timeout_s=kwargs.pop("timeout_s", 1.0), **kwargs)
+
+
+class TestDockAgentHappyPath:
+    def test_it_reads_the_documented_fields(self):
+        from rosy_core.docking.agent import DockReachability
+        with _StubDock(HEALTHY) as dock:
+            status = an_agent(dock.url).poll()
+        assert status.reachability is DockReachability.OK
+        assert status.answered is True
+        assert status.charging is True
+        assert status.load_present is True
+        assert status.current_a == pytest.approx(1.42)
+        assert status.output_voltage_v == pytest.approx(8.31)
+        assert status.dock_id == "dock_1"
+        assert status.faults == ()
+
+    def test_a_fault_list_comes_through(self):
+        body = dict(HEALTHY, charging=False, current_a=0.0,
+                    faults=["overtemp", "contact_open"])
+        with _StubDock(body) as dock:
+            status = an_agent(dock.url).poll()
+        assert status.answered is True
+        assert status.faults == ("overtemp", "contact_open")
+        assert status.charging is False
+
+    def test_load_present_and_charging_are_independent(self):
+        """접점이 물렸는데 전류가 안 흐르는 상황은 접촉 실패와 다른 고장이다 —
+        산화된 접점, 만충, 래치된 보호회로."""
+        body = dict(HEALTHY, load_present=True, charging=False, current_a=0.0)
+        with _StubDock(body) as dock:
+            status = an_agent(dock.url).poll()
+        assert status.load_present is True
+        assert status.charging is False
+
+
+class TestDockAgentFailures:
+    """어느 경우에도 예외가 콜백으로 새면 안 되고, 각각이 서로 구분되어야 한다.
+    상태머신이 "도크가 전류 없다고 답했다"와 "도크가 답을 안 했다"를 가르지
+    못하면 재시도 전략을 세울 수 없다."""
+
+    def test_a_dead_dock_is_not_an_exception(self):
+        """거부냐 지연이냐는 OS 마다 다르고 상태머신도 구분할 필요가 없다.
+        중요한 것은 답을 못 받았고, 그때 충전 중이 아니라는 것이다."""
+        from rosy_core.docking.agent import DockReachability
+        with _StubDock(HEALTHY) as dock:
+            url = dock.url                      # 서버를 닫고 그 포트를 쓴다
+        status = an_agent(url, timeout_s=0.3).poll()
+        assert status.reachability in (DockReachability.UNREACHABLE,
+                                       DockReachability.TIMEOUT)
+        assert status.answered is False
+        assert status.charging is False         # 모를 때는 충전 중이 아니다
+        assert status.error is not None         # 왜 실패했는지는 남아야 한다
+
+    def test_a_slow_dock_times_out_rather_than_hanging(self):
+        from rosy_core.docking.agent import DockReachability
+        with _StubDock(HEALTHY, delay_s=2.0) as dock:
+            status = an_agent(dock.url, timeout_s=0.3).poll()
+        assert status.reachability is DockReachability.TIMEOUT
+        assert status.answered is False
+
+    def test_the_client_never_blocks_longer_than_its_timeout(self):
+        """이 폴링은 틱 안에서 돈다. 멎은 도크가 틱을 멈춰 세우면 안 된다."""
+        import time as _t
+        with _StubDock(HEALTHY, delay_s=3.0) as dock:
+            started = _t.monotonic()
+            an_agent(dock.url, timeout_s=0.3).poll()
+            elapsed = _t.monotonic() - started
+        assert elapsed < 1.5
+
+    def test_a_non_200_is_a_bad_response(self):
+        from rosy_core.docking.agent import DockReachability
+        with _StubDock(HEALTHY, status=503) as dock:
+            status = an_agent(dock.url).poll()
+        assert status.reachability is DockReachability.BAD_RESPONSE
+        assert status.answered is False
+
+    def test_malformed_json_is_a_bad_response(self):
+        from rosy_core.docking.agent import DockReachability
+        with _StubDock(None, raw=b"{not json at all") as dock:
+            status = an_agent(dock.url).poll()
+        assert status.reachability is DockReachability.BAD_RESPONSE
+
+    def test_a_non_object_body_is_a_bad_response(self):
+        from rosy_core.docking.agent import DockReachability
+        with _StubDock([1, 2, 3]) as dock:
+            status = an_agent(dock.url).poll()
+        assert status.reachability is DockReachability.BAD_RESPONSE
+
+    def test_missing_charging_field_is_a_bad_response(self):
+        """없는 필드를 False 로 채우면 "충전 안 됨"과 "말을 안 함"이 섞인다."""
+        from rosy_core.docking.agent import DockReachability
+        body = {k: v for k, v in HEALTHY.items() if k != "charging"}
+        with _StubDock(body) as dock:
+            status = an_agent(dock.url).poll()
+        assert status.reachability is DockReachability.BAD_RESPONSE
+
+    def test_optional_fields_may_be_absent(self):
+        from rosy_core.docking.agent import DockReachability
+        body = {"load_present": True, "charging": True}
+        with _StubDock(body) as dock:
+            status = an_agent(dock.url).poll()
+        assert status.reachability is DockReachability.OK
+        assert status.current_a is None
+        assert status.faults == ()
+
+    def test_no_url_means_no_dock_agent(self):
+        from rosy_core.docking.agent import DockReachability
+        status = an_agent(None).poll()
+        assert status.reachability is DockReachability.UNREACHABLE
+        assert status.answered is False
+
+
+# --- 충전 확인: 독립된 두 소스 -------------------------------------------------
+#
+# LAN 의 어떤 장치가 charging:true 라고 우겨도 그것만으로 안전 경로를 끄지
+# 못하게 한다. 이 판정이 D-27 deep 셧다운 억제의 입력이기 때문이다.
+
+def a_status(**kwargs):
+    from rosy_core.docking.agent import DockReachability, DockStatus
+    options = dict(reachability=DockReachability.OK, load_present=True,
+                   charging=True, current_a=1.4)
+    options.update(kwargs)
+    return DockStatus(**options)
+
+
+def unreachable_status():
+    from rosy_core.docking.agent import DockReachability, DockStatus
+    return DockStatus(reachability=DockReachability.UNREACHABLE)
+
+
+def a_confirmation(clock, **kwargs):
+    from rosy_core.docking.charging import ChargingConfirmation
+    options = dict(window_s=10.0, fall_tolerance_v=0.02)
+    options.update(kwargs)
+    return ChargingConfirmation(clock=clock, **options)
+
+
+class TestChargingConfirmation:
+    def test_nothing_is_confirmed_before_any_sample(self, clock):
+        assert a_confirmation(clock).confirmed is False
+
+    def test_a_dock_reporting_current_with_steady_voltage_confirms(self, clock):
+        confirmation = a_confirmation(clock, window_s=10.0)
+        for _ in range(12):
+            clock.advance(1.0)
+            confirmation.update(a_status(), voltage=7.60)
+        assert confirmation.confirmed is True
+
+    def test_a_dock_reporting_current_with_rising_voltage_confirms(self, clock):
+        confirmation = a_confirmation(clock, window_s=10.0)
+        voltage = 7.40
+        for _ in range(12):
+            clock.advance(1.0)
+            voltage += 0.01
+            confirmation.update(a_status(), voltage=voltage)
+        assert confirmation.confirmed is True
+
+    def test_a_dock_claiming_current_while_voltage_falls_is_rejected(self, clock):
+        """도크가 거짓말을 하거나, 전류가 팩까지 도달하지 못하고 있다.
+        어느 쪽이든 충전으로 인정하면 안 된다."""
+        confirmation = a_confirmation(clock, window_s=10.0)
+        voltage = 7.60
+        for _ in range(12):
+            clock.advance(1.0)
+            voltage -= 0.02
+            confirmation.update(a_status(), voltage=voltage)
+        assert confirmation.confirmed is False
+
+    def test_a_spoofed_dock_cannot_disable_a_safety_path_alone(self, clock):
+        """설계의 핵심 방어 — 이 판정이 D-27 셧다운 억제의 입력이다."""
+        confirmation = a_confirmation(clock, window_s=10.0)
+        voltage = 6.60
+        for _ in range(20):
+            clock.advance(1.0)
+            voltage -= 0.01                      # 팩은 계속 죽어간다
+            confirmation.update(a_status(charging=True, current_a=99.0),
+                                voltage=voltage)
+        assert confirmation.confirmed is False
+
+    def test_a_dock_reporting_no_current_is_not_confirmed(self, clock):
+        confirmation = a_confirmation(clock, window_s=10.0)
+        for _ in range(12):
+            clock.advance(1.0)
+            confirmation.update(a_status(charging=False, current_a=0.0),
+                                voltage=7.60)
+        assert confirmation.confirmed is False
+
+    def test_an_unreachable_dock_is_not_confirmed_and_not_an_error(self, clock):
+        confirmation = a_confirmation(clock, window_s=10.0)
+        for _ in range(12):
+            clock.advance(1.0)
+            confirmation.update(unreachable_status(), voltage=7.60)
+        assert confirmation.confirmed is False
+
+    def test_confirmation_needs_the_whole_window(self, clock):
+        """한두 표본으로 확정하면 접점이 스치기만 해도 충전으로 읽힌다."""
+        confirmation = a_confirmation(clock, window_s=10.0)
+        for _ in range(5):
+            clock.advance(1.0)
+            confirmation.update(a_status(), voltage=7.60)
+        assert confirmation.confirmed is False
+        for _ in range(6):
+            clock.advance(1.0)
+            confirmation.update(a_status(), voltage=7.60)
+        assert confirmation.confirmed is True
+
+    def test_it_survives_a_single_noisy_voltage_sample(self, clock):
+        """전압 표본 한 발이 튀었다고 충전 판정이 무너지면 안 된다."""
+        confirmation = a_confirmation(clock, window_s=10.0, fall_tolerance_v=0.05)
+        for index in range(14):
+            clock.advance(1.0)
+            voltage = 7.60 - (0.03 if index == 6 else 0.0)
+            confirmation.update(a_status(), voltage=voltage)
+        assert confirmation.confirmed is True
+
+    def test_losing_the_dock_drops_confirmation_at_once(self, clock):
+        """확정은 창을 요구하지만 해제는 즉시다 — 안전한 방향으로 비대칭."""
+        confirmation = a_confirmation(clock, window_s=10.0)
+        for _ in range(12):
+            clock.advance(1.0)
+            confirmation.update(a_status(), voltage=7.60)
+        assert confirmation.confirmed is True
+        clock.advance(1.0)
+        confirmation.update(a_status(charging=False, current_a=0.0), voltage=7.60)
+        assert confirmation.confirmed is False
+
+    def test_a_missing_voltage_does_not_confirm(self, clock):
+        confirmation = a_confirmation(clock, window_s=10.0)
+        for _ in range(12):
+            clock.advance(1.0)
+            confirmation.update(a_status(), voltage=None)
+        assert confirmation.confirmed is False
+
+    def test_reset_clears_the_window(self, clock):
+        confirmation = a_confirmation(clock, window_s=10.0)
+        for _ in range(12):
+            clock.advance(1.0)
+            confirmation.update(a_status(), voltage=7.60)
+        assert confirmation.confirmed is True
+        confirmation.reset()
+        assert confirmation.confirmed is False

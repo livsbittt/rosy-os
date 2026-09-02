@@ -231,6 +231,7 @@ class BatteryMonitor:
         self._deep_since: Optional[float] = None
         self._deep_announced = False
         self._sentinel_written = False
+        self._charging = False
 
     # --- 조회 -----------------------------------------------------------------
 
@@ -285,9 +286,15 @@ class BatteryMonitor:
                 level=self._level,
                 shutdown_armed=self._shutdown_armed_locked(),
                 filtered_voltage=self._voltage,
+                charging=self._charging,
             )
 
     def _shutdown_armed_locked(self) -> bool:
+        # 충전 중이면 무장하지 않는다 (D-27 인터록). 4%에 도크에 도착한 로봇은
+        # 수 분간 DEEP 을 유지하는데, 그 사이에 halt 하면 충전기 위에서 꺼지고
+        # D-25 대로 전원 버튼 말고는 깨어날 방법이 없다.
+        if self._charging:
+            return False
         if self._level is not BatteryLevel.DEEP or self._deep_since is None:
             return False
         if self._last_sample_at is None:
@@ -295,6 +302,26 @@ class BatteryMonitor:
         return self._last_sample_at - self._deep_since >= self._cfg.deep_dwell_s
 
     # --- 입력 -----------------------------------------------------------------
+
+    def set_charging(self, confirmed: bool) -> None:
+        """확인된 충전 여부를 반영한다 (D-27 인터록).
+
+        `confirmed` 는 도크의 주장이 아니라 `ChargingConfirmation` 의 판정이다 —
+        도크가 보고한 전류 *그리고* 떨어지지 않는 전압. LAN 의 장치 하나가
+        말만으로 안전 경로를 끄지 못하게 하는 것이 그 이중화의 목적이다.
+
+        충전이 끊기면 dwell 을 처음부터 다시 센다. 플러그가 빠졌다고 즉시
+        꺼지면 안 된다.
+        """
+        pending: list[tuple] = []
+        with self._lock:
+            if bool(confirmed) == self._charging:
+                return
+            self._charging = bool(confirmed)
+            if not self._charging and self._level is BatteryLevel.DEEP:
+                self._deep_since = self._last_sample_at
+            self._reconcile_sentinel_locked(pending)
+        self._emit_all(pending)
 
     def on_voltage(self, voltage: float, now: Optional[float] = None) -> None:
         """ADC 표본 1건 반영. 유한하지 않은 값은 필터를 건드리지 않고 버린다."""

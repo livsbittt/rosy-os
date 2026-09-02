@@ -748,3 +748,90 @@ class TestResolveLed:
         alert = self._alert(clock, 7.42, 3)
         assert (resolve_led(alert, False, None, 0.0)
                 == resolve_led(alert, False, None, 9.0))
+
+
+# --- 충전 중 deep 셧다운 억제 (D-27 인터록, 스펙 C) -----------------------------
+#
+# 4%에 도크에 도착한 로봇은 수 분간 deep 을 유지한다. 억제가 없으면 충전기 위에서
+# 스스로 꺼지고, D-25 가 확인했듯 halt 된 Pi 5 는 전원 버튼과 RTC 알람 말고는
+# 깨어날 방법이 없다. 충전에 성공하고 벽돌이 되는 셈이다.
+
+class TestChargingSuppressesShutdown:
+    def _armed_monitor(self, clock, tmp_path, **kwargs):
+        monitor = make_monitor(
+            clock, enter_samples=3, deep_dwell_s=60.0,
+            sentinel_path=tmp_path / "battery-shutdown-request.json",
+            shutdown_grace_s=120.0, **kwargs)
+        feed(monitor, clock, 6.40, 9, step_s=1.0)
+        feed(monitor, clock, 6.40, 1, step_s=60.0)
+        return monitor
+
+    def _sentinel(self, tmp_path):
+        return tmp_path / "battery-shutdown-request.json"
+
+    def test_charging_prevents_the_shutdown_from_arming(self, clock, tmp_path):
+        monitor = make_monitor(
+            clock, enter_samples=3, deep_dwell_s=60.0,
+            sentinel_path=self._sentinel(tmp_path), shutdown_grace_s=120.0)
+        monitor.set_charging(True)
+        feed(monitor, clock, 6.40, 9, step_s=1.0)
+        feed(monitor, clock, 6.40, 5, step_s=60.0)
+        assert monitor.shutdown_armed is False
+        assert not self._sentinel(tmp_path).exists()
+
+    def test_charging_withdraws_an_already_written_sentinel(self, clock, tmp_path):
+        monitor = self._armed_monitor(clock, tmp_path)
+        assert self._sentinel(tmp_path).exists()
+        monitor.set_charging(True)
+        clock.advance(1.0)
+        monitor.on_voltage(6.40)
+        assert monitor.shutdown_armed is False
+        assert not self._sentinel(tmp_path).exists()
+
+    def test_losing_charging_re_arms_only_after_the_full_dwell(self, clock, tmp_path):
+        """플러그가 빠졌다고 즉시 꺼지면 안 된다 — dwell 을 처음부터 다시 센다."""
+        monitor = self._armed_monitor(clock, tmp_path)
+        monitor.set_charging(True)
+        clock.advance(1.0)
+        monitor.on_voltage(6.40)
+        assert monitor.shutdown_armed is False
+
+        monitor.set_charging(False)
+        clock.advance(1.0)
+        monitor.on_voltage(6.40)
+        assert monitor.shutdown_armed is False          # 아직 dwell 전
+        feed(monitor, clock, 6.40, 1, step_s=60.0)
+        assert monitor.shutdown_armed is True
+
+    def test_the_level_itself_is_unchanged_while_charging(self, clock, tmp_path):
+        """억제하는 것은 셧다운이지 판정이 아니다. 팩은 여전히 비어 있다."""
+        from rosy_core.protocol.schemas import BatteryLevel
+        monitor = self._armed_monitor(clock, tmp_path)
+        monitor.set_charging(True)
+        clock.advance(1.0)
+        monitor.on_voltage(6.40)
+        assert monitor.level is BatteryLevel.DEEP
+
+    def test_the_deep_led_alert_is_unaffected(self, clock, tmp_path):
+        """충전 중에도 로봇은 눈에 띄게 비어 있어야 한다."""
+        monitor = self._armed_monitor(clock, tmp_path)
+        monitor.set_charging(True)
+        clock.advance(1.0)
+        monitor.on_voltage(6.40)
+        alert = monitor.led_alert
+        assert alert is not None
+        assert alert.blink_hz == pytest.approx(2.0)
+
+    def test_status_reports_the_suppression(self, clock, tmp_path):
+        monitor = self._armed_monitor(clock, tmp_path)
+        monitor.set_charging(True)
+        clock.advance(1.0)
+        monitor.on_voltage(6.40)
+        status = monitor.status()
+        assert status.charging is True
+        assert status.shutdown_armed is False
+
+    def test_charging_defaults_to_false(self, clock):
+        """아무도 말해주지 않으면 충전 중이 아니다 — 억제는 명시적이어야 한다."""
+        monitor = make_monitor(clock)
+        assert monitor.status().charging is False
