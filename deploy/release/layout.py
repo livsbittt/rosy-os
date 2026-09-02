@@ -133,6 +133,11 @@ class Layout:
         return self.var / "release-state.json"
 
     @property
+    def recovery_hold(self) -> Path:
+        """Set while the device is held for recovery; survives reboot."""
+        return self.var / "recovery-hold.json"
+
+    @property
     def backups(self) -> Path:
         return self.var / "backups"
 
@@ -208,7 +213,13 @@ def _fsync_directory(path: Path) -> None:
         os.close(fd)
 
 
-def write_json_atomic(path: Path, payload: dict) -> None:
+#: Mode for state files the dashboard has to read. NamedTemporaryFile creates
+#: at 0600 and os.replace preserves it, which left release-state.json
+#: root-only — unreadable by CORE at uid 1000, the process meant to show it.
+STATE_FILE_MODE = 0o644
+
+
+def write_json_atomic(path: Path, payload: dict, *, mode: int = STATE_FILE_MODE) -> None:
     """Replace ``path`` in one step, or leave the old content untouched.
 
     The temporary file is created in the destination directory so the rename
@@ -235,6 +246,8 @@ def write_json_atomic(path: Path, payload: dict) -> None:
             handle.write(encoded)
             handle.flush()
             os.fsync(handle.fileno())
+        if os.name == "posix":
+            os.chmod(temporary, mode)
         os.replace(temporary, path)
     except BaseException:
         temporary.unlink(missing_ok=True)
@@ -245,6 +258,38 @@ def write_json_atomic(path: Path, payload: dict) -> None:
 def write_activation(layout: Layout, record: ActivationRecord) -> None:
     """Install ``record`` as the device's authoritative activation."""
     write_json_atomic(layout.activation, asdict(record))
+
+
+def _check_contained(layout: Layout, data: dict, path: Path) -> None:
+    """Refuse a record that points outside the directories it may name.
+
+    The payload paths inside a bundle are already contained (see
+    manifest.py), but the activation record is the higher-value target: it is
+    what boot reads to decide which tree to run. A release_path anywhere on
+    disk, or a generation id carrying "..", would let anything that can write
+    this one file choose what the next boot executes.
+    """
+    for field in ("config_generation", "data_generation"):
+        value = data[field]
+        if not isinstance(value, str) or not value or value in {".", ".."} or "/" in value or "\\" in value:
+            raise ActivationUnreadable(
+                f"{path}: {field} must be a single directory name, got {value!r}"
+            )
+
+    release_path = data["release_path"]
+    if not isinstance(release_path, str):
+        raise ActivationUnreadable(f"{path}: release_path must be a string, got {release_path!r}")
+
+    try:
+        resolved = Path(release_path).resolve()
+        root = layout.releases.resolve()
+    except OSError as exc:  # pragma: no cover - unresolvable path
+        raise ActivationUnreadable(f"{path}: release_path cannot be resolved: {exc}") from exc
+
+    if resolved != root and root not in resolved.parents:
+        raise ActivationUnreadable(
+            f"{path}: release_path {release_path!r} is outside {root}"
+        )
 
 
 def read_activation(layout: Layout) -> ActivationRecord:
@@ -287,6 +332,8 @@ def read_activation(layout: Layout) -> ActivationRecord:
 
     if data["runtime_mode"] not in VALID_RUNTIME_MODES:
         raise ActivationUnreadable(f"{path}: unknown runtime mode {data['runtime_mode']!r}")
+
+    _check_contained(layout, data, path)
 
     return ActivationRecord(
         schema_version=version,

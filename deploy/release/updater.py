@@ -31,8 +31,9 @@ provoke on real hardware.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -42,6 +43,7 @@ from layout import (
     ActivationRecord,
     ActivationUnreadable,
     Layout,
+    freeze_tree,
     read_activation,
     update_display_pointers,
     write_activation,
@@ -53,6 +55,10 @@ JOURNAL_SCHEMA_VERSION = 1
 #: The health check is bounded so a candidate that never comes up cannot hold
 #: the device in an unusable state indefinitely.
 DEFAULT_HEALTH_TIMEOUT_S = 90.0
+
+#: Gap between health probes. Without it the bounded wait is a hot spin that
+#: pegs a core on the Pi 5 for the whole timeout, during an update.
+HEALTH_POLL_INTERVAL_S = 1.0
 
 
 class UpdateState(str, Enum):
@@ -130,13 +136,22 @@ class Updater:
         stop_runtime: Callable[[], None],
         start_runtime: Callable[[str], None],
         health_check: Callable[[], bool],
+        disable_runtime: Callable[[], None] | None = None,
         clock: Callable[[], float] | None = None,
+        sleep: Callable[[float], None] | None = None,
     ) -> None:
         self.layout = layout
         self._stop_runtime = stop_runtime
         self._start_runtime = start_runtime
         self._health_check = health_check
-        self._clock = clock or (lambda: 0.0)
+        # A RECOVERY HOLD has to actually keep the runtime down, not merely be
+        # returned to the caller. Falls back to stopping it, which is weaker
+        # than disabling the unit but never worse than nothing.
+        self._disable_runtime = disable_runtime or stop_runtime
+        self._sleep = sleep or time.sleep
+        # A real monotonic clock by default: a stub that always returns the
+        # same value turns the bounded wait into an infinite loop.
+        self._clock = clock or time.monotonic
 
     # --- recorded state ---------------------------------------------------
 
@@ -220,6 +235,11 @@ class Updater:
 
         old = self._current_activation()
 
+        # Freeze before the record moves. Immutability is what rollback rests
+        # on: the previous set has to still be what was activated. A function
+        # nothing calls is worse than none — it reads as enforcement.
+        self._freeze(candidate)
+
         journal = Journal(
             schema_version=JOURNAL_SCHEMA_VERSION,
             release_id=candidate.release_id,
@@ -260,6 +280,16 @@ class Updater:
             detail=f"candidate CORE did not become healthy within {health_timeout_s:g}s",
         )
 
+    def _freeze(self, record: ActivationRecord) -> None:
+        """Drop write permission across the release and its generations."""
+        for path in (
+            Path(record.release_path),
+            self.layout.config_generation(record.config_generation),
+            self.layout.data_generation(record.data_generation),
+        ):
+            if path.is_dir():
+                freeze_tree(path)
+
     def _await_health(self, timeout_s: float) -> bool:
         """Poll the injected health check until it passes or the bound expires."""
         deadline = self._clock() + timeout_s
@@ -268,6 +298,7 @@ class Updater:
                 return True
             if self._clock() >= deadline:
                 return False
+            self._sleep(HEALTH_POLL_INTERVAL_S)
 
     def _link_target_id(self, link: Path) -> str | None:
         try:
@@ -289,39 +320,115 @@ class Updater:
             # Nothing to go back to — a failed first activation.
             self.layout.activation.unlink(missing_ok=True)
             update_display_pointers(self.layout, current=None, previous=None)
-            journal.complete = True
-            self._write_journal(journal)
-            self.record_state(
-                UpdateState.RECOVERY_HOLD,
-                journal.release_id,
-                f"{detail}; no previous release to fall back to",
+            return self._enter_recovery_hold(
+                journal,
+                release_id=journal.release_id,
+                detail=f"{detail}; no previous release to fall back to",
             )
-            return Outcome(UpdateState.RECOVERY_HOLD, journal.release_id, detail)
 
-        previous = ActivationRecord(**journal.old_activation)
+        previous = self._previous_record(journal)
         write_activation(self.layout, previous)
         update_display_pointers(self.layout, current=previous.release_id, previous=journal.old_previous)
         self._start_runtime(previous.runtime_mode)
 
         if not self._await_health(DEFAULT_HEALTH_TIMEOUT_S):
-            journal.complete = True
-            self._write_journal(journal)
-            self.record_state(
-                UpdateState.RECOVERY_HOLD,
-                previous.release_id,
-                "the previous release also failed its health check; runtime left disabled",
-            )
-            return Outcome(
-                UpdateState.RECOVERY_HOLD,
-                previous.release_id,
-                "rollback target is unhealthy",
+            return self._enter_recovery_hold(
+                journal,
+                release_id=previous.release_id,
+                detail="the previous release also failed its health check; runtime left disabled",
             )
 
-        journal.complete = True
-        self._write_journal(journal)
+        self._complete_journal(journal)
         self.record_state(UpdateState.ROLLED_BACK_CORE_ONLY, previous.release_id, detail)
         self._clear_journal()
         return Outcome(UpdateState.ROLLED_BACK_CORE_ONLY, previous.release_id, detail)
+
+    def _settled(self, detail: str, release_id: str | None = None) -> Outcome:
+        """Nothing to finish — but only if there is something to boot.
+
+        Clearing a journal is not the same as having a usable device. If the
+        activation record is gone or unreadable, letting the runtime start
+        would boot nothing at all, so that is a hold in its own right.
+        """
+        current = self._current_activation()
+        if current is None:
+            self._disable_runtime()
+            return Outcome(
+                UpdateState.RECOVERY_HOLD,
+                release_id,
+                "no usable activation record; the device has nothing to boot",
+            )
+        return Outcome(UpdateState.ACTIVATED_CORE_ONLY, current.release_id, detail)
+
+    def _previous_record(self, journal: Journal) -> ActivationRecord:
+        """The record to roll back to, forced to core.
+
+        A robot commissioned into ``motor`` that then fails an update must not
+        come back with its wheels live on a release whose health check just
+        failed. Restoring the old record verbatim did exactly that, while
+        still reporting ROLLED_BACK_CORE_ONLY. Re-approving a hardware mode is
+        a field decision, so rollback always lands in core and the operator
+        re-commissions deliberately.
+        """
+        try:
+            restored = ActivationRecord(**journal.old_activation)
+        except TypeError as exc:
+            raise ActivationUnreadable(
+                f"journal holds an activation record this build cannot read: {exc}"
+            ) from exc
+        return replace(restored, runtime_mode=ACTIVATION_RUNTIME_MODE)
+
+    def _complete_journal(self, journal: Journal) -> None:
+        """Mark the journal done without discarding the state trail.
+
+        record_state appends to the journal on disk, so writing back a stale
+        in-memory copy erases every step recorded since it was read.
+        """
+        current = self.read_journal() or journal
+        current.complete = True
+        self._write_journal(current)
+
+    def _enter_recovery_hold(
+        self, journal: Journal, *, release_id: str | None, detail: str
+    ) -> Outcome:
+        """Stop, and stay stopped across reboots.
+
+        A hold that lives only in a return value is gone by the next boot. The
+        marker is written before the journal is completed so the recover unit
+        sees the hold first and refuses to let the runtime start.
+        """
+        write_json_atomic(
+            self.layout.recovery_hold,
+            {
+                "schema_version": JOURNAL_SCHEMA_VERSION,
+                "release_id": release_id,
+                "detail": detail,
+                "at": _now(),
+            },
+        )
+        self._complete_journal(journal)
+        self.record_state(UpdateState.RECOVERY_HOLD, release_id, detail)
+        self._disable_runtime()
+        return Outcome(UpdateState.RECOVERY_HOLD, release_id, detail)
+
+    # --- recovery hold ----------------------------------------------------
+
+    def read_recovery_hold(self) -> dict | None:
+        """The persisted hold, if the device is in one."""
+        path = self.layout.recovery_hold
+        if not path.is_file():
+            return None
+        import json
+
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            # An unreadable marker is still a marker: hold rather than guess.
+            return {"release_id": None, "detail": "recovery hold marker is unreadable"}
+
+    def clear_recovery_hold(self) -> None:
+        """Release the hold. A deliberate operator action, never automatic."""
+        self.layout.recovery_hold.unlink(missing_ok=True)
 
     # --- recovery ---------------------------------------------------------
 
@@ -333,17 +440,23 @@ class Updater:
         goes back to the activation set that was known good rather than
         booting a candidate whose health was never established.
         """
+        hold = self.read_recovery_hold()
+        if hold is not None:
+            self._disable_runtime()
+            self.record_state(UpdateState.RECOVERY_HOLD, hold.get("release_id"), hold.get("detail", ""))
+            return Outcome(
+                UpdateState.RECOVERY_HOLD,
+                hold.get("release_id"),
+                hold.get("detail", "device is held for recovery"),
+            )
+
         journal = self.read_journal()
         if journal is None:
-            return Outcome(UpdateState.ACTIVATED_CORE_ONLY, None, "no interrupted update")
+            return self._settled("no interrupted update")
 
         if journal.complete:
             self._clear_journal()
-            return Outcome(
-                UpdateState.ACTIVATED_CORE_ONLY,
-                journal.release_id,
-                "journal was already complete; cleaned up",
-            )
+            return self._settled("journal was already complete; cleaned up", journal.release_id)
 
         return self._roll_back(
             journal,
@@ -370,11 +483,13 @@ def prunable_image_digests(
         if record is None:
             continue
         manifest = manifests_by_release.get(record.release_id)
-        if manifest is None:
-            # An activation whose manifest is unreadable protects nothing by
-            # name, so protect conservatively: refuse to prune at all.
+        containers = (manifest or {}).get("containers") or {}
+        if not containers:
+            # A manifest that is missing, unreadable, or names no images tells
+            # us nothing about what this live release needs. Not knowing is a
+            # reason to delete nothing, not a reason to delete everything.
             return set()
-        protected.update(str(d) for d in manifest.get("containers", {}).values())
+        protected.update(str(d) for d in containers.values())
 
     return all_digests - protected
 

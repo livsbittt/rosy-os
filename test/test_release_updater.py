@@ -53,11 +53,16 @@ class FakeRuntime:
         self.unhealthy = set(unhealthy or ())
         self.started: list[str] = []
         self.stops = 0
+        self.disables = 0
         self.running: str | None = None
         self.fail_on_stop = False
         self.fail_on_start = False
         self.fail_on_health = False
         self.time = 0.0
+
+    def disable(self) -> None:
+        self.disables += 1
+        self.running = None
 
     def stop(self) -> None:
         if self.fail_on_stop:
@@ -103,7 +108,9 @@ def _updater(layout: Layout, runtime: FakeRuntime) -> Updater:
         stop_runtime=runtime.stop,
         start_runtime=runtime.start,
         health_check=runtime.check,
+        disable_runtime=runtime.disable,
         clock=runtime.clock,
+        sleep=lambda _seconds: None,
     )
 
 
@@ -271,7 +278,8 @@ def test_recovery_hold_when_the_rollback_target_is_also_unhealthy(layout, runtim
 
     assert outcome.state is UpdateState.RECOVERY_HOLD
     assert not outcome.ok
-    assert "unhealthy" in outcome.detail
+    assert "also failed its health check" in outcome.detail
+    assert runtime.disables >= 1, "a hold must take the runtime down"
 
 
 # --- power loss -----------------------------------------------------------
@@ -472,3 +480,188 @@ def test_retention_never_deletes_a_release_an_activation_points_at():
 def test_retention_ignores_protection_for_releases_that_are_gone():
     kept = releases_to_keep(["2026.09.15-005"], keep_last=3, protected={"2026.01.01-001"})
     assert kept == {"2026.09.15-005"}
+
+
+# --- rollback never restores a hardware mode ------------------------------
+
+
+def _commission(layout: Layout, record: ActivationRecord, mode: str) -> None:
+    """Put a non-core activation on disk, the way commissioning would."""
+    from dataclasses import replace as _replace
+
+    from layout import write_activation
+
+    write_activation(layout, _replace(record, runtime_mode=mode))
+
+
+@pytest.mark.parametrize("mode", ["motor", "hardware"])
+def test_rollback_from_a_commissioned_robot_lands_in_core(layout, runtime, installed, mode):
+    """The wheels must not come back live on a release that just failed.
+
+    A robot approved for motor or hardware keeps that mode in its activation
+    record. Restoring the previous record verbatim on a failed update brought
+    the hardware back up while still reporting ROLLED_BACK_CORE_ONLY.
+    """
+    old, new = installed
+    _commission(layout, old, mode)
+    runtime.unhealthy = {NEW}
+
+    outcome = _updater(layout, runtime).activate(new, health_timeout_s=10)
+
+    assert outcome.state is UpdateState.ROLLED_BACK_CORE_ONLY
+    assert read_activation(layout).release_id == OLD
+    assert read_activation(layout).runtime_mode == "core", "rollback must force core"
+    assert set(runtime.started) == {"core"}, f"rollback started {mode}"
+
+
+@pytest.mark.parametrize("mode", ["motor", "hardware"])
+def test_recovery_from_a_commissioned_robot_lands_in_core(layout, runtime, installed, mode):
+    old, new = installed
+    _commission(layout, old, mode)
+    runtime.fail_on_start = True
+
+    with pytest.raises(PowerLoss):
+        _updater(layout, runtime).activate(new)
+
+    rebooted = FakeRuntime(layout)
+    _updater(layout, rebooted).recover()
+
+    assert read_activation(layout).runtime_mode == "core"
+    assert set(rebooted.started) == {"core"}
+
+
+def test_a_journal_this_build_cannot_read_is_reported_not_crashed(layout, runtime, installed):
+    """A schema-drifted journal must not raise TypeError inside the boot path."""
+    _old, new = installed
+    runtime.fail_on_start = True
+    with pytest.raises(PowerLoss):
+        _updater(layout, runtime).activate(new)
+
+    journal = json.loads(layout.journal.read_text(encoding="utf-8"))
+    journal["old_activation"]["unexpected_field"] = "from a newer build"
+    layout.journal.write_text(json.dumps(journal), encoding="utf-8")
+
+    with pytest.raises(ActivationUnreadable, match="cannot read"):
+        _updater(layout, FakeRuntime(layout)).recover()
+
+
+# --- a recovery hold outlives the reboot ----------------------------------
+
+
+def test_recovery_hold_persists_across_a_reboot(layout, runtime):
+    """A hold that lives only in a return value is gone by the next boot."""
+    first = _install(layout, OLD, "old")
+    runtime.unhealthy = {OLD}
+
+    outcome = _updater(layout, runtime).activate(first, health_timeout_s=10)
+    assert outcome.state is UpdateState.RECOVERY_HOLD
+
+    rebooted = FakeRuntime(layout)
+    after_reboot = _updater(layout, rebooted).recover()
+
+    assert after_reboot.state is UpdateState.RECOVERY_HOLD
+    assert not after_reboot.ok, "a held device must not report a successful recovery"
+    assert rebooted.started == [], "the runtime must not start while held"
+    assert rebooted.disables >= 1
+
+
+def test_a_hold_is_only_released_deliberately(layout, runtime):
+    first = _install(layout, OLD, "old")
+    runtime.unhealthy = {OLD}
+    updater = _updater(layout, runtime)
+    updater.activate(first, health_timeout_s=10)
+
+    assert updater.read_recovery_hold() is not None
+    updater.clear_recovery_hold()
+    assert updater.read_recovery_hold() is None
+
+    # The hold is gone, but this device never completed a first activation, so
+    # there is still no activation record and nothing to boot.
+    after = _updater(layout, FakeRuntime(layout)).recover()
+    assert after.state is UpdateState.RECOVERY_HOLD
+    assert "nothing to boot" in after.detail
+
+
+def test_clearing_a_hold_lets_a_device_with_an_activation_boot(layout, runtime, installed):
+    _old, new = installed
+    runtime.unhealthy = {NEW, OLD}
+    updater = _updater(layout, runtime)
+    updater.activate(new, health_timeout_s=10)
+
+    updater.clear_recovery_hold()
+
+    after = _updater(layout, FakeRuntime(layout)).recover()
+    assert after.state is UpdateState.ACTIVATED_CORE_ONLY
+    assert after.release_id == OLD
+
+
+def test_an_unreadable_hold_marker_still_holds(layout, runtime, installed):
+    layout.recovery_hold.write_text("{ not json", encoding="utf-8")
+
+    outcome = _updater(layout, runtime).recover()
+
+    assert outcome.state is UpdateState.RECOVERY_HOLD
+    assert "unreadable" in outcome.detail
+
+
+def test_the_hold_state_is_visible_to_the_dashboard(layout, runtime):
+    first = _install(layout, OLD, "old")
+    runtime.unhealthy = {OLD}
+    updater = _updater(layout, runtime)
+    updater.activate(first, health_timeout_s=10)
+
+    assert updater.read_state()["state"] == UpdateState.RECOVERY_HOLD.value
+
+
+# --- the audit trail survives a rollback ----------------------------------
+
+
+def test_rollback_keeps_the_state_trail(layout, runtime, installed):
+    """record_state appends to the journal; a stale write would erase it."""
+    _old, new = installed
+    runtime.unhealthy = {NEW, OLD}
+
+    _updater(layout, runtime).activate(new, health_timeout_s=10)
+
+    journal = json.loads(layout.journal.read_text(encoding="utf-8"))
+    states = [entry["state"] for entry in journal["states"]]
+    assert UpdateState.ACTIVATING_CORE_ONLY.value in states
+    assert UpdateState.ROLLING_BACK.value in states
+
+
+# --- the bound is real without an injected clock --------------------------
+
+
+def test_the_health_bound_holds_with_the_default_clock(layout, installed):
+    """A stub clock that never advances made the bounded wait infinite."""
+    _old, new = installed
+    runtime = FakeRuntime(layout, unhealthy={NEW})
+
+    updater = Updater(
+        layout,
+        stop_runtime=runtime.stop,
+        start_runtime=runtime.start,
+        health_check=runtime.check,
+        disable_runtime=runtime.disable,
+        sleep=lambda _seconds: None,
+    )
+    outcome = updater.activate(new, health_timeout_s=0.05)
+
+    assert outcome.state is UpdateState.ROLLED_BACK_CORE_ONLY
+
+
+# --- retention: a manifest naming no images protects nothing --------------
+
+
+def test_a_manifest_without_containers_prunes_nothing():
+    """Readable but empty is as uninformative as unreadable."""
+    current = ActivationRecord.create(
+        release_id=NEW, release_path=Path("/opt/rosy/releases") / NEW,
+        config_generation=NEW, data_generation=NEW,
+    )
+    prunable = prunable_image_digests(
+        {"sha256:a"},
+        activation_records=[current],
+        manifests_by_release={NEW: {"release_id": NEW}},
+    )
+    assert prunable == set()
