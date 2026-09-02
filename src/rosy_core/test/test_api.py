@@ -21,9 +21,9 @@ def client(tmp_path):
     httpx = pytest.importorskip("httpx")
     from fastapi.testclient import TestClient
 
-    config = yaml.safe_load((Path(__file__).parent.parent / "config" / "rosy_default.yaml").read_text())
+    config = yaml.safe_load((Path(__file__).parent.parent / "config" / "rosy_default.yaml").read_text(encoding="utf-8"))
     profile = RobotProfile.load(Path(__file__).parent.parent / "config" / "profile.pinky_pro.yaml")
-    caps = yaml.safe_load((Path(__file__).parent.parent / "config" / "capabilities.yaml").read_text())
+    caps = yaml.safe_load((Path(__file__).parent.parent / "config" / "capabilities.yaml").read_text(encoding="utf-8"))
     services = CoreServices.build(config, profile, caps, tmp_path / "wp.json")
     app = create_app(config, services)
     return TestClient(app), services

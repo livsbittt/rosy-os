@@ -482,6 +482,115 @@ function renderEvents(payload) {
   });
 }
 
+
+// --- Device Runtime cards (WP-5) -------------------------------------------
+//
+// The rule these three share: when the Host Agent did not answer, say so.
+// Filling the fields with em dashes would render an unreachable agent and a
+// healthy device identically, and an operator reads an empty field as "fine".
+
+function setCardUnavailable(cardId, noteId, payload) {
+  const card = document.getElementById(cardId);
+  if (card) card.dataset.available = "false";
+  const note = document.getElementById(noteId);
+  if (note) {
+    const recovery = payload.recovery ? ` ${payload.recovery}` : "";
+    note.textContent = `${payload.detail || "정보를 가져올 수 없습니다."}${recovery}`;
+  }
+}
+
+function setChip(id, value) {
+  const chip = document.getElementById(id);
+  if (!chip) return;
+  const mode = value || "UNKNOWN";
+  chip.dataset.mode = mode;
+  chip.textContent = mode === "UNKNOWN" ? "—" : mode;
+}
+
+function renderHostNetwork(payload) {
+  const status = document.getElementById("host-agent-status");
+  if (status) {
+    status.dataset.status = payload.available ? "OK" : "UNAVAILABLE";
+    status.textContent = payload.available ? "Host Agent 연결됨" : "Host Agent 없음";
+  }
+
+  if (!payload.available) {
+    setChip("network-mode", "UNKNOWN");
+    setCardUnavailable("network-card", "network-note", payload);
+    return;
+  }
+
+  const card = document.getElementById("network-card");
+  if (card) card.dataset.available = "true";
+
+  const data = payload.data || {};
+  setChip("network-mode", data.mode);
+  // The SSID is displayable; a PSK never is, and the agent does not send one.
+  setText("network-ssid", data.ssid || "—");
+  setText("network-ipv4", data.ipv4 || "—");
+  setText("network-route", data.default_route || "—");
+  setText("network-dns", (data.dns || []).join(", ") || "—");
+  setText("network-internet", data.internet ? "도달" : "도달 못함");
+  setText("network-peer", data.peer_reachable ? "가능" : "확인 필요");
+
+  const note = document.getElementById("network-note");
+  if (note) {
+    // Internet and peer reachability fail separately: a router with client
+    // isolation gives you the internet and no dashboard.
+    note.textContent = data.internet && !data.peer_reachable
+      ? "인터넷은 되지만 같은 WLAN 단말에서 접근되지 않습니다. 공유기의 client isolation 설정을 확인하십시오."
+      : (payload.detail || "");
+  }
+}
+
+function renderHostRelease(payload) {
+  if (!payload.available) {
+    setChip("release-state", "UNKNOWN");
+    setCardUnavailable("release-card", "release-note", payload);
+    setActionsEnabled(false);
+    return;
+  }
+
+  const card = document.getElementById("release-card");
+  if (card) card.dataset.available = "true";
+
+  const data = payload.data || {};
+  setChip("release-state", data.state);
+  setText("release-current", data.current || "—");
+  setText("release-previous", data.previous || "없음");
+  setText("release-staged", data.staged || "없음");
+  setText("release-revision", (data.git_revision || "").slice(0, 12) || "—");
+  setText(
+    "release-schema",
+    data.config_schema != null ? `${data.config_schema} / ${data.data_schema}` : "—",
+  );
+  setText("release-failure", data.last_failure || "없음");
+
+  const note = document.getElementById("release-note");
+  if (note) note.textContent = data.detail || payload.detail || "";
+
+  // Rollback needs somewhere to go; clearing a hold needs a hold.
+  const held = data.state === "RECOVERY_HOLD";
+  setEnabled("release-rollback", session.role === "administrator" && Boolean(data.previous) && !held);
+  setEnabled("release-clear-hold", session.role === "administrator" && held);
+}
+
+function renderCommissioning(payload) {
+  setChip("commissioning-mode", payload.runtime_mode);
+  const note = document.getElementById("commissioning-note");
+  if (note) note.textContent = payload.detail || "";
+}
+
+function setEnabled(id, enabled) {
+  const element = document.getElementById(id);
+  if (element) element.disabled = !enabled;
+}
+
+function setActionsEnabled(enabled) {
+  setEnabled("release-rollback", enabled);
+  setEnabled("release-clear-hold", enabled);
+}
+
 async function refreshSlowData() {
   const requests = await Promise.allSettled([
     api("/api/v1/system/runtime"),
@@ -489,8 +598,14 @@ async function refreshSlowData() {
     api("/api/v1/system/capabilities"),
     api("/api/v1/safety/state"),
     api("/api/v1/events?limit=10"),
+    api("/api/v1/host/network"),
+    api("/api/v1/host/release"),
+    api("/api/v1/host/commissioning"),
   ]);
-  const renderers = [renderRuntime, renderRobotInfo, renderCapabilities, renderSafety, renderEvents];
+  const renderers = [
+    renderRuntime, renderRobotInfo, renderCapabilities, renderSafety, renderEvents,
+    renderHostNetwork, renderHostRelease, renderCommissioning,
+  ];
   requests.forEach((result, index) => {
     if (result.status === "fulfilled") renderers[index](result.value);
   });

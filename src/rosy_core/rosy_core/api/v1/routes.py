@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from rosy_core.api.deps import AuthContext, auth_dependency, get_services, require_role
+from rosy_core.api.deps import AuthContext, get_services, require_role
 from rosy_core.api.errors import ApiError
 from rosy_core.command.arbitration import Mode
 from rosy_core.protocol.schemas import PowerMode, RobotMode
 from rosy_core.services import CoreServices
+from rosy_core.system.host_agent_client import HostAgentClient
 from rosy_core.waypoints.manager import Waypoint
 
 viewer = require_role("viewer")
@@ -135,8 +134,8 @@ def safety_state(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(g
 
 
 class LimitsRequest(BaseModel):
-    manual_linear: Optional[float] = None
-    manual_angular: Optional[float] = None
+    manual_linear: float | None = None
+    manual_angular: float | None = None
 
 
 @safety_router.put("/limits")
@@ -154,10 +153,10 @@ navigation_router = APIRouter(prefix="/api/v1", tags=["navigation"])
 
 
 class GoalRequest(BaseModel):
-    x: Optional[float] = None
-    y: Optional[float] = None
-    yaw: Optional[float] = 0.0
-    waypoint: Optional[str] = None
+    x: float | None = None
+    y: float | None = None
+    yaw: float | None = 0.0
+    waypoint: str | None = None
 
 
 @navigation_router.post("/navigation/goal")
@@ -235,7 +234,7 @@ events_router = APIRouter(prefix="/api/v1/events", tags=["events"])
 
 
 @events_router.get("")
-def list_events(since_seq: Optional[int] = None, limit: int = 100,
+def list_events(since_seq: int | None = None, limit: int = 100,
                 _: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
     events = svc.events.history(since_seq=since_seq, limit=limit)
     return {"events": [e.model_dump() for e in events], "last_seq": svc.events.last_seq}
@@ -357,3 +356,145 @@ def power_set_mode(body: PowerModeRequest, auth: AuthContext = Depends(operator)
     svc.power.request_mode(body.mode, source=f"api:{auth.role}")
     svc.state.set_power(svc.power.status())
     return svc.power.status().model_dump()
+
+
+# --- Network / Release / Commissioning (WP-5, 설계 §10.2/§10.3) --------------
+#
+# CORE 는 호스트 권한이 없으므로 이 세 화면의 데이터는 전부 Host Agent 에서 온다.
+# 에이전트가 없는 상태(개발 장비, 서비스 미기동)는 예외가 아니라 정상적으로
+# 있을 수 있는 상태이며, 그때 **없는 값을 그럴듯하게 채우지 않는다.** 빈 칸은
+# 운영자에게 "이상 없음" 으로 읽히고, 지어낸 값은 사실로 읽힌다.
+
+host_router = APIRouter(prefix="/api/v1/host", tags=["host"])
+
+
+def _agent(svc: CoreServices) -> HostAgentClient:
+    host_cfg = (svc.config or {}).get("host_agent", {})
+    return HostAgentClient(
+        socket_path=host_cfg.get("socket_path", "/run/rosy/host-agent.sock"),
+        timeout_s=float(host_cfg.get("timeout_s", 5.0)),
+    )
+
+
+def _relay(reply, *, absent_detail: str) -> dict:
+    """Turn an agent reply into a card payload that cannot mislead.
+
+    ``available`` is the field the dashboard keys on. When it is false the
+    card shows why instead of showing empty fields — an unreachable agent and
+    a healthy device with nothing to report look identical otherwise.
+    """
+    if not reply.reachable:
+        return {
+            "available": False,
+            "code": reply.code,
+            "detail": reply.detail or absent_detail,
+            "recovery": reply.recovery,
+            "data": None,
+        }
+    return {
+        "available": True,
+        "ok": reply.ok,
+        "code": reply.code,
+        "detail": reply.detail,
+        "recovery": reply.recovery,
+        "data": reply.data,
+    }
+
+
+@host_router.get("/network")
+def host_network(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
+    """현재 네트워크 모드와 도달성. SSID 는 표시하되 secret 은 절대 싣지 않는다."""
+    reply = _agent(svc).request("network.status", role="viewer")
+    return _relay(reply, absent_detail="Host Agent 에 연결할 수 없어 네트워크 상태를 알 수 없습니다.")
+
+
+@host_router.get("/release")
+def host_release(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
+    """current / previous / staged 와 마지막 실패 사유."""
+    reply = _agent(svc).request("release.status", role="viewer")
+    return _relay(reply, absent_detail="Host Agent 에 연결할 수 없어 릴리스 상태를 알 수 없습니다.")
+
+
+class HostActionRequest(BaseModel):
+    """파괴적 명령의 공통 입력.
+
+    `confirmed` 는 대시보드의 재확인이 실제로 있었음을 뜻한다. 기본값이 False 인
+    것이 핵심이다 — 빠뜨리면 실행되지 않고 거부된다.
+    """
+
+    confirmed: bool = False
+    idempotency_key: str | None = None
+
+
+class ReleaseInstallRequest(HostActionRequest):
+    release_id: str = Field(min_length=1, max_length=64)
+
+
+@host_router.post("/release/install")
+def host_release_install(
+    body: ReleaseInstallRequest,
+    auth: AuthContext = Depends(admin),
+    svc: CoreServices = Depends(get_services),
+):
+    reply = _agent(svc).request(
+        "release.install",
+        role="administrator",
+        user_id=auth.token[:8],
+        confirmed=body.confirmed,
+        params={"release_id": body.release_id},
+        idempotency_key=body.idempotency_key,
+    )
+    return _relay(reply, absent_detail="Host Agent 에 연결할 수 없어 설치를 시작하지 못했습니다.")
+
+
+@host_router.post("/release/rollback")
+def host_release_rollback(
+    body: HostActionRequest,
+    auth: AuthContext = Depends(admin),
+    svc: CoreServices = Depends(get_services),
+):
+    reply = _agent(svc).request(
+        "release.rollback",
+        role="administrator",
+        user_id=auth.token[:8],
+        confirmed=body.confirmed,
+        idempotency_key=body.idempotency_key,
+    )
+    return _relay(reply, absent_detail="Host Agent 에 연결할 수 없어 롤백을 시작하지 못했습니다.")
+
+
+@host_router.post("/release/clear-hold")
+def host_release_clear_hold(
+    body: HostActionRequest,
+    auth: AuthContext = Depends(admin),
+    svc: CoreServices = Depends(get_services),
+):
+    """RECOVERY HOLD 해제. 홀드 중에는 install 이 거부되므로 별도의 의도적 행위다."""
+    reply = _agent(svc).request(
+        "release.clear_hold",
+        role="administrator",
+        user_id=auth.token[:8],
+        confirmed=body.confirmed,
+        idempotency_key=body.idempotency_key,
+    )
+    return _relay(reply, absent_detail="Host Agent 에 연결할 수 없어 홀드를 해제하지 못했습니다.")
+
+
+@host_router.get("/commissioning")
+def host_commissioning(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
+    """runtime mode 와 hardware 재승인 사유.
+
+    runtime mode 는 CORE 가 스스로 안다 — 자기가 무엇으로 기동했는지는 호스트에
+    묻지 않아도 된다. 그래서 이 카드는 에이전트가 없어도 절반은 정직하게 채운다.
+    """
+    mode = (svc.config or {}).get("runtime", {}).get("mode", "core")
+    return {
+        "runtime_mode": mode,
+        "motor_hold": mode == "core",
+        "detail": (
+            "UART·모터 미승인 상태입니다. 이것은 정상이며, 승격은 별도 현장 안전 "
+            "절차를 따릅니다."
+            if mode == "core"
+            else f"현재 {mode} 모드로 기동되어 있습니다. 현장 안전 절차가 완료되었는지 확인하십시오."
+        ),
+    }

@@ -379,3 +379,122 @@ button { color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+
+/* --- Device Runtime cards (WP-5) ------------------------------------------
+   A card whose data did not arrive is dimmed and says so. It must not look
+   like a card reporting that everything is fine with nothing to add. */
+
+.host-card-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+}
+
+.host-card {
+  background: var(--surface-raised, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.09));
+  border-radius: 0.9rem;
+  padding: 1rem 1.1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.host-card > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.host-card h3 {
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.host-card[data-available="false"] {
+  border-style: dashed;
+  opacity: 0.72;
+}
+
+.host-card[data-available="false"] .host-facts {
+  /* Hidden rather than dimmed: an em dash in a field reads as "measured, and
+     it is nothing", which is the opposite of what an unreachable agent means. */
+  display: none;
+}
+
+.mode-chip {
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  border: 1px solid currentColor;
+}
+
+.mode-chip[data-mode="SITE_STA"],
+.mode-chip[data-mode="ACTIVATED_CORE_ONLY"],
+.mode-chip[data-mode="core"] { color: var(--signal-ok, #6ee7b7); }
+
+.mode-chip[data-mode="RELAY_AP_STA"],
+.mode-chip[data-mode="PROVISIONING_AP"],
+.mode-chip[data-mode="RECOVERY_AP"] { color: var(--signal-warn, #fbbf24); }
+
+.mode-chip[data-mode="NETWORK_HOLD"],
+.mode-chip[data-mode="RECOVERY_HOLD"],
+.mode-chip[data-mode="motor"],
+.mode-chip[data-mode="hardware"] { color: var(--signal-danger, #f87171); }
+
+.mode-chip[data-mode="UNKNOWN"] { color: var(--text-muted, #94a3b8); }
+
+.host-facts {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.host-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+}
+
+.host-facts dt { color: var(--text-muted, #94a3b8); }
+.host-facts dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+
+.host-note {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-muted, #94a3b8);
+}
+
+.host-card[data-available="false"] .host-note { color: var(--signal-warn, #fbbf24); }
+
+.host-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+
+.host-actions button {
+  flex: 1 1 auto;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.78rem;
+  border-radius: 0.55rem;
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.14));
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.host-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .host-card { transition: opacity 120ms ease; }
+}

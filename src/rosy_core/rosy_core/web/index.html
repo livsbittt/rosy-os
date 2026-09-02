@@ -101,6 +101,68 @@
       <p id="runtime-warning" class="runtime-warning" role="status"></p>
     </section>
 
+    <section id="host-panel" class="panel host-panel" aria-labelledby="host-heading">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">DEVICE RUNTIME</p>
+          <h2 id="host-heading">네트워크와 릴리스</h2>
+        </div>
+        <span id="host-agent-status" class="machine-tag" data-status="UNKNOWN">확인 전</span>
+      </div>
+
+      <div class="host-card-grid">
+        <article class="host-card" id="network-card" data-available="unknown"
+                 aria-labelledby="network-card-heading">
+          <header>
+            <h3 id="network-card-heading">네트워크</h3>
+            <span id="network-mode" class="mode-chip" data-mode="UNKNOWN">—</span>
+          </header>
+          <dl class="host-facts">
+            <div><dt>SSID</dt><dd id="network-ssid">—</dd></div>
+            <div><dt>WLAN IPv4</dt><dd id="network-ipv4">—</dd></div>
+            <div><dt>기본 경로</dt><dd id="network-route">—</dd></div>
+            <div><dt>DNS</dt><dd id="network-dns">—</dd></div>
+            <div><dt>인터넷</dt><dd id="network-internet">—</dd></div>
+            <div><dt>같은 WLAN 단말 접근</dt><dd id="network-peer">—</dd></div>
+          </dl>
+          <p class="host-note" id="network-note" role="status"></p>
+        </article>
+
+        <article class="host-card" id="release-card" data-available="unknown"
+                 aria-labelledby="release-card-heading">
+          <header>
+            <h3 id="release-card-heading">릴리스</h3>
+            <span id="release-state" class="mode-chip" data-mode="UNKNOWN">—</span>
+          </header>
+          <dl class="host-facts">
+            <div><dt>current</dt><dd id="release-current">—</dd></div>
+            <div><dt>previous</dt><dd id="release-previous">—</dd></div>
+            <div><dt>staged</dt><dd id="release-staged">—</dd></div>
+            <div><dt>Git revision</dt><dd id="release-revision">—</dd></div>
+            <div><dt>config / data schema</dt><dd id="release-schema">—</dd></div>
+            <div><dt>마지막 실패</dt><dd id="release-failure">—</dd></div>
+          </dl>
+          <p class="host-note" id="release-note" role="status"></p>
+          <div class="host-actions">
+            <button type="button" id="release-rollback" data-role="administrator" disabled>
+              이전 릴리스로 롤백
+            </button>
+            <button type="button" id="release-clear-hold" data-role="administrator" disabled>
+              복구 홀드 해제
+            </button>
+          </div>
+        </article>
+
+        <article class="host-card" id="commissioning-card" aria-labelledby="commissioning-heading">
+          <header>
+            <h3 id="commissioning-heading">커미셔닝</h3>
+            <span id="commissioning-mode" class="mode-chip" data-mode="UNKNOWN">—</span>
+          </header>
+          <p class="host-note" id="commissioning-note" role="status">확인 전</p>
+        </article>
+      </div>
+    </section>
+
     <section id="ros-network-panel" class="panel ros-network-panel" aria-labelledby="ros-network-heading">
       <div class="panel-heading">
         <div>
