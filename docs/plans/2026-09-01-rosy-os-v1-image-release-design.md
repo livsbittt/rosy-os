@@ -401,7 +401,8 @@ public key로 `signing_key_id`를 검증한다. v1은 단일 신뢰 key를 사�
 ### 9.2 업데이트 상태머신
 
 ```text
-RECEIVED
+NOT_INSTALLED            (한 번도 설치되지 않은 장비의 시작 상태)
+  -> RECEIVED
   -> SIGNATURE_VERIFIED
   -> CHECKSUM_VERIFIED
   -> COMPATIBILITY_CHECKED
@@ -415,6 +416,14 @@ RECEIVED
   -> ROLLING_BACK
   -> ROLLED_BACK_CORE_ONLY
 ```
+
+`NOT_INSTALLED`는 공장 출하 직후처럼 아직 아무것도 활성화되지 않은 상태다.
+`RECEIVED`는 번들이 도착했다는 뜻이므로 신규 장비에 쓰면 일어나지 않은 사건을
+주장하게 된다. 네트워크 쪽 §8.1의 `UNPROVISIONED`와 같은 이유로 구분한다.
+
+`NOT_INSTALLED`부터 `MIGRATION_VALIDATED`까지는 아직 활성화를 시도하지 않은
+단계다. 이 단계에서 중단된 장비는 잃은 것이 없으므로 복구 홀드 대상이 아니다.
+`ACTIVATING_CORE_ONLY`부터가 되돌릴 것이 생기는 지점이다.
 
 각 상태와 실패 이유를 `/var/lib/rosy/release-state.json`과 감사 이벤트에 기록한다.
 전원 재인가 후에도 updater는 마지막 완료 상태를 읽어 미완료 staging을 정리하거나

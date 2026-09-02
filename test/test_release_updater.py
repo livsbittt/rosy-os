@@ -789,7 +789,7 @@ def test_a_factory_fresh_device_does_not_hold_itself(layout, runtime):
     """
     outcome = _updater(layout, runtime).recover()
 
-    assert outcome.state is UpdateState.RECEIVED
+    assert outcome.state is UpdateState.NOT_INSTALLED
     assert not layout.recovery_hold.exists(), "a fresh device must not mark itself held"
     assert runtime.disables == 0
 
@@ -816,14 +816,24 @@ def test_a_device_that_lost_its_record_is_still_held(layout, runtime, installed)
     assert runtime.disables >= 1
 
 
-def test_the_discriminator_is_release_state_not_guesswork(layout, runtime):
-    """Fresh and lost differ by exactly one file, and that is asserted."""
+def test_the_discriminator_is_how_far_the_state_got(layout, runtime):
+    """Fresh and lost are separated by the recorded step, not by a file's existence.
+
+    Keying on "release-state.json exists" was right only while nothing wrote
+    the seven steps before an activation. The boundary is
+    ACTIVATING_CORE_ONLY — the first moment the device has something to lose.
+    """
     fresh = _updater(layout, runtime)
     assert fresh.read_state() is None
-    assert fresh.recover().state is UpdateState.RECEIVED
+    assert fresh.recover().state is UpdateState.NOT_INSTALLED
 
-    fresh.record_state(UpdateState.RECEIVED, OLD)
-    assert fresh.read_state() is not None
+    fresh.record_state(UpdateState.STAGED, OLD)
+    assert fresh.read_state() is not None, "a state was recorded"
+    assert fresh.recover().state is UpdateState.NOT_INSTALLED, (
+        "a staged first install has lost nothing"
+    )
+
+    fresh.record_state(UpdateState.ACTIVATING_CORE_ONLY, OLD)
     assert _updater(layout, runtime).recover().state is UpdateState.RECOVERY_HOLD
 
 
@@ -886,3 +896,96 @@ def test_a_recovered_device_does_not_block_boot(layout, runtime, installed):
 
     assert outcome.state is UpdateState.ROLLED_BACK_CORE_ONLY
     assert not outcome.blocks_runtime
+
+
+# --- how far the state got, not merely that one exists --------------------
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        UpdateState.RECEIVED,
+        UpdateState.SIGNATURE_VERIFIED,
+        UpdateState.CHECKSUM_VERIFIED,
+        UpdateState.COMPATIBILITY_CHECKED,
+        UpdateState.STAGED,
+        UpdateState.CONFIG_BACKED_UP,
+        UpdateState.MIGRATION_VALIDATED,
+    ],
+)
+def test_a_first_install_interrupted_before_activation_is_not_a_hold(layout, runtime, state):
+    """Seven steps precede an activation, and none means anything was lost.
+
+    Nothing records these yet, so keying the discriminator on "a state
+    exists" was right by accident. The first time an install records STAGED
+    and the download is interrupted, that device would have held itself and
+    refused its own first install.
+    """
+    updater = _updater(layout, runtime)
+    updater.record_state(state, NEW)
+
+    outcome = updater.recover()
+
+    assert outcome.state is UpdateState.NOT_INSTALLED
+    assert not outcome.blocks_runtime
+    assert not layout.recovery_hold.exists()
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        UpdateState.ACTIVATING_CORE_ONLY,
+        UpdateState.CORE_HEALTHY,
+        UpdateState.ACTIVATED_CORE_ONLY,
+        UpdateState.ROLLED_BACK_CORE_ONLY,
+    ],
+)
+def test_a_lost_record_after_an_activation_attempt_is_a_hold(layout, runtime, state):
+    """ACTIVATING_CORE_ONLY is where the device first has something to lose."""
+    updater = _updater(layout, runtime)
+    updater.record_state(state, NEW)
+
+    outcome = updater.recover()
+
+    assert outcome.state is UpdateState.RECOVERY_HOLD
+    assert outcome.blocks_runtime
+
+
+# --- an unreadable state file is history, not absence ---------------------
+
+
+def test_a_corrupt_state_file_holds_rather_than_reading_as_fresh(layout, runtime):
+    """CORE can write this file; a bug there must not talk the device out of a hold.
+
+    Mirroring read_journal and returning None on a corrupt file would flip a
+    device that lost its activation record into "never installed" and let it
+    boot with nothing.
+    """
+    layout.release_state.write_text("{ truncated", encoding="utf-8")
+
+    outcome = _updater(layout, runtime).recover()
+
+    assert outcome.state is UpdateState.RECOVERY_HOLD
+    assert outcome.blocks_runtime
+
+
+def test_a_corrupt_state_file_does_not_crash_the_boot_path(layout, runtime):
+    """A traceback with no recorded reason is worse than a hold with one."""
+    layout.release_state.write_bytes(bytes([0xff, 0xfe]) + b" binary")
+
+    outcome = _updater(layout, runtime).recover()
+
+    assert outcome.state is UpdateState.RECOVERY_HOLD
+    assert layout.recovery_hold.is_file()
+
+
+def test_a_state_this_build_does_not_know_is_not_reassurance(layout, runtime):
+    """An unrecognised state came from somewhere; assume it meant something."""
+    layout.release_state.write_text(
+        json.dumps({"schema_version": 1, "state": "FROM_A_NEWER_BUILD", "release_id": NEW}),
+        encoding="utf-8",
+    )
+
+    outcome = _updater(layout, runtime).recover()
+
+    assert outcome.state is UpdateState.RECOVERY_HOLD

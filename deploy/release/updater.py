@@ -68,6 +68,12 @@ class RecoveryHeld(Exception):
 class UpdateState(str, Enum):
     """States recorded in release-state.json and the journal."""
 
+    #: Nothing has ever been installed. RECEIVED would assert that a bundle
+    #: arrived, which on a factory-fresh device did not happen — and `state`
+    #: is what a dashboard filters and displays, so it has to be true on its
+    #: own. §8.1 draws the same distinction on the network side with
+    #: UNPROVISIONED.
+    NOT_INSTALLED = "NOT_INSTALLED"
     RECEIVED = "RECEIVED"
     SIGNATURE_VERIFIED = "SIGNATURE_VERIFIED"
     CHECKSUM_VERIFIED = "CHECKSUM_VERIFIED"
@@ -82,6 +88,27 @@ class UpdateState(str, Enum):
     ROLLING_BACK = "ROLLING_BACK"
     ROLLED_BACK_CORE_ONLY = "ROLLED_BACK_CORE_ONLY"
     RECOVERY_HOLD = "RECOVERY_HOLD"
+
+
+#: States that do not imply anything was ever activated.
+#:
+#: The discriminator used to be "has any state been recorded", which was
+#: right only because nothing yet records the seven steps that precede an
+#: activation. The first time WP-4 records STAGED during a *first* install and
+#: the download is interrupted, that device would hold itself and refuse its
+#: own first install — the same brick through a different door. Holding is
+#: correct from ACTIVATING_CORE_ONLY onward, which is the moment the device
+#: first had something to lose, and the same boundary activate() already draws.
+PRE_INSTALL_STATES = frozenset({
+    UpdateState.NOT_INSTALLED,
+    UpdateState.RECEIVED,
+    UpdateState.SIGNATURE_VERIFIED,
+    UpdateState.CHECKSUM_VERIFIED,
+    UpdateState.COMPATIBILITY_CHECKED,
+    UpdateState.STAGED,
+    UpdateState.CONFIG_BACKED_UP,
+    UpdateState.MIGRATION_VALIDATED,
+})
 
 
 @dataclass
@@ -189,12 +216,31 @@ class Updater:
             self._write_journal(journal)
 
     def read_state(self) -> dict | None:
+        """The last recorded step: absent, readable, or unreadable.
+
+        Three outcomes, not two. Mirroring read_journal and returning None on
+        a corrupt file would make an unreadable state read as *absent* — which
+        flips a device that has lost its activation record into "never
+        installed" and lets it boot with nothing. release-state.json sits in
+        the one host path CORE can write, so a CORE bug truncating it must not
+        be able to talk the device out of a hold.
+
+        Raising is also wrong: this is on the boot path, and a traceback with
+        no recorded reason is worse than a hold with one.
+        """
         path = self.layout.release_state
         if not path.is_file():
             return None
+
         import json
 
-        return json.loads(path.read_text(encoding="utf-8"))
+        try:
+            recorded = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
+            return {"state": None, "release_id": None, "unreadable": str(exc)}
+        if not isinstance(recorded, dict):
+            return {"state": None, "release_id": None, "unreadable": "not an object"}
+        return recorded
 
     # --- journal ----------------------------------------------------------
 
@@ -386,9 +432,9 @@ class Updater:
         device with no history is simply not yet installed, not held.
         """
         current = self._current_activation()
-        if current is None and self.read_state() is None:
+        if current is None and self._never_activated():
             return Outcome(
-                UpdateState.RECEIVED,
+                UpdateState.NOT_INSTALLED,
                 None,
                 "no release installed yet; awaiting first activation",
             )
@@ -409,6 +455,25 @@ class Updater:
             self.record_state(UpdateState.RECOVERY_HOLD, release_id, detail)
             return Outcome(UpdateState.RECOVERY_HOLD, release_id, detail)
         return Outcome(UpdateState.ACTIVATED_CORE_ONLY, current.release_id, detail)
+
+    def _never_activated(self) -> bool:
+        """Whether this device has ever reached an activation.
+
+        Keyed on how far the recorded state got rather than on whether a file
+        exists, so the steps that precede a first install do not read as
+        history. An unreadable state file counts as history: not knowing is a
+        reason to hold, not a reason to boot.
+        """
+        recorded = self.read_state()
+        if recorded is None:
+            return True
+        if recorded.get("unreadable"):
+            return False
+        try:
+            state = UpdateState(recorded.get("state"))
+        except ValueError:
+            return False  # a state this build does not know is not reassurance
+        return state in PRE_INSTALL_STATES
 
     def _previous_record(self, journal: Journal) -> ActivationRecord:
         """The record to roll back to, forced to core.

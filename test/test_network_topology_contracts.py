@@ -235,10 +235,14 @@ def _default_claims(section: str) -> list[str]:
     import re
 
     sentences = re.split(r"(?<=[.!?다])\s+|\n\n", section)
+    # Not only 기본: a claim can assert a default without the word. "표준
+    # 토폴로지로 채택한다" and "자체 AP를 상시 운용한다" both say which mode
+    # the device runs by default while avoiding it entirely.
+    markers = ("기본", "표준", "항상", "상시")
     return [
         " ".join(s.split())
         for s in sentences
-        if "기본" in s and (SITE_STA in s or RELAY in s or "릴레이" in s)
+        if any(m in s for m in markers) and (SITE_STA in s or RELAY in s or "릴레이" in s)
     ]
 
 
