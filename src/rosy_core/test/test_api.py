@@ -182,3 +182,194 @@ def test_error_shape_err101(client):
     body = r.json()
     assert set(body.keys()) == {"error"}
     assert {"code", "message", "detail"} <= set(body["error"].keys())   # ERR-101
+
+
+# --- Docking API (DNC-001~003) -------------------------------------------------
+
+
+@pytest.fixture
+def docking_client(tmp_path):
+    """docking.supported=true 로 켜진 로봇. 기본 capabilities 는 false 다."""
+    httpx = pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+
+    config = yaml.safe_load((Path(__file__).parent.parent / "config" / "rosy_default.yaml").read_text(encoding="utf-8"))
+    profile = RobotProfile.load(Path(__file__).parent.parent / "config" / "profile.pinky_pro.yaml")
+    caps = yaml.safe_load((Path(__file__).parent.parent / "config" / "capabilities.yaml").read_text(encoding="utf-8"))
+    caps["docking"] = {"supported": True}
+    services = CoreServices.build(config, profile, caps, tmp_path / "wp.json")
+    app = create_app(config, services)
+    return TestClient(app), services
+
+
+def _register_dock(services, dock_id="dock_1", map_id=None):
+    from rosy_core.docking.database import DockInstance, DockType
+    services.docking._db.add_type(
+        DockType(name="rosy_v1", detector="simulated", staging_offset_m=0.7))
+    return services.docking._db.add(DockInstance(
+        id=dock_id, type="rosy_v1", x=2.5, y=1.8, yaw=0.0,
+        map_id=map_id, agent_url="http://10.0.0.50"))
+
+
+class TestDockingStubContract:
+    """DNC-003 — 이 계약이 회귀하면 안 된다. 기능을 넣으면서 스텁을 깨는 것이
+    가장 흔한 사고다."""
+
+    def test_dock_returns_501_when_unsupported(self, client):
+        tc, _ = client
+        r = tc.post("/api/v1/docking/dock", json={}, headers=OPERATOR)
+        assert r.status_code == 501
+        assert r.json()["error"]["code"] == "CAPABILITY_NOT_SUPPORTED"
+
+    def test_undock_returns_501_when_unsupported(self, client):
+        tc, _ = client
+        r = tc.post("/api/v1/docking/undock", headers=OPERATOR)
+        assert r.status_code == 501
+        assert r.json()["error"]["code"] == "CAPABILITY_NOT_SUPPORTED"
+
+    def test_capabilities_still_report_docking_false(self, client):
+        tc, _ = client
+        r = tc.get("/api/v1/system/capabilities", headers=VIEWER)
+        assert r.json()["docking"]["supported"] is False
+
+
+class TestDockingStatus:
+    def test_status_is_readable_by_a_viewer(self, docking_client):
+        tc, _ = docking_client
+        r = tc.get("/api/v1/docking/status", headers=VIEWER)
+        assert r.status_code == 200
+        assert r.json()["state"] == "UNDOCKED"
+
+    def test_status_is_readable_even_when_unsupported(self, client):
+        """상태 조회까지 501 로 막으면 대시보드가 "도킹 없음"을 표시할 수 없다."""
+        tc, _ = client
+        r = tc.get("/api/v1/docking/status", headers=VIEWER)
+        assert r.status_code == 200
+
+
+class TestDockCrud:
+    def test_an_operator_can_register_and_list_a_dock(self, docking_client):
+        tc, services = docking_client
+        r = tc.post("/api/v1/docking/types", headers=ADMIN, json={
+            "name": "rosy_v1", "detector": "simulated", "staging_offset_m": 0.7})
+        assert r.status_code == 200
+
+        r = tc.post("/api/v1/docking/docks", headers=ADMIN, json={
+            "id": "dock_1", "type": "rosy_v1", "x": 2.5, "y": 1.8, "yaw": 0.0,
+            "agent_url": "http://10.0.0.50"})
+        assert r.status_code == 200
+
+        r = tc.get("/api/v1/docking/docks", headers=VIEWER)
+        assert [d["id"] for d in r.json()["docks"]] == ["dock_1"]
+
+    def test_a_dock_of_an_unknown_type_is_refused(self, docking_client):
+        tc, _ = docking_client
+        r = tc.post("/api/v1/docking/docks", headers=ADMIN, json={
+            "id": "dock_1", "type": "ghost", "x": 0.0, "y": 0.0, "yaw": 0.0})
+        assert r.status_code == 400
+        assert r.json()["error"]["code"] == "UNKNOWN_DOCK_TYPE"
+
+    def test_a_duplicate_dock_is_refused(self, docking_client):
+        tc, services = docking_client
+        _register_dock(services)
+        r = tc.post("/api/v1/docking/docks", headers=ADMIN, json={
+            "id": "dock_1", "type": "rosy_v1", "x": 0.0, "y": 0.0, "yaw": 0.0})
+        assert r.json()["error"]["code"] == "DOCK_EXISTS"
+
+    def test_an_unknown_dock_is_404(self, docking_client):
+        tc, _ = docking_client
+        r = tc.delete("/api/v1/docking/docks/nope", headers=ADMIN)
+        assert r.status_code == 404
+
+    def test_a_viewer_cannot_register_a_dock(self, docking_client):
+        tc, _ = docking_client
+        r = tc.post("/api/v1/docking/docks", headers=VIEWER, json={
+            "id": "dock_1", "type": "rosy_v1", "x": 0.0, "y": 0.0, "yaw": 0.0})
+        assert r.status_code == 403
+
+    def test_teaching_records_the_current_pose(self, docking_client):
+        tc, services = docking_client
+        _register_dock(services)
+        services.state.set_pose(7.0, 3.0, 1.5)
+        r = tc.post("/api/v1/docking/docks/dock_1/teach", headers=OPERATOR)
+        assert r.status_code == 200
+        assert r.json()["x"] == pytest.approx(7.0)
+        assert services.docking._db.get("dock_1").y == pytest.approx(3.0)
+
+    def test_teaching_an_unknown_dock_is_404(self, docking_client):
+        tc, _ = docking_client
+        r = tc.post("/api/v1/docking/docks/nope/teach", headers=OPERATOR)
+        assert r.status_code == 404
+
+
+class TestDockingCommands:
+    def test_dock_accepts_an_id(self, docking_client):
+        tc, services = docking_client
+        _register_dock(services)
+        r = tc.post("/api/v1/docking/dock", json={"dock": "dock_1"}, headers=OPERATOR)
+        assert r.status_code == 200
+        assert r.json()["state"] == "DOCKING"
+
+    def test_dock_without_an_id_uses_the_single_dock(self, docking_client):
+        tc, services = docking_client
+        _register_dock(services)
+        r = tc.post("/api/v1/docking/dock", json={}, headers=OPERATOR)
+        assert r.status_code == 200
+
+    def test_an_unknown_dock_id_is_404(self, docking_client):
+        tc, services = docking_client
+        _register_dock(services)
+        r = tc.post("/api/v1/docking/dock", json={"dock": "nope"}, headers=OPERATOR)
+        assert r.status_code == 404
+        assert r.json()["error"]["code"] == "NOT_FOUND"
+
+    def test_a_dock_on_another_map_is_refused(self, docking_client):
+        tc, services = docking_client
+        _register_dock(services, map_id="warehouse_b")
+        services.state.set_map_id("warehouse_a")
+        r = tc.post("/api/v1/docking/dock", json={"dock": "dock_1"}, headers=OPERATOR)
+        assert r.status_code == 409
+        assert r.json()["error"]["code"] == "MAP_MISMATCH"
+
+    def test_docking_under_estop_is_refused(self, docking_client):
+        tc, services = docking_client
+        _register_dock(services)
+        services.safety.trigger_estop("test")
+        r = tc.post("/api/v1/docking/dock", json={"dock": "dock_1"}, headers=OPERATOR)
+        assert r.status_code == 409
+        assert r.json()["error"]["code"] == "EMERGENCY_ACTIVE"
+
+    def test_a_viewer_cannot_command_docking(self, docking_client):
+        tc, services = docking_client
+        _register_dock(services)
+        r = tc.post("/api/v1/docking/dock", json={"dock": "dock_1"}, headers=VIEWER)
+        assert r.status_code == 403
+
+    def test_undocking_when_not_docked_is_refused(self, docking_client):
+        tc, services = docking_client
+        _register_dock(services)
+        r = tc.post("/api/v1/docking/undock", headers=OPERATOR)
+        assert r.status_code == 409
+        assert r.json()["error"]["code"] == "NOT_DOCKED"
+
+    def test_cancel_returns_to_undocked(self, docking_client):
+        tc, services = docking_client
+        _register_dock(services)
+        tc.post("/api/v1/docking/dock", json={"dock": "dock_1"}, headers=OPERATOR)
+        r = tc.post("/api/v1/docking/cancel", headers=OPERATOR)
+        assert r.status_code == 200
+        assert r.json()["state"] == "UNDOCKED"
+
+
+class TestDockingSnapshot:
+    def test_the_state_snapshot_carries_docking(self, docking_client):
+        tc, _ = docking_client
+        r = tc.get("/api/v1/robot/state", headers=VIEWER)
+        assert r.json()["docking"]["state"] == "UNDOCKED"
+
+    def test_existing_snapshot_fields_are_untouched(self, docking_client):
+        tc, _ = docking_client
+        body = r = tc.get("/api/v1/robot/state", headers=VIEWER).json()
+        for key in ("robot_id", "mode", "navigation", "pose", "velocity",
+                    "battery", "safety", "power"):
+            assert key in body

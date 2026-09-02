@@ -11,6 +11,10 @@ from typing import Any, Optional
 from rosy_core.capability import Capability
 from rosy_core.command.arbitration import ModeMachine, SourceRegistry
 from rosy_core.command.manager import CommandManager
+from rosy_core.docking.agent import DockAgent
+from rosy_core.docking.database import DockDatabase
+from rosy_core.docking.detector import SimulatedDetector
+from rosy_core.docking.manager import DockingConfig, DockingManager
 from rosy_core.events.bus import EventBus
 from rosy_core.identity import RobotIdentity
 from rosy_core.navigation.manager import NavigationManager
@@ -127,6 +131,7 @@ class CoreServices:
     nav: NavigationManager
     power: PowerManager
     battery: BatteryMonitor
+    docking: DockingManager
     runtime_probe: HostRuntimeProbe
     started_at: float = field(default_factory=time.time)
 
@@ -168,6 +173,19 @@ class CoreServices:
         battery = BatteryMonitor(
             _battery_config(safety_cfg, data_path=waypoints_path.parent),
             events=events)
+        docking = DockingManager(
+            database=DockDatabase(waypoints_path.parent / "docks.json"),
+            safety=safety,
+            config=DockingConfig(),
+            events=events,
+            # 검출기는 경계 뒤다 — 실물 선택은 카메라 스펙 뒤로 유보되어 있고,
+            # ros_bridge 가 기종에 맞는 것을 주입한다.
+            detector_factory=lambda dock, dock_type: SimulatedDetector(script=[]),
+            agent_factory=lambda dock: DockAgent(dock.agent_url),
+            capability_provider=lambda: capability.supports("docking.supported"),
+            map_id_provider=lambda: state.map_id,
+            battery=battery,
+        )
         runtime_probe = HostRuntimeProbe(
             host_root=os.environ.get("ROSY_HOST_ROOT", "/"),
             data_path=waypoints_path.parent,
@@ -175,4 +193,5 @@ class CoreServices:
         return cls(config=config, identity=identity, profile=profile, capability=capability,
                    events=events, state=state, registry=registry, modes=modes,
                    command=command, safety=safety, waypoints=waypoints, nav=nav,
-                   power=power, battery=battery, runtime_probe=runtime_probe)
+                   power=power, battery=battery, docking=docking,
+                   runtime_probe=runtime_probe)

@@ -127,6 +127,10 @@ class DockingManager:
     # --- 조회 -----------------------------------------------------------------
 
     @property
+    def database(self) -> DockDatabase:
+        return self._db
+
+    @property
     def state(self) -> DockState:
         return self._state
 

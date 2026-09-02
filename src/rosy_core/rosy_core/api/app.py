@@ -22,6 +22,7 @@ from rosy_core.api.v1.routes import (
     slam_router,
     system_router,
     waypoints_router,
+    docking_router,
 )
 from rosy_core.api.ws import ws_router
 from rosy_core.services import CoreServices
@@ -52,6 +53,7 @@ def create_app(config: dict[str, Any], services: CoreServices) -> FastAPI:
     app.include_router(power_router)
     app.include_router(sensors_router)
     app.include_router(slam_router)
+    app.include_router(docking_router)
     app.include_router(metrics_router)
     app.include_router(host_router)
     app.include_router(ws_router)
