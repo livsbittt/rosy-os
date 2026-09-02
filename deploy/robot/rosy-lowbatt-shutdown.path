@@ -1,0 +1,11 @@
+[Unit]
+Description=Watch for the ROSY low-battery shutdown request
+Documentation=file:///opt/rosy/docs/plans/2026-09-02-battery-integrity-low-battery-alert-design.md
+
+[Path]
+# CORE writes this when the pack has held the deep level past its dwell. It is
+# an observation, not a command: this unit decides whether to act on it.
+PathExists=/var/lib/rosy/battery-shutdown-request.json
+
+[Install]
+WantedBy=multi-user.target

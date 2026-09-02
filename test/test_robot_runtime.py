@@ -207,3 +207,75 @@ def test_container_entrypoint_is_forced_to_unix_line_endings():
 
     assert b"\r\n" not in entrypoint
     assert "*.sh text eol=lf" in attributes
+
+
+# --- 저배터리 셧다운 (D-27) ---------------------------------------------------
+#
+# CORE 는 uid 1000 비특권이라 호스트를 끌 수 없다. 파일로 관찰을 남기고 호스트
+# 유닛이 판단·실행한다. 명령 채널이 아니므로 소켓도 인증도 없다.
+# 설계: docs/plans/2026-09-02-battery-integrity-low-battery-alert-design.md
+
+def _unit(name: str) -> str:
+    return (DEPLOY / name).read_text(encoding="utf-8")
+
+
+def _directives(text: str) -> dict:
+    found = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if line and not line.startswith(("#", "[")) and "=" in line:
+            key, value = line.split("=", 1)
+            found.setdefault(key.strip(), []).append(value.strip())
+    return found
+
+
+def test_lowbatt_path_unit_watches_the_sentinel_core_writes():
+    directives = _directives(_unit("rosy-lowbatt-shutdown.path"))
+
+    watched = directives["PathExists"]
+    assert len(watched) == 1
+    assert watched[0].endswith("/battery-shutdown-request.json")
+    # CORE 의 데이터 디렉터리 — compose 의 ROSY_DATA_PATH 바인드와 같은 곳이어야 한다.
+    assert watched[0].startswith("/var/lib/rosy")
+    assert directives["WantedBy"] == ["multi-user.target"]
+
+
+def test_lowbatt_service_is_a_oneshot_that_checks_before_it_halts():
+    text = _unit("rosy-lowbatt-shutdown.service")
+    directives = _directives(text)
+
+    assert directives["Type"] == ["oneshot"]
+    # 판단은 호스트가 한다 — 파일을 보자마자 끄지 않는다.
+    assert any("rosy-lowbatt-shutdown.sh" in value
+               for value in directives["ExecStart"])
+
+
+def test_lowbatt_service_never_runs_at_boot_on_its_own():
+    """/var/lib/rosy 는 영속이다. path 유닛만이 이 서비스를 띄워야 한다."""
+    directives = _directives(_unit("rosy-lowbatt-shutdown.service"))
+    assert "WantedBy" not in directives
+    assert "RequiredBy" not in directives
+
+
+def test_lowbatt_guard_refuses_a_stale_sentinel():
+    """불결한 종료로 살아남은 파일이 다음 부팅을 끄면 안 된다."""
+    script = (DEPLOY / "rosy-lowbatt-shutdown.sh").read_text(encoding="utf-8")
+    assert "ROSY_LOWBATT_MAX_AGE_S" in script
+    assert "requested_at" in script
+    assert "systemctl" in script or "halt" in script
+
+
+def test_lowbatt_guard_rechecks_the_file_after_the_grace_period():
+    """유예 중 충전이 시작되면 CORE 가 파일을 지운다 — 그때 꺼지면 안 된다."""
+    script = (DEPLOY / "rosy-lowbatt-shutdown.sh").read_text(encoding="utf-8")
+    assert "grace_seconds" in script
+    assert "sleep" in script
+
+
+def test_installer_enables_the_lowbatt_units_alongside_the_runtime():
+    installer = (DEPLOY / "install-pi.sh").read_text(encoding="utf-8")
+    assert "rosy-lowbatt-shutdown.path" in installer
+    assert "rosy-lowbatt-shutdown.service" in installer
+    assert "rosy-lowbatt-shutdown.sh" in installer
+    # 기존 런타임 유닛 처리는 그대로여야 한다.
+    assert "systemctl enable --now rosy-runtime.service" in installer

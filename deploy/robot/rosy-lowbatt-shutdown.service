@@ -1,0 +1,13 @@
+[Unit]
+Description=ROSY low-battery guarded shutdown (D-27)
+Documentation=file:///opt/rosy/docs/plans/2026-09-02-battery-integrity-low-battery-alert-design.md
+# Only rosy-lowbatt-shutdown.path may start this. There is deliberately no
+# [Install] section: /var/lib/rosy is persistent, so a sentinel that survived an
+# unclean shutdown must not be able to halt the next boot by itself.
+
+[Service]
+Type=oneshot
+ExecStart=/opt/rosy/deploy/robot/rosy-lowbatt-shutdown.sh
+# The script sleeps out the grace period, so it must not be killed for taking
+# its time. It bounds itself.
+TimeoutStartSec=0

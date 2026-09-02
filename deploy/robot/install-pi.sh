@@ -273,8 +273,19 @@ build_and_start_core() {
 enable_boot_service() {
     install -m 0644 "$INSTALL_ROOT/deploy/robot/rosy-runtime.service" \
         /etc/systemd/system/rosy-runtime.service
+
+    # Low-battery guarded shutdown (D-27). Only the path unit is enabled: the
+    # service has no [Install] section on purpose, because /var/lib/rosy is
+    # persistent and a stale sentinel must not halt a fresh boot on its own.
+    chmod 0755 "$INSTALL_ROOT/deploy/robot/rosy-lowbatt-shutdown.sh"
+    install -m 0644 "$INSTALL_ROOT/deploy/robot/rosy-lowbatt-shutdown.service" \
+        /etc/systemd/system/rosy-lowbatt-shutdown.service
+    install -m 0644 "$INSTALL_ROOT/deploy/robot/rosy-lowbatt-shutdown.path" \
+        /etc/systemd/system/rosy-lowbatt-shutdown.path
+
     systemctl daemon-reload
     systemctl enable --now rosy-runtime.service
+    systemctl enable --now rosy-lowbatt-shutdown.path
 }
 
 main() {
