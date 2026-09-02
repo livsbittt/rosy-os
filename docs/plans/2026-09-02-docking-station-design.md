@@ -339,8 +339,10 @@ termination.
 
 **Controller.** An MCU that senses load, energises only when a load is present,
 measures current, serves the status endpoint, and de-energises on removal or
-fault. Its firmware lives in `deploy/dock/` with the contract documented beside
-it.
+fault. Its firmware lives in a top-level `dock/` with the contract documented beside
+it — **not** under `deploy/`, which means "how this robot is installed and
+updated". The dock is a different device, and filing its firmware next to the
+robot's OS image would suggest it belongs in the robot's release bundle.
 
 ## One dock per robot, a schema for more
 
@@ -366,7 +368,7 @@ rosy_core/docking/
     database.py    DockInstance, DockType, teach/load/save.
     detector.py    DockDetector protocol + SimulatedDetector.
     agent.py       HTTP client for the dock's status endpoint.
-deploy/dock/       ESP32 firmware and its contract.
+dock/              ESP32 firmware and its contract (separate device).
 ```
 
 `DockingManager` takes an injected clock, a detector, a dock-agent client and a

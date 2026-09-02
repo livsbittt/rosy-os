@@ -208,8 +208,8 @@ inspection suffices; the bench check in Task 11 carries the verification.
 ### Task 10: Dock firmware and its contract
 
 **Files:**
-- Create: `deploy/dock/README.md`
-- Create: `deploy/dock/firmware/` (ESP32 sketch)
+- Create: `dock/README.md`
+- Create: `dock/firmware/` (ESP32 sketch)
 - Create: `test/test_dock_contract.py`
 
 1. Write failing tests that the documented status schema matches what
