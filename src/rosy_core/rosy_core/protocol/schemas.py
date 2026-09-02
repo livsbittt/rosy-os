@@ -127,6 +127,27 @@ class Battery(BaseModel):
     voltage: Optional[float] = None
 
 
+class BatteryLevel(str, enum.Enum):
+    """SAF-005 경보 단계. DEEP만 신설이고 나머지는 기존 임계 그대로다."""
+
+    OK = "ok"
+    WARNING = "warning"        # SAF-005 경고 — 기본 20%
+    CRITICAL = "critical"      # SAF-005 크리티컬 — 기본 10%
+    DEEP = "deep"              # 모터 정지 후 호스트 셧다운 (D-27)
+
+
+class BatteryStatus(BaseModel):
+    """필터를 통과한 배터리 판정. `battery`(생 percent/voltage)와 별개로 붙는다.
+
+    `filtered_voltage`는 저역통과를 거친 값이라 `battery.voltage`와 다를 수 있다.
+    전류 센싱이 없으므로 percent는 어디까지나 추정치다.
+    """
+
+    level: BatteryLevel = BatteryLevel.OK
+    shutdown_armed: bool = False
+    filtered_voltage: Optional[float] = None
+
+
 class SafetySummary(BaseModel):
     estop: bool = False
 
@@ -213,6 +234,7 @@ class StateSnapshot(BaseModel):
     pose: Pose = Field(default_factory=Pose)
     velocity: Velocity = Field(default_factory=Velocity)
     battery: Battery = Field(default_factory=Battery)
+    battery_status: BatteryStatus = Field(default_factory=BatteryStatus)
     safety: SafetySummary = Field(default_factory=SafetySummary)
     swarm: SwarmStatus = Field(default_factory=SwarmStatus)  # v1.1 additive (SWM-006)
     power: PowerStatus = Field(default_factory=PowerStatus)  # v1.4 additive (PWR-001)

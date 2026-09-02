@@ -7,6 +7,7 @@ from typing import Optional
 
 from rosy_core.protocol.schemas import (
     Battery,
+    BatteryStatus,
     HealthState,
     NavigationState,
     Pose,
@@ -29,6 +30,7 @@ class StateManager:
         self._pose = Pose()
         self._velocity = Velocity()
         self._battery = Battery()
+        self._battery_status = BatteryStatus()
         self._safety = SafetySummary()
         self._swarm = SwarmStatus()
         self._power = PowerStatus()
@@ -83,6 +85,10 @@ class StateManager:
         with self._lock:
             self._power = status
 
+    def set_battery_status(self, status: BatteryStatus) -> None:
+        with self._lock:
+            self._battery_status = status
+
     def set_sensor(self, key: str, data: dict) -> None:
         with self._lock:
             self._sensors[key] = data
@@ -113,6 +119,7 @@ class StateManager:
                 pose=self._pose.model_copy(),
                 velocity=self._velocity.model_copy(),
                 battery=self._battery.model_copy(),
+                battery_status=self._battery_status.model_copy(),
                 safety=self._safety.model_copy(),
                 swarm=self._swarm.model_copy(),
                 power=self._power.model_copy(),
