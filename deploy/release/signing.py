@@ -124,6 +124,16 @@ def parse_sha256sums(data: bytes) -> tuple[dict[str, str], list[Rejection]]:
             continue
 
         path = match.group("path")
+        if _escapes_root(path):
+            rejections.append(
+                Rejection(
+                    "SHA256SUMS_PATH_UNSAFE",
+                    f"{CHECKSUM_FILENAME}:{number}",
+                    f"{path!r} leaves the release root; verify_checksums would hash "
+                    "a file outside it",
+                )
+            )
+            continue
         if path in entries:
             rejections.append(
                 Rejection(
@@ -150,6 +160,20 @@ def parse_sha256sums(data: bytes) -> tuple[dict[str, str], list[Rejection]]:
         )
 
     return entries, rejections
+
+
+def _escapes_root(path: str) -> bool:
+    """Whether a checksum-list path points outside the release directory.
+
+    manifest.py already refuses these for payload entries. The checksum list
+    is signed, so a bad path here is not directly exploitable — but the two
+    validators should apply the same discipline, and verify_checksums joins
+    these straight onto the release root.
+    """
+    normalised = path.replace("\\", "/")
+    if normalised.startswith("/") or re.match(r"^[A-Za-z]:", path):
+        return True
+    return any(part == ".." for part in normalised.split("/"))
 
 
 def sign_checksums(sums: bytes, private_key: Path) -> str:
@@ -276,10 +300,24 @@ def find_unlisted_files(root: Path, entries: dict[str, str]) -> list[Rejection]:
     rejections: list[Rejection] = []
 
     for path in sorted(root.rglob("*")):
-        if not path.is_file():
-            continue
         relative = path.relative_to(root).as_posix()
-        if relative in ignored or relative in entries:
+        if relative in ignored:
+            continue
+
+        # is_file() follows symlinks, so a dangling one reads as "not a file"
+        # and vanished from this check entirely.
+        if path.is_symlink():
+            rejections.append(
+                Rejection(
+                    "CHECKSUM_SYMLINK",
+                    relative,
+                    "a release must not contain symlinks; what it resolves to is "
+                    "not covered by the checksum list",
+                )
+            )
+            continue
+
+        if not path.is_file() or relative in entries:
             continue
         rejections.append(
             Rejection(
@@ -307,7 +345,15 @@ def verify_release_files(root: Path, public_key: Path) -> list[Rejection]:
         return [Rejection("SIGNATURE_MISSING", SIGNATURE_FILENAME, "release is unsigned")]
 
     sums = sums_path.read_bytes()
-    rejections = verify_signature(sums, sig_path.read_text(encoding="utf-8"), public_key)
+    try:
+        signature = sig_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        # Not valid text, so certainly not valid base64 — a rejection, not a
+        # traceback out of the update path.
+        return [
+            Rejection("SIGNATURE_MALFORMED", SIGNATURE_FILENAME, "signature file is not UTF-8 text")
+        ]
+    rejections = verify_signature(sums, signature, public_key)
     if rejections:
         # Do not hash anything on an untrusted list: it would report
         # reassuring "checksum OK" lines for attacker-chosen content.

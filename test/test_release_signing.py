@@ -17,6 +17,7 @@ import pytest
 from signing import (  # via test/conftest.py
     CHECKSUM_FILENAME,
     SIGNATURE_FILENAME,
+    SigningToolMissing,
     build_sha256sums,
     find_unlisted_files,
     parse_sha256sums,
@@ -29,14 +30,19 @@ from signing import (  # via test/conftest.py
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# OpenSSL 3 is a stated requirement of the release contract, not an optional
-# convenience. If it is missing the suite fails loudly rather than skipping,
-# because a silent skip here would report a green signature check that never
-# ran.
-pytestmark = pytest.mark.skipif(
-    shutil.which("openssl") is None,
-    reason="openssl is required by the release signing contract",
-)
+
+def test_openssl_is_available():
+    """The signature contract needs OpenSSL 3; its absence is a failure.
+
+    This used to be a module-level skipif, directly under a comment saying a
+    silent skip would report a green signature check that never ran. It did
+    exactly that. Now the whole module fails on a runner without openssl,
+    which is the honest outcome for a stated requirement.
+    """
+    assert shutil.which("openssl") is not None, (
+        "openssl is required by the release signing contract; "
+        "install it rather than skipping these tests"
+    )
 
 
 def _generate_key(directory: Path, name: str = "test") -> tuple[Path, Path]:
@@ -345,3 +351,18 @@ def test_the_secret_scanner_recognises_an_ed25519_private_key(tmp_path):
     private, _ = _generate_key(tmp_path)
     findings = scan_text("leaked.key", private.read_text(encoding="utf-8"))
     assert any(f.kind == "private-key" for f in findings)
+
+
+def test_a_missing_verifier_raises_rather_than_rejecting(monkeypatch, release, keys):
+    """An absent verifier is not a bad signature and must not read as one."""
+    import signing
+
+    _private, public = keys
+    monkeypatch.setattr(signing.shutil, "which", lambda _name: None)
+
+    # A well-formed 64-byte signature, so the call reaches openssl rather than
+    # stopping at the length check.
+    well_formed = base64.b64encode(bytes(64)).decode("ascii")
+
+    with pytest.raises(SigningToolMissing):
+        verify_signature(b"anything", well_formed, public)

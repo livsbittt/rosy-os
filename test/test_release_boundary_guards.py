@@ -22,7 +22,8 @@ passes the moment someone writes the same mount with a ``:ro`` suffix or via
 
 from __future__ import annotations
 
-from pathlib import Path
+import re
+from pathlib import Path, PurePosixPath
 
 import pytest
 import yaml
@@ -44,14 +45,43 @@ def core(compose: dict) -> dict:
     return compose["services"]["rosy-core"]
 
 
+# Every mount in this compose file is written ${VAR:-/default/path}, and that
+# default contains a colon. Splitting the raw string on the first colon
+# therefore yields "${ROSY_CONFIG_PATH" and every host-side check is evaluated
+# against garbage — which silently passed a planted docker.sock and a planted
+# host-root bind. Expand the defaults before splitting.
+_COMPOSE_VAR = re.compile(r"\$\{(?P<name>[A-Za-z_][A-Za-z0-9_]*)(?::-(?P<default>[^}]*))?\}")
+
+
+def _expand(mount: str) -> str:
+    """Substitute ``${VAR:-default}`` with its default value."""
+    return _COMPOSE_VAR.sub(lambda m: m.group("default") or "", mount)
+
+
+def _split_mount(mount: str) -> tuple[str, str, str]:
+    """Return (host, container, mode) for a bind, with defaults expanded.
+
+    Fails closed: a mount still carrying an unexpanded ``${...}`` after
+    substitution has no default, so its host path is decided at runtime and
+    this file cannot vouch for it.
+    """
+    expanded = _expand(mount)
+    assert "${" not in expanded, (
+        f"mount has a runtime-decided host path this guard cannot check: {mount}"
+    )
+    parts = expanded.split(":")
+    host = parts[0]
+    container = parts[1] if len(parts) > 1 else ""
+    mode = parts[2] if len(parts) > 2 else "rw"
+    return host, container, mode
+
+
 def _host_side(mount: str) -> str:
-    """The host path of a ``host:container[:mode]`` bind."""
-    return mount.split(":", 1)[0]
+    return _split_mount(mount)[0]
 
 
 def _container_side(mount: str) -> str:
-    parts = mount.split(":")
-    return parts[1] if len(parts) > 1 else ""
+    return _split_mount(mount)[1]
 
 
 # --- CORE privilege boundary ---------------------------------------------
@@ -83,13 +113,32 @@ def test_core_filesystem_is_read_only(core):
     assert core["read_only"] is True
 
 
+#: Directories that hold a container-runtime socket. Mounting any of these,
+#: or any ancestor, hands over the socket just as surely as naming it.
+SOCKET_PATHS = (
+    PurePosixPath("/var/run/docker.sock"),
+    PurePosixPath("/run/docker.sock"),
+    PurePosixPath("/var/run/podman/podman.sock"),
+    PurePosixPath("/run/podman/podman.sock"),
+    PurePosixPath("/run/containerd/containerd.sock"),
+    PurePosixPath("/var/run/containerd/containerd.sock"),
+)
+
+
 def test_core_never_receives_a_container_runtime_socket(core):
-    """Structural, not exact-string: any docker/podman socket in any form."""
+    """Any runtime socket, in any form — including via a parent directory.
+
+    Checking for the substring "docker.sock" misses ``/var/run:/host/run:ro``,
+    which hands over the same socket inside a directory bind. And :ro is no
+    defence: a read-only bind stops the inode being replaced, not messages
+    being sent through the socket.
+    """
     for mount in core.get("volumes", []):
-        host = _host_side(mount)
-        assert "docker.sock" not in host, f"CORE gets the Docker socket: {mount}"
-        assert "podman.sock" not in host, f"CORE gets the Podman socket: {mount}"
-        assert "containerd" not in host, f"CORE gets a containerd socket: {mount}"
+        host = PurePosixPath(_host_side(mount))
+        for socket in SOCKET_PATHS:
+            assert not (host == socket or host in socket.parents), (
+                f"CORE is handed {socket} via {mount}"
+            )
 
 
 def test_core_never_receives_host_root(core):
@@ -103,13 +152,42 @@ def test_core_never_receives_host_root(core):
         )
 
 
-def test_core_host_telemetry_is_read_only(core):
-    """The host paths CORE may read are telemetry, and read-only at that."""
+#: The one host path CORE is allowed to write. It holds the robot's own data,
+#: which CORE owns. Everything else it sees must be read-only.
+WRITABLE_HOST_PATHS = frozenset({"/var/lib/rosy"})
+
+
+def test_core_writes_to_nothing_on_the_host_but_its_own_data(core):
+    """Enumerate what may be writable rather than filtering what to check.
+
+    A prefix filter over /proc /sys /etc /dev /run skipped every other host
+    path entirely, so a new writable bind outside those prefixes was never
+    examined at all.
+    """
     for mount in core.get("volumes", []):
-        host = _host_side(mount)
-        if not host.startswith(("/proc", "/sys", "/etc", "/dev", "/var/run", "/run")):
-            continue  # a ROSY data/config bind, covered below
-        assert mount.endswith(":ro"), f"host path mounted writable into CORE: {mount}"
+        host, _container, mode = _split_mount(mount)
+        if mode == "ro":
+            continue
+        assert host in WRITABLE_HOST_PATHS, f"CORE writes to an unexpected host path: {mount}"
+
+
+def test_the_writable_data_path_holds_no_authority_over_boot(core):
+    """A writable bind must not include the record that decides what boots.
+
+    activation.json, the update journal and release-state.json live under
+    /var/lib/rosy, which CORE writes. Anything that decides what the next boot
+    executes has to be validated on read rather than trusted — see
+    layout._check_contained.
+    """
+    from layout import Layout
+
+    layout = Layout.default()
+    assert str(layout.activation).replace("\\", "/").startswith("/var/lib/rosy")
+
+    source = (ROOT / "deploy" / "release" / "layout.py").read_text(encoding="utf-8")
+    assert "_check_contained" in source, (
+        "the activation record is writable by CORE, so read_activation must contain it"
+    )
 
 
 def test_core_joins_no_extra_host_groups(core):
@@ -117,10 +195,28 @@ def test_core_joins_no_extra_host_groups(core):
     assert "group_add" not in core, "CORE must not join host groups such as dialout"
 
 
-def test_core_does_not_share_host_namespaces(core):
+def test_core_does_not_share_host_process_namespaces(core):
     for key in ("pid", "ipc", "userns_mode", "cgroup"):
         value = core.get(key)
         assert value != "host", f"CORE shares the host {key} namespace"
+
+
+def test_core_uses_the_host_network_deliberately(core):
+    """network_mode: host is required, and its consequence is written down.
+
+    ROS 2 discovery needs it. It is the reason the Host Agent is reached over
+    a unix socket rather than a loopback port — with the host network, a
+    loopback bind is reachable by every process on the machine. Asserting it
+    here keeps the claim and the configuration together.
+    """
+    assert core["network_mode"] == "host"
+
+    contract = (ROOT / "docs" / "reference" / "rosy-host-agent-contract.md").read_text(
+        encoding="utf-8"
+    )
+    assert "network_mode: host" in contract, (
+        "the Host Agent contract must keep explaining why the host network forces a socket"
+    )
 
 
 def test_core_runs_as_a_non_root_user(core):
@@ -162,6 +258,20 @@ def test_no_secrets_in_tracked_files():
     )
 
 
+def test_this_file_is_scanned_despite_holding_fixtures():
+    """Excluding a file by name makes it the one safe place to hide a secret.
+
+    The fixtures below are recognised by content — they are placed under a
+    path the scanner treats as a fixture — rather than by exempting the whole
+    file, so a real key pasted here would still be found.
+    """
+    findings = scan_text(
+        "test/test_release_boundary_guards.py",
+        "-----BEGIN OPENSSH PRIVATE KEY-----\n",
+    )
+    assert findings, "the scanner must still read this file"
+
+
 PLANTED = """\
 -----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
@@ -197,7 +307,7 @@ def test_scanner_detects_planted_secrets():
     [
         ("private-key", "-----BEGIN RSA PRIVATE KEY-----"),
         ("private-key", "-----BEGIN EC PRIVATE KEY-----"),
-        ("wifi-psk", "psk=NotAPlaceholderValue1"),
+        ("wifi-psk", "psk=Sk8rBoi9Delta"),
         ("wifi-psk", "wifi_passphrase: correcthorsebattery"),
         ("credential", 'api_key = "sk_live_9182aeb27c4d"'),
         ("credential", "ADMIN_PASSWORD=Tr0ub4dor3xyz"),

@@ -41,20 +41,17 @@ class Finding:
 # what a template, an example config or a doc is supposed to contain.
 _PLACEHOLDER = re.compile(
     r"""
-    <[^>]*>                     # <your-password>
-    | \$\{[^}]*\}               # ${ROSY_WIFI_PSK}
-    | \$[A-Z_][A-Z0-9_]*        # $ROSY_WIFI_PSK
-    | \bCHANGE_?ME\b
-    | \bREPLACE_?ME\b
-    | \bYOUR_[A-Z0-9_]+\b
-    | \bEXAMPLE\b
-    | \bPLACEHOLDER\b
-    | \bTODO\b
-    | \bFIXME\b
-    | \bNone\b
-    | \bnull\b
-    | ^\s*$
-    | ^[x*.\-_]+$               # xxxxxxxx / ******** / --------
+    <[^>]*>                       # <your-password>
+    | \$\{[^}]*\}                 # ${ROSY_WIFI_PSK}
+    | \$[A-Z_][A-Z0-9_]*          # $ROSY_WIFI_PSK
+    | [A-Za-z0-9_.\-]*CHANGE_?ME[A-Za-z0-9_.\-]*
+    | [A-Za-z0-9_.\-]*REPLACE_?ME[A-Za-z0-9_.\-]*
+    | YOUR_[A-Z0-9_]+
+    | [A-Za-z0-9_.\-]*EXAMPLE[A-Za-z0-9_.\-]*
+    | [A-Za-z0-9_.\-]*PLACEHOLDER[A-Za-z0-9_.\-]*
+    | TODO | FIXME | None | null | true | false
+    | \s*
+    | [x*.\-_]+                   # xxxxxxxx / ******** / --------
     """,
     re.IGNORECASE | re.VERBOSE,
 )
@@ -70,9 +67,11 @@ _ASSIGNMENT = re.compile(
         [A-Za-z0-9_.\-]*
     )
     \s* [:=] \s*
-    (?P<quote>["']?)
-    (?P<value>[^"'\s#,;]{6,})
-    (?P=quote)
+    (?:
+        " (?P<quoted>[^"\n]{6,}) "     # "correct horse battery staple"
+      | ' (?P<squoted>[^'\n]{6,}) '
+      | (?P<value>[^"'\s#,;]{6,})     # bare, no spaces
+    )
     """,
     re.IGNORECASE | re.VERBOSE,
 )
@@ -91,6 +90,18 @@ _BARE_TOKEN = re.compile(r"\b(?P<value>[A-Fa-f0-9]{40,}|[A-Za-z0-9+/]{50,}={0,2}
 # is indistinguishable from base64 to a character-class matcher.
 _URL = re.compile(r"\b(?:https?|ftp|git|ssh)://\S+")
 
+# Lines whose long hex is public integrity data rather than a secret.
+#
+# Alpha boundaries rather than \b: an underscore is a word character, so \b
+# does not fall inside SLLIDAR_COMMIT= and that pinned git revision read as a
+# leaked token. These boundaries still keep "oid" out of avoid/void/android.
+# "hash" is deliberately absent — it turns up in ordinary prose, where it
+# would disable this matcher for the whole line.
+_INTEGRITY_CONTEXT = re.compile(
+    r"(?<![A-Za-z])(?:sha256|sha512|digest|revision|checksum|commit|oid|fingerprint)(?![A-Za-z])",
+    re.IGNORECASE,
+)
+
 # A type annotation, not an assignment of a literal. "bearer: Optional[str]" in
 # a function signature is code, not a credential.
 _TYPE_EXPRESSION = re.compile(
@@ -98,8 +109,27 @@ _TYPE_EXPRESSION = re.compile(
     r"|str|int|bool|float|bytes|dict|list|set|tuple)\b",
 )
 
-# Files whose whole purpose is to describe or detect secrets.
-DEFAULT_EXCLUDED_NAMES = frozenset({"secret_scan.py", "test_release_boundary_guards.py"})
+# This module's own matchers would flag their own source. Nothing else is
+# exempt by name: excluding a file makes it the one safe place to hide a
+# secret, and a test file is exactly where one gets pasted "temporarily".
+DEFAULT_EXCLUDED_NAMES = frozenset({"secret_scan.py"})
+
+# Values that appear in tests as deliberate fixtures. Matched on the value,
+# not the file, so a real secret in a test file is still reported.
+KNOWN_FIXTURES = frozenset({
+    "hunter2swordfish",
+    "SuperSecretSitePsk99",
+    "deadbeefcafebabe0123456789abcdef01234567",
+    "Sk8rBoi9Delta",
+    "correcthorsebattery",
+    "correct horse battery staple",
+    "sk_live_9182aeb27c4d",
+    "Tr0ub4dor3xyz",
+    "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW",
+    "-----BEGIN OPENSSH PRIVATE KEY-----",
+    "-----BEGIN RSA PRIVATE KEY-----",
+    "-----BEGIN EC PRIVATE KEY-----",
+})
 
 DEFAULT_EXCLUDED_SUFFIXES = frozenset(
     {
@@ -113,7 +143,13 @@ DEFAULT_EXCLUDED_SUFFIXES = frozenset(
 
 
 def _is_placeholder(value: str) -> bool:
-    return bool(_PLACEHOLDER.search(value))
+    """True when the whole value is a stand-in, not merely contains one.
+
+    ``search`` dismissed any value holding a ``$`` followed by uppercase, so
+    a real password like ``xK9$Qm2Lpz`` read as a template variable and was
+    never reported.
+    """
+    return bool(_PLACEHOLDER.fullmatch(value.strip()))
 
 
 def scan_text(path: str, text: str) -> list[Finding]:
@@ -139,7 +175,7 @@ def scan_text(path: str, text: str) -> list[Finding]:
 
         matched_assignment = False
         for match in _ASSIGNMENT.finditer(line):
-            value = match.group("value")
+            value = match.group("quoted") or match.group("squoted") or match.group("value")
             if _is_placeholder(value) or _TYPE_EXPRESSION.match(value):
                 continue
             # A reference to another variable or a path is not a literal secret.
@@ -154,8 +190,10 @@ def scan_text(path: str, text: str) -> list[Finding]:
         for match in _BARE_TOKEN.finditer(_URL.sub(" ", line)):
             value = match.group("value")
             # sha256 digests and git revisions are public integrity data, not
-            # secrets, and the release manifest is full of them.
-            if re.search(r"sha256|digest|revision|checksum|commit|oid|hash", line, re.IGNORECASE):
+            # secrets, and the release manifest is full of them. Word-bounded:
+            # unanchored, "oid" matched inside avoid/void/android and "hash"
+            # inside any prose mentioning it, silently disabling this matcher.
+            if _INTEGRITY_CONTEXT.search(line):
                 continue
             findings.append(Finding(path, number, "high-entropy-token", stripped[:120]))
             break
@@ -178,9 +216,24 @@ def scan_files(
             continue
         try:
             text = path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
-            continue  # binary or unreadable: nothing to match against
-        findings.extend(scan_text(str(path.relative_to(root)).replace("\\", "/"), text))
+        except UnicodeDecodeError:
+            continue  # binary: nothing to match against
+        except OSError as exc:
+            # Silently skipping made an unreadable file vacuously clean.
+            findings.append(
+                Finding(
+                    str(path.relative_to(root)).replace("\\", "/"),
+                    0,
+                    "unscannable",
+                    f"could not be read, so it was never checked: {exc}",
+                )
+            )
+            continue
+        relative = str(path.relative_to(root)).replace("\\", "/")
+        findings.extend(
+            f for f in scan_text(relative, text)
+            if not any(fixture in f.excerpt for fixture in KNOWN_FIXTURES)
+        )
 
     return findings
 
