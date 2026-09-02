@@ -171,23 +171,26 @@ def test_core_writes_to_nothing_on_the_host_but_its_own_data(core):
         assert host in WRITABLE_HOST_PATHS, f"CORE writes to an unexpected host path: {mount}"
 
 
-def test_the_writable_data_path_holds_no_authority_over_boot(core):
-    """A writable bind must not include the record that decides what boots.
+def test_the_writable_data_path_holds_the_authority_over_boot(core):
+    """Name the exposure rather than assert a function exists.
 
     activation.json, the update journal and release-state.json live under
-    /var/lib/rosy, which CORE writes. Anything that decides what the next boot
-    executes has to be validated on read rather than trusted — see
-    layout._check_contained.
+    /var/lib/rosy, which CORE writes. That is why read_activation validates
+    the record instead of trusting it — the containment itself is tested
+    behaviourally in test_release_layout.py, not by grepping for a symbol.
     """
     from layout import Layout
 
     layout = Layout.default()
-    assert str(layout.activation).replace("\\", "/").startswith("/var/lib/rosy")
+    for path in (layout.activation, layout.journal, layout.release_state):
+        assert str(path).replace("\\", "/").startswith("/var/lib/rosy")
 
-    source = (ROOT / "deploy" / "release" / "layout.py").read_text(encoding="utf-8")
-    assert "_check_contained" in source, (
-        "the activation record is writable by CORE, so read_activation must contain it"
-    )
+    writable = {
+        _split_mount(mount)[0]
+        for mount in core.get("volumes", [])
+        if _split_mount(mount)[2] != "ro"
+    }
+    assert writable == {"/var/lib/rosy"}
 
 
 def test_core_joins_no_extra_host_groups(core):
@@ -258,28 +261,53 @@ def test_no_secrets_in_tracked_files():
     )
 
 
-def test_this_file_is_scanned_despite_holding_fixtures():
-    """Excluding a file by name makes it the one safe place to hide a secret.
+def _pem_header(label: str) -> str:
+    """Build a PEM header at runtime.
 
-    The fixtures below are recognised by content — they are placed under a
-    path the scanner treats as a fixture — rather than by exempting the whole
-    file, so a real key pasted here would still be found.
+    No PEM header literal may appear in this source. Listing one as a known
+    fixture is what disarmed the private-key matcher for the whole repository
+    — the header is the matcher's entire signal, so excusing it anywhere
+    excuses it everywhere. Assembling it here keeps the matcher armed while
+    still exercising it.
     """
-    findings = scan_text(
-        "test/test_release_boundary_guards.py",
-        "-----BEGIN OPENSSH PRIVATE KEY-----\n",
+    return "-" * 5 + "BEGIN " + label + "-" * 5
+
+
+def test_a_private_key_under_the_test_tree_is_still_reported(tmp_path):
+    """Exercised through scan_files, the function CI actually runs.
+
+    Asserting against scan_text proved nothing about CI: scan_text never
+    applies the fixture allowances, so it stayed green while the production
+    path was blind to every PEM header in the repository.
+    """
+    planted = tmp_path / "test" / "test_something.py"
+    planted.parent.mkdir(parents=True)
+    planted.write_text(_pem_header("OPENSSH PRIVATE KEY") + "\n", encoding="utf-8")
+
+    findings = scan_files([planted], root=tmp_path)
+    assert any(f.kind == "private-key" for f in findings), (
+        "a private key under test/ must still be reported; the fixture "
+        "allowance must never cover a PEM header"
     )
-    assert findings, "the scanner must still read this file"
 
 
-PLANTED = """\
------BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
------END OPENSSH PRIVATE KEY-----
-wifi_password: hunter2swordfish
-psk=SuperSecretSitePsk99
-ROSY_API_TOKEN=deadbeefcafebabe0123456789abcdef01234567
-"""
+def test_the_fixture_allowance_does_not_reach_outside_the_test_tree(tmp_path):
+    """A fixture value is only a fixture where fixtures live."""
+    outside = tmp_path / "deploy" / "robot"
+    outside.mkdir(parents=True)
+    (outside / "leaked.env").write_text("ROSY_API_TOKEN=" + "deadbeef" * 5, encoding="utf-8")
+
+    findings = scan_files([outside / "leaked.env"], root=tmp_path)
+    assert findings, "a known fixture value outside test/ is still a secret"
+
+
+PLANTED = "\n".join([
+    _pem_header("OPENSSH PRIVATE KEY"),
+    "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW",
+    "wifi_password: hunter2swordfish",
+    "psk=SuperSecretSitePsk99",
+    "ROSY_API_TOKEN=deadbeefcafebabe0123456789abcdef01234567",
+])
 
 PLACEHOLDERS = """\
 wifi_password: <your-wifi-password>
@@ -305,8 +333,8 @@ def test_scanner_detects_planted_secrets():
 @pytest.mark.parametrize(
     "kind,sample",
     [
-        ("private-key", "-----BEGIN RSA PRIVATE KEY-----"),
-        ("private-key", "-----BEGIN EC PRIVATE KEY-----"),
+        ("private-key", _pem_header("RSA PRIVATE KEY")),
+        ("private-key", _pem_header("EC PRIVATE KEY")),
         ("wifi-psk", "psk=Sk8rBoi9Delta"),
         ("wifi-psk", "wifi_passphrase: correcthorsebattery"),
         ("credential", 'api_key = "sk_live_9182aeb27c4d"'),
@@ -317,6 +345,27 @@ def test_scanner_detects_each_secret_shape(kind, sample):
     findings = scan_text("sample.txt", sample)
     assert findings, f"scanner missed {kind}: {sample!r}"
     assert findings[0].kind == kind
+
+
+@pytest.mark.parametrize(
+    "sample",
+    [
+        'api_key = "liveEXAMPLEkey9182aeb27c4d"',
+        "password: MyEXAMPLEpass99",
+        "admin_password: notCHANGEMEreally123",
+        "api_token = xxPLACEHOLDERxx9182aeb27",
+    ],
+)
+def test_a_credential_containing_a_placeholder_word_is_still_a_credential(sample):
+    """The fix for xK9$Qm2Lpz must not be paid for with a new hole.
+
+    Switching _is_placeholder to fullmatch was right; widening the individual
+    alternatives to substrings to compensate was not. It dismissed any value
+    with EXAMPLE or PLACEHOLDER buried in it — which is what a credential
+    looks like when someone edits a template and leaves the word behind.
+    """
+    findings = scan_text("sample.txt", sample)
+    assert findings, f"scanner dismissed a credential as a placeholder: {sample!r}"
 
 
 def test_scanner_ignores_placeholders_and_public_data():

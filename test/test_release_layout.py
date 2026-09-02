@@ -388,3 +388,62 @@ def test_freezing_blocks_casual_writes_for_an_unprivileged_process(layout):
 
     with pytest.raises(PermissionError):
         (release / "compose.yaml").write_text("# edited\n", encoding="utf-8")
+
+
+# --- the record cannot point outside the directories it may name ----------
+
+
+def _write_raw_activation(layout: Layout, record: ActivationRecord, **overrides) -> None:
+    """Write an activation record straight to disk, bypassing the constructor.
+
+    This is what a compromised CORE could do: it writes /var/lib/rosy, and
+    activation.json is what the next boot obeys.
+    """
+    payload = {
+        "schema_version": record.schema_version,
+        "release_id": record.release_id,
+        "release_path": record.release_path,
+        "config_generation": record.config_generation,
+        "data_generation": record.data_generation,
+        "runtime_mode": record.runtime_mode,
+        "activated_at": record.activated_at,
+    }
+    payload.update(overrides)
+    layout.activation.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_a_release_path_outside_the_releases_directory_is_refused(layout, tmp_path):
+    record = _install_release(layout, "2026.09.01-001", "first")
+    elsewhere = tmp_path / "attacker-controlled"
+    elsewhere.mkdir()
+    _write_raw_activation(layout, record, release_path=str(elsewhere))
+
+    with pytest.raises(ActivationUnreadable, match="outside"):
+        read_activation(layout)
+
+
+@pytest.mark.parametrize(
+    "generation",
+    ["../../../../tmp/evil-config", "..", ".", "nested/path", "", "a\\b"],
+)
+def test_a_generation_id_that_is_not_one_directory_name_is_refused(layout, generation):
+    record = _install_release(layout, "2026.09.01-001", "first")
+    _write_raw_activation(layout, record, config_generation=generation)
+
+    with pytest.raises(ActivationUnreadable, match="single directory name"):
+        read_activation(layout)
+
+
+def test_a_traversing_data_generation_is_refused(layout):
+    record = _install_release(layout, "2026.09.01-001", "first")
+    _write_raw_activation(layout, record, data_generation="../../etc")
+
+    with pytest.raises(ActivationUnreadable, match="single directory name"):
+        read_activation(layout)
+
+
+def test_the_releases_directory_itself_is_an_acceptable_prefix(layout):
+    """Containment must not reject the legitimate case it exists to allow."""
+    record = _install_release(layout, "2026.09.01-001", "first")
+    write_activation(layout, record)
+    assert read_activation(layout).release_id == "2026.09.01-001"

@@ -154,6 +154,7 @@ Host Agent는 아래 명령만 안다. 임의 명령, 임의 경로, 임의 인�
 | `release.status` | — | viewer | 불필요 |
 | `release.install` | `release_id` (staging에 존재하는 것만) | administrator | 필요 |
 | `release.rollback` | — | administrator | 필요 |
+| `release.clear_hold` | — | administrator | 필요 |
 | `service.status` | `unit` (고정 목록 내에서만) | viewer | 불필요 |
 | `system.reboot` | — | administrator | 필요 |
 
@@ -166,6 +167,10 @@ Host Agent는 아래 명령만 안다. 임의 명령, 임의 경로, 임의 인�
 - 파일 경로를 받는 명령은 없다. 경로가 필요하면 Host Agent가 `Layout`에서 스스로
   구성한다.
 - 셸을 경유하지 않는다. `subprocess`에 인자 리스트로 직접 넘긴다.
+- 장비가 `RECOVERY HOLD`이면 `release.install`은 `RECOVERY_HELD`로 거부한다.
+  홀드 해제(`release.clear_hold`)는 별도의 의도적 행위다. 홀드를 통과해
+  설치하면 성공을 보고한 뒤 다음 부팅이 그것을 뒤집는다 — 현장에서 복구 중인
+  작업자에게 가장 나쁜 형태의 거짓말이다.
 
 ## 7. Host Agent가 갖지 않는 것
 

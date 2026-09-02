@@ -201,6 +201,49 @@ def test_provisioning_ap_is_separate_from_the_operating_relay_ap(srs, design):
 # --- downstream consistency ----------------------------------------------
 
 
+def test_net_002_and_003_are_stated_for_both_modes(srs):
+    """The acceptance criterion verbatim, and it was not being checked.
+
+    Reverting NET-002 from "두 모드 모두에서" to "릴레이 모드에서" passed every
+    assertion in this file, which is the criterion US-001 states outright.
+    """
+    section = _section(srs, "## 3.1 ")
+
+    net002 = section.split("### NET-002", 1)[1].split("### NET-003", 1)[0]
+    assert "두 모드 모두에서" in net002, "NET-002 must hold in both modes, not only the relay"
+    assert SITE_STA in net002 and RELAY in net002
+
+    net003 = section.split("### NET-003", 1)[1].split("### NET-004", 1)[0]
+    assert SITE_STA in net003 and RELAY in net003, (
+        "NET-003 must say where local control holds in each mode; they fail differently"
+    )
+
+    net004 = section.split("### NET-004", 1)[1].split("### NET-005", 1)[0]
+    assert "릴레이 NAT" in net004 and "사업장 WLAN" in net004, (
+        "NET-004 must cover the NAT of both topologies"
+    )
+
+
+def test_the_srs_never_reasserts_the_superseded_default(srs):
+    """Adding the new decision does not help if the old one is re-added beside it.
+
+    Re-inserting D-19's claim — that the relay is the standard topology and on
+    by default — alongside the new text left every other assertion green.
+    """
+    section = _section(srs, "## 3.1 ")
+    for claim in (
+        "표준 배포 시나리오",
+        "기본으로 활성화",
+        "항상 자체 AP",
+        "릴레이를 기본",
+        "상시 AP",
+    ):
+        assert claim not in section, f"the SRS reasserts the superseded contract: {claim!r}"
+
+    # The default is stated exactly once, and it is SITE_STA.
+    assert section.count("기본값은 `SITE_STA`") == 1
+
+
 def test_srs_net_requirements_cover_both_modes(srs):
     section = _section(srs, "## 3.1 ").split("### IDN-003", 1)[0]
     for req in ("NET-001", "NET-002", "NET-003", "NET-004", "NET-005"):

@@ -24,6 +24,7 @@ from layout import (
     resolve_activation,
 )
 from updater import (
+    RecoveryHeld,
     Updater,
     UpdateState,
     prunable_image_digests,
@@ -665,3 +666,89 @@ def test_a_manifest_without_containers_prunes_nothing():
         manifests_by_release={NEW: {"release_id": NEW}},
     )
     assert prunable == set()
+
+
+# --- a held device refuses to be updated ----------------------------------
+
+
+def _hold(layout: Layout, runtime: FakeRuntime) -> Updater:
+    """Drive the device into RECOVERY HOLD and return a fresh updater."""
+    first = _install(layout, OLD, "old")
+    runtime.unhealthy = {OLD}
+    updater = _updater(layout, runtime)
+    assert updater.activate(first, health_timeout_s=10).state is UpdateState.RECOVERY_HOLD
+    return updater
+
+
+def test_a_held_device_refuses_to_activate(layout, runtime):
+    """Succeeding here would be a lie the next boot contradicts.
+
+    The hold is what recover() reads, so activating through it reported
+    ok=True and then came back disabled — an operator recovering a robot in
+    the field would be told it worked.
+    """
+    updater = _hold(layout, runtime)
+    good = _install(layout, NEW, "new")
+
+    with pytest.raises(RecoveryHeld, match="held for recovery"):
+        updater.activate(good)
+
+
+def test_the_refusal_names_the_way_out(layout, runtime):
+    updater = _hold(layout, runtime)
+    with pytest.raises(RecoveryHeld, match="clear the hold"):
+        updater.activate(_install(layout, NEW, "new"))
+
+
+def test_clearing_the_hold_allows_the_recovery_install(layout, runtime):
+    """One deliberate act, then the ordinary path works."""
+    updater = _hold(layout, runtime)
+    good = _install(layout, NEW, "new")
+
+    updater.clear_recovery_hold()
+    healthy = FakeRuntime(layout)
+    outcome = _updater(layout, healthy).activate(good)
+
+    assert outcome.state is UpdateState.ACTIVATED_CORE_ONLY
+    assert read_activation(layout).release_id == NEW
+
+    # And the next boot agrees with what the operator was told.
+    rebooted = FakeRuntime(layout)
+    after = _updater(layout, rebooted).recover()
+    assert after.state is UpdateState.ACTIVATED_CORE_ONLY
+    assert after.ok
+
+
+def test_a_device_with_nothing_to_boot_leaves_a_marker(layout, runtime):
+    """Every hold is inspectable in /var/lib/rosy, not only derived."""
+    updater = _hold(layout, runtime)
+    updater.clear_recovery_hold()
+
+    outcome = _updater(layout, FakeRuntime(layout)).recover()
+
+    assert outcome.state is UpdateState.RECOVERY_HOLD
+    assert layout.recovery_hold.is_file(), "the hold must be persisted, not just returned"
+
+
+# --- activation freezes what rollback will need ---------------------------
+
+
+def test_activation_freezes_the_release_and_its_generations(layout, runtime, installed):
+    """Rollback rests on the previous set still being what was activated."""
+    import os
+    import stat as stat_module
+
+    if os.name != "posix":
+        pytest.skip("POSIX permission bits; the device and CI are Linux")
+
+    _old, new = installed
+    _updater(layout, runtime).activate(new)
+
+    write_bits = stat_module.S_IWUSR | stat_module.S_IWGRP | stat_module.S_IWOTH
+    for root in (
+        layout.release(NEW),
+        layout.config_generation(NEW),
+        layout.data_generation(NEW),
+    ):
+        for entry in [root, *root.rglob("*")]:
+            assert not entry.stat().st_mode & write_bits, f"still writable after activation: {entry}"

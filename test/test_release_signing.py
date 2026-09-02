@@ -366,3 +366,64 @@ def test_a_missing_verifier_raises_rather_than_rejecting(monkeypatch, release, k
 
     with pytest.raises(SigningToolMissing):
         verify_signature(b"anything", well_formed, public)
+
+
+# --- every rejection code this module can emit is exercised ---------------
+
+
+def test_every_signing_rejection_code_is_asserted_somewhere():
+    """The guardrail that caught the manifest gaps, applied to its sibling.
+
+    Three hardenings shipped here with no assertions at all — the codes
+    existed, the branches were unreachable from the suite, and the file could
+    have been reverted wholesale without a single test noticing.
+    """
+    import re as _re
+
+    source = (ROOT / "deploy" / "release" / "signing.py").read_text(encoding="utf-8")
+    emitted = set(_re.findall(r'Rejection\(\s*\n?\s*"([A-Z0-9_]+)"', source))
+    assert emitted, "no rejection codes found; the pattern needs updating"
+
+    tests = Path(__file__).read_text(encoding="utf-8")
+    unasserted = sorted(code for code in emitted if code not in tests)
+    assert not unasserted, f"rejection codes with no test: {unasserted}"
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/etc/systemd/system/evil.service", "../../etc/shadow", "images/../../../root/.ssh/id_ed25519"],
+)
+def test_a_checksum_list_path_that_leaves_the_release_is_rejected(path):
+    """The manifest refuses these; the checksum list must apply the same rule.
+
+    verify_checksums joins these onto the release root, so an unchecked path
+    hashes a file outside it.
+    """
+    sums = (f"{'a' * 64}  {path}\n").encode()
+    _, rejections = parse_sha256sums(sums)
+    assert any(r.code == "SHA256SUMS_PATH_UNSAFE" for r in rejections)
+
+
+def test_a_symlink_in_a_release_is_rejected(release, keys):
+    """is_file() follows symlinks, so a dangling one vanished from the check."""
+    import os
+
+    if os.name != "posix":
+        pytest.skip("symlink creation needs privilege on Windows; CI is Linux")
+
+    private, public = keys
+    _sign_release(release, private)
+    os.symlink(release / "does-not-exist", release / "images" / "dangling")
+
+    rejections = verify_release_files(release, public)
+    assert [r.code for r in rejections] == ["CHECKSUM_SYMLINK"]
+
+
+def test_a_non_utf8_signature_file_is_rejected(release, keys):
+    """Not valid text is certainly not valid base64 — a rejection, not a crash."""
+    private, public = keys
+    _sign_release(release, private)
+    (release / SIGNATURE_FILENAME).write_bytes(b"\xff\xfe\x00binary")
+
+    rejections = verify_release_files(release, public)
+    assert [r.code for r in rejections] == ["SIGNATURE_MALFORMED"]

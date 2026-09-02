@@ -61,6 +61,10 @@ DEFAULT_HEALTH_TIMEOUT_S = 90.0
 HEALTH_POLL_INTERVAL_S = 1.0
 
 
+class RecoveryHeld(Exception):
+    """The device is in RECOVERY HOLD and refuses to activate anything."""
+
+
 class UpdateState(str, Enum):
     """States recorded in release-state.json and the journal."""
 
@@ -233,6 +237,18 @@ class Updater:
                 f"an activation must install {ACTIVATION_RUNTIME_MODE!r}, got {candidate.runtime_mode!r}"
             )
 
+        # A held device must not be updated as though nothing were wrong. The
+        # hold is what the next boot reads, so activating through it reports
+        # success and then comes back disabled — the worst of both designs.
+        # Clearing the hold is a deliberate act; requiring it here is what
+        # makes it one.
+        hold = self.read_recovery_hold()
+        if hold is not None:
+            raise RecoveryHeld(
+                f"device is held for recovery ({hold.get('detail', 'no detail')}); "
+                "clear the hold deliberately before installing a release"
+            )
+
         old = self._current_activation()
 
         # Freeze before the record moves. Immutability is what rollback rests
@@ -352,12 +368,21 @@ class Updater:
         """
         current = self._current_activation()
         if current is None:
-            self._disable_runtime()
-            return Outcome(
-                UpdateState.RECOVERY_HOLD,
-                release_id,
-                "no usable activation record; the device has nothing to boot",
+            detail = "no usable activation record; the device has nothing to boot"
+            # Persist it like any other hold, so an operator inspecting
+            # /var/lib/rosy sees a marker rather than having to infer the state.
+            write_json_atomic(
+                self.layout.recovery_hold,
+                {
+                    "schema_version": JOURNAL_SCHEMA_VERSION,
+                    "release_id": release_id,
+                    "detail": detail,
+                    "at": _now(),
+                },
             )
+            self._disable_runtime()
+            self.record_state(UpdateState.RECOVERY_HOLD, release_id, detail)
+            return Outcome(UpdateState.RECOVERY_HOLD, release_id, detail)
         return Outcome(UpdateState.ACTIVATED_CORE_ONLY, current.release_id, detail)
 
     def _previous_record(self, journal: Journal) -> ActivationRecord:
@@ -373,6 +398,11 @@ class Updater:
         try:
             restored = ActivationRecord(**journal.old_activation)
         except TypeError as exc:
+            # Propagates out of recover() without writing a hold marker. That
+            # is deliberate: rosy-release-recover.service is a Requires= of
+            # rosy-runtime.service, so a non-zero exit already keeps the
+            # runtime down. Writing a marker from a path we cannot interpret
+            # would claim more understanding than we have.
             raise ActivationUnreadable(
                 f"journal holds an activation record this build cannot read: {exc}"
             ) from exc

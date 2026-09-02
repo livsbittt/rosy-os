@@ -44,11 +44,7 @@ _PLACEHOLDER = re.compile(
     <[^>]*>                       # <your-password>
     | \$\{[^}]*\}                 # ${ROSY_WIFI_PSK}
     | \$[A-Z_][A-Z0-9_]*          # $ROSY_WIFI_PSK
-    | [A-Za-z0-9_.\-]*CHANGE_?ME[A-Za-z0-9_.\-]*
-    | [A-Za-z0-9_.\-]*REPLACE_?ME[A-Za-z0-9_.\-]*
-    | YOUR_[A-Z0-9_]+
-    | [A-Za-z0-9_.\-]*EXAMPLE[A-Za-z0-9_.\-]*
-    | [A-Za-z0-9_.\-]*PLACEHOLDER[A-Za-z0-9_.\-]*
+    | CHANGE_?ME | REPLACE_?ME | YOUR_[A-Z0-9_]+ | EXAMPLE | PLACEHOLDER
     | TODO | FIXME | None | null | true | false
     | \s*
     | [x*.\-_]+                   # xxxxxxxx / ******** / --------
@@ -114,8 +110,13 @@ _TYPE_EXPRESSION = re.compile(
 # secret, and a test file is exactly where one gets pasted "temporarily".
 DEFAULT_EXCLUDED_NAMES = frozenset({"secret_scan.py"})
 
-# Values that appear in tests as deliberate fixtures. Matched on the value,
-# not the file, so a real secret in a test file is still reported.
+#: Invented credential strings that appear in tests as deliberate fixtures.
+#:
+#: Applied only to files under FIXTURE_ROOT, and deliberately holding no PEM
+#: header: listing "-----BEGIN OPENSSH PRIVATE KEY-----" here disarmed the
+#: private-key matcher for the whole repository, which is the one artifact
+#: the design is most explicit about keeping out. Tests that need a header
+#: assemble it at runtime so no literal reaches the source.
 KNOWN_FIXTURES = frozenset({
     "hunter2swordfish",
     "SuperSecretSitePsk99",
@@ -125,11 +126,17 @@ KNOWN_FIXTURES = frozenset({
     "correct horse battery staple",
     "sk_live_9182aeb27c4d",
     "Tr0ub4dor3xyz",
+    "liveEXAMPLEkey9182aeb27c4d",
+    "MyEXAMPLEpass99",
+    "notCHANGEMEreally123",
+    "xxPLACEHOLDERxx9182aeb27",
+    # An invented base64 blob used as a key body in the planted fixture.
+    # Safe to excuse: it is a specific literal, not a matcher signal.
     "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW",
-    "-----BEGIN OPENSSH PRIVATE KEY-----",
-    "-----BEGIN RSA PRIVATE KEY-----",
-    "-----BEGIN EC PRIVATE KEY-----",
 })
+
+#: Fixture values are only excused here. Anywhere else they are secrets.
+FIXTURE_ROOT = "test/"
 
 DEFAULT_EXCLUDED_SUFFIXES = frozenset(
     {
@@ -147,7 +154,9 @@ def _is_placeholder(value: str) -> bool:
 
     ``search`` dismissed any value holding a ``$`` followed by uppercase, so
     a real password like ``xK9$Qm2Lpz`` read as a template variable and was
-    never reported.
+    never reported. The alternatives above stay unwidened for the same
+    reason: matching EXAMPLE as a substring dismissed
+    ``liveEXAMPLEkey9182aeb27c4d``, which is a credential with a word in it.
     """
     return bool(_PLACEHOLDER.fullmatch(value.strip()))
 
@@ -230,9 +239,10 @@ def scan_files(
             )
             continue
         relative = str(path.relative_to(root)).replace("\\", "/")
+        in_fixtures = relative.startswith(FIXTURE_ROOT)
         findings.extend(
             f for f in scan_text(relative, text)
-            if not any(fixture in f.excerpt for fixture in KNOWN_FIXTURES)
+            if not (in_fixtures and any(fixture in f.excerpt for fixture in KNOWN_FIXTURES))
         )
 
     return findings
