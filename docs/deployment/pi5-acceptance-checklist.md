@@ -41,8 +41,13 @@ WP-1(릴리스 계약)과 WP-2(불변 layout·updater)는 하드웨어 없이 �
 
 ## 2. WP-6 착수 전에 검증할 미확인 가정
 
-아래 셋은 설계가 전제하지만 **아직 아무도 확인하지 않았다.** 빌드 스크립트를
-쓰기 전에 버리는 이미지 한 장으로 먼저 확인하는 편이 싸다. 하나라도 어긋나면
+아래는 설계가 전제하지만 **아직 아무도 확인하지 않은 것**이며,
+`deploy/image/inputs.lock.yaml`에 `verified: false`로 기록되어 있다.
+`deploy/image/verify-inputs.sh`가 이 값들이 남아 있는 한 빌드를 거부한다 —
+고정되지 않은 입력으로 만든 이미지는 provenance를 진술할 수 없고, 그것이
+설계 §7.2가 요구하는 유일한 것이다.
+
+버리는 이미지 한 장으로 먼저 확인하는 편이 싸다. 하나라도 어긋나면
 manifest의 `target.os_suite`부터 바뀐다.
 
 - [ ] **`rpi-image-gen` v2.7.0이 실제로 필요한 일을 하는가.** 태그와 전체 commit
@@ -79,6 +84,32 @@ native ARM64 빌드 호스트에서:
 - [ ] UART overlay는 존재하되 motor service는 비활성인가
 - [ ] 기본 `ROSY_RUNTIME_MODE=core`인가
 - [ ] 이미지 압축 해제 후 checksum 재검증이 통과하는가
+
+### 3.1 자동화된 부분
+
+§3의 항목 중 상당수는 `deploy/image/verify-artifacts.sh`가 실행한다.
+
+```bash
+sudo losetup -Pf --show rosy-pi5-<release-id>.img   # 압축 해제 후
+sudo mount /dev/loopXp2 /mnt/rosy
+ROSY_IMAGE_MOUNT=/mnt/rosy ./deploy/image/verify-artifacts.sh dist/<release-id>
+```
+
+`ROSY_IMAGE_MOUNT` 없이 실행하면 **BUILD_GO를 보고하지 않고 실패한다.** 배포
+디렉터리만 검사하는 것은 §12.2가 요구하는 이미지 검사가 아니기 때문이다.
+
+`deploy/release/image_checks.py`가 검사하는 것 (전부 tmpdir 트리로 테스트되어
+있으며, 실기에서는 마운트된 실제 트리에 같은 코드가 돈다):
+
+- 필수 unit 존재와 **enable 여부** — 아무도 enable 하지 않은 unit을 넣는 것은
+  넣지 않은 것과 같다
+- `rosy-runtime.service`가 recovery gate를 `Requires=`로 의존하고 `After=`로
+  정렬하는지. **`Wants=`이면 홀드된 장비가 그냥 부팅한다**
+- release 공개키 존재, 개인키 부재 (확장자와 내용 양쪽)
+- 기본 `ROSY_RUNTIME_MODE=core`, UART overlay 존재하되 motor unit 비활성
+- **CORE 계정이 로그인 계정과 다른 uid인지** — Host Agent 계약 §3의 전제 조건
+- OCI archive 존재 (첫 부팅에 인터넷이 필요하면 안 된다)
+- 이미지 트리 전체 secret 스캔
 
 **통과하면 `BUILD_GO`. 이것으로 `BOOT_GO`를 대신하지 않는다.**
 

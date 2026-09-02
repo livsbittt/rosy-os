@@ -1,0 +1,370 @@
+"""Contracts for the image pipeline's inputs and scripts (WP-6).
+
+No image has been built. What can be checked without hardware is that the
+pipeline refuses to run on assumptions nobody verified, that it refuses to
+call an unbuilt image a release, and that the lock file names every input
+design section 7.2 requires.
+
+The point of the lock file is provenance: the same inputs must produce a
+release you can describe. An entry left `null` or `verified: false` is an
+input that is not pinned, and building on it produces an image whose
+provenance cannot be stated — which is the one thing 7.2 asks for.
+"""
+
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+
+import pytest
+import yaml
+
+ROOT = Path(__file__).resolve().parents[1]
+IMAGE_DIR = ROOT / "deploy" / "image"
+LOCK = IMAGE_DIR / "inputs.lock.yaml"
+SCRIPTS = ("build-image.sh", "verify-inputs.sh", "verify-artifacts.sh")
+
+bash_only = pytest.mark.skipif(
+    subprocess.run(["bash", "-c", "true"], capture_output=True, check=False).returncode != 0,
+    reason="bash is required to exercise the pipeline scripts",
+)
+
+
+def _bash(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
+    """Run bash from the directory holding the script, with relative names.
+
+    The bash on PATH here resolves neither a Windows drive path nor its MSYS
+    form, so an absolute argument exits 127 and every one of these tests
+    reports a script problem that is really a path problem. Relative names
+    from an explicit cwd work in Git Bash and on Linux alike.
+    """
+    return subprocess.run(
+        ["bash", *args],
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,  # the return code is the assertion
+    )
+
+
+@pytest.fixture(scope="module")
+def lock() -> dict:
+    return yaml.safe_load(LOCK.read_text(encoding="utf-8"))
+
+
+# --- the lock names every input section 7.2 requires -----------------------
+
+
+def test_the_lock_file_exists(lock):
+    assert lock["schema_version"] == 1
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ("image_tool", "tag"),
+        ("image_tool", "commit"),
+        ("os", "suite"),
+        ("os", "architecture"),
+        ("os", "apt_sources"),
+        ("container_runtime", "engine_version"),
+        ("container_runtime", "compose_plugin_version"),
+        ("ros", "base_image_digest"),
+        ("containers", "rosy_core_digest"),
+        ("containers", "rosy_io_digest"),
+        ("sources", "rosy_revision"),
+    ],
+)
+def test_every_pinned_input_has_a_slot(lock, path):
+    """Section 7.2's list, present even where the value is not yet known."""
+    node = lock
+    for key in path:
+        assert key in node, f"the lock file has no slot for {'.'.join(path)}"
+        node = node[key]
+
+
+def test_the_lock_records_the_core_account_precondition(lock):
+    """The Host Agent contract's precondition lives or dies in the image."""
+    accounts = lock["accounts"]
+
+    assert accounts["core_user"] == "rosy"
+    assert accounts["login_uid_must_differ"] is True
+    assert accounts["core_uid"] != 1000, "uid 1000 is the Pi's login account"
+
+
+def test_the_lock_preserves_build_provenance(lock):
+    """Package repositories move; the same source can produce a different image."""
+    provenance = lock["provenance"]
+
+    assert provenance["record_installed_packages"] is True
+    assert provenance["record_apt_repository_metadata"] is True
+
+
+def test_the_unverified_assumptions_are_marked_as_such(lock):
+    """These are exactly the ones the checklist says to settle first."""
+    for section in ("image_tool", "os", "container_runtime", "ros", "containers"):
+        assert "verified" in lock[section], f"{section} does not say whether it was verified"
+
+    unverified = [name for name in ("image_tool", "os", "container_runtime")
+                  if lock[name]["verified"] is False]
+    assert unverified, (
+        "every assumption is marked verified; if that is true, the acceptance "
+        "checklist section 2 should be updated to match"
+    )
+
+
+def test_the_risky_assumptions_explain_themselves(lock):
+    """A bare `verified: false` tells the next person nothing."""
+    for section in ("image_tool", "os", "container_runtime"):
+        if lock[section]["verified"] is False:
+            assert lock[section].get("note"), f"{section} is unverified with no explanation"
+
+
+# --- the scripts refuse to proceed on unpinned inputs ---------------------
+
+
+@bash_only
+def test_verify_inputs_refuses_while_anything_is_unpinned():
+    """The gate that stops a build producing an undescribable image."""
+    result = _bash(["verify-inputs.sh", "inputs.lock.yaml"], IMAGE_DIR)
+
+    assert result.returncode != 0, "the lock still has unpinned inputs; this must refuse"
+    assert "unverified assumptions" in result.stderr or "unpinned inputs" in result.stderr
+
+
+@bash_only
+def test_verify_inputs_accepts_a_fully_pinned_lock(tmp_path):
+    """And it must actually pass once the work is done, or it is just noise."""
+    import shutil
+
+    pinned = yaml.safe_load(LOCK.read_text(encoding="utf-8"))
+
+    def settle(node):
+        if isinstance(node, dict):
+            return {
+                key: (True if key == "verified" else "pinned" if value is None else settle(value))
+                for key, value in node.items()
+            }
+        return node
+
+    (tmp_path / "inputs.lock.yaml").write_text(yaml.safe_dump(settle(pinned)), encoding="utf-8")
+    shutil.copy(IMAGE_DIR / "verify-inputs.sh", tmp_path / "verify-inputs.sh")
+
+    result = _bash(["verify-inputs.sh", "inputs.lock.yaml"], tmp_path)
+
+    assert result.returncode == 0, result.stderr
+
+
+@bash_only
+def test_verify_inputs_ignores_its_own_explanatory_comments():
+    """The comments describe the markers; only settings may fail the gate."""
+    result = _bash(["verify-inputs.sh", "inputs.lock.yaml"], IMAGE_DIR)
+
+    reported = [line for line in result.stderr.splitlines() if ":" in line]
+    assert reported, "the gate reported nothing"
+    assert not any("#" in line for line in reported), (
+        "a comment line was reported as an unpinned input"
+    )
+
+
+@bash_only
+def test_the_build_script_does_not_pretend_to_have_built_anything(tmp_path):
+    """No image exists. The script must say so rather than produce a directory."""
+    result = _bash(
+        ["build-image.sh", "--release-id", "2026.09.01-001", "--dist", "./_unused"], IMAGE_DIR
+    )
+
+    assert result.returncode != 0
+    assert "not implemented" in result.stderr or "arm64" in result.stderr
+    assert not (IMAGE_DIR / "_unused").exists(), "a failed build must leave nothing behind"
+
+
+@bash_only
+def test_the_build_script_refuses_a_malformed_release_id():
+    result = _bash(["build-image.sh", "--release-id", "latest"], IMAGE_DIR)
+
+    assert result.returncode != 0
+    assert "YYYY.MM.DD-NNN" in result.stderr
+
+
+def test_the_build_script_refuses_a_non_arm64_host():
+    """Design 7.1: an x86 QEMU build is never the basis of a release image."""
+    script = (IMAGE_DIR / "build-image.sh").read_text(encoding="utf-8")
+
+    assert "aarch64" in script
+    assert "uname -m" in script
+
+
+def test_verify_artifacts_requires_the_image_tree_for_build_go():
+    """Checking the distribution directory alone is not BUILD_GO."""
+    script = (IMAGE_DIR / "verify-artifacts.sh").read_text(encoding="utf-8")
+
+    assert "ROSY_IMAGE_MOUNT" in script
+    tail = script.split("ROSY_IMAGE_MOUNT to the mounted root", 1)[1]
+    assert "exit 1" in tail, "a skipped image inspection must not report BUILD_GO"
+
+
+def test_verify_artifacts_checks_every_declared_artifact():
+    """Section 7.4's list."""
+    script = (IMAGE_DIR / "verify-artifacts.sh").read_text(encoding="utf-8")
+
+    for artifact in ("manifest.json", "SHA256SUMS", "SHA256SUMS.sig",
+                     "sbom.spdx.json", "release-notes.md", "img.xz", "bmap"):
+        assert artifact in script, f"verify-artifacts does not check {artifact}"
+
+
+# --- script hygiene, matching the rest of deploy/ -------------------------
+
+
+@pytest.mark.parametrize("name", SCRIPTS + ("../robot/release-recover.sh",))
+def test_scripts_are_lf_only(name):
+    """CRLF is unsafe in a Pi shell.
+
+    Compared as bytes rather than through an escaped string literal: the
+    first version of this asserted on a literal backslash-r, so it passed
+    against a CRLF file — which is the one failure a line-ending test exists
+    to catch.
+    """
+    path = IMAGE_DIR / name
+    assert bytes([13, 10]) not in path.read_bytes(), f"CRLF in {path.name}"
+
+
+@bash_only
+@pytest.mark.parametrize("name", SCRIPTS + ("../robot/release-recover.sh",))
+def test_scripts_parse(name):
+    result = _bash(["-n", name], IMAGE_DIR)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("name", SCRIPTS + ("../robot/release-recover.sh",))
+def test_scripts_fail_fast(name):
+    """set -euo pipefail, like the rest of the deployment kit."""
+    text = (IMAGE_DIR / name).read_text(encoding="utf-8")
+    assert "set -euo pipefail" in text
+
+
+# --- the recovery gate ships and is wired ---------------------------------
+
+
+def test_the_recovery_gate_unit_exists():
+    unit = (ROOT / "deploy" / "robot" / "rosy-release-recover.service").read_text(encoding="utf-8")
+
+    assert "Type=oneshot" in unit
+    assert "Before=rosy-runtime.service" in unit
+
+
+def test_the_runtime_requires_the_gate_rather_than_wanting_it():
+    """With Wants=, a device held for recovery boots anyway."""
+    unit = (ROOT / "deploy" / "robot" / "rosy-runtime.service").read_text(encoding="utf-8")
+
+    assert "Requires=rosy-release-recover.service" in unit
+    assert "After=rosy-release-recover.service" in unit
+    assert "Wants=rosy-release-recover.service" not in unit
+
+
+def test_the_gate_has_no_restart_or_swallowed_failure():
+    """Either would convert a hold into a boot."""
+    unit = (ROOT / "deploy" / "robot" / "rosy-release-recover.service").read_text(encoding="utf-8")
+    script = (ROOT / "deploy" / "robot" / "release-recover.sh").read_text(encoding="utf-8")
+
+    def directives(text: str) -> list[str]:
+        return [
+            line for line in text.splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+
+    assert not any(line.startswith("Restart=") for line in directives(unit))
+    assert not any("|| true" in line for line in directives(script))
+    assert "blocks_runtime" in script, "the gate must key on the hold, not on ok"
+
+
+# --- the recovery gate actually gates ------------------------------------
+
+
+def _bash_view(path: Path) -> str:
+    """The path as the local bash sees it.
+
+    The bash here is WSL, so the repository is /mnt/f/... and a Windows path
+    means nothing to it. Asking bash itself avoids guessing.
+    """
+    result = subprocess.run(
+        ["bash", "-c", "pwd"],
+        cwd=str(path), capture_output=True, text=True, encoding="utf-8",
+        errors="replace", check=False,
+    )
+    return result.stdout.strip()
+
+
+def _run_gate(tmp_path: Path) -> subprocess.CompletedProcess:
+    """Run the real gate script against a temporary layout.
+
+    Asserting that the source mentions blocks_runtime proved nothing: turning
+    its exit into 0 left every test green. This runs it.
+
+    The variables are assigned inside bash rather than passed through env=,
+    because WSL does not inherit arbitrary Windows environment variables and
+    the script would silently fall back to its production defaults.
+    """
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    tools = _bash_view(ROOT / "deploy" / "release")
+    layout = _bash_view(tmp_path)
+
+    return subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                f'ROSY_RELEASE_TOOLS="{tools}" ROSY_LAYOUT_ROOT="{layout}" '
+                f"ROSY_PYTHON=python3 ./release-recover.sh"
+            ),
+        ],
+        cwd=str(ROOT / "deploy" / "robot"),
+        capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
+    )
+
+
+@bash_only
+def test_the_gate_lets_a_fresh_device_boot(tmp_path):
+    """A device out of the box has nothing to recover and must not be held."""
+    result = _run_gate(tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert "NOT_INSTALLED" in result.stdout
+
+
+@bash_only
+def test_the_gate_blocks_a_held_device(tmp_path):
+    """The whole point: a recovery hold must stop the runtime from starting."""
+    import json
+
+    layout_var = tmp_path / "var" / "lib" / "rosy"
+    layout_var.mkdir(parents=True)
+    (layout_var / "recovery-hold.json").write_text(
+        json.dumps({"schema_version": 1, "release_id": "2026.09.05-002",
+                    "detail": "the previous release also failed its health check"}),
+        encoding="utf-8",
+    )
+
+    result = _run_gate(tmp_path)
+
+    assert result.returncode != 0, "a held device must not be allowed to boot its runtime"
+    assert "RECOVERY_HOLD" in result.stdout
+
+
+@bash_only
+def test_the_gate_reports_why_it_held(tmp_path):
+    import json
+
+    layout_var = tmp_path / "var" / "lib" / "rosy"
+    layout_var.mkdir(parents=True)
+    (layout_var / "recovery-hold.json").write_text(
+        json.dumps({"schema_version": 1, "release_id": None,
+                    "detail": "no usable activation record"}),
+        encoding="utf-8",
+    )
+
+    result = _run_gate(tmp_path)
+
+    assert "no usable activation record" in result.stdout

@@ -1,0 +1,21 @@
+[Unit]
+Description=ROSY release recovery gate (runs before the runtime on every boot)
+Documentation=file:///opt/rosy/docs/deployment/release-retention.md
+# Nothing about the release layout depends on the network, and this must
+# finish before anything reads an activation record.
+DefaultDependencies=no
+After=local-fs.target
+Requires=local-fs.target
+Before=rosy-runtime.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/rosy/deploy/robot/release-recover.sh
+# A non-zero exit is the gate doing its job: rosy-runtime.service requires
+# this unit, so a device held for recovery does not start its runtime. Do not
+# add a Restart= or a `|| true` here — either would open the gate.
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

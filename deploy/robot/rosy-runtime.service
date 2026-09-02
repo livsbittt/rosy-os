@@ -3,6 +3,12 @@ Description=ROSY Raspberry Pi robot runtime
 Wants=network-online.target
 After=network-online.target docker.service
 Requires=docker.service
+# The recovery gate finishes an interrupted update, and holds the device when
+# it cannot. Requires= (not Wants=) so a hold actually stops the runtime: with
+# Wants=, a held device would boot its runtime anyway and the hold would be
+# advisory. After= so this never starts while the gate is still deciding.
+Requires=rosy-release-recover.service
+After=rosy-release-recover.service
 
 [Service]
 Type=oneshot

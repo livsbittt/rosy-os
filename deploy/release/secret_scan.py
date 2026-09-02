@@ -105,6 +105,20 @@ _TYPE_EXPRESSION = re.compile(
     r"|str|int|bool|float|bytes|dict|list|set|tuple)\b",
 )
 
+# A reference to a value rather than the value itself: psk=self.setup_psk,
+# psk=request.psk, psk=generate_setup_psk(). Code that hands a secret around
+# is what the scanner protects, not what it is looking for.
+#
+# Narrow on purpose. A passphrase shaped exactly like a dotted identifier or
+# a no-argument call is vanishingly unlikely, and widening an exclusion is
+# how a matcher goes quiet without anyone noticing.
+_CODE_REFERENCE = re.compile(
+    r"^(?:"
+    r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+"
+    r"|[A-Za-z_][A-Za-z0-9_]*\(\)"
+    r")$"
+)
+
 # This module's own matchers would flag their own source. Nothing else is
 # exempt by name: excluding a file makes it the one safe place to hide a
 # secret, and a test file is exactly where one gets pasted "temporarily".
@@ -126,6 +140,7 @@ KNOWN_FIXTURES = frozenset({
     "correct horse battery staple",
     "sk_live_9182aeb27c4d",
     "Tr0ub4dor3xyz",
+    "site-passphrase-not-to-be-kept",
     "liveEXAMPLEkey9182aeb27c4d",
     "MyEXAMPLEpass99",
     "notCHANGEMEreally123",
@@ -178,14 +193,24 @@ def scan_text(path: str, text: str) -> list[Finding]:
             continue
 
         wpa = _WPA_PSK.match(line)
-        if wpa and not _is_placeholder(wpa.group("value")):
+        if (
+            wpa
+            and not _is_placeholder(wpa.group("value"))
+            # A wpa_supplicant.conf never says psk=self.setup_psk; source that
+            # passes a passphrase along must not read as one.
+            and not _CODE_REFERENCE.match(wpa.group("value").rstrip(","))
+        ):
             findings.append(Finding(path, number, "wifi-psk", stripped[:120]))
             continue
 
         matched_assignment = False
         for match in _ASSIGNMENT.finditer(line):
             value = match.group("quoted") or match.group("squoted") or match.group("value")
-            if _is_placeholder(value) or _TYPE_EXPRESSION.match(value):
+            if (
+                _is_placeholder(value)
+                or _TYPE_EXPRESSION.match(value)
+                or _CODE_REFERENCE.match(value)
+            ):
                 continue
             # A reference to another variable or a path is not a literal secret.
             if value.startswith(("/", "./", "~", "@")):
