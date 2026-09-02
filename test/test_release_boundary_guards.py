@@ -185,12 +185,15 @@ def test_the_writable_data_path_holds_the_authority_over_boot(core):
     for path in (layout.activation, layout.journal, layout.release_state):
         assert str(path).replace("\\", "/").startswith("/var/lib/rosy")
 
+    # Which paths are writable is enforced by
+    # test_core_writes_to_nothing_on_the_host_but_its_own_data; what this test
+    # adds is that the writable one contains the boot authority.
     writable = {
         _split_mount(mount)[0]
         for mount in core.get("volumes", [])
         if _split_mount(mount)[2] != "ro"
     }
-    assert writable == {"/var/lib/rosy"}
+    assert str(Layout.default().activation).replace("\\", "/").startswith(tuple(writable))
 
 
 def test_core_joins_no_extra_host_groups(core):

@@ -120,10 +120,22 @@ class Outcome:
 
     @property
     def ok(self) -> bool:
+        """Whether the device ended in a good activated state."""
         return self.state in {
             UpdateState.ACTIVATED_CORE_ONLY,
             UpdateState.ROLLED_BACK_CORE_ONLY,
         }
+
+    @property
+    def blocks_runtime(self) -> bool:
+        """Whether rosy-release-recover.service must refuse to let boot proceed.
+
+        Distinct from :attr:`ok`, and the distinction matters for exactly one
+        case: a factory-fresh device has nothing activated, so ``ok`` is
+        False, but nothing is wrong with it and the first-boot flow needs the
+        boot to continue. Only a hold actually blocks.
+        """
+        return self.state is UpdateState.RECOVERY_HOLD
 
 
 def _now() -> str:
@@ -365,8 +377,21 @@ class Updater:
         Clearing a journal is not the same as having a usable device. If the
         activation record is gone or unreadable, letting the runtime start
         would boot nothing at all, so that is a hold in its own right.
+
+        "Gone" and "never existed" are different, though, and conflating them
+        bricks a factory-fresh device: recover() runs before the runtime on
+        every boot, so an unprovisioned robot would hold itself on boot one
+        and then refuse its own first activation. release-state.json is the
+        discriminator — absent until activate() first records a state — so a
+        device with no history is simply not yet installed, not held.
         """
         current = self._current_activation()
+        if current is None and self.read_state() is None:
+            return Outcome(
+                UpdateState.RECEIVED,
+                None,
+                "no release installed yet; awaiting first activation",
+            )
         if current is None:
             detail = "no usable activation record; the device has nothing to boot"
             # Persist it like any other hold, so an operator inspecting

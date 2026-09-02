@@ -224,24 +224,39 @@ def test_net_002_and_003_are_stated_for_both_modes(srs):
     )
 
 
-def test_the_srs_never_reasserts_the_superseded_default(srs):
+def _default_claims(section: str) -> list[str]:
+    """Sentences in ``section`` that state which mode is the default.
+
+    A sentence qualifies when it says "기본" and names a mode. Counting these
+    is what a denylist of phrases cannot do: a paraphrase of the superseded
+    claim matches no listed string, but it is still a second sentence saying
+    a different mode is the default.
+    """
+    import re
+
+    sentences = re.split(r"(?<=[.!?다])\s+|\n\n", section)
+    return [
+        " ".join(s.split())
+        for s in sentences
+        if "기본" in s and (SITE_STA in s or RELAY in s or "릴레이" in s)
+    ]
+
+
+def test_the_srs_states_exactly_one_default_mode(srs):
     """Adding the new decision does not help if the old one is re-added beside it.
 
-    Re-inserting D-19's claim — that the relay is the standard topology and on
-    by default — alongside the new text left every other assertion green.
+    The previous version listed five superseded phrases and checked for their
+    absence. A denylist of literals cannot enforce the absence of a claim —
+    "릴레이(AP+STA)를 표준 토폴로지로 하며 기본으로 켠다" matches none of them
+    and contradicts D-26 just as squarely. Counting default-statements does.
     """
-    section = _section(srs, "## 3.1 ")
-    for claim in (
-        "표준 배포 시나리오",
-        "기본으로 활성화",
-        "항상 자체 AP",
-        "릴레이를 기본",
-        "상시 AP",
-    ):
-        assert claim not in section, f"the SRS reasserts the superseded contract: {claim!r}"
+    claims = _default_claims(_section(srs, "## 3.1 "))
 
-    # The default is stated exactly once, and it is SITE_STA.
-    assert section.count("기본값은 `SITE_STA`") == 1
+    assert claims, "the SRS must state which mode is the default"
+    for claim in claims:
+        assert SITE_STA in claim, (
+            f"a default is claimed for something other than SITE_STA: {claim!r}"
+        )
 
 
 def test_srs_net_requirements_cover_both_modes(srs):

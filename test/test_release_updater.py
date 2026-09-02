@@ -633,6 +633,28 @@ def test_rollback_keeps_the_state_trail(layout, runtime, installed):
 # --- the bound is real without an injected clock --------------------------
 
 
+def _bounded_sleep(limit: int = 2000):
+    """A sleep that gives up rather than letting the suite hang.
+
+    Any test that exercises the *default* clock has to bound itself. A no-op
+    sleep here meant a frozen clock spun forever and the suite hung — which
+    is detection of a sort, but a hang is a worse signal than a failure and
+    it masked the tests queued behind it.
+    """
+    import time as _time
+
+    calls = 0
+
+    def sleep(_seconds: float) -> None:
+        nonlocal calls
+        calls += 1
+        if calls > limit:
+            raise AssertionError(f"the health wait is not bounded; it looped {limit} times")
+        _time.sleep(0.002)  # real time, so the default clock actually advances
+
+    return sleep
+
+
 def test_the_health_bound_holds_with_the_default_clock(layout, installed):
     """A stub clock that never advances made the bounded wait infinite."""
     _old, new = installed
@@ -644,7 +666,7 @@ def test_the_health_bound_holds_with_the_default_clock(layout, installed):
         start_runtime=runtime.start,
         health_check=runtime.check,
         disable_runtime=runtime.disable,
-        sleep=lambda _seconds: None,
+        sleep=_bounded_sleep(),
     )
     outcome = updater.activate(new, health_timeout_s=0.05)
 
@@ -752,3 +774,115 @@ def test_activation_freezes_the_release_and_its_generations(layout, runtime, ins
     ):
         for entry in [root, *root.rglob("*")]:
             assert not entry.stat().st_mode & write_bits, f"still writable after activation: {entry}"
+
+
+# --- a device out of the box is not a device in trouble -------------------
+
+
+def test_a_factory_fresh_device_does_not_hold_itself(layout, runtime):
+    """recover() runs before the runtime on every boot, including the first.
+
+    Treating "no activation record" as a hold bricked an unprovisioned robot:
+    it held itself on boot one and then refused its own first activation. A
+    device with no history has nothing to recover, it just has nothing
+    installed.
+    """
+    outcome = _updater(layout, runtime).recover()
+
+    assert outcome.state is UpdateState.RECEIVED
+    assert not layout.recovery_hold.exists(), "a fresh device must not mark itself held"
+    assert runtime.disables == 0
+
+
+def test_a_factory_fresh_device_can_complete_its_first_activation(layout, runtime):
+    """The whole point: out of the box, provisioning works with no intervention."""
+    _updater(layout, runtime).recover()
+
+    first = _install(layout, OLD, "old")
+    outcome = _updater(layout, runtime).activate(first)
+
+    assert outcome.state is UpdateState.ACTIVATED_CORE_ONLY
+    assert read_activation(layout).release_id == OLD
+
+
+def test_a_device_that_lost_its_record_is_still_held(layout, runtime, installed):
+    """The case the hold exists for, kept separate from the fresh one."""
+    layout.activation.unlink()
+
+    outcome = _updater(layout, runtime).recover()
+
+    assert outcome.state is UpdateState.RECOVERY_HOLD
+    assert layout.recovery_hold.is_file()
+    assert runtime.disables >= 1
+
+
+def test_the_discriminator_is_release_state_not_guesswork(layout, runtime):
+    """Fresh and lost differ by exactly one file, and that is asserted."""
+    fresh = _updater(layout, runtime)
+    assert fresh.read_state() is None
+    assert fresh.recover().state is UpdateState.RECEIVED
+
+    fresh.record_state(UpdateState.RECEIVED, OLD)
+    assert fresh.read_state() is not None
+    assert _updater(layout, runtime).recover().state is UpdateState.RECOVERY_HOLD
+
+
+# --- the bounded wait fails rather than hanging ---------------------------
+
+
+def test_the_health_wait_cannot_loop_unboundedly(layout, installed):
+    """A frozen clock used to make this spin forever; the suite hung.
+
+    Asserting on the collaborator instead of the wall clock turns that into a
+    failure without reimplementing the timeout in the test.
+    """
+    _old, new = installed
+    runtime = FakeRuntime(layout, unhealthy={NEW})
+
+    updater = Updater(
+        layout,
+        stop_runtime=runtime.stop,
+        start_runtime=runtime.start,
+        health_check=runtime.check,
+        disable_runtime=runtime.disable,
+        sleep=_bounded_sleep(),
+    )
+    outcome = updater.activate(new, health_timeout_s=1.0)
+
+    assert outcome.state is UpdateState.ROLLED_BACK_CORE_ONLY
+
+
+# --- what the recover unit keys on ----------------------------------------
+
+
+def test_a_fresh_device_does_not_block_its_own_boot(layout, runtime):
+    """ok and blocks_runtime are not the same question.
+
+    A fresh device has nothing activated, so ok is False — but nothing is
+    wrong with it, and the first-boot flow needs the boot to proceed. Exiting
+    the recover unit on ok would have stopped a new robot from provisioning.
+    """
+    outcome = _updater(layout, runtime).recover()
+
+    assert not outcome.ok
+    assert not outcome.blocks_runtime
+
+
+def test_a_held_device_blocks_its_own_boot(layout, runtime, installed):
+    layout.activation.unlink()
+    outcome = _updater(layout, runtime).recover()
+
+    assert outcome.state is UpdateState.RECOVERY_HOLD
+    assert outcome.blocks_runtime
+
+
+def test_a_recovered_device_does_not_block_boot(layout, runtime, installed):
+    _old, new = installed
+    runtime.fail_on_start = True
+    with pytest.raises(PowerLoss):
+        _updater(layout, runtime).activate(new)
+
+    outcome = _updater(layout, FakeRuntime(layout)).recover()
+
+    assert outcome.state is UpdateState.ROLLED_BACK_CORE_ONLY
+    assert not outcome.blocks_runtime

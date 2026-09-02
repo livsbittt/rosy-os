@@ -86,6 +86,12 @@ native ARM64 빌드 호스트에서:
 
 - [ ] SD에 기록한다 (Raspberry Pi Imager Custom Image 또는 검증된 CLI + bmap)
 - [ ] **유선 랜을 연결하지 않은 채** 부팅한다
+- [ ] **한 번도 활성화된 적 없는 장비**가 스스로 RECOVERY HOLD에 들어가지 않는가.
+      `rosy-release-recover.service`는 모든 부팅에서 runtime보다 먼저 도는데,
+      "활성화 레코드 없음"을 홀드로 취급하면 박스에서 꺼낸 로봇이 첫 부팅에서
+      스스로 잠기고 자기 첫 설치마저 거부한다. `updater._settled`가
+      release-state.json 유무로 "아직 설치 안 됨"과 "레코드를 잃음"을 구분한다 —
+      실기에서 이것이 실제로 성립하는지 확인할 것
 - [ ] CORE가 기동하고 대시보드가 뜨는가
 - [ ] **인터넷 없이** 기동이 완료되는가 — OCI archive 로컬 import가 동작해야 한다
 - [ ] runtime mode가 `core`이고 `rosy-motor`/`rosy-io`가 시작되지 않았는가
