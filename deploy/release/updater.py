@@ -49,6 +49,7 @@ from layout import (
     write_activation,
     write_json_atomic,
 )
+from storage import check_update_headroom, reclaim
 
 JOURNAL_SCHEMA_VERSION = 1
 
@@ -192,6 +193,8 @@ class Updater:
         # than disabling the unit but never worse than nothing.
         self._disable_runtime = disable_runtime or stop_runtime
         self._sleep = sleep or time.sleep
+        #: What the last completed activation reclaimed, for the dashboard.
+        self.last_storage_report = None
         # A real monotonic clock by default: a stub that always returns the
         # same value turns the bounded wait into an infinite loop.
         self._clock = clock or time.monotonic
@@ -282,6 +285,14 @@ class Updater:
 
     # --- activation -------------------------------------------------------
 
+    def check_headroom(self, bundle_bytes: int) -> list:
+        """Whether an update of this size may start at all.
+
+        Called before a bundle is unpacked. Refusing here costs nothing;
+        refusing halfway through leaves a partial staging tree behind.
+        """
+        return check_update_headroom(bundle_bytes, staging=self.layout.staging)
+
     def activate(
         self,
         candidate: ActivationRecord,
@@ -343,6 +354,9 @@ class Updater:
             self._write_journal(journal)
             self.record_state(UpdateState.ACTIVATED_CORE_ONLY, candidate.release_id)
             self._clear_journal()
+            # Only now. Reclaiming before this point can delete the tree a
+            # rollback is about to need.
+            self._reclaim(keep_staged=())
             return Outcome(
                 UpdateState.ACTIVATED_CORE_ONLY,
                 candidate.release_id,
@@ -353,6 +367,23 @@ class Updater:
             journal,
             detail=f"candidate CORE did not become healthy within {health_timeout_s:g}s",
         )
+
+    def _reclaim(self, *, keep_staged) -> None:
+        """Free what is safe to free, and never fail an activation for it.
+
+        Cleanup runs after the device is already in a good state, so a problem
+        here is a disk-space problem, not an update problem. Letting it raise
+        would turn a completed activation into a reported failure.
+        """
+        try:
+            self.last_storage_report = reclaim(self.layout, keep_staged=keep_staged)
+        except OSError as exc:  # pragma: no cover - defensive
+            self.last_storage_report = None
+            self.record_state(
+                UpdateState.ACTIVATED_CORE_ONLY,
+                None,
+                f"activation succeeded; storage reclamation failed: {exc}",
+            )
 
     def _freeze(self, record: ActivationRecord) -> None:
         """Drop write permission across the release and its generations."""
