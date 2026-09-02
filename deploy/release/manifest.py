@@ -118,6 +118,12 @@ def _validate_files(files: Any, out: list[Rejection]) -> None:
             if key not in entry:
                 out.append(Rejection("MANIFEST_FIELD_MISSING", f"{field}.{key}", "required"))
 
+        extra = sorted(set(entry) - FILE_ENTRY_KEYS)
+        if extra:
+            out.append(
+                Rejection("MANIFEST_FIELD_UNKNOWN", field, f"unrecognised fields {extra}")
+            )
+
         path = entry.get("path")
         if isinstance(path, str):
             _validate_payload_path(path, f"{field}.path", out)
@@ -260,6 +266,77 @@ def _validate_containers(containers: Any, out: list[Rejection]) -> None:
             )
 
 
+#: Fields whose contract genuinely allows null.
+NULLABLE_FIELDS = frozenset({"runtime.minimum_bootloader"})
+
+
+def _reject_nulls(value: object, out: list[Rejection], prefix: str = "") -> None:
+    """Report every explicit null, at any depth, except where one is allowed."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            field = f"{prefix}.{key}" if prefix else key
+            if item is None:
+                if field not in NULLABLE_FIELDS:
+                    out.append(
+                        Rejection(
+                            "MANIFEST_FIELD_NULL",
+                            field,
+                            "explicitly null; omit the field or give it a value, "
+                            "but do not declare it empty",
+                        )
+                    )
+                continue
+            _reject_nulls(item, out, field)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            field = f"{prefix}[{index}]"
+            if item is None:
+                out.append(Rejection("MANIFEST_FIELD_NULL", field, "explicitly null"))
+                continue
+            _reject_nulls(item, out, field)
+
+
+def _reject_unknown_keys(value: object, allowed: dict, out: list[Rejection], prefix: str) -> None:
+    """Refuse keys the contract does not define, at every level.
+
+    manifest.schema.json sets additionalProperties: false throughout, so the
+    implementation has to agree — an unrecognised key is a manifest written
+    against a contract this build does not implement.
+    """
+    if not isinstance(value, dict):
+        return
+    unknown = sorted(set(value) - set(allowed))
+    if unknown:
+        out.append(
+            Rejection(
+                "MANIFEST_FIELD_UNKNOWN",
+                prefix or "<root>",
+                f"unrecognised fields {unknown}; refusing rather than ignoring them",
+            )
+        )
+    for key, nested in allowed.items():
+        if nested and key in value:
+            _reject_unknown_keys(value[key], nested, out, f"{prefix}.{key}" if prefix else key)
+
+
+#: The full key shape, mirroring manifest.schema.json.
+ALLOWED_KEYS: dict = {
+    "schema_version": None,
+    "release_id": None,
+    "git_revision": None,
+    "created_at": None,
+    "target": {"board": None, "architecture": None, "os_family": None, "os_suite": None},
+    "runtime": {"config_schema": None, "data_schema": None, "minimum_bootloader": None},
+    "containers": {"rosy_core": None, "rosy_io": None},
+    "defaults": {"runtime_mode": None},
+    "signing_key_id": None,
+    "requires_recommissioning": None,
+    "files": None,
+}
+
+FILE_ENTRY_KEYS = frozenset({"path", "sha256"})
+
+
 def validate_manifest(
     data: Any,
     *,
@@ -299,15 +376,13 @@ def validate_manifest(
         if field not in data:
             out.append(Rejection("MANIFEST_FIELD_MISSING", field, "required"))
 
-    unknown = sorted(set(data) - set(REQUIRED_FIELDS))
-    if unknown:
-        out.append(
-            Rejection(
-                "MANIFEST_FIELD_UNKNOWN",
-                "<root>",
-                f"unrecognised fields {unknown}; refusing rather than ignoring them",
-            )
-        )
+    # null is neither absence nor a value, and every check below is written
+    # as "if x is not None". Left alone, a single null walks straight past the
+    # board check, the payload-path check and the core-only default. Reject it
+    # here so no downstream guard has to remember.
+    _reject_nulls(data, out)
+
+    _reject_unknown_keys(data, ALLOWED_KEYS, out, "")
 
     release_id = data.get("release_id")
     if isinstance(release_id, str) and not _RELEASE_ID.match(release_id):

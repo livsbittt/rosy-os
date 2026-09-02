@@ -300,6 +300,90 @@ def test_malformed_payload_checksum_is_rejected(digest):
     assert "MANIFEST_FILE_SHA256_INVALID" in _codes(_manifest(files=files))
 
 
+def test_payload_path_with_a_nul_byte_is_rejected():
+    """The one rejection code no test named.
+
+    A NUL truncates a path at the C boundary, so what Python validates and
+    what the kernel opens can differ. The traversal check fires first when a
+    path also contains "..", so this one's only problem is the NUL.
+    """
+    files = [{"path": "images/rosy-core.oci.tar" + chr(0) + "extra", "sha256": FILE_SHA}]
+    assert "MANIFEST_FILE_PATH_INVALID" in _codes(_manifest(files=files))
+
+
+# --- null is neither absence nor a value ----------------------------------
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["release_id", "git_revision", "created_at", "target", "runtime",
+     "containers", "defaults", "signing_key_id", "requires_recommissioning", "files"],
+)
+def test_an_explicitly_null_field_is_rejected(field):
+    """Guards written "if x is not None" all had the same hole.
+
+    A single null slipped between them and the "field not in data" check,
+    defeating the board check, the payload-path check and the core-only
+    default at once.
+    """
+    assert "MANIFEST_FIELD_NULL" in _codes(_manifest(**{field: None}))
+
+
+@pytest.mark.parametrize(
+    "parent,key",
+    [
+        ("target", "board"),
+        ("target", "architecture"),
+        ("runtime", "config_schema"),
+        ("containers", "rosy_core"),
+        ("defaults", "runtime_mode"),
+    ],
+)
+def test_a_nested_null_is_rejected(parent, key):
+    data = _manifest()
+    data[parent][key] = None
+    assert "MANIFEST_FIELD_NULL" in _codes(data)
+
+
+def test_a_null_inside_a_file_entry_is_rejected():
+    files = [{"path": None, "sha256": None}]
+    assert "MANIFEST_FIELD_NULL" in _codes(_manifest(files=files))
+
+
+def test_minimum_bootloader_is_the_one_field_that_may_be_null():
+    """Its contract is "a version string or nothing"."""
+    assert validate_manifest(_manifest()) == []
+    assert _manifest()["runtime"]["minimum_bootloader"] is None
+
+
+@pytest.mark.parametrize(
+    "parent,key",
+    [("target", "board_revision"), ("runtime", "extra"), ("defaults", "allow_hardware")],
+)
+def test_a_nested_unknown_key_is_rejected(parent, key):
+    """The schema sets additionalProperties: false at every level."""
+    data = _manifest()
+    data[parent][key] = "surprise"
+    assert "MANIFEST_FIELD_UNKNOWN" in _codes(data)
+
+
+def test_an_unknown_key_in_a_file_entry_is_rejected():
+    files = [{"path": "images/a.tar", "sha256": FILE_SHA, "mode": "0777"}]
+    assert "MANIFEST_FIELD_UNKNOWN" in _codes(_manifest(files=files))
+
+
+def test_every_rejection_code_the_validator_can_emit_is_asserted_somewhere():
+    """A code no test names is a rejection path no test exercises."""
+    import re as _re
+
+    source = (ROOT / "deploy" / "release" / "manifest.py").read_text(encoding="utf-8")
+    emitted = set(_re.findall(r'Rejection\(\s*"(MANIFEST_[A-Z_]+)"', source))
+
+    tests = Path(__file__).read_text(encoding="utf-8")
+    unasserted = sorted(code for code in emitted if code not in tests)
+    assert not unasserted, f"rejection codes with no test: {unasserted}"
+
+
 def test_empty_file_list_is_rejected():
     assert "MANIFEST_FILES_EMPTY" in _codes(_manifest(files=[]))
 
