@@ -551,3 +551,118 @@ class TestShutdownSentinel:
         feed(monitor, clock, 6.40, 1, step_s=60.0)
         assert monitor.shutdown_armed is True            # 판정은 그대로 살아 있다
         assert list(tmp_path.iterdir()) == []
+
+
+# --- 설정 배선 ----------------------------------------------------------------
+
+def _shipped_config(name="config/rosy_default.yaml"):
+    import pathlib
+    import yaml
+    root = pathlib.Path(__file__).resolve().parents[1]
+    return yaml.safe_load((root / name).read_text(encoding="utf-8"))
+
+
+def _pi5_config():
+    import pathlib
+    import yaml
+    root = pathlib.Path(__file__).resolve().parents[3]
+    path = root / "deploy/robot/config/rosy.pi5.example.yaml"
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+class TestShippedConfiguration:
+    def test_default_config_declares_a_2s_span(self):
+        """3S 상수(12.6/10.0)가 남아 있으면 실기 percent가 0으로 고정된다."""
+        safety = _shipped_config()["safety"]
+        assert safety["battery_full_voltage"] == pytest.approx(8.4)
+        assert safety["battery_empty_voltage"] == pytest.approx(6.4)
+
+    def test_pi5_example_declares_a_2s_span(self):
+        """Pi에 실제로 배포되는 파일 — 여기가 틀리면 기본값 정정이 무의미하다."""
+        safety = _pi5_config()["safety"]
+        assert safety["battery_full_voltage"] == pytest.approx(8.4)
+        assert safety["battery_empty_voltage"] == pytest.approx(6.4)
+
+    def test_default_config_ships_the_2s_curve(self):
+        from rosy_core.services import _battery_config
+        cfg = _battery_config(_shipped_config()["safety"], data_path=None)
+        assert cfg.curve.points[0] == (8.40, 100.0)
+        assert cfg.curve.points[-1] == (6.40, 0.0)
+
+    def test_the_regression_is_closed_against_the_shipped_defaults(self):
+        """7.4V(2S 공칭)가 0%로 클램프되던 것이 이 작업의 출발점이다."""
+        from rosy_core.services import _battery_config
+        cfg = _battery_config(_shipped_config()["safety"], data_path=None)
+        percent = cfg.curve.percent(7.40)
+        assert percent > 0.0
+        assert 10.0 < percent < 30.0
+
+    def test_a_full_2s_pack_reads_full(self):
+        from rosy_core.services import _battery_config
+        cfg = _battery_config(_shipped_config()["safety"], data_path=None)
+        assert cfg.curve.percent(8.40) == pytest.approx(100.0)
+
+
+class TestBatteryConfigParsing:
+    def test_missing_keys_keep_defaults(self):
+        from rosy_core.services import _battery_config
+        cfg = _battery_config({}, data_path=None)
+        assert cfg.warning_percent == 20.0
+        assert cfg.critical_percent == 10.0
+        assert cfg.deep_percent == 5.0
+        assert cfg.filter_tau_s > 0.0
+
+    def test_a_configured_curve_wins_over_the_span(self):
+        from rosy_core.services import _battery_config
+        cfg = _battery_config({
+            "battery_full_voltage": 12.6,
+            "battery_empty_voltage": 10.0,
+            "battery_curve": [[12.6, 100], [11.1, 50], [10.0, 0]],
+        }, data_path=None)
+        assert cfg.curve.percent(11.1) == pytest.approx(50.0)
+
+    def test_no_curve_falls_back_to_the_span(self):
+        from rosy_core.services import _battery_config
+        cfg = _battery_config({
+            "battery_full_voltage": 12.6, "battery_empty_voltage": 10.0,
+        }, data_path=None)
+        assert cfg.curve.percent(11.3) == pytest.approx(50.0)
+
+    def test_thresholds_and_dwell_come_from_config(self):
+        from rosy_core.services import _battery_config
+        cfg = _battery_config({
+            "battery_warning_percent": 25,
+            "battery_critical_percent": 12,
+            "battery_deep_percent": 6,
+            "battery_deep_dwell_s": 30,
+            "battery_shutdown_grace_s": 90,
+            "battery_filter_tau_s": 2.5,
+            "battery_enter_samples": 4,
+            "battery_exit_samples": 7,
+            "battery_hysteresis_percent": 5,
+        }, data_path=None)
+        assert (cfg.warning_percent, cfg.critical_percent, cfg.deep_percent) == (25.0, 12.0, 6.0)
+        assert cfg.deep_dwell_s == 30.0
+        assert cfg.shutdown_grace_s == 90.0
+        assert cfg.filter_tau_s == 2.5
+        assert (cfg.enter_samples, cfg.exit_samples) == (4, 7)
+        assert cfg.hysteresis_percent == 5.0
+
+    def test_sentinel_path_is_none_without_a_data_path(self):
+        """데이터 경로가 없으면 호스트를 끌 수단도 없다 — 조용히 비활성이다."""
+        from rosy_core.services import _battery_config
+        assert _battery_config({}, data_path=None).sentinel_path is None
+
+    def test_sentinel_path_sits_in_the_data_directory(self, tmp_path):
+        from rosy_core.services import _battery_config
+        cfg = _battery_config({}, data_path=tmp_path)
+        assert cfg.sentinel_path == tmp_path / "battery-shutdown-request.json"
+
+    def test_a_broken_curve_falls_back_rather_than_refusing_to_boot(self):
+        """설정 오타로 로봇이 안 뜨는 것보다 스팬으로 도는 편이 낫다."""
+        from rosy_core.services import _battery_config
+        cfg = _battery_config({
+            "battery_full_voltage": 8.4, "battery_empty_voltage": 6.4,
+            "battery_curve": [[8.4, 100]],          # 점이 하나뿐 — 무효
+        }, data_path=None)
+        assert cfg.curve.percent(7.4) == pytest.approx(50.0)

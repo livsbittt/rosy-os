@@ -28,8 +28,28 @@ safety:
   battery_warning_percent: 20     # SAF-005
   battery_critical_percent: 10    # SAF-005
   battery_critical_policy: RETURN_HOME
-  battery_full_voltage: 12.6      # 전압→퍼센트 선형 변환 (HWA Profile 참조)
-  battery_empty_voltage: 10.0
+  battery_deep_percent: 5         # SAF-005 하위 신설 — 모터 정지 후 셧다운 (D-27)
+  battery_deep_dwell_s: 60        # DEEP을 이만큼 유지해야 셧다운이 무장된다 (s)
+  battery_shutdown_grace_s: 120   # 센티넬에 적어 호스트 유닛에 넘길 유예 (s)
+  battery_filter_tau_s: 5.0       # 전압 저역통과 시상수 — 모터 새그 제거
+  battery_enter_samples: 3        # 한 단계 내려가는 데 필요한 연속 표본
+  battery_exit_samples: 5         # 한 단계 올라오는 데 필요한 연속 표본
+  battery_hysteresis_percent: 3.0 # 복귀는 임계 + 이 마진을 넘어야 시작된다
+  battery_curve:                  # 2S Li-ion OCV (팩 전압, percent). 없으면 아래 스팬 사용
+    - [8.40, 100]
+    - [8.12, 90]
+    - [7.96, 80]
+    - [7.84, 70]
+    - [7.74, 60]
+    - [7.64, 50]
+    - [7.58, 40]
+    - [7.50, 30]
+    - [7.42, 20]
+    - [7.32, 10]
+    - [6.60, 5]
+    - [6.40, 0]
+  battery_full_voltage: 8.4      # 전압→퍼센트 선형 변환 (HWA Profile 참조)
+  battery_empty_voltage: 6.4
   fleet_loss_policy: STOP         # SAF-003
   stuck_timeout_s: 30             # NAV-006
   manual_linear: 0.15

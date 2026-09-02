@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -13,6 +14,11 @@ from rosy_core.command.manager import CommandManager
 from rosy_core.events.bus import EventBus
 from rosy_core.identity import RobotIdentity
 from rosy_core.navigation.manager import NavigationManager
+from rosy_core.power.battery import (
+    BatteryConfig,
+    BatteryCurve,
+    BatteryMonitor,
+)
 from rosy_core.power.manager import (
     LidarPolicy,
     PowerConfig,
@@ -24,6 +30,53 @@ from rosy_core.safety.manager import BatteryPolicy, SafetyManager, SpeedLimits
 from rosy_core.state.manager import StateManager
 from rosy_core.system.runtime import HostRuntimeProbe
 from rosy_core.waypoints.manager import WaypointManager
+
+
+#: 셧다운 요청 표식. 명령이 아니라 관찰이며, 판단과 실행은 호스트 유닛이 한다.
+SHUTDOWN_SENTINEL_NAME = "battery-shutdown-request.json"
+
+
+def _battery_config(raw: dict[str, Any], data_path: Any = None) -> BatteryConfig:
+    """rosy_default.yaml의 safety 블록 → BatteryConfig (누락 키는 기본값 유지).
+
+    곡선이 없거나 무효하면 기존 two-point 스팬으로 되돌아간다. 설정 오타 하나로
+    로봇이 아예 뜨지 않는 것보다 정확도가 낮은 채로 도는 편이 낫다.
+    """
+    defaults = BatteryConfig()
+
+    full = float(raw.get("battery_full_voltage", 8.4))
+    empty = float(raw.get("battery_empty_voltage", 6.4))
+
+    curve: BatteryCurve
+    points = raw.get("battery_curve")
+    try:
+        if points:
+            curve = BatteryCurve([(float(v), float(p)) for v, p in points])
+        else:
+            curve = BatteryCurve.from_span(full=full, empty=empty)
+    except (ValueError, TypeError):
+        try:
+            curve = BatteryCurve.from_span(full=full, empty=empty)
+        except ValueError:
+            curve = BatteryCurve.default()
+
+    sentinel = None if data_path is None else Path(data_path) / SHUTDOWN_SENTINEL_NAME
+
+    return BatteryConfig(
+        curve=curve,
+        filter_tau_s=float(raw.get("battery_filter_tau_s", defaults.filter_tau_s)),
+        warning_percent=float(raw.get("battery_warning_percent", defaults.warning_percent)),
+        critical_percent=float(raw.get("battery_critical_percent", defaults.critical_percent)),
+        deep_percent=float(raw.get("battery_deep_percent", defaults.deep_percent)),
+        enter_samples=int(raw.get("battery_enter_samples", defaults.enter_samples)),
+        exit_samples=int(raw.get("battery_exit_samples", defaults.exit_samples)),
+        hysteresis_percent=float(
+            raw.get("battery_hysteresis_percent", defaults.hysteresis_percent)),
+        deep_dwell_s=float(raw.get("battery_deep_dwell_s", defaults.deep_dwell_s)),
+        sentinel_path=sentinel,
+        shutdown_grace_s=float(
+            raw.get("battery_shutdown_grace_s", defaults.shutdown_grace_s)),
+    )
 
 
 def _power_config(raw: dict[str, Any]) -> PowerConfig:
@@ -73,6 +126,7 @@ class CoreServices:
     waypoints: WaypointManager
     nav: NavigationManager
     power: PowerManager
+    battery: BatteryMonitor
     runtime_probe: HostRuntimeProbe
     started_at: float = field(default_factory=time.time)
 
@@ -111,6 +165,9 @@ class CoreServices:
         nav = NavigationManager(events, state, waypoints, safety,
                                 stuck_timeout_s=float(safety_cfg.get("stuck_timeout_s", 30.0)))
         power = PowerManager(_power_config(config.get("power", {})), events=events)
+        battery = BatteryMonitor(
+            _battery_config(safety_cfg, data_path=waypoints_path.parent),
+            events=events)
         runtime_probe = HostRuntimeProbe(
             host_root=os.environ.get("ROSY_HOST_ROOT", "/"),
             data_path=waypoints_path.parent,
@@ -118,4 +175,4 @@ class CoreServices:
         return cls(config=config, identity=identity, profile=profile, capability=capability,
                    events=events, state=state, registry=registry, modes=modes,
                    command=command, safety=safety, waypoints=waypoints, nav=nav,
-                   power=power, runtime_probe=runtime_probe)
+                   power=power, battery=battery, runtime_probe=runtime_probe)
