@@ -1,7 +1,9 @@
 # ROSY Host Agent 계약 (전송·인증·명령)
 
 - **Document ID:** ROSY-HOSTAGENT-001
-- **Status:** Contract accepted, implementation pending (WP-4)
+- **Status:** Contract accepted; decision layer implemented (`deploy/release/host_agent.py`),
+  transport and privileged execution implemented (`host_agent_server.py`), on-device
+  verification pending WP-7
 - **Related:** `docs/plans/2026-09-01-rosy-os-v1-image-release-design.md` §4.4/§10,
   ADR D-22, `deploy/robot/compose.yaml`, `test/test_release_boundary_guards.py`
 
@@ -200,14 +202,39 @@ Host Agent는 아래 명령만 안다. 임의 명령, 임의 경로, 임의 인�
 
 `network.apply_profile`은 SSID를 남기되 PSK는 남기지 않는다.
 
-## 9. 구현 시 열려 있는 것
+## 9. 구현 상태
 
-이 계약이 정하지 않은 것, WP-4에서 결정할 것:
+### 9.1 확정되어 구현된 것
 
-- 프레이밍 상세(줄 단위 JSON으로 충분한지, 길이 프리픽스가 필요한지)
-- 장시간 명령(`release.install`)의 진행률 보고 방식 — 스트리밍 응답인지 폴링인지
-- Host Agent 자체의 재시작·감시 전략
-- idempotency 기록의 보존 기간
+| 항목 | 결정 | 구현 |
+|---|---|---|
+| 프레이밍 | 줄 단위 JSON. 길이 프리픽스는 쓰지 않는다 — 요청이 한 줄이고 상한이 있으면 프레이밍은 문제가 되지 않는다 | `HostAgent.handle_line` |
+| 요청 크기 상한 | 64 KiB. 초과하면 읽지 않고 `HOST_AGENT_REQUEST_TOO_LARGE` | `MAX_REQUEST_BYTES` |
+| idempotency 보존 | 최근 256건, 삽입 순서. **성공만 기억한다** | `_Idempotency` |
+| 연결당 요청 | 1건. 응답 후 닫는다 | `serve_forever` |
 
-전송과 인증(§2, §3)은 위에서 확정된 것으로 취급한다. 구현 중 이를 바꾸려면 이
-문서를 함께 고친다.
+idempotency가 성공만 기억하는 것이 중요하다. 실행 중 실패(끊긴 `nmcli`, 바쁜
+unit)를 기억하면 같은 key로 재시도할 때마다 그 실패가 재생되어, 대시보드로는
+영영 고칠 수 없는 장비가 된다. 재시도는 다시 시도하겠다는 뜻이다.
+
+### 9.2 아직 열려 있는 것
+
+- 장시간 명령(`release.install`)의 진행률 보고 — 스트리밍 응답인지 폴링인지.
+  현재는 완료 후 한 번 응답한다.
+- Host Agent 자체의 재시작·감시 전략 (systemd `Restart=` 정책)
+- `SubprocessCommands`가 부르는 `rosy-release` CLI 자체 (§14의 목표 인터페이스,
+  WP-6에서 구현)
+
+### 9.3 검증 상태
+
+거부 판정 전체 — allowlist, 역할, 재확인, 열거 대조, 임의 파라미터 거부, 홀드 중
+install 거부, idempotency, 요청 크기·스키마, 감사 redaction — 은
+`test/test_host_agent.py`에서 소켓 없이 검증된다. 각 가드를 하나씩 무력화해
+스위트가 잡는지 확인했다(14/14).
+
+소켓 자체(`SO_PEERCRED`, 소유권·모드)와 실제 `nmcli`/`systemctl` 실행은 실기에서
+확인한다 — `pi5-acceptance-checklist.md`. 여기서 검증된 것은 uid 판정 로직과
+명령이 셸 문자열이 아니라 인자 리스트로 만들어진다는 것뿐이다.
+
+전송과 인증(§2, §3)은 확정된 것으로 취급한다. 구현 중 이를 바꾸려면 이 문서를
+함께 고친다.
