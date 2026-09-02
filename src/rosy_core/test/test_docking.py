@@ -624,3 +624,534 @@ class TestChargingConfirmation:
         assert confirmation.confirmed is True
         confirmation.reset()
         assert confirmation.confirmed is False
+
+
+# --- 도킹 상태머신 -------------------------------------------------------------
+
+class SpyExecutor:
+    """모션 실행부 대역. 무엇을 시켰는지만 기록한다."""
+
+    def __init__(self):
+        self.goals = []
+        self.drives = []
+        self.stops = 0
+        self.cancels = 0
+        self.exemption = False
+        self.exemption_history = []
+        self._travelled = 0.0
+
+    def navigate_to(self, pose):
+        self.goals.append(pose)
+
+    def cancel_navigation(self):
+        self.cancels += 1
+
+    def drive(self, linear, angular):
+        self.drives.append((linear, angular))
+
+    def stop(self):
+        self.stops += 1
+
+    def set_collision_exemption(self, enabled):
+        self.exemption = bool(enabled)
+        self.exemption_history.append(bool(enabled))
+
+    def travelled_m(self):
+        return self._travelled
+
+    def reset_odometry_mark(self):
+        self._travelled = 0.0
+
+    def advance_odometry(self, metres):
+        self._travelled += metres
+
+
+class StubSafety:
+    def __init__(self, estop=False):
+        self.estop = estop
+
+
+class StubBattery:
+    """BatteryMonitor 대역 — 필터된 전압과 충전 억제 신호만 흉내낸다."""
+
+    def __init__(self, voltage=7.60):
+        self.voltage = voltage
+        self.charging = False
+
+    def set_charging(self, confirmed):
+        self.charging = bool(confirmed)
+
+
+class StubAgent:
+    """도크 에이전트 대역 — 네트워크 없이 상태를 지정한다."""
+
+    def __init__(self, status=None):
+        self.status = status if status is not None else a_status()
+        self.polls = 0
+
+    def poll(self):
+        self.polls += 1
+        return self.status
+
+
+def a_manager(clock, *, detector=None, agent=None, estop=False,
+              supported=True, docks=("dock_1",), max_retries=3, **config_kwargs):
+    from rosy_core.docking.manager import DockingConfig, DockingManager
+    from rosy_core.docking.detector import SimulatedDetector
+
+    db = DockDatabase.empty()
+    db.add_type(DockType(name="rosy_v1", detector="simulated",
+                         staging_offset_m=0.7, docking_threshold_m=0.05,
+                         max_retries=max_retries, undock_distance_m=0.35))
+    for dock_id in docks:
+        db.add(a_dock(id=dock_id))
+
+    detector = detector if detector is not None else SimulatedDetector(
+        script=[(0.60, 0.0, 0.0), (0.30, 0.0, 0.0), (0.04, 0.0, 0.0)],
+        clock=clock, step_s=1.0)
+    agent = agent if agent is not None else StubAgent()
+    battery = config_kwargs.pop('battery', None) or StubBattery()
+    events = config_kwargs.pop('events', None)
+
+    manager = DockingManager(
+        database=db,
+        safety=StubSafety(estop=estop),
+        config=DockingConfig(**config_kwargs),
+        clock=clock,
+        detector_factory=lambda dock, dock_type: detector,
+        agent_factory=lambda dock: agent,
+        capability_provider=lambda: supported,
+        map_id_provider=lambda: "warehouse_a",
+        battery=battery,
+        events=events,
+    )
+    manager.executor = SpyExecutor()
+    manager.detector = detector
+    manager.agent = agent
+    manager.battery = battery
+    return manager
+
+
+def arrive(manager):
+    """스테이징 도착을 알린다."""
+    from rosy_core.protocol.schemas import NavigationState
+    manager.on_navigation_state(NavigationState.ARRIVED)
+
+
+def run_to_docked(manager, clock, ticks=40, step_s=0.5):
+    for _ in range(ticks):
+        clock.advance(step_s)
+        manager.tick()
+
+
+class TestDockingAcceptance:
+    def test_a_dock_command_enters_docking(self, clock):
+        from rosy_core.protocol.schemas import DockState
+        manager = a_manager(clock)
+        manager.dock("dock_1")
+        assert manager.state is DockState.DOCKING
+        assert manager.executor.goals, "staging goal must be sent"
+
+    def test_the_staging_goal_is_in_front_of_the_dock(self, clock):
+        manager = a_manager(clock)
+        manager.dock("dock_1")
+        goal = manager.executor.goals[0]
+        # dock_1 은 (2.5, 1.8, yaw=0), 오프셋 0.7 → 앞쪽 0.7 m
+        assert goal.x == pytest.approx(1.8)
+        assert goal.y == pytest.approx(1.8)
+
+    def test_an_unsupported_robot_is_refused(self, clock):
+        """DNC-003 — capability 가 꺼진 로봇은 도킹하지 않는다."""
+        manager = a_manager(clock, supported=False)
+        with pytest.raises(DockError) as excinfo:
+            manager.dock("dock_1")
+        assert excinfo.value.code == "CAPABILITY_NOT_SUPPORTED"
+
+    def test_an_unknown_dock_is_refused(self, clock):
+        manager = a_manager(clock)
+        with pytest.raises(DockError) as excinfo:
+            manager.dock("nope")
+        assert excinfo.value.code == "NOT_FOUND"
+
+    def test_a_dock_on_another_map_is_refused(self, clock):
+        manager = a_manager(clock)
+        manager._map_id_provider = lambda: "warehouse_b"
+        with pytest.raises(DockError) as excinfo:
+            manager.dock("dock_1")
+        assert excinfo.value.code == "MAP_MISMATCH"
+
+    def test_estop_refuses_a_dock_command(self, clock):
+        manager = a_manager(clock, estop=True)
+        with pytest.raises(DockError) as excinfo:
+            manager.dock("dock_1")
+        assert excinfo.value.code == "EMERGENCY_ACTIVE"
+
+    def test_docking_twice_is_refused(self, clock):
+        manager = a_manager(clock)
+        manager.dock("dock_1")
+        with pytest.raises(DockError) as excinfo:
+            manager.dock("dock_1")
+        assert excinfo.value.code == "DOCKING_ACTIVE"
+
+    def test_the_single_dock_needs_no_id(self, clock):
+        from rosy_core.protocol.schemas import DockState
+        manager = a_manager(clock)
+        manager.dock()                              # 1:1 배치
+        assert manager.state is DockState.DOCKING
+
+    def test_with_two_docks_an_id_is_required(self, clock):
+        manager = a_manager(clock, docks=("dock_1", "dock_2"))
+        with pytest.raises(DockError) as excinfo:
+            manager.dock()
+        assert excinfo.value.code == "DOCK_REQUIRED"
+
+
+class TestDockingSequence:
+    def test_the_happy_path_reaches_charging(self, clock):
+        from rosy_core.protocol.schemas import DockState
+        manager = a_manager(clock)
+        manager.dock("dock_1")
+        arrive(manager)
+        run_to_docked(manager, clock)
+        assert manager.state in (DockState.DOCKED, DockState.CHARGING)
+
+    def test_the_phases_run_in_order(self, clock):
+        from rosy_core.docking.manager import DockPhase
+        manager = a_manager(clock)
+        seen = []
+        manager.dock("dock_1")
+        seen.append(manager.phase)
+        arrive(manager)
+        for _ in range(40):
+            clock.advance(0.5)
+            manager.tick()
+            if manager.phase not in seen:
+                seen.append(manager.phase)
+        order = [p for p in seen if p is not None]
+        assert order[0] is DockPhase.STAGING
+        assert DockPhase.ACQUIRING in order
+        assert DockPhase.APPROACHING in order
+        assert order.index(DockPhase.ACQUIRING) < order.index(DockPhase.APPROACHING)
+
+    def test_the_approach_drives_forward(self, clock):
+        manager = a_manager(clock)
+        manager.dock("dock_1")
+        arrive(manager)
+        for _ in range(10):
+            clock.advance(0.5)
+            manager.tick()
+        assert any(linear > 0 for linear, _ in manager.executor.drives)
+
+    def test_a_lateral_error_produces_a_correcting_turn(self, clock):
+        from rosy_core.docking.detector import SimulatedDetector
+        detector = SimulatedDetector(script=[(0.5, 0.10, 0.0)], clock=clock)
+        manager = a_manager(clock, detector=detector)
+        manager.dock("dock_1")
+        arrive(manager)
+        for _ in range(8):
+            clock.advance(0.5)
+            manager.tick()
+        turns = [angular for _, angular in manager.executor.drives if angular != 0.0]
+        assert turns and turns[0] > 0        # 도크가 왼쪽에 있으면 왼쪽으로 돈다
+
+    def test_charging_is_reported_once_confirmed(self, clock):
+        from rosy_core.protocol.schemas import DockState
+        manager = a_manager(clock, charge_confirm_s=2.0)
+        manager.dock("dock_1")
+        arrive(manager)
+        run_to_docked(manager, clock, ticks=60)
+        assert manager.state is DockState.CHARGING
+
+    def test_contact_without_current_stays_docked_not_charging(self, clock):
+        from rosy_core.protocol.schemas import DockState
+        agent = StubAgent(a_status(load_present=True, charging=False, current_a=0.0))
+        manager = a_manager(clock, agent=agent, settle_timeout_s=1e9)
+        manager.dock("dock_1")
+        arrive(manager)
+        run_to_docked(manager, clock, ticks=60)
+        assert manager.state is DockState.DOCKED
+
+
+class TestDockingFailures:
+    def test_a_detector_that_never_acquires_retries_then_fails(self, clock):
+        from rosy_core.docking.detector import SimulatedDetector
+        from rosy_core.protocol.schemas import DockState
+        blind = SimulatedDetector(script=[], clock=clock)
+        manager = a_manager(clock, detector=blind, max_retries=2,
+                            acquire_timeout_s=2.0, backoff_s=0.5)
+        manager.dock("dock_1")
+        for _ in range(200):
+            clock.advance(0.5)
+            arrive(manager)          # Nav2 는 목표 완료를 계속 보고한다
+            manager.tick()
+            if manager.state is DockState.DOCK_FAILED:
+                break
+        assert manager.state is DockState.DOCK_FAILED
+        assert manager.retries == 2
+
+    def test_a_staging_timeout_fails(self, clock):
+        from rosy_core.protocol.schemas import DockState
+        manager = a_manager(clock, max_retries=0, staging_timeout_s=5.0)
+        manager.dock("dock_1")                      # 도착을 알리지 않는다
+        for _ in range(40):
+            clock.advance(1.0)
+            manager.tick()
+        assert manager.state is DockState.DOCK_FAILED
+
+    def test_dock_failed_is_terminal_and_does_not_retry_itself(self, clock):
+        """무인 상태로 스무 번 실패한 로봇은 물리적 문제가 있다. 루프는 그것을
+        숨기면서 지키려던 팩을 마저 비운다."""
+        from rosy_core.docking.detector import SimulatedDetector
+        from rosy_core.protocol.schemas import DockState
+        manager = a_manager(clock, detector=SimulatedDetector(script=[], clock=clock),
+                            max_retries=0, acquire_timeout_s=1.0)
+        manager.dock("dock_1")
+        for _ in range(50):
+            clock.advance(0.5)
+            arrive(manager)
+            manager.tick()
+        assert manager.state is DockState.DOCK_FAILED
+        goals_before = len(manager.executor.goals)
+        for _ in range(50):
+            clock.advance(0.5)
+            arrive(manager)
+            manager.tick()
+        assert manager.state is DockState.DOCK_FAILED
+        assert len(manager.executor.goals) == goals_before
+
+    def test_a_settle_failure_reseats_without_re_staging(self, clock):
+        """접점에 닿았는데 전류가 없는 것은 도착 실패와 다른 고장이다 —
+        스테이징까지 되돌아갈 이유가 없다."""
+        agent = StubAgent(a_status(load_present=False, charging=False, current_a=0.0))
+        manager = a_manager(clock, agent=agent, settle_timeout_s=2.0,
+                            max_retries=2, backoff_s=0.5)
+        manager.dock("dock_1")
+        arrive(manager)
+        goals_after_staging = len(manager.executor.goals)
+        for _ in range(120):
+            clock.advance(0.5)
+            manager.tick()
+        assert manager.reseats >= 1
+        assert len(manager.executor.goals) == goals_after_staging
+
+
+class TestDockingInterlocks:
+    def test_estop_during_the_approach_aborts(self, clock):
+        from rosy_core.docking.detector import SimulatedDetector
+        from rosy_core.protocol.schemas import DockState
+        # 접점에 닿지 않는 대본 — 접근 구간에 머무른다.
+        far = SimulatedDetector(script=[(0.5, 0.0, 0.0)], clock=clock)
+        manager = a_manager(clock, detector=far)
+        manager.dock("dock_1")
+        arrive(manager)
+        for _ in range(6):
+            clock.advance(0.5)
+            manager.tick()
+        manager._safety.estop = True
+        clock.advance(0.5)
+        manager.tick()
+        assert manager.state is DockState.DOCK_FAILED
+        assert manager.executor.exemption is False
+
+    def test_the_collision_exemption_is_only_for_the_approach(self, clock):
+        manager = a_manager(clock)
+        manager.dock("dock_1")
+        assert manager.executor.exemption is False   # 스테이징 중에는 아니다
+        arrive(manager)
+        run_to_docked(manager, clock)
+        assert manager.executor.exemption is False   # 끝나면 반드시 풀린다
+        assert True in manager.executor.exemption_history
+
+    def test_cancel_releases_everything(self, clock):
+        from rosy_core.protocol.schemas import DockState
+        manager = a_manager(clock)
+        manager.dock("dock_1")
+        arrive(manager)
+        for _ in range(5):
+            clock.advance(0.5)
+            manager.tick()
+        manager.cancel()
+        assert manager.state is DockState.UNDOCKED
+        assert manager.executor.exemption is False
+        assert manager.executor.stops >= 1
+
+
+class TestUndocking:
+    def test_it_reverses_on_odometry_and_finishes(self, clock):
+        from rosy_core.protocol.schemas import DockState
+        manager = a_manager(clock)
+        manager.dock("dock_1")
+        arrive(manager)
+        run_to_docked(manager, clock)
+        manager.undock()
+        assert manager.state is DockState.UNDOCKING
+        for _ in range(20):
+            clock.advance(0.5)
+            manager.executor.advance_odometry(0.05)
+            manager.tick()
+        assert manager.state is DockState.UNDOCKED
+
+    def test_it_drives_backward(self, clock):
+        manager = a_manager(clock)
+        manager.dock("dock_1")
+        arrive(manager)
+        run_to_docked(manager, clock)
+        before = len(manager.executor.drives)
+        manager.undock()
+        clock.advance(0.5)
+        manager.tick()
+        reverse = manager.executor.drives[before:]
+        assert reverse and all(linear < 0 for linear, _ in reverse)
+
+    def test_it_does_not_consult_the_detector(self, clock):
+        """도크에 반쯤 물린 상태에서는 LiDAR 도 카메라도 믿을 게 없다."""
+        manager = a_manager(clock)
+        manager.dock("dock_1")
+        arrive(manager)
+        run_to_docked(manager, clock)
+        manager.undock()
+        assert manager.detector.relative_pose() is None   # stop 되어 있어야 한다
+
+    def test_undocking_when_not_docked_is_refused(self, clock):
+        manager = a_manager(clock)
+        with pytest.raises(DockError) as excinfo:
+            manager.undock()
+        assert excinfo.value.code == "NOT_DOCKED"
+
+
+# --- 20% 자동 복귀 (설계 §"20%에서, 10%가 아니라") ------------------------------
+#
+# 크리티컬 10%는 2S 팩의 절벽 구간이라 거기서 출발하면 도크까지 못 갈 수 있고,
+# 전류 센싱이 없어 에너지 예산을 세울 수도 없다. 로봇은 임무를 더 일찍 포기한다.
+
+class TestReturnToDock:
+    def _manager(self, clock, **kwargs):
+        return a_manager(clock, **kwargs)
+
+    def test_the_warning_level_starts_a_return(self, clock):
+        from rosy_core.protocol.schemas import BatteryLevel, DockState
+        manager = self._manager(clock)
+        manager.on_battery_level(BatteryLevel.WARNING)
+        assert manager.state is DockState.DOCKING
+        assert manager.executor.goals
+
+    def test_the_ok_level_does_not(self, clock):
+        from rosy_core.protocol.schemas import BatteryLevel, DockState
+        manager = self._manager(clock)
+        manager.on_battery_level(BatteryLevel.OK)
+        assert manager.state is DockState.UNDOCKED
+
+    def test_critical_also_returns(self, clock):
+        """20%를 놓친 채 10%에 도달했다면 그때라도 가야 한다."""
+        from rosy_core.protocol.schemas import BatteryLevel, DockState
+        manager = self._manager(clock)
+        manager.on_battery_level(BatteryLevel.CRITICAL)
+        assert manager.state is DockState.DOCKING
+
+    def test_no_dock_configured_does_nothing(self, clock):
+        """도크가 없는 로봇에서는 SAF-005 의 기존 폴백이 그대로 남는다."""
+        from rosy_core.protocol.schemas import BatteryLevel, DockState
+        manager = self._manager(clock, docks=())
+        manager.on_battery_level(BatteryLevel.WARNING)
+        assert manager.state is DockState.UNDOCKED
+
+    def test_it_does_not_restart_while_already_docking(self, clock):
+        from rosy_core.protocol.schemas import BatteryLevel
+        manager = self._manager(clock)
+        manager.on_battery_level(BatteryLevel.WARNING)
+        goals = len(manager.executor.goals)
+        manager.on_battery_level(BatteryLevel.WARNING)
+        manager.on_battery_level(BatteryLevel.CRITICAL)
+        assert len(manager.executor.goals) == goals
+
+    def test_it_does_not_fire_when_already_docked(self, clock):
+        from rosy_core.protocol.schemas import BatteryLevel, DockState
+        manager = self._manager(clock)
+        manager.dock("dock_1")
+        arrive(manager)
+        run_to_docked(manager, clock)
+        goals = len(manager.executor.goals)
+        manager.on_battery_level(BatteryLevel.WARNING)
+        assert manager.state in (DockState.DOCKED, DockState.CHARGING)
+        assert len(manager.executor.goals) == goals
+
+    def test_estop_blocks_the_return(self, clock):
+        from rosy_core.protocol.schemas import BatteryLevel, DockState
+        manager = self._manager(clock, estop=True)
+        manager.on_battery_level(BatteryLevel.WARNING)
+        assert manager.state is DockState.UNDOCKED
+
+    def test_an_unsupported_robot_does_not_try(self, clock):
+        from rosy_core.protocol.schemas import BatteryLevel, DockState
+        manager = self._manager(clock, supported=False)
+        manager.on_battery_level(BatteryLevel.WARNING)
+        assert manager.state is DockState.UNDOCKED
+
+    def test_a_manual_session_defers_the_return(self, clock):
+        """수동 조작(우선순위 3)이 도킹(4)보다 위다. 운영자에게서 빼앗지 않는다."""
+        from rosy_core.protocol.schemas import BatteryLevel, DockState
+        manager = self._manager(clock)
+        manager.set_manual_active(True)
+        manager.on_battery_level(BatteryLevel.WARNING)
+        assert manager.state is DockState.UNDOCKED
+        assert manager.return_pending is True
+
+    def test_the_deferred_return_runs_when_manual_ends(self, clock):
+        from rosy_core.protocol.schemas import BatteryLevel, DockState
+        manager = self._manager(clock)
+        manager.set_manual_active(True)
+        manager.on_battery_level(BatteryLevel.WARNING)
+        manager.set_manual_active(False)
+        clock.advance(0.5)
+        manager.tick()
+        assert manager.state is DockState.DOCKING
+        assert manager.return_pending is False
+
+    def test_recovering_above_warning_cancels_a_pending_return(self, clock):
+        from rosy_core.protocol.schemas import BatteryLevel
+        manager = self._manager(clock)
+        manager.set_manual_active(True)
+        manager.on_battery_level(BatteryLevel.WARNING)
+        assert manager.return_pending is True
+        manager.on_battery_level(BatteryLevel.OK)
+        assert manager.return_pending is False
+
+    def test_the_return_cancels_an_active_navigation_goal(self, clock):
+        from rosy_core.protocol.schemas import BatteryLevel
+        manager = self._manager(clock)
+        manager.on_battery_level(BatteryLevel.WARNING)
+        assert manager.executor.cancels >= 1
+
+    def test_a_failed_return_does_not_loop(self, clock):
+        """DOCK_FAILED 뒤에 경고 레벨이 계속 와도 다시 시도하지 않는다."""
+        from rosy_core.docking.detector import SimulatedDetector
+        from rosy_core.protocol.schemas import BatteryLevel, DockState
+        manager = self._manager(clock, detector=SimulatedDetector(script=[], clock=clock),
+                                max_retries=0, acquire_timeout_s=1.0)
+        manager.on_battery_level(BatteryLevel.WARNING)
+        for _ in range(50):
+            clock.advance(0.5)
+            arrive(manager)
+            manager.tick()
+        assert manager.state is DockState.DOCK_FAILED
+        goals = len(manager.executor.goals)
+        manager.on_battery_level(BatteryLevel.CRITICAL)
+        assert len(manager.executor.goals) == goals
+
+    def test_an_event_records_why_the_robot_left(self, clock):
+        from rosy_core.protocol.schemas import BatteryLevel
+        events = RecordingDockEvents()
+        manager = self._manager(clock, events=events)
+        manager.on_battery_level(BatteryLevel.WARNING)
+        assert "docking.return_started" in events.types()
+
+
+class RecordingDockEvents:
+    def __init__(self):
+        self.published = []
+
+    def publish(self, type_, severity=None, source=None, data=None):
+        self.published.append((type_, severity, source, data or {}))
+
+    def types(self):
+        return [entry[0] for entry in self.published]
