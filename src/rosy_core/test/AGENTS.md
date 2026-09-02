@@ -1,0 +1,60 @@
+<!-- Parent: ../AGENTS.md -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+
+# test
+
+## Purpose
+
+pytest for rosy_core policy, API, dashboard, and protocol. Most tests import Python modules directly and do not spin rclpy.
+
+## Key Files
+
+| File | Description |
+|------|-------------|
+| `test_protocol_schemas.py` | Envelope/event schema (P1-19, D-10/D-18) |
+| `test_core_logic.py` | State, command mux, safety, waypoints |
+| `test_api.py` | FastAPI routes, auth roles, battery/docking endpoints |
+| `test_sprint2.py` | Later P1 slices |
+| `test_power.py` | IDLE/STANDBY/proximity wake |
+| `test_battery.py` | Curve, hysteresis, deep shutdown sentinel (SAF-005, D-27) |
+| `test_docking.py` | Dock SM, staging vs sensor closed-loop |
+| `test_dashboard.py` | Embedded `/dashboard` assets and CSP |
+| `test_host_cards.py` | Dashboard host/network/release cards |
+| `test_host_runtime.py` | `HostRuntimeProbe` read-only telemetry |
+| `test_ros_graph_monitor.py` | ROS graph snapshot bounds |
+| `test_runtime_config.py` | YAML merge / ROSY_CONFIG |
+
+## Subdirectories
+
+None (ignore `__pycache__/`).
+
+## For AI Agents
+
+### Working In This Directory
+
+- Inject clocks. Power, battery, and docking tests advance time explicitly.
+- Do not import `ros_bridge` at module top in these tests (optional ROS deps).
+- When adding an API field, assert it here **and** in `protocol/schemas.py`.
+
+### Testing Requirements
+
+```bash
+python3 -m pytest src/rosy_core/test/ -v
+python3 -m pytest src/rosy_core/test/test_battery.py src/rosy_core/test/test_api.py -v
+```
+
+### Common Patterns
+
+FastAPI `TestClient`; construct `CoreServices` with temp paths.
+
+## Dependencies
+
+### Internal
+
+- `rosy_core` package (source tree import)
+
+### External
+
+- pytest, fastapi, pydantic, httpx
+
+<!-- MANUAL: -->

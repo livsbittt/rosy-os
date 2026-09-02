@@ -1,0 +1,55 @@
+<!-- Parent: ../AGENTS.md -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+
+# api
+
+## Purpose
+
+FastAPI surface for ROSY-API-REF-001. Factory builds the app, serves `/dashboard`, and mounts v1 routers plus WebSocket.
+
+## Key Files
+
+| File | Description |
+|------|-------------|
+| `__init__.py` | Package marker |
+| `app.py` | `create_app`; routers; static dashboard; CSP on HTML |
+| `deps.py` | SEC-101 static-token auth; `require_role`; `get_services` |
+| `errors.py` | ERR-101 `ApiError` + domain exception mapping |
+| `ws.py` | `/ws/state` (10 Hz) and `/ws/events` with type glob filters |
+
+## Subdirectories
+
+| Directory | Purpose |
+|-----------|---------|
+| `v1/` | REST routers (see `v1/AGENTS.md`) |
+
+## For AI Agents
+
+### Working In This Directory
+
+- Roles: viewer < operator < administrator. Teleop/mode/nav mutations need operator+.
+- REST uses `Authorization: Bearer`; WebSocket auth is `?token=` (close 4401 on bad token).
+- `/metrics` is unauthenticated Prometheus text — do not put secrets there.
+- Dashboard is first-party static files from `../web/`. Do not add inline scripts (CSP `script-src 'self'`).
+- `app.state.core` is `CoreServices`. Routes must not touch rclpy.
+- Domain conflicts (`MODE_CONFLICT`, `EMERGENCY_ACTIVE`) map to HTTP 409.
+
+### Testing Requirements
+
+`src/rosy_core/test/test_api.py`, `test_dashboard.py`.
+
+### Common Patterns
+
+`ApiError(code, http_status, message)` — do not raise raw HTTPException for domain failures.
+
+## Dependencies
+
+### Internal
+
+- `rosy_core.services.CoreServices`, protocol schemas, web assets
+
+### External
+
+- FastAPI, uvicorn, pydantic
+
+<!-- MANUAL: -->

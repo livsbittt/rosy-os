@@ -1,0 +1,71 @@
+<!-- Parent: ../AGENTS.md -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+
+# test
+
+## Purpose
+
+Host-side pytest for deploy/release/motor/network contracts. These tests do **not** need a ROS overlay; CI runs `python3 -m pytest test/ -v` separately from `src/rosy_core/test`. `conftest.py` inserts `deploy/release` onto `sys.path` so modules shipped as scripts remain importable.
+
+## Key Files
+
+| File | Description |
+|------|-------------|
+| `conftest.py` | Adds `deploy/release` to `sys.path` |
+| `test_motor_control.py` | Differential-drive contracts: geometry, limits, APPLIED/LIMITED/REJECTED |
+| `test_bringup_motor_contracts.py` | Bringup wiring of MotorController |
+| `test_dynamixel_driver_safety.py` | RPM cap and encoder rollover in Dynamixel driver |
+| `test_dynamixel_probe.py` | UART probe helpers |
+| `test_host_agent.py` | Host Agent decision layer (refusals, roles, audit) |
+| `test_image_checks.py` | Image content/layout checks |
+| `test_image_pipeline.py` | Image build input lock / pipeline |
+| `test_network_provisioner.py` | Wi-Fi / nmcli provisioning |
+| `test_network_topology_contracts.py` | Pins ADR D-26 / CORE SRS / OS design / Implementation Plan on `SITE_STA` + opt-in `RELAY_AP_STA` |
+| `test_pi_wifi_deployment.py` | SD-card Wi-Fi/SSH first-boot contracts |
+| `test_release_boundary_guards.py` | CORE must not hold host privilege (D-22) |
+| `test_release_layout.py` | On-disk release layout |
+| `test_release_manifest.py` | Manifest schema |
+| `test_release_signing.py` | Ed25519 signing |
+| `test_release_storage.py` | Release store / retention |
+| `test_release_updater.py` | Activate/rollback updater |
+| `test_robot_runtime.py` | compose/Dockerfile/runtime-mode contracts |
+| `test_dashboard_browser.py` | Optional Chromium regression; skipped unless `ROSY_RUN_BROWSER_TESTS=1` |
+| `test_dock_contract.py` | Dock firmware contract: `/status` fields, no Wi-Fi secrets in `dock/` sources |
+
+## Subdirectories
+
+None (ignore `__pycache__/`).
+
+## For AI Agents
+
+### Working In This Directory
+
+- Keep tests ROS-free. Import `rosy_bringup.motor_control` / `deploy/release` modules directly.
+- If you add a deploy script, add a contract test here — CI only started covering this tree after a comment in `.github/workflows/ci.yml`.
+- Do not mock away the refusal paths in Host Agent; they are the product.
+- Changing SITE_STA / relay wording in one doc without the others fails `test_network_topology_contracts.py`.
+
+### Testing Requirements
+
+```bash
+python3 -m pytest test/ -v
+python3 -m pytest test/test_motor_control.py test/test_host_agent.py -v
+```
+
+### Common Patterns
+
+- Inject clocks, command ports, and filesystem roots. Do not call `nmcli`/`reboot` in tests.
+- Assert explicit result enums (`APPLIED` / `LIMITED` / `REJECTED` / `DRIVER_ERROR`).
+
+## Dependencies
+
+### Internal
+
+- `src/rosy_bringup/rosy_bringup/motor_control.py`, `dynamixel_driver.py`
+- `deploy/release/*`, `deploy/robot/*`, `deploy/image/*`
+
+### External
+
+- pytest, PyYAML; OpenSSL only if a test shells out to signing fixtures
+
+<!-- MANUAL: -->
