@@ -666,3 +666,85 @@ class TestBatteryConfigParsing:
             "battery_curve": [[8.4, 100]],          # 점이 하나뿐 — 무효
         }, data_path=None)
         assert cfg.curve.percent(7.4) == pytest.approx(50.0)
+
+
+# --- LED 중재 (설계 §"표시 권한" 우선순위 표) ----------------------------------
+
+class TestResolveLed:
+    def _alert(self, clock, voltage, samples):
+        monitor = make_monitor(clock, enter_samples=3)
+        feed(monitor, clock, voltage, samples)
+        return monitor.led_alert
+
+    def test_nothing_to_show_clears(self):
+        from rosy_core.power.battery import resolve_led
+        assert resolve_led(None, info_visible=False,
+                           gauge_percent=80.0, now=0.0).command == "clear"
+
+    def test_gauge_shows_only_inside_the_info_window(self):
+        from rosy_core.power.battery import resolve_led
+        closed = resolve_led(None, info_visible=False, gauge_percent=80.0, now=0.0)
+        open_ = resolve_led(None, info_visible=True, gauge_percent=80.0, now=0.0)
+        assert closed.command == "clear"
+        assert open_.command == "fill"
+        assert (open_.r, open_.g, open_.b) == (0, 60, 0)          # 60% 이상 녹색
+
+    def test_gauge_bands_at_their_boundaries(self):
+        from rosy_core.power.battery import resolve_led
+        def rgb(percent):
+            c = resolve_led(None, info_visible=True, gauge_percent=percent, now=0.0)
+            return (c.r, c.g, c.b)
+        assert rgb(100.0) == (0, 60, 0)
+        assert rgb(60.0) == (0, 60, 0)
+        assert rgb(59.9) == (60, 40, 0)
+        assert rgb(30.0) == (60, 40, 0)
+        assert rgb(29.9) == (60, 0, 0)
+        assert rgb(0.0) == (60, 0, 0)
+
+    def test_an_unknown_gauge_percent_clears_rather_than_guessing(self):
+        from rosy_core.power.battery import resolve_led
+        assert resolve_led(None, info_visible=True,
+                           gauge_percent=None, now=0.0).command == "clear"
+
+    def test_a_solid_alert_outranks_the_gauge(self, clock):
+        from rosy_core.power.battery import resolve_led
+        alert = self._alert(clock, 7.42, 3)                       # WARNING, 상시
+        command = resolve_led(alert, info_visible=True, gauge_percent=80.0, now=0.0)
+        assert command.command == "fill"
+        assert (command.r, command.g, command.b) == (30, 20, 0)   # 게이지 녹색이 아니다
+
+    def test_the_alert_survives_the_info_window_closing(self, clock):
+        """이 스펙이 존재하는 이유 — 아무도 앞에 없어도 경보는 계속 보여야 한다."""
+        from rosy_core.power.battery import resolve_led
+        alert = self._alert(clock, 7.42, 3)
+        command = resolve_led(alert, info_visible=False, gauge_percent=80.0, now=0.0)
+        assert command.command == "fill"
+        assert (command.r, command.g, command.b) == (30, 20, 0)
+
+    def test_a_blinking_alert_alternates_with_the_clock(self, clock):
+        from rosy_core.power.battery import resolve_led
+        alert = self._alert(clock, 7.32, 6)                       # CRITICAL, 1 Hz
+        assert resolve_led(alert, False, None, now=0.0).command == "fill"
+        assert resolve_led(alert, False, None, now=0.6).command == "clear"
+        assert resolve_led(alert, False, None, now=1.1).command == "fill"
+
+    def test_a_blinking_alert_never_falls_back_to_the_gauge_when_dark(self, clock):
+        """어두운 국면에 게이지가 비집고 들어오면 깜빡임이 색 교대로 보인다."""
+        from rosy_core.power.battery import resolve_led
+        alert = self._alert(clock, 7.32, 6)
+        dark = resolve_led(alert, info_visible=True, gauge_percent=80.0, now=0.6)
+        assert dark.command == "clear"
+
+    def test_deep_blinks_twice_as_fast(self, clock):
+        from rosy_core.power.battery import resolve_led
+        alert = self._alert(clock, 6.40, 9)                       # DEEP, 2 Hz
+        assert resolve_led(alert, False, None, now=0.0).command == "fill"
+        assert resolve_led(alert, False, None, now=0.3).command == "clear"
+        assert resolve_led(alert, False, None, now=0.55).command == "fill"
+
+    def test_commands_compare_equal_so_the_bridge_can_skip_repeats(self, clock):
+        """2 Hz 깜빡임이 5 Hz 서비스 호출 폭풍이 되지 않게 하는 전제."""
+        from rosy_core.power.battery import resolve_led
+        alert = self._alert(clock, 7.42, 3)
+        assert (resolve_led(alert, False, None, 0.0)
+                == resolve_led(alert, False, None, 9.0))

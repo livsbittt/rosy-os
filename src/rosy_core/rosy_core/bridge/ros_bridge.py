@@ -45,6 +45,7 @@ from rosy_core.diagnostics.collector import (
     topic_freshness_provider,
 )
 from rosy_core.navigation.manager import NavGoalSpec
+from rosy_core.power.battery import BatteryLevel, resolve_led
 from rosy_core.protocol.schemas import HealthState
 
 # 늦게 뜬 노드도 현재 모드를 즉시 받도록 latch 한다 (PWR-003).
@@ -54,8 +55,6 @@ _LATCHED = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
 # 정보 창이 열려 있는 동안 display/info 재발행 간격 (s).
 _INFO_REPUBLISH_S = 1.0
 
-# 배터리 잔량 → LED 색 (percent 하한, R, G, B).
-_LED_STEPS = ((60.0, 0, 60, 0), (30.0, 60, 40, 0), (0.0, 60, 0, 0))
 
 
 class RosBridge:
@@ -66,8 +65,6 @@ class RosBridge:
         self._frame_prefix = str(cfg.get("robot", {}).get("frame_prefix", ""))
         self._base_frame = f"{self._frame_prefix}base_footprint"
         self._map_frame = "map"
-        self._battery_full = float(cfg.get("safety", {}).get("battery_full_voltage", 12.6))
-        self._battery_empty = float(cfg.get("safety", {}).get("battery_empty_voltage", 10.0))
         self._state_hz = float(cfg.get("state", {}).get("rate_hz", 10.0))
 
         self.cmd_vel_pub = node.create_publisher(Twist, "cmd_vel", 10)
@@ -118,6 +115,7 @@ class RosBridge:
         # 드라이버는 core보다 먼저 떠서 이미 회전 중이다 — 기동 시 불필요한 호출 방지.
         self._applied_lidar_spinning = True
         self._info_was_visible = False
+        self._applied_led = None
         self._info_last_pub = 0.0
         self._voltage_topic_seen = False
         self._api_address: Optional[str] = None
@@ -142,12 +140,30 @@ class RosBridge:
         self._apply_voltage(float(msg.data))
 
     def _apply_voltage(self, voltage: float) -> None:
+        """생 표본을 정책 계층에 넣고, 그것이 거른 값으로만 SAF-005를 태운다.
+
+        예전에는 표본 하나가 곧장 임계 판정을 거쳐 E-Stop 까지 갔다. 모터가
+        기동할 때의 전압 새그 한 발이 크리티컬 정책을 오발화시키던 경로다.
+        """
         if not math.isfinite(voltage):
             return
-        span = max(self._battery_full - self._battery_empty, 1e-6)
-        percent = max(0.0, min(100.0, (voltage - self._battery_empty) / span * 100.0))
+
+        battery = self._svc.battery
+        battery.on_voltage(voltage)
+
+        percent = battery.percent
+        if percent is None:
+            return
+
         self._svc.state.set_battery(percent, voltage)
-        self._svc.power.on_battery_alert(self._battery_alert_state(percent))
+        self._svc.state.set_battery_status(battery.status())
+        self._svc.power.on_battery_alert(battery.level.value)
+
+        # DEEP 은 유예 전에 먼저 움직임을 멈춘다. 모터가 최대 소모원이고, 부하가
+        # 빠져야 전압이 휴지 곡선 쪽으로 회복해 셧다운 판단의 근거가 나아진다.
+        if battery.level is BatteryLevel.DEEP:
+            self._svc.safety.trigger_estop("battery_deep")
+
         action = self._svc.safety.on_battery_percent(percent)
         if action == "RETURN_HOME":
             try:
@@ -156,15 +172,6 @@ class RosBridge:
                 self._svc.safety.trigger_estop("battery_policy")
         elif action in ("STOP",):
             self._svc.safety.trigger_estop("battery_policy")
-
-    def _battery_alert_state(self, percent: float) -> str:
-        """SAF-005 임계와 동일한 구간 판정 — 경보 시 화면을 깨우기 위한 입력."""
-        policy = self._svc.safety.battery_policy
-        if percent <= policy.critical_percent:
-            return "critical"
-        if percent <= policy.warning_percent:
-            return "warning"
-        return "ok"
 
     def _on_nav_cmd_vel(self, msg: Twist) -> None:
         self._svc.command.set_nav_twist(CoreTwist(linear=msg.linear.x, angular=msg.angular.z))
@@ -263,11 +270,9 @@ class RosBridge:
             if not self._info_was_visible or (now - self._info_last_pub) >= _INFO_REPUBLISH_S:
                 self._publish_display_info(status)
                 self._info_last_pub = now
-            if not self._info_was_visible:
-                self._set_led_gauge(self._svc.state.snapshot().battery.percent)
-        elif self._info_was_visible:
-            self._clear_led()
         self._info_was_visible = status.info_visible
+
+        self._reconcile_led(status.info_visible, now)
 
     def _publish_display_info(self, status) -> None:
         snapshot = self._svc.state.snapshot()
@@ -304,14 +309,22 @@ class RosBridge:
         self._api_address = f"http://{host}:{port}"
         return self._api_address
 
-    def _set_led_gauge(self, percent: float) -> None:
-        for floor, r, g, b in _LED_STEPS:
-            if percent >= floor:
-                self._call_led("fill", r, g, b)
-                return
+    def _reconcile_led(self, info_visible: bool, now: float) -> None:
+        """중재 결과에 LED 를 맞춘다 (SAF-005 경보 > 정보창 게이지).
 
-    def _clear_led(self) -> None:
-        self._call_led("clear", 0, 0, 0)
+        명령이 바뀔 때만 서비스를 부른다. 이 틱은 5 Hz 이고 DEEP 경보는 2 Hz 로
+        깜빡이므로, 그러지 않으면 같은 색을 초당 다섯 번 다시 칠하게 된다.
+        """
+        command = resolve_led(
+            self._svc.battery.led_alert,
+            info_visible=info_visible,
+            gauge_percent=self._svc.state.snapshot().battery.percent,
+            now=now,
+        )
+        if command == self._applied_led:
+            return
+        self._call_led(command.command, command.r, command.g, command.b)
+        self._applied_led = command
 
     def _reconcile_lidar(self, spinning: bool) -> None:
         """PowerManager가 선언한 회전 의도에 LiDAR 모터를 맞춘다 (PWR-005).

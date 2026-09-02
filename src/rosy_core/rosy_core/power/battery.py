@@ -130,6 +130,48 @@ class LedAlert:
         return (float(now) * self.blink_hz) % 1.0 < 0.5
 
 
+# 근접 정보창에서 보여주는 잔량 게이지 (percent 하한, R, G, B).
+# ros_bridge 에 있던 _LED_STEPS 를 옮겨왔다 — LED 색을 정하는 곳은 하나여야 한다.
+_LED_GAUGE: tuple[tuple[float, int, int, int], ...] = (
+    (60.0, 0, 60, 0),
+    (30.0, 60, 40, 0),
+    (0.0, 60, 0, 0),
+)
+
+
+@dataclass(frozen=True)
+class LedCommand:
+    """LED 서비스에 그대로 넘길 명령. 동치 비교가 되어야 반복 호출을 건너뛴다."""
+
+    command: str        # "fill" | "clear"
+    r: int = 0
+    g: int = 0
+    b: int = 0
+
+
+_LED_CLEAR = LedCommand("clear")
+
+
+def resolve_led(alert: Optional[LedAlert], info_visible: bool,
+                gauge_percent: Optional[float], now: float) -> LedCommand:
+    """설계 §"표시 권한"의 우선순위를 한곳에서 결정한다.
+
+    경보가 살아 있으면 정보창 게이지보다 위다. 깜빡임의 어두운 국면에도 게이지로
+    떨어지지 않는다 — 그러면 깜빡임이 아니라 두 색의 교대로 보인다.
+    """
+    if alert is not None:
+        if not alert.lit_at(now):
+            return _LED_CLEAR
+        return LedCommand("fill", alert.r, alert.g, alert.b)
+
+    if info_visible and gauge_percent is not None:
+        for floor, r, g, b in _LED_GAUGE:
+            if gauge_percent >= floor:
+                return LedCommand("fill", r, g, b)
+
+    return _LED_CLEAR
+
+
 @dataclass
 class BatteryConfig:
     """SAF-005 임계와 필터 파라미터. 전부 `safety:` 블록에서 주입된다."""

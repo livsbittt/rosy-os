@@ -118,29 +118,52 @@
    `PowerManager`.
 5. Run `python -m pytest test -q` from `src/rosy_core` and confirm it passes.
 
-### Task 6: ros_bridge integration
+### Task 6: LED arbitration in the policy layer
+
+**Files:**
+- Modify: `src/rosy_core/rosy_core/power/battery.py`
+- Modify: `src/rosy_core/test/test_battery.py`
+
+`ros_bridge.py` has no tests and cannot even be imported here — it pulls in
+`rclpy`, which is absent on any machine without a ROS install. The original
+plan said to extend its tests; there are none to extend. So the decision moves
+to where it can be tested and where this codebase already puts decisions, and
+the bridge keeps only the reconciliation, exactly as it does for `power/mode`
+and the PWR-005 LiDAR intent.
+
+1. Write failing tests for a pure `resolve_led(alert, info_visible,
+   gauge_percent, now)` covering the design's priority table: an active alert
+   outranks the info-window gauge; a blinking alert alternates fill and clear
+   with the injected clock; the gauge shows only when the window is open and no
+   alert is active; nothing shows otherwise; and a `None` gauge percent inside
+   an open window clears rather than guessing a colour.
+2. Write a failing test that the alert survives `info_visible` going false —
+   the regression this whole spec exists for.
+3. Move the `_LED_STEPS` gauge thresholds out of `ros_bridge` so one module
+   decides LED colour, and test the three bands at their boundaries.
+4. Run `python -m pytest test/test_battery.py -q` and confirm it passes.
+
+### Task 6b: ros_bridge reconciliation
 
 **Files:**
 - Modify: `src/rosy_core/rosy_core/bridge/ros_bridge.py`
-- Modify: `src/rosy_core/test/test_core_logic.py`
+
+Not directly testable here; kept deliberately trivial so that inspection is
+enough and the bench check in Task 8 carries the verification.
 
 1. Route `_apply_voltage` through `BatteryMonitor`: feed it the raw sample, take
    filtered percent from it, and pass that to `state.set_battery`,
    `power.on_battery_alert`, and `safety.on_battery_percent`. Delete the inline
    `span`/`percent` computation and `_battery_alert_state`, whose thresholds now
    live in one place.
-2. Replace the info-window-only LED call with reconciliation against the
-   declared alert intent in `_tick_power`, applying the design's priority table:
-   an active alert outranks the `_LED_STEPS` gauge, and clearing the info window
-   must not clear an active alert.
+2. Replace the info-window-only LED call in `_tick_power` with a call to
+   `resolve_led` plus a reconciler that only calls the service when the command
+   changes, so a 2 Hz blink does not become a 5 Hz service call storm.
 3. On the `deep` level, stop motion before the grace period by tripping E-Stop
-   through the existing `safety.trigger_estop("battery_deep")` path rather than
-   introducing a second motor-stop route.
-4. Extend the existing bridge tests to cover: a sag transient producing no
-   E-Stop, an alert surviving `info_visible` going false, the gauge resuming
-   once the alert clears, and `set_led` not being called when the service is
-   unavailable.
-5. Run `python -m pytest test -q` from `src/rosy_core` and confirm it passes.
+   through the existing `safety.trigger_estop` path rather than introducing a
+   second motor-stop route.
+4. Byte-compile the module (`python -m py_compile`) since the suite cannot
+   import it, and confirm no other call sites of the deleted helpers remain.
 
 ### Task 7: Host shutdown unit
 
