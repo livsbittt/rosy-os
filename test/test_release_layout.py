@@ -351,15 +351,40 @@ def test_tree_fingerprint_detects_an_added_file(layout):
 
 
 @posix_only
-def test_freezing_a_release_blocks_casual_writes(layout):
+def test_freezing_clears_every_write_bit(layout):
+    """What freeze_tree promises, asserted directly.
+
+    Checking the mode rather than provoking a PermissionError keeps this
+    meaningful under root, which ignores the write bit — and root is exactly
+    who runs the updater on the device.
+    """
+    import stat as stat_module
+
     from layout import freeze_tree
 
     _install_release(layout, "2026.09.01-001", "first")
     release = layout.release("2026.09.01-001")
     freeze_tree(release)
 
+    writable = [
+        entry.relative_to(release).as_posix()
+        for entry in [release, *release.rglob("*")]
+        if entry.stat().st_mode & (stat_module.S_IWUSR | stat_module.S_IWGRP | stat_module.S_IWOTH)
+    ]
+    assert writable == [], f"still writable after freeze: {writable}"
+
+
+@posix_only
+def test_freezing_blocks_casual_writes_for_an_unprivileged_process(layout):
+    """The behaviour the mode bits buy, where the process is not root."""
+    from layout import freeze_tree
+
     if os.geteuid() == 0:
-        pytest.skip("root ignores the write bit; the guard is against accident, not privilege")
+        pytest.skip("root ignores the write bit; test_freezing_clears_every_write_bit covers the mode")
+
+    _install_release(layout, "2026.09.01-001", "first")
+    release = layout.release("2026.09.01-001")
+    freeze_tree(release)
 
     with pytest.raises(PermissionError):
         (release / "compose.yaml").write_text("# edited\n", encoding="utf-8")
