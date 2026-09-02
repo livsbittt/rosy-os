@@ -205,3 +205,23 @@ class TestNavigation:
         nav.on_pose_progress(0.0, 0.0)
         assert nav.nav_state.value == "CANCELED"                       # NAV-006
         assert "nav.stuck" in [ev.type for ev in bus.history()]
+
+
+def test_manual_active_reports_a_live_teleop_session():
+    """도킹 복귀는 수동 조작 중이면 미뤄야 한다 (MANUAL 3 > DOCKING 4).
+    그 판정에 쓸 신호가 CommandManager 에 있어야 한다."""
+    from rosy_core.command.arbitration import Mode, ModeMachine, SourceRegistry
+    from rosy_core.command.manager import CommandManager
+    from rosy_core.safety.manager import BatteryPolicy, SafetyManager, SpeedLimits
+
+    safety = SafetyManager(SpeedLimits(), BatteryPolicy())
+    modes = ModeMachine()
+    command = CommandManager(SourceRegistry(), modes, safety)
+
+    assert command.manual_active is False
+    modes.transition(Mode.MANUAL)
+    accepted, reason = command.teleop(0.1, 0.0)
+    assert accepted, reason
+    assert command.manual_active is True
+    command.clear_manual()
+    assert command.manual_active is False

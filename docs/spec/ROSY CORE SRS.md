@@ -807,19 +807,46 @@ Raw ROS Publish 기능은 기본 비활성화하며 관리자 설정으로만 �
 
 ---
 
-# 19. Docking 확장 (스텁)
+# 19. Docking (D-28)
 
 ### DNC-001 Capability 플래그
 
-Docking 지원 여부는 Capability(`docking.supported`)로 선언한다. 첫 구현(Pinky Pro)은 `false`이다.
+Docking 지원 여부는 Capability(`docking.supported`)로 선언한다. 미선언 하드웨어의 기본값은 `false`이며, 그때 §DNC-003의 스텁 계약이 그대로 적용된다.
 
 ### DNC-002 모드 통합
 
-Docking 활성 로봇에서 Docking 시행 중 모드는 `DOCKING`(우선순위 4, §8.1)으로 전환되어야 한다. 해당 우선순위 슬롯은 CMD-001 설정에서 예약 관리한다.
+Docking 시행 중 모드는 `DOCKING`(우선순위 4, §8.1)으로 전환된다. **도킹 액션은 스테이징 주행(Nav2)까지 스스로 소유하며**, 명령 수락부터 도킹 완료 또는 실패까지 `DOCKING` 모드를 유지한다. 모드 전이표가 `NAVIGATION → DOCKING`을 허용하지 않기 때문이며, 이 구조 덕분에 도킹 중 Fleet 주행 명령이 끼어들지 못한다(4 > 5).
 
 ### DNC-003 스텁 계약
 
-Docking 미지원 로봇은 Docking 명령에 `501 CAPABILITY_NOT_SUPPORTED`로 응답해야 한다. 향후 상태(`DOCK/UNDOCK/CHARGING/DOCKED/DOCK_FAILED`)와 명령(`POST /api/v1/docking/dock|undock`)의 계약은 API Ref에서 관리한다.
+Docking 미지원 로봇은 Docking **명령**(`POST /api/v1/docking/dock|undock|cancel`)에 `501 CAPABILITY_NOT_SUPPORTED`로 응답해야 한다. **상태 조회(`GET /api/v1/docking/status`)는 예외로 항상 200을 반환**하며 `supported: false`를 함께 싣는다 — 읽기를 막으면 운영 화면이 "이 로봇은 도크가 없다"조차 표시할 수 없다.
+
+### DNC-004 상태
+
+| 상태 | 의미 |
+|---|---|
+| `UNDOCKED` | 기본. 도크에 있지 않고 가는 중도 아니다 |
+| `DOCKING` | 시퀀스 진행 중 (스테이징·획득·접근·착좌) |
+| `DOCKED` | 접점은 물렸으나 충전은 미확인 |
+| `CHARGING` | 충전이 확인됨 (DNC-006) |
+| `UNDOCKING` | 오도메트리만으로 후진 중 |
+| `DOCK_FAILED` | 재시도 소진. 명령 전까지 종착이며 **스스로 재시도하지 않는다** |
+
+**맵은 스테이징까지만 쓴다.** 로컬라이제이션 오차(±10 cm)가 접점 공차(±5 mm)보다 두 자릿수 크므로, 획득 이후의 모든 단계는 관측된 도크 상대 포즈에 폐루프를 건다. 언도킹은 반대로 센서를 보지 않고 오도메트리만으로 직진 후진한다 — 도크에 물린 상태에서는 어떤 거리 센서도 벽을 볼 뿐이다.
+
+### DNC-005 Dock Database
+
+도크는 Waypoint가 아니다. 기종(`dock_types`)과 개체(`docks`)를 분리해 저장하며, 개체는 맵 좌표 포즈·`map_id`·에이전트 주소를 갖는다. 스테이징 포즈는 저장하지 않고 오프셋으로 매번 계산한다(가르친 포즈가 낡은 스테이징을 남기지 않게).
+
+도크 포즈는 **teach-by-docking**으로 기록한다 — 로봇을 도크에 밀어넣은 뒤 그 순간의 맵 포즈를 `POST /api/v1/docking/docks/{id}/teach`로 저장한다. 다른 `map_id`의 도크 요청은 MAP-002에 따라 거부한다.
+
+### DNC-006 충전 확인과 자동 복귀
+
+**충전은 독립된 두 소스로 확인한다** — 도크 에이전트가 보고한 전류 **그리고** 필터를 통과한 팩 전압이 하락하지 않을 것. 로봇에는 충전 신호가 없고(§SAF-005), 이 판정이 D-27 셧다운 억제의 입력이므로, 단일 소스로는 네트워크상의 장치 하나가 안전 경로를 무력화할 수 있다.
+
+**확인된 충전은 SAF-005의 `deep` 셧다운을 억제한다**(D-27 Amendment). 억제 대상은 셧다운이며 단계 판정과 경보 표시는 유지된다.
+
+자동 복귀는 **Warning(20%)** 에서 발동한다. Critical(10%)은 2S 팩의 급락 구간이라 그 지점에서 출발하면 도크 도달을 보장할 수 없고, 전류 센서가 없어 경로 길이 기반 에너지 예산을 산출할 수단도 없다. 수동 조작 세션(우선순위 3)이 있으면 복귀는 보류되었다가 세션 종료 후 실행되며, 20% 위로 회복하면 취소된다. 도크가 없는 로봇에서는 SAF-005의 기존 `RETURN_HOME`/`STOP` 폴백이 그대로 남는다.
 
 ---
 

@@ -117,6 +117,7 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 | `severity` | `info`, `warning`, `error`, `critical` |
 | `command_priority` | 1=EMERGENCY, 2=SAFETY, 3=MANUAL, 4=DOCKING, 5=NAVIGATION, 6=FLEET, 7=IDLE |
 | `fleet_policy` | `STOP`, `HOLD`, `RETURN_HOME`, `CONTINUE` |
+| `dock_state` | `UNDOCKED`, `DOCKING`, `DOCKED`, `CHARGING`, `UNDOCKING`, `DOCK_FAILED` (v1.5 additive, DNC-004) |
 
 ### 좌표·계측
 
@@ -206,8 +207,15 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 | GET | `/metrics` | 내부/모니터링 | OBS-101 (Prometheus 형식, 토큰 면제는 배포 정책) |
 | GET | `/api/v1/ros/nodes\|topics\|services` | Admin | ROS-102 |
 | POST | `/api/v1/ros/publish` | Admin + 설정 ON | ROS-102 (기본 비활성) |
-| POST | `/api/v1/docking/dock` | Operator | DNC-003 (미지원 시 501) |
+| POST | `/api/v1/docking/dock` | Operator | DNC-003 (미지원 시 501). body: `{"dock": "dock_1"}` — 도크가 1개면 생략 가능 |
 | POST | `/api/v1/docking/undock` | Operator | DNC-003 |
+| POST | `/api/v1/docking/cancel` | Operator | DNC-003 |
+| GET | `/api/v1/docking/status` | Viewer | DNC-003 — **capability 무관 항상 200**, `supported` 포함 |
+| GET | `/api/v1/docking/docks` | Viewer | DNC-005 |
+| POST | `/api/v1/docking/types` | Admin | DNC-005 도크 기종 등록 |
+| POST | `/api/v1/docking/docks` | Admin | DNC-005 도크 개체 등록 |
+| DELETE | `/api/v1/docking/docks/{id}` | Admin | DNC-005 |
+| POST | `/api/v1/docking/docks/{id}/teach` | Operator | DNC-005 teach-by-docking |
 
 ---
 
@@ -394,7 +402,7 @@ Follower의 rosy_core은 스트림 수신 여부를 `stream_timeout_ms`(기본 1
   "teleop": true,
   "slam": true,
   "swarm": { "follow": true, "lead": true },
-  "docking": { "supported": false },
+  "docking": { "supported": false },   // true 이면 DNC-004~006 전체가 활성
   "sensors": ["lidar", "imu", "battery", "encoder"],
   "events": ["nav.*", "safety.*"],
   "api_versions": ["v1"],

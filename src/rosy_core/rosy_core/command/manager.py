@@ -58,6 +58,16 @@ class CommandManager:
         self.watchdog.refresh()
         return True, ""
 
+    @property
+    def manual_active(self) -> bool:
+        """살아 있는 teleop 세션이 있는가.
+
+        도킹 복귀 정책이 쓴다 — MANUAL(3)이 DOCKING(4)보다 위라, 운영자가 쥐고
+        있는 로봇을 배터리 정책이 빼앗지 않는다. 워치독이 만료된 명령은 이미
+        조종이 아니므로 세션으로 치지 않는다.
+        """
+        return self._manual_twist is not None and not self.watchdog.expired()
+
     def set_nav_twist(self, twist: Optional[Twist], now: Optional[float] = None) -> None:
         self._nav_twist = twist
         self._nav_updated_at = (

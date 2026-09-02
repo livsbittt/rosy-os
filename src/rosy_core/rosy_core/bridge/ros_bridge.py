@@ -29,7 +29,7 @@ from nav_msgs.msg import Odometry
 from nav2_msgs.action import NavigateToPose
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import BatteryState, Imu, LaserScan, Range
-from std_msgs.msg import Float32, String
+from std_msgs.msg import Bool, Float32, String
 from std_srvs.srv import Empty
 
 from rosy_interfaces.srv import SetLed
@@ -85,6 +85,8 @@ class RosBridge:
 
         self.power_mode_pub = node.create_publisher(String, "power/mode", _LATCHED)
         self.display_info_pub = node.create_publisher(String, "display/info", 10)
+        self.dock_exemption_pub = node.create_publisher(
+            Bool, "docking/collision_exemption", _LATCHED)
         self._led_client = node.create_client(SetLed, "set_led")
         # sllidar_ros2가 제공하는 모터 제어 서비스 (PWR-005).
         self._lidar_start_client = node.create_client(Empty, "start_motor")
@@ -94,9 +96,13 @@ class RosBridge:
         self._state_timer = node.create_timer(1.0 / self._state_hz, self._tick_state)
         self._diag_timer = node.create_timer(1.0, self._tick_diagnostics)
         self._power_timer = node.create_timer(1.0 / 5.0, self._tick_power)
+        self._dock_timer = node.create_timer(1.0 / 5.0, self._tick_docking)
 
         self._goal_handle = None
         self._last_odom_ts = 0.0
+        self._last_odom_xy = None
+        self._dock_odom_mark = None
+        self._applied_dock_exemption = False
         # slam_toolbox 를 모듈 최상단에서 임포트하면 브리지 임포트가, 따라서
         # 노드 기동 전체가 실패한다. core 이미지에는 설치되지 않고 pi5-lite
         # capabilities 도 slam: false 다. 여기서 시도하고 부재는 기록만 해서
@@ -122,6 +128,7 @@ class RosBridge:
 
         self._setup_diagnostics()
         self._svc.nav.executor = self
+        self._svc.docking.executor = self
         self._node.get_logger().info("ros_bridge ready (cmd_vel sole publisher @50Hz)")
 
     def _on_odom(self, msg: Odometry) -> None:
@@ -133,6 +140,7 @@ class RosBridge:
         )
         self._svc.state.set_pose(pose.position.x, pose.position.y, yaw)
         self._svc.state.set_velocity(msg.twist.twist.linear.x, msg.twist.twist.angular.z)
+        self._last_odom_xy = (pose.position.x, pose.position.y)
         self._svc.nav.on_pose_progress(pose.position.x, pose.position.y)
 
     def _on_battery(self, msg: Float32) -> None:
@@ -163,6 +171,10 @@ class RosBridge:
         # 빠져야 전압이 휴지 곡선 쪽으로 회복해 셧다운 판단의 근거가 나아진다.
         if battery.level is BatteryLevel.DEEP:
             self._svc.safety.trigger_estop("battery_deep")
+
+        # 20% 경고에서 도크 복귀를 시도한다 (DNC-006). 도크가 없거나
+        # 미지원이면 아무 일도 하지 않고 SAF-005 폴백이 그대로 남는다.
+        self._svc.docking.on_battery_level(battery.level)
 
         action = self._svc.safety.on_battery_percent(percent)
         if action == "RETURN_HOME":
@@ -366,6 +378,62 @@ class RosBridge:
         results = self.diagnostics.collect()
         for component, health in results.items():
             self._svc.state.set_diagnostic(component, health)
+
+
+    # --- DockingExecutor 구현 (docking.manager와 계약) -------------------------
+    #
+    # 정책은 rosy_core.docking.manager 가 갖고 여기는 조정만 한다 — power/mode 와
+    # PWR-005 LiDAR 의도와 같은 형태다.
+
+    def navigate_to(self, pose) -> None:
+        """스테이징 주행. 도킹 액션이 Nav2 구간까지 소유하므로 여기서 부른다."""
+        self.send_goal(NavGoalSpec(x=pose.x, y=pose.y, yaw=pose.yaw))
+
+    def cancel_navigation(self) -> None:
+        self.cancel_goal()
+
+    def drive(self, linear: float, angular: float) -> None:
+        """접근·후진 속도. 기존 cmd_vel 멀렉서를 통과시킨다.
+
+        nav 슬롯을 쓴다. 수동 조작(우선순위 3)이 도킹(4)을 이겨야 하는데 멀렉서가
+        이미 manual 을 위에 두고 있고, DOCKING 과 NAVIGATION 사이의 구분은 여기서
+        의미가 없다 — 도킹 중에는 도킹 매니저가 주행을 소유하므로 경쟁할 nav
+        목표 자체가 존재하지 않는다.
+        """
+        self._svc.command.set_nav_twist(CoreTwist(linear=linear, angular=angular))
+
+    def stop(self) -> None:
+        self._svc.command.set_nav_twist(CoreTwist(linear=0.0, angular=0.0))
+
+    def set_collision_exemption(self, enabled: bool) -> None:
+        """도크는 코스트맵에 장애물로 찍힌다 — 접근 구간에만 면제를 선언한다.
+
+        Nav2 에 이를 끄는 표준 서비스가 없어서 의도를 토픽으로 내보낸다. 실제
+        코스트맵 연동은 실기 항목으로 남는다(DOCK_GO).
+        """
+        if enabled == self._applied_dock_exemption:
+            return
+        self._applied_dock_exemption = enabled
+        self.dock_exemption_pub.publish(Bool(data=bool(enabled)))
+        self._node.get_logger().info(
+            "docking collision exemption %s" % ("on" if enabled else "off"))
+
+    def reset_odometry_mark(self) -> None:
+        self._dock_odom_mark = self._last_odom_xy
+
+    def travelled_m(self) -> float:
+        """마크 이후 이동 거리. 언도킹은 센서를 보지 않고 이 값만 쓴다."""
+        if self._dock_odom_mark is None or self._last_odom_xy is None:
+            return 0.0
+        return math.hypot(self._last_odom_xy[0] - self._dock_odom_mark[0],
+                          self._last_odom_xy[1] - self._dock_odom_mark[1])
+
+    def _tick_docking(self) -> None:
+        docking = self._svc.docking
+        docking.on_navigation_state(self._svc.nav.nav_state)
+        docking.set_manual_active(self._svc.command.manual_active)
+        docking.tick()
+        self._svc.state.set_docking(docking.status())
 
     # --- NavExecutor 구현 (navigation.manager와 계약) -------------------------
 
