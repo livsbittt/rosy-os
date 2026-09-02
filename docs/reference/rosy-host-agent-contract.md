@@ -160,6 +160,14 @@ Host Agent는 아래 명령만 안다. 임의 명령, 임의 경로, 임의 인�
 | `service.status` | `unit` (고정 목록 내에서만) | viewer | 불필요 |
 | `system.reboot` | — | administrator | 필요 |
 
+**`system.shutdown`은 이 표에 없고, 앞으로도 추가하지 않는다.** 저배터리 셧다운은
+사람이 없는 상태에서 발화하므로 인증할 administrator도 확인해 줄 operator도 없다.
+그 경로를 여기에 뚫으면 이 문서 전체의 근거인 "무인·무확인 실행을 거부한다"가
+무너진다. 대신 CORE가 파일에 관찰을 기록하고 호스트 유닛이 스스로 판단하는
+일방향 센티넬을 쓴다 — 명령 채널이 아니므로 이 계약의 대상이 아니다. 근거와
+인터록은 ADR D-27, 설계는
+`docs/plans/2026-09-02-battery-integrity-low-battery-alert-design.md`에 있다.
+
 규칙:
 
 - `profile_id`, `release_id`, `unit`은 **열거된 값과 대조**한다. 문자열을 그대로
