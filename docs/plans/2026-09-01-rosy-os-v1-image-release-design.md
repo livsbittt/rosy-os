@@ -4,7 +4,7 @@
 - **Date:** 2026-09-01
 - **Target:** Raspberry Pi 5 8 GB / Raspberry Pi OS Lite 64-bit / ROS 2 Jazzy
 - **Audience:** ROSY 런타임, 배포, 운영 UI, 현장 시운전 담당자
-- **Related:** ROSY-CORE-SRS-001, ROSY-FLEET-SRS-001, ROSY-API-REF-001, ADR D-5/D-6/D-12/D-19/D-22/D-23
+- **Related:** ROSY-CORE-SRS-001, ROSY-FLEET-SRS-001, ROSY-API-REF-001, ADR D-5/D-6/D-12/D-22/D-23/D-26 (D-26이 D-19을 대체)
 
 ## 1. 목적
 
@@ -545,10 +545,13 @@ E-stop 해제나 hardware mode 승격은 별도 현장 안전 절차를 따른�
 ### 12.3 Raspberry Pi 5 인수
 
 1. SD 기록 후 유선 연결 없이 부팅한다.
-2. 설정 AP와 setup UI로 Site Wi-Fi를 등록한다.
+2. 설정 AP와 setup UI로 Site Wi-Fi와 운용 모드를 등록한다.
 3. 실패한 자격정보에서 AP 복귀를 확인한다.
-4. 정상 WLAN에서 mDNS와 IPv4 대시보드에 다른 단말로 접속한다.
-5. 인터넷과 peer 접속을 각각 기록한다.
+4. `SITE_STA`에서 mDNS와 IPv4 대시보드에 다른 단말로 접속한다.
+5. 인터넷과 peer 접속을 각각 기록한다. 공유기의 client isolation으로 peer만
+   실패할 수 있으므로 같은 판정으로 묶지 않는다.
+5a. `RELAY_AP_STA`를 켠 장비에서 사용자 단말이 로봇 AP를 경유해 접속되는지,
+    상위 업링크를 끊어도 로봇 AP 서브넷 안의 제어가 유지되는지 확인한다.
 6. 인터넷을 차단해도 로컬 대시보드가 유지되는지 확인한다.
 7. 전원 재인가 후 CORE 자동 복구를 확인한다.
 8. 정상 update, 손상/미서명 update와 health-failure rollback을 실행한다.

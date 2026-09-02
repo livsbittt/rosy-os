@@ -138,9 +138,13 @@ native ARM64 빌드 호스트에서:
 
 ## 6. UPDATE_GO — 실기 update와 rollback
 
-tmpdir에서는 전부 통과했다(`test_release_updater.py`). 실기에서 다시 확인한다.
+activation·rollback·전원손실 복구는 tmpdir에서 검증되어 있다
+(`test_release_updater.py`). 아래 항목 중 **`deploy/release/`에 구현이 없어 지금은
+어떤 테스트로도 실패시킬 수 없는 것**은 ⚠로 표시했다 — WP-6에서 구현하며, 그전까지
+이 항목들은 인수 대상이 아니라 구현 대상이다.
 
-- [ ] 정상 번들 설치 → `current`가 새 릴리스, `previous`가 이전 릴리스
+- [ ] ⚠ 정상 번들 설치 → `current`가 새 릴리스, `previous`가 이전 릴리스
+      (번들 압축 해제와 staging은 아직 구현되지 않았다)
 - [ ] **손상된 번들** 거부 — payload를 1바이트 바꾼다 → `CHECKSUM_MISMATCH`
 - [ ] **미서명 번들** 거부 → `SIGNATURE_MISSING`
 - [ ] **다른 키로 서명된 번들** 거부 → `SIGNATURE_INVALID`
@@ -154,14 +158,18 @@ tmpdir에서는 전부 통과했다(`test_release_updater.py`). 실기에서 다
 - [ ] 대시보드에 current/previous/staged와 실패 사유가 표시되는가
 - [ ] 롤백 후 이전 릴리스의 컨테이너 이미지가 남아 있는가 —
       `release-retention.md` §4의 prune 금지 규칙이 지켜지는가
-- [ ] 활성화 성공 후 staging 디렉터리가 정리되는가
-- [ ] 여유 공간 부족 시 업데이트를 **시작하지 않고** 거부하는가
+- [ ] ⚠ 활성화 성공 후 staging 디렉터리가 정리되는가 (미구현)
+- [ ] ⚠ 여유 공간 부족 시 업데이트를 **시작하지 않고** 거부하는가 (미구현)
 
 ## 7. MOTOR_HOLD — 유지되어야 하는 상태
 
 이 절은 통과시키는 것이 아니라 **깨지지 않았음을 확인**하는 것이다.
 
 - [ ] 위 모든 시험 뒤에도 runtime mode가 `core`인가
+- [ ] **모터 모드로 승인된 장비에서** 업데이트를 실패시켰을 때, 롤백 뒤에도
+      `core`인가 (updater가 이전 record의 mode를 `core`로 강제한다 —
+      실기에서 반드시 확인할 것)
+- [ ] 열 상승과 저장소 로그 증가를 기록했는가 (설계 §12.3 10단계)
 - [ ] UART·모터 승인은 별도 commissioning 절차로 남아 있는가
       (`deploy/robot/verify-motors.sh`, `docs/deployment/power-bench-verification.md`)
 

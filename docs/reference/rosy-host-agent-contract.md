@@ -71,8 +71,19 @@ credential 검사**에서 나온다(§3).
 설정 파일이 되며, 설계 §2.7이 금지하는 "이미지에 담긴 공유 비밀"로 되돌아간다.
 커널이 이미 정확한 답을 무료로 주는데 비밀을 새로 만들 이유가 없다.
 
-사용자 신원은 별개 층이다. Host Agent가 아는 것은 "요청한 것이 CORE"라는 사실뿐이고,
-**어떤 사람이 요청했는지는 CORE가 판단해 요청에 실어 보낸다**(§5).
+**이 검사가 실제로 증명하는 것은 "uid가 `ROSY_UID`인 어떤 프로세스"이지 "CORE"가
+아니다.** compose는 user namespace 재매핑을 쓰지 않으므로 컨테이너의 uid 1000은
+호스트의 uid 1000과 같은 사용자다. Raspberry Pi OS Lite에서 uid 1000은 보통 사람이
+로그인하는 기본 계정이다. 그대로 두면 그 계정의 SSH 세션이 `release.install`,
+`network.apply_profile`, `system.reboot`을 그대로 호출할 수 있다.
+
+따라서 **CORE에 로그인 계정과 구분되는 전용 시스템 uid를 부여하는 것이 이 인증의
+전제 조건이다.** 이미지 빌드(WP-6)에서 `rosy` 시스템 사용자를 만들고
+`ROSY_UID`/`ROSY_GID`를 거기에 맞춘다. 그전까지 이 계약의 인증 강도는 "로컬 로그인
+사용자와 동등"이며, 그 이상으로 취급해서는 안 된다.
+
+사용자 신원은 그 위의 별개 층이다. **어떤 사람이 요청했는지는 CORE가 판단해 요청에
+실어 보낸다**(§5).
 
 ## 4. 요청 경로
 
@@ -158,15 +169,23 @@ Host Agent는 아래 명령만 안다. 임의 명령, 임의 경로, 임의 인�
 
 ## 7. Host Agent가 갖지 않는 것
 
-- CORE 컨테이너에 Docker socket이나 host root를 전달하지 않는다. 이 제약은 문서가
-  아니라 CI가 강제한다 — `test_core_never_receives_a_container_runtime_socket`,
-  `test_core_never_receives_host_root`, `test_core_joins_no_extra_host_groups`.
+- CORE 컨테이너에 Docker socket이나 host root를 전달하지 않는다. 이 제약은
+  `test_core_never_receives_a_container_runtime_socket`,
+  `test_core_never_receives_host_root`,
+  `test_core_writes_to_nothing_on_the_host_but_its_own_data`,
+  `test_core_joins_no_extra_host_groups`가 compose를 파싱해 검사한다. 이 검사들은
+  `${VAR:-기본값}`을 먼저 전개한 뒤 경로를 비교하며, 소켓은 상위 디렉터리를 통해
+  전달되는 경우까지 본다 — 문자열 부분 일치로 검사하던 초기 판본은 `:ro`를 붙이거나
+  `/var/run`을 통째로 마운트하는 것을 놓쳤다.
 - Host Agent는 `/cmd_vel`을 비롯한 어떤 이동 명령 경로도 갖지 않는다. 모터는
   ROS 2 어댑터의 영역이고 Host Agent는 거기에 닿지 않는다.
 - Host Agent는 E-stop 해제나 hardware 모드 승격을 수행하지 않는다. 설계 §10이
   정한 대로 별도 현장 안전 절차다.
 - `release.install`과 `release.rollback`은 언제나 `core`로 끝난다. Host Agent에
-  motor/hardware로 기동하라고 요청하는 명령은 존재하지 않는다.
+  motor/hardware로 기동하라고 요청하는 명령은 존재하지 않으며, updater의 rollback은
+  이전 activation record의 mode를 그대로 되살리지 않고 `core`로 강제한다
+  (`updater._previous_record`). 모터 모드로 승인된 로봇이 업데이트에 실패했을 때
+  바퀴가 살아난 채 돌아오지 않도록 하기 위한 것이다.
 
 ## 8. 감사
 

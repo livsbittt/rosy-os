@@ -307,7 +307,7 @@ ROS `/diagnostics` + 자체 수집(CPU/MEM/Disk/온도/네트워크) → 컴포�
 | P1-18 | map_id 노출 + Goal 검증 (MAP-001, MAP-002, D-13) | 불일치 Goal `MAP_MISMATCH` 거부 | S |
 | P1-19 | **프로토콜 스키마 패키지 고정** (D-10): envelope/이벤트 스키마(PRT-001, API Ref §7·8)를 `rosy_core/protocol/`에 구현·버전화 | 스키마 단위 테스트 통과 | S |
 | P1-20 | 저배터리 정책 + Stuck 감지 (SAF-005, NAV-006) | 임계값 주입 시나리오 통과 | M |
-| P1-21 | 네트워크 프로비저닝: WiFi 릴레이(AP+STA) NetworkManager 프로파일 스크립트 + 접속 가이드(SSID·게이트웨이 IP 폴백) (NET-001~004, D-19) | 릴레이 AP 접속 기기에서 `rosy-01.local:8080` 접근 확인 | S |
+| P1-21 | 네트워크 프로비저닝: `SITE_STA`(기본)와 `RELAY_AP_STA`(장비별 옵트인) NetworkManager 프로파일 스크립트 + 접속 가이드(모드별 폴백 주소) (NET-001~005, D-19→D-26) | 두 모드 각각에서 다른 단말이 대시보드에 접근하는지 확인 | S |
 
 **M1 완료 기준:** ROS CLI 없이 API만으로 기본 기능 제어. **AT 16건 중 API 계열 12건 통과**(브라우저 4건: AT-02, 05, 09, 11은 M2).
 
@@ -479,7 +479,7 @@ ROS `/diagnostics` + 자체 수집(CPU/MEM/Disk/온도/네트워크) → 컴포�
 | SRV-001 | CORE | P1-12 | AT-01 |
 | CFG-001/002 | CORE | P1-1 | 설정 로드 |
 | SEC-101~103 | CORE | P1-9 | 권한 테스트 |
-| NET-001~004 | CORE | P1-21 | AT-02 (릴레이 AP 경유) |
+| NET-001~005 | CORE | P1-21 | AT-02 (SITE_STA peer 접속 / RELAY_AP_STA 경유, 각각) |
 | SWM-001~006 | CORE/FLEET | P5-3, P1-19(스키마) | FAT-06 |
 | LOG-001/002 | CORE | P1-9, P1-17 | 감사 검증 |
 | PRT-001~006 | API Ref | P1-19, P4-2, P4-6 | FAT-02, 03 |

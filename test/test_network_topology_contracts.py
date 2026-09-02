@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ADR = ROOT / "docs" / "reference" / "ROSY ADR Log.md"
 SRS = ROOT / "docs" / "spec" / "ROSY CORE SRS.md"
 DESIGN = ROOT / "docs" / "plans" / "2026-09-01-rosy-os-v1-image-release-design.md"
+IMPLEMENTATION_PLAN = ROOT / "docs" / "plan" / "ROSY Implementation Plan.md"
 
 CONTRACT_DOCS = (ADR, SRS, DESIGN)
 
@@ -25,6 +26,19 @@ RELAY = "RELAY_AP_STA"
 
 def _text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def _section(text: str, heading: str, level: str = "## ") -> str:
+    """The body of one heading, ending at the next heading of the same level.
+
+    Splitting to end-of-file made several checks below vacuous: content that
+    had moved into a *later* section still satisfied an assertion about this
+    one, so reverting NET-002 to relay-only passed.
+    """
+    assert heading in text, f"missing heading: {heading}"
+    body = text.split(heading, 1)[1]
+    marker = "\n" + level
+    return body.split(marker, 1)[0] if marker in body else body
 
 
 @pytest.fixture(scope="module")
@@ -50,20 +64,41 @@ def test_contract_documents_exist():
 # --- ADR governance -------------------------------------------------------
 
 
+#: D-19's original reasoning, which the ADR log's rule says must not be
+#: rewritten when a decision is replaced. Asserted verbatim so that editing
+#: the superseded record in place fails rather than passing quietly.
+D19_ORIGINAL_DECISION = (
+    "**Decision:** 해당 토폴로지를 표준 배포 시나리오로 수용한다(NET-001~004)."
+)
+D19_ORIGINAL_CONTEXT = (
+    '현장 네트워크 구성이 "로봇이 상위 WiFi에 연결된 채 AP처럼 동작해 무선을 릴레이"하는'
+)
+
+
+def test_the_adr_log_still_requires_superseding_rather_than_editing(adr):
+    """The governance rule this whole test module rests on."""
+    assert "기존 ADR을 수정하지 않고" in adr
+    assert "`Superseded`" in adr
+
+
 def test_d19_is_superseded_not_edited_in_place(adr):
     """The ADR log's own rule: supersede, never rewrite a decision."""
-    assert "## D-19 접속 토폴로지: 로봇 WiFi 릴레이(AP+STA) 지원" in adr, (
-        "D-19 must survive verbatim as the historical record"
+    section = _section(adr, "## D-19 접속 토폴로지: 로봇 WiFi 릴레이(AP+STA) 지원")
+    assert "**Status:** Superseded by D-26" in section
+    assert D19_ORIGINAL_DECISION in section, (
+        "D-19's original Decision must survive verbatim; the ADR log forbids "
+        "rewriting a superseded record"
     )
-    assert "**Status:** Superseded by D-26" in adr
+    assert D19_ORIGINAL_CONTEXT in section, "D-19's original Context must survive verbatim"
     assert "| D-19 | 접속 토폴로지: 로봇 WiFi 릴레이(AP+STA) 지원 | Superseded by D-26 |" in adr
 
 
 def test_d26_exists_and_replaces_d19(adr):
-    assert "## D-26" in adr
-    d26 = adr.split("## D-26", 1)[1]
+    d26 = _section(adr, "## D-26")
     assert "D-19 대체" in d26
     assert SITE_STA in d26 and RELAY in d26
+    for heading in ("**Context:**", "**Decision:**", "**Consequences:**"):
+        assert heading in d26, f"D-26 is missing {heading}"
 
 
 def test_adr_index_lists_every_decision_section(adr):
@@ -94,6 +129,36 @@ def test_relay_is_in_v1_scope_everywhere():
             )
 
 
+#: Wording from the superseded contract. Present anywhere outside D-19's own
+#: historical record, it means the old decision has crept back in alongside
+#: the new one — which is how two contradictory contracts coexist unnoticed.
+SUPERSEDED_WORDING = (
+    "표준 배포 시나리오",
+    "WiFi 릴레이 모드 (AP+STA 동시)",
+    "## 3.1 네트워크 접속 (WiFi 릴레이 토폴로지)",
+)
+
+
+def test_the_superseded_contract_does_not_survive_outside_d19(adr, srs, design):
+    """Adding the new decision is not enough; the old one has to stop applying."""
+    adr_outside_d19 = adr.replace(
+        _section(adr, "## D-19 접속 토폴로지: 로봇 WiFi 릴레이(AP+STA) 지원"), ""
+    )
+    for phrase in SUPERSEDED_WORDING:
+        assert phrase not in srs, f"SRS still carries the superseded contract: {phrase!r}"
+        assert phrase not in design, f"design still carries the superseded contract: {phrase!r}"
+        assert phrase not in adr_outside_d19, (
+            f"the superseded contract appears outside D-19's record: {phrase!r}"
+        )
+
+
+def test_the_srs_does_not_declare_relay_the_default(srs):
+    section = _section(srs, "## 3.1 ")
+    assert "기본값은 `SITE_STA`" in section
+    for claim in ("릴레이를 기본으로", "기본은 릴레이", "기본값은 `RELAY_AP_STA`"):
+        assert claim not in section, f"SRS contradicts D-26: {claim!r}"
+
+
 def test_both_modes_named_in_every_contract_document():
     for path in CONTRACT_DOCS:
         text = _text(path)
@@ -114,10 +179,15 @@ def test_relay_is_declared_opt_in(adr, srs, design):
     assert "장비별 옵트인으로 한다" in design
 
 
+def _flat(text: str) -> str:
+    """Collapse whitespace so a neutral reflow does not fail an assertion."""
+    return " ".join(text.split())
+
+
 def test_both_modes_share_the_first_boot_provisioning_ap(adr, srs, design):
     assert "동일한 첫 부팅 설정 AP" in adr
     assert "두 모드 모두 동일한 첫 부팅 설정 AP로 프로비저닝된다" in srs
-    assert "두 운용\n모드 어느 쪽으로 갈지는 프로비저닝 단계에서 선택" in design
+    assert "두 운용 모드 어느 쪽으로 갈지는 프로비저닝 단계에서 선택" in _flat(design)
 
 
 def test_provisioning_ap_is_separate_from_the_operating_relay_ap(srs, design):
@@ -132,7 +202,7 @@ def test_provisioning_ap_is_separate_from_the_operating_relay_ap(srs, design):
 
 
 def test_srs_net_requirements_cover_both_modes(srs):
-    section = srs.split("## 3.1 ", 1)[1].split("### IDN-003", 1)[0]
+    section = _section(srs, "## 3.1 ").split("### IDN-003", 1)[0]
     for req in ("NET-001", "NET-002", "NET-003", "NET-004", "NET-005"):
         assert f"### {req}" in section, f"{req} missing from SRS 3.1"
 
@@ -161,3 +231,23 @@ def test_dashboard_network_card_shows_the_relay_mode(design):
 def test_design_points_at_the_superseding_adr(design):
     assert "ADR D-26" in design
     assert "D-19를 D-26으로 대체" in design
+
+
+def test_the_implementation_plan_points_at_the_current_decision():
+    """A plan still citing D-19 will be executed against the old contract.
+
+    This file is not in CONTRACT_DOCS above because it is a schedule rather
+    than a contract, but it names the decision it implements, and that name
+    has to be the one still in force.
+    """
+    text = _text(IMPLEMENTATION_PLAN)
+    for line in text.splitlines():
+        if "D-19" in line:
+            assert "D-26" in line, (
+                f"the implementation plan cites D-19 without D-26: {line.strip()!r}"
+            )
+
+
+def test_the_design_header_names_the_decision_in_force(design):
+    header = design.split("## 1.", 1)[0]
+    assert "D-26" in header, "the design's Related list must name D-26, not only D-19"

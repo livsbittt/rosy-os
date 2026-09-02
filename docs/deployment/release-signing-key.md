@@ -39,7 +39,10 @@ openssl pkey -in rosy-release-2026-01.key -pubout -out rosy-release-2026-01.pem
 ```
 
 - `.key`가 개인키다. 이 파일은 서명 환경을 절대 떠나지 않는다.
-- `.pem`이 공개키다. 이것만 이미지와 저장소에 들어간다.
+- `.pem`이 공개키다. 이것은 **이미지에** 들어간다 — 장비의
+  `/etc/rosy/trusted-release-keys/<key-id>.pem`. 저장소에는 커밋하지 않는다:
+  `test_no_private_key_is_tracked_in_the_repository`가 확장자만 보고 거부하며,
+  공개키 예외를 두면 개인키가 섞여 들어와도 알아채지 못한다.
 - key id(`rosy-release-2026-01`)는 manifest의 `signing_key_id`와 장비의
   `/etc/rosy/trusted-release-keys/` 파일명에 함께 쓰인다. 소문자·숫자·하이픈만
   허용된다(`deploy/release/manifest.py`의 `_KEY_ID`).
@@ -54,13 +57,15 @@ openssl pkey -in rosy-release-2026-01.key -pubout -out rosy-release-2026-01.pem
 - 서명 작업 로그(언제, 어떤 release_id, 어떤 git revision에 서명했는지)를
   남기고 일반 artifact와 **분리 보관**한다.
 
-**금지 사항** — 아래는 CI가 기계적으로 막는다(`test_release_boundary_guards.py`,
-`test_release_signing.py`):
+**금지 사항.** 아래 넷 중 CI가 실제로 막을 수 있는 것은 저장소 안에서 일어나는
+둘뿐이다. 나머지 둘은 운영 규율이며, CI가 지켜준다고 착각하면 안 된다.
 
-- 저장소에 개인키를 커밋하는 것
-- 컨테이너 이미지나 SD 이미지에 개인키를 넣는 것
-- 빌드 호스트에 개인키를 두는 것
-- `.key` / `.pem` / `id_ed25519` 형태의 파일을 추적 대상에 넣는 것
+| 금지 | 강제 수단 |
+|---|---|
+| 저장소에 개인키를 커밋하는 것 | `test_no_private_key_is_tracked_in_the_repository` + `secret_scan` |
+| `.key` / `.pem` / `id_ed25519` 형태의 파일을 추적 대상에 넣는 것 | 같은 테스트 |
+| 컨테이너·SD 이미지에 개인키를 넣는 것 | **CI 밖.** WP-6의 이미지 검사가 마운트된 트리에 `secret_scan`을 돌려야 확인된다 |
+| 빌드 호스트에 개인키를 두는 것 | **CI 밖.** 서명 환경 분리라는 운영 규율로만 보장된다 |
 
 ## 5. 백업
 
@@ -85,8 +90,12 @@ v1의 온라인 키 rotation은 비범위다. 교체 경로는 하나뿐이다.
 
 ## 7. 릴리스 서명 절차
 
+> **`sign_release.py`는 아직 없다.** 아래 CLI는 WP-6에서 이미지 파이프라인과 함께
+> 붙일 목표 인터페이스이며, 지금 복사해 실행하면 실패한다. 그때까지는 서명 환경에서
+> `deploy/release/signing.py`의 함수를 직접 호출한다.
+
 ```bash
-# 서명 환경에서
+# 목표 인터페이스 (WP-6에서 제공 예정)
 python3 deploy/release/sign_release.py dist/2026.09.01-001 \
     --private-key /secure/rosy-release-2026-01.key
 ```
@@ -97,8 +106,6 @@ python3 deploy/release/sign_release.py dist/2026.09.01-001 \
 - `sign_checksums(sums, private_key)` — raw Ed25519 64바이트 서명을 base64로
 - `verify_release_files(root, public_key)` — 서명 먼저, 그 다음 파일 checksum
 
-`sign_release.py` CLI 자체는 WP-6에서 이미지 파이프라인과 함께 붙인다. 그때까지는
-위 함수를 직접 호출한다.
 
 ## 8. 검증 순서를 바꾸지 말 것
 

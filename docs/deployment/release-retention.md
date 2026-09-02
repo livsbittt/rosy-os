@@ -27,10 +27,15 @@ staging 할 공간이 없으면 업데이트가 시작조차 못 하고, 이전 
 | 이벤트 `/var/lib/rosy/events` | 500 MB 상한 | 오래된 이벤트부터 회전 |
 | 맵 `/var/lib/rosy/maps` | 1 GB 상한 | 삭제하지 않고 경고만 — 맵은 사용자 자산이다 |
 | staging `/var/cache/rosy/releases` | 업데이트 중 최대 1 세트 ~3 GB | 활성화 후 즉시 삭제 |
-| 여유 공간 | 최소 4 GB 상시 확보 | 아래 §5 |
+| 여유(상시) | 4 GB | §5의 진입 조건으로 보호 |
 
-합계는 32 GB 카드에서 약 20 GB를 쓰고 나머지를 여유로 남긴다. 16 GB 카드는
-릴리스 보존 수를 2로 줄여야 하며, v1의 권장 최소 용량은 **32 GB**다.
+위 항목의 합은 약 **14.7 GB**이고, 상시 확보할 여유 4 GB를 더하면 약 **18.7 GB**다.
+32 GB 카드(포맷 후 실사용 약 29 GB)에서는 10 GB가량 남는다.
+
+16 GB 카드는 성립하지 않는다. 보존 릴리스를 3개에서 2개로 줄여도 릴리스 디렉터리
+200 MB와 이미지 한 세트 2.7 GB만 회수되어 약 15.8 GB가 필요하고, 포맷 후 실사용
+용량(약 14.5 GB)을 이미 넘는다. **v1의 최소 용량은 32 GB이며 권장은 64 GB다** —
+64 GB면 §5의 업데이트 진입 조건을 여유 있게 만족한다.
 
 숫자 중 컨테이너 이미지 크기는 현재 `deploy/robot/Dockerfile`의 `ros:jazzy-ros-base`
 기반 추정이며, WP-6에서 실제 이미지를 빌드한 뒤 실측으로 교체해야 한다. 나머지는
@@ -44,7 +49,7 @@ staging 할 공간이 없으면 업데이트가 시작조차 못 하고, 이전 
   현재(current)와 이전(previous)이 최소 조건이다.
 - 최초 factory recovery 이미지는 별도 보관하며 이 정책의 대상이 아니다.
 
-`deploy/release/updater.py`의 `releases_to_keep(installed, keep_last, protected)`가
+`deploy/release/updater.py`의 `releases_to_keep(installed, *, keep_last, protected)`가
 이 규칙을 구현한다. `protected`가 비어 있지 않으면 `keep_last`를 초과해서라도
 유지한다 — **롤백 대상 릴리스를 지우는 것은 복구 가능한 실패를 현장 방문으로
 바꾸는 일이다.**
@@ -59,7 +64,7 @@ staging 할 공간이 없으면 업데이트가 시작조차 못 하고, 이전 
 규칙: **어떤 activation record가 참조하는 릴리스의 manifest에 적힌 digest는
 절대 prune하지 않는다.**
 
-`prunable_image_digests(all_digests, activation_records, manifests_by_release)`가
+`prunable_image_digests(all_digests, *, activation_records, manifests_by_release)`가
 이를 계산한다. 두 가지 보수적 동작이 있다.
 
 - 활성 릴리스의 manifest를 읽을 수 없으면 **아무것도 prune하지 않는다.** 살아있는
@@ -77,7 +82,10 @@ staging 할 공간이 없으면 업데이트가 시작조차 못 하고, 이전 
 (번들 크기 + 압축 해제분)을 확보하지 못하면 **업데이트를 시작하지 않고 거부한다.**
 절반쯤 풀린 staging을 남기고 실패하는 것보다 시작하지 않는 편이 낫다.
 
-- 진입 조건: 여유 공간 ≥ 번들 크기 × 2.5 + 1 GB
+- 진입 조건: 여유 공간 ≥ 번들 크기 × 2.5 + 1 GB.
+  ~3 GB 번들이면 8.5 GB가 필요하다. §2의 예산이 32 GB 카드에서 남기는 약 10 GB로
+  충족되며, 이 숫자가 최소 용량을 32 GB로 정한 이유다. 16 GB 카드에서는 이 조건을
+  만족시킬 수 없다.
 - 미달 시: `UPDATE REJECTED`, 사유는 필요/가용 용량을 숫자로 표시
 - 활성화 성공 직후 staging 디렉터리를 삭제하고, 그 다음에 보존 정책(§3, §4)을 적용
 
@@ -92,3 +100,15 @@ staging 할 공간이 없으면 업데이트가 시작조차 못 하고, 이전 
 - 현재 여유 공간과 업데이트 진입 조건 충족 여부
 - 보존 중인 릴리스 목록과 각각이 current/previous인지
 - 정리로 삭제된 항목과 그 사유
+
+## 7. 아직 구현되지 않은 것
+
+§3의 릴리스 보존과 §4의 prune 금지 규칙은 `updater.py`에 구현되어 있고 테스트가
+있다. 아래는 **정책만 정의되어 있고 코드가 없다.** WP-6/WP-7에서 구현한다.
+
+- §5의 여유 공간 진입 조건 검사
+- 활성화 성공 후 staging 디렉터리 삭제
+- 이벤트·맵 상한 강제와 회전
+- §6의 대시보드 표시
+
+이 문서를 근거로 "저장소 관리가 끝났다"고 판단하지 말 것.
