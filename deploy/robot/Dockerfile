@@ -55,10 +55,13 @@ COPY deploy/robot/requirements-io.txt /tmp/requirements-io.txt
 RUN apt-get -o Acquire::Retries=5 update \
     && apt-get install -y --no-install-recommends \
         python3-pip \
+        python3-yaml \
         ros-jazzy-joint-state-publisher \
         ros-jazzy-robot-state-publisher \
         ros-jazzy-tf-transformations \
         ros-jazzy-xacro \
+        ros-jazzy-navigation2 \
+        ros-jazzy-nav2-bringup \
     && python3 -m pip install --break-system-packages --no-cache-dir \
         -r /tmp/requirements-io.txt \
     && rm -rf /var/lib/apt/lists/* /tmp/requirements-io.txt
@@ -74,10 +77,11 @@ RUN git clone https://github.com/Slamtec/sllidar_ros2.git src/sllidar_ros2 \
 COPY src/rosy_interfaces ./src/rosy_interfaces
 COPY src/rosy_description ./src/rosy_description
 COPY src/rosy_bringup ./src/rosy_bringup
+COPY src/rosy_navigation ./src/rosy_navigation
 RUN mkdir -p src/rosy_description/meshes
 RUN source /opt/ros/jazzy/setup.bash \
     && colcon build --merge-install \
-        --packages-select sllidar_ros2 rosy_interfaces rosy_description rosy_bringup
+        --packages-select sllidar_ros2 rosy_interfaces rosy_description rosy_bringup rosy_navigation
 
 FROM io-runtime AS io
 

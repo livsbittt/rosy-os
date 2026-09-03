@@ -1,20 +1,12 @@
 """Static contract tests for the Raspberry Pi robot runtime."""
 
-from pathlib import Path
-
 import yaml
 
-
-ROOT = Path(__file__).resolve().parents[1]
-DEPLOY = ROOT / "deploy" / "robot"
-
-
-def _compose() -> dict:
-    return yaml.safe_load((DEPLOY / "compose.yaml").read_text(encoding="utf-8"))
+from robot_contracts import DEPLOY, ROOT, board_caps, board_profile, compose
 
 
 def test_runtime_separates_core_from_hardware_devices():
-    services = _compose()["services"]
+    services = compose()["services"]
 
     assert set(services) == {"rosy-core", "rosy-motor", "rosy-io"}
     assert "devices" not in services["rosy-core"]
@@ -31,7 +23,7 @@ def test_runtime_separates_core_from_hardware_devices():
 
 
 def test_runtime_uses_local_ros_network_and_bounded_logs():
-    services = _compose()["services"]
+    services = compose()["services"]
 
     for service in services.values():
         assert service["network_mode"] == "host"
@@ -45,7 +37,7 @@ def test_runtime_uses_local_ros_network_and_bounded_logs():
 
 
 def test_runtime_uses_one_namespace_and_a_real_core_health_endpoint():
-    services = _compose()["services"]
+    services = compose()["services"]
     namespace_arg = "__ns:=/${ROSY_NAMESPACE:-rosy_01}"
 
     assert namespace_arg in services["rosy-core"]["command"]
@@ -55,7 +47,7 @@ def test_runtime_uses_one_namespace_and_a_real_core_health_endpoint():
 
 
 def test_runtime_builds_distinct_targets_from_shared_dockerfile():
-    services = _compose()["services"]
+    services = compose()["services"]
     dockerfile = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
 
     assert services["rosy-core"]["build"]["target"] == "core"
@@ -75,7 +67,7 @@ def test_runtime_builds_distinct_targets_from_shared_dockerfile():
 
 
 def test_initial_io_slice_disables_unavailable_adc_battery_driver():
-    compose_command = _compose()["services"]["rosy-io"]["command"]
+    compose_command = compose()["services"]["rosy-io"]["command"]
     launch = (
         ROOT / "src" / "rosy_bringup" / "launch" / "bringup_robot.launch.py"
     ).read_text(encoding="utf-8")
@@ -87,7 +79,7 @@ def test_initial_io_slice_disables_unavailable_adc_battery_driver():
 
 
 def test_motor_only_profile_excludes_lidar_and_passes_uart_parameters():
-    services = _compose()["services"]
+    services = compose()["services"]
     motor = services["rosy-motor"]
     command = motor["command"]
 
@@ -107,7 +99,7 @@ def test_motor_only_profile_excludes_lidar_and_passes_uart_parameters():
 
 
 def test_hardware_profile_passes_the_same_motor_safety_limits():
-    command = _compose()["services"]["rosy-io"]["command"]
+    command = compose()["services"]["rosy-io"]["command"]
 
     assert "max_linear_mps:=${ROSY_MAX_LINEAR_MPS:-0.25}" in command
     assert "max_angular_rps:=${ROSY_MAX_ANGULAR_RPS:-2.5}" in command
@@ -128,7 +120,7 @@ def test_example_environment_exposes_motor_limits_as_data_only_values():
 
 
 def test_io_health_requires_the_motor_node_to_be_discoverable():
-    io = _compose()["services"]["rosy-io"]
+    io = compose()["services"]["rosy-io"]
 
     assert "healthcheck" in io
     assert "/${ROSY_NAMESPACE:-rosy_01}/rosy_bringup" in " ".join(
@@ -136,24 +128,12 @@ def test_io_health_requires_the_motor_node_to_be_discoverable():
     )
 
 
-def _board_caps(mode: str) -> dict:
-    return yaml.safe_load(
-        (DEPLOY / "config" / f"capabilities.{mode}.yaml").read_text(encoding="utf-8")
-    )
-
-
-def _board_profile(mode: str) -> dict:
-    return yaml.safe_load(
-        (DEPLOY / "config" / f"profile.{mode}.yaml").read_text(encoding="utf-8")
-    )
-
-
 def test_core_data_is_a_host_owned_bind_and_capabilities_match_the_slice():
-    compose = _compose()
-    core = compose["services"]["rosy-core"]
+    runtime = compose()
+    core = runtime["services"]["rosy-core"]
 
     assert "${ROSY_DATA_PATH:-/var/lib/rosy}:/var/lib/rosy" in core["volumes"]
-    assert "volumes" not in compose
+    assert "volumes" not in runtime
     assert (
         "./config/profile.${ROSY_RUNTIME_MODE:-core}.yaml:/etc/rosy/profile.yaml:ro"
         in core["volumes"]
@@ -166,8 +146,8 @@ def test_core_data_is_a_host_owned_bind_and_capabilities_match_the_slice():
 
 
 def test_core_mode_does_not_advertise_motion_hardware():
-    caps = _board_caps("core")
-    profile = _board_profile("core")
+    caps = board_caps("core")
+    profile = board_profile("core")
 
     assert caps["teleop"] is False
     assert caps["sensors"] == []
@@ -177,8 +157,8 @@ def test_core_mode_does_not_advertise_motion_hardware():
 
 
 def test_motor_mode_advertises_teleop_without_lidar():
-    caps = _board_caps("motor")
-    profile = _board_profile("motor")
+    caps = board_caps("motor")
+    profile = board_profile("motor")
 
     assert caps["teleop"] is True
     assert caps["sensors"] == ["encoder"]
@@ -187,26 +167,16 @@ def test_motor_mode_advertises_teleop_without_lidar():
     assert profile["profile"]["sensors"] == [{"encoder": "dynamixel"}]
 
 
-def test_hardware_mode_advertises_lidar_without_nav_stack():
-    caps = _board_caps("hardware")
-    profile = _board_profile("hardware")
-    io = _compose()["services"]["rosy-io"]
+def test_pi5_lite_is_a_board_alias_not_a_copied_overlay():
+    catalog = yaml.safe_load((DEPLOY / "config" / "board.yaml").read_text(encoding="utf-8"))
+    resolve = (DEPLOY / "config" / "resolve-mode.sh").read_text(encoding="utf-8")
+    wrapper = (DEPLOY / "runtime-mode.sh").read_text(encoding="utf-8")
 
-    assert caps["teleop"] is True
-    assert caps["sensors"] == ["lidar", "encoder"]
-    assert caps["navigation"]["goal_navigation"] is False
-    assert caps["slam"] is False
-    assert profile["profile"]["sensors"] == [
-        {"lidar": "rplidar_c1"},
-        {"encoder": "dynamixel"},
-    ]
-    assert "enable_lidar:=true" in io["command"]
-    assert any("ttyAMA0" in device for device in io["devices"])
-
-
-def test_pi5_lite_overlay_aliases_hardware_board_support():
-    assert _board_caps("pi5-lite") == _board_caps("hardware")
-    assert _board_profile("pi5-lite") == _board_profile("hardware")
+    assert catalog["aliases"]["pi5-lite"] == "hardware"
+    assert "resolve_runtime_mode" in resolve
+    assert "resolve-mode.sh" in wrapper
+    assert not (DEPLOY / "config" / "capabilities.pi5-lite.yaml").is_file()
+    assert not (DEPLOY / "config" / "profile.pi5-lite.yaml").is_file()
 
 
 def test_board_catalog_lists_every_runtime_overlay():
@@ -218,26 +188,27 @@ def test_board_catalog_lists_every_runtime_overlay():
         assert spec["profile"] == f"profile.{mode}.yaml"
         assert (DEPLOY / "config" / spec["capabilities"]).is_file()
         assert (DEPLOY / "config" / spec["profile"]).is_file()
-        caps = _board_caps(mode)
+        caps = board_caps(mode)
         assert caps["teleop"] is spec["teleop"]
         assert caps["sensors"] == spec["sensors"]
     assert catalog["aliases"]["pi5-lite"] == "hardware"
 
 
 def test_core_container_receives_runtime_mode():
-    env = _compose()["services"]["rosy-core"]["environment"]
+    env = compose()["services"]["rosy-core"]["environment"]
     assert env["ROSY_RUNTIME_MODE"] == "${ROSY_RUNTIME_MODE:-core}"
 
 
 def test_runtime_mode_wrapper_requires_overlay_files():
     script = (DEPLOY / "runtime-mode.sh").read_text(encoding="utf-8")
+    assert "resolve-mode.sh" in script
     assert "capabilities.${MODE}.yaml" in script
     assert "profile.${MODE}.yaml" in script
     assert "missing board overlay" in script
 
 
 def test_core_reads_only_bounded_host_telemetry_paths():
-    core = _compose()["services"]["rosy-core"]
+    core = compose()["services"]["rosy-core"]
     mounts = set(core["volumes"])
 
     assert core["environment"]["ROSY_HOST_ROOT"] == "${ROSY_HOST_ROOT:-/host}"

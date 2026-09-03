@@ -13,9 +13,9 @@ Pinky Pro board overlays mounted into `rosy-core`. `ROSY_RUNTIME_MODE` selects `
 |------|-------------|
 | `profile.core.yaml` / `capabilities.core.yaml` | Dashboard only: no teleop, no lidar |
 | `profile.motor.yaml` / `capabilities.motor.yaml` | Dynamixel teleop, encoder only |
-| `profile.hardware.yaml` / `capabilities.hardware.yaml` | Motor + RPLidar; nav/slam still false |
-| `profile.pi5-lite.yaml` / `capabilities.pi5-lite.yaml` | Alias of the hardware overlay |
-| `board.yaml` | Catalog of modes, overlay files, and the pi5-lite alias |
+| `profile.hardware.yaml` / `capabilities.hardware.yaml` | Motor + RPLidar + Nav2 goal/return-home; slam still false |
+| `board.yaml` | Catalog of modes and aliases (`pi5-lite` → `hardware`) |
+| `resolve-mode.sh` | Maps aliases to catalog modes; overlay YAML exists only for catalog modes |
 | `rosy.pi5.example.yaml` | Example `ROSY_CONFIG` for the device |
 
 ## Subdirectories
@@ -27,7 +27,8 @@ None.
 ### Working In This Directory
 
 - Compose bind-mounts profile/capabilities over `/etc/rosy/`. Keep keys aligned with `src/rosy_core/config/` schemas.
-- Do not enable slam/nav/swarm here unless the hardware image actually contains those stacks.
+- Overlay YAML exists only for `core` / `motor` / `hardware`. Do not copy YAML for aliases.
+- Do not enable slam/swarm here unless the hardware image actually launches those stacks. `hardware` may advertise Nav2 only because `hardware.launch.py` starts it.
 
 ### Testing Requirements
 

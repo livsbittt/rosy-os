@@ -13,7 +13,7 @@ commissioning order are in
 This deployment keeps Raspberry Pi OS as the host and runs the ROS 2 Jazzy
 userland in isolated containers. `rosy-core` owns the FastAPI/rclpy middleware
 and has no device access. `rosy-motor` owns only the motor bus for commissioning,
-while `rosy-io` owns the Pinky Pro motor and LiDAR adapters in full hardware mode.
+while `rosy-io` owns the Pinky Pro motor, LiDAR, and Nav2 adapters in full hardware mode.
 
 > This first runtime slice does not yet package the wiringPi/ws2811 based IMU,
 > ADC, LCD, LED, or lamp nodes. Those drivers need a separate Raspberry Pi 5
@@ -81,10 +81,10 @@ Do not use `privileged: true`. `rosy-motor` receives only the motor UART;
 `rosy-io` receives the motor and LiDAR UARTs.
 
 `ROSY_NAMESPACE` is also applied to the core TF frame prefix, so topics and
-frames stay aligned. The mounted Pi 5 Lite profile advertises only the motor,
-encoder, LiDAR, teleop, and event functions present in this first slice; IMU,
-battery, Nav2 goals, SLAM, and swarm remain disabled until their runtimes are
-packaged and physically accepted.
+frames stay aligned. The mounted hardware profile advertises motor, encoder, LiDAR, teleop, and
+Nav2 goal/return-home. IMU, battery, SLAM, and swarm remain disabled until
+those runtimes are packaged and physically accepted. Nav2 still needs a site
+map and localization check before it is a field motion path.
 
 For a released robot, replace development image tags with immutable image
 digests that were built and accepted for the exact source revision.
@@ -166,7 +166,8 @@ sudo docker compose --env-file .env logs --tail 100 rosy-core rosy-motor
 ```
 
 After motor-only physical acceptance, build the hardware profile and change
-`ROSY_RUNTIME_MODE=hardware` to add LiDAR.
+`ROSY_RUNTIME_MODE=hardware` to add LiDAR and Nav2. The bundled demo map is
+not a warehouse map; replace it before treating goal clicks as accepted motion.
 
 The installer already installs boot-time supervision. Verify it after the
 interactive checks:
@@ -202,7 +203,8 @@ files appear as unavailable fields instead of failing `rosy-core`.
 
 Mode changes require confirmation in the dashboard and are serialized while a
 request is in flight. The NAV button is disabled when
-`navigation.goal_navigation` is unavailable; the API enforces the same gate.
+`navigation.goal_navigation` is unavailable (`core` and `motor`); `hardware`
+advertises it because Nav2 is launched. The API enforces the same gate.
 Navigation velocity samples expire after 500 ms, so changing modes cannot
 reactivate an old motion sample.
 

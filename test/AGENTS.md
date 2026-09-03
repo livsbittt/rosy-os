@@ -28,7 +28,9 @@ Host-side pytest for deploy/release/motor/network contracts. These tests do **no
 | `test_release_signing.py` | Ed25519 signing |
 | `test_release_storage.py` | Release store / retention |
 | `test_release_updater.py` | Activate/rollback updater |
-| `test_robot_runtime.py` | compose/Dockerfile/runtime-mode contracts |
+| `robot_contracts.py` | Shared ROOT/DEPLOY/compose helpers |
+| `test_robot_runtime.py` | compose/D-22/D-27/runtime-mode contracts |
+| `test_nav2_hardware_slice.py` | Hardware Nav2 launch, D-2/D-4, packaging |
 | `test_dashboard_browser.py` | Optional Chromium regression; skipped unless `ROSY_RUN_BROWSER_TESTS=1` |
 | `test_dock_contract.py` | Dock firmware contract: `/status` fields, no Wi-Fi secrets in `dock/` sources |
 

@@ -12,7 +12,7 @@ On-device runtime: multi-stage Dockerfile (`core` / `io` targets), Compose `rosy
 | File | Description |
 |------|-------------|
 | `Dockerfile` | Multi-stage: `core` image vs `rosy-io` |
-| `compose.yaml` | `rosy-core` (always), `rosy-motor` (profile `motor`), hardware/LiDAR (profile `hardware`); host network, read-only, cap_drop ALL |
+| `compose.yaml` | `rosy-core` (always), `rosy-motor` (profile `motor`), hardware/LiDAR/Nav2 (profile `hardware`); host network, read-only, cap_drop ALL |
 | `runtime-mode.sh` | Modes: `core` \| `motor` \| `hardware` (not `io`) |
 | `entrypoint.sh` | Container entry |
 | `install-pi.sh` | First-boot install on Pi |
@@ -58,7 +58,7 @@ Compose YAML anchors `x-ros-environment` and `x-runtime-defaults`. Namespace `__
 ### Internal
 
 - Build context `../..` (repo root)
-- Config overlays: `config/profile.pi5-lite.yaml`, `capabilities.pi5-lite.yaml`
+- Config overlays: `config/board.yaml` plus `capabilities.{core,motor,hardware}.yaml`. `pi5-lite` is an alias resolved by `config/resolve-mode.sh`.
 
 ### External
 

@@ -80,6 +80,7 @@ def image(tmp_path: Path) -> Path:
     config = root / "opt/rosy/deploy/robot/config"
     for name in (
         "board.yaml",
+        "resolve-mode.sh",
         "capabilities.core.yaml",
         "capabilities.motor.yaml",
         "capabilities.hardware.yaml",
@@ -268,6 +269,7 @@ def test_a_missing_oci_archive_is_refused(image, relative):
     [
         "opt/rosy/deploy/robot/compose.yaml",
         "opt/rosy/deploy/robot/release-recover.sh",
+        "opt/rosy/deploy/robot/config/resolve-mode.sh",
         "opt/rosy/deploy/release",
     ],
 )

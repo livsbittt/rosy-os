@@ -19,18 +19,14 @@ fi
 
 cd "$SCRIPT_DIR"
 
+# shellcheck source=config/resolve-mode.sh
+source "$SCRIPT_DIR/config/resolve-mode.sh"
+MODE="$(resolve_runtime_mode "$MODE" "$SCRIPT_DIR/config/board.yaml")" || exit 2
+export ROSY_RUNTIME_MODE="$MODE"
+
 compose() {
     docker compose --env-file "$ENV_FILE" "$@"
 }
-
-# Compose bind-mounts config/{profile,capabilities}.${MODE}.yaml into CORE.
-case "$MODE" in
-    "core"|"motor"|"hardware") ;;
-    *)
-        echo "error: unknown ROSY_RUNTIME_MODE '$MODE' (expected core, motor, or hardware)" >&2
-        exit 2
-        ;;
-esac
 
 CAP_FILE="$SCRIPT_DIR/config/capabilities.${MODE}.yaml"
 PROF_FILE="$SCRIPT_DIR/config/profile.${MODE}.yaml"

@@ -1,9 +1,9 @@
 # Pinky Pro board support — runtime mode `hardware`.
-# Motor + RPLidar. Nav2/SLAM are not in the image yet.
+# Motor + RPLidar + Nav2 localization/navigation. SLAM is not launched.
 capability_version: 1
 navigation:
-  goal_navigation: false
-  return_home: false
+  goal_navigation: true
+  return_home: true
   max_linear_velocity: 0.20
   max_angular_velocity: 0.80
 teleop: true

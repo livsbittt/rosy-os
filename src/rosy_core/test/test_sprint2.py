@@ -181,7 +181,7 @@ class TestSlamCapabilityGate:
         config = yaml.safe_load((CONFIG_DIR / "rosy_default.yaml").read_text(encoding="utf-8"))
         profile = RobotProfile.load(CONFIG_DIR / "profile.pinky_pro.yaml")
         caps = yaml.safe_load((CONFIG_DIR / "capabilities.yaml").read_text(encoding="utf-8"))
-        caps["slam"] = False                      # capabilities.pi5-lite.yaml 과 동일
+        caps["slam"] = False                      # hardware overlay (and the pi5-lite alias)
         services = CoreServices.build(config, profile, caps, tmp_path / "wp.json")
         services.nav.executor = FakeExecutor()
         return TestClient(create_app(config, services)), services

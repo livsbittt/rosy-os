@@ -14,10 +14,14 @@ Pinky Pro는 ROSY OS의 첫 하드웨어다. 이 문서는 그 보드 지원 범
 |------|--------|------|------------|
 | `core` (기본) | `rosy-core` | 없음 | teleop/lidar/nav/slam 꺼짐 |
 | `motor` | + `rosy-motor` | UART4 Dynamixel만 | teleop + encoder. lidar/nav 꺼짐 |
-| `hardware` | + `rosy-io` | 모터 + RPLidar (`/dev/ttyAMA0`) | teleop + encoder + lidar. **nav/slam 꺼짐** |
+| `hardware` | + `rosy-io` | 모터 + RPLidar (`/dev/ttyAMA0`) | teleop + encoder + lidar + Nav2 goal/return-home. **slam 꺼짐** |
 
-Nav2와 SLAM은 아직 이미지에 없다. 대시보드 맵 클릭은 `goal_navigation: false`라
-501이다. IMU·ADC·LCD·LED·lamp는 io 이미지에 넣지 않았다.
+`hardware`는 `rosy_navigation/hardware.launch.py`로 모터·LiDAR와 Nav2
+localization/navigation을 같이 띄운다. velocity_smoother 출력은 `nav_cmd_vel`이라
+Command Manager만 `cmd_vel`을 발행한다(D-2). odom/base TF는 `rosy_01/` 접두를
+붙이고 `map`은 전역으로 둔다(D-4). 기본 맵은 패키지 `map/my_map.yaml`이다.
+현장 맵을 넣기 전에는 AMCL이 맞지 않을 수 있다. SLAM은 런치하지 않는다.
+IMU·ADC·LCD·LED·lamp는 io 이미지에 넣지 않았다.
 
 `GET /api/v1/host/commissioning`은 모드를 CORE가 직접 보고한다.
 `motor_hold`는 `core`에서만 참, `lidar_hold`는 `hardware`가 아니면 참이다.
@@ -30,4 +34,4 @@ Nav2와 SLAM은 아직 이미지에 없다. 대시보드 맵 클릭은 `goal_nav
 4. 서명 SD 이미지는 아직 없다 (`BUILD_GO` HOLD). 개발 태그는 현장이 아니다.
 
 파일: `deploy/robot/config/capabilities.{core,motor,hardware}.yaml`.
-`capabilities.pi5-lite.yaml`은 hardware 별칭이다.
+`pi5-lite`는 `board.yaml` 별칭이며 `resolve-mode.sh`가 `hardware`로 푼다. YAML 복사본은 두지 않는다.

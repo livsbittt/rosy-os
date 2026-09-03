@@ -12,13 +12,14 @@ Nav2 and SLAM Toolbox launch/config/maps for real robot and Gazebo. ament_cmake.
 | File | Description |
 |------|-------------|
 | `package.xml` | Depends on navigation2, nav2_bringup |
-| `CMakeLists.txt` | Installs launch, params, maps, rviz, scripts |
+| `CMakeLists.txt` | Installs the Python policy package, launch, params, maps, rviz, scripts |
 
 ## Subdirectories
 
 | Directory | Purpose |
 |-----------|---------|
-| `launch/` | XML launches: bringup, localization, slam, gz_*, web_* (see `launch/AGENTS.md`) |
+| `rosy_navigation/` | Importable D-4 helpers (`frame_prefix`, `params_rewrite`) |
+| `launch/` | `hardware.launch.py` plus XML launches: bringup, localization, slam, gz_*, web_* (see `launch/AGENTS.md`) |
 | `params/` | `nav2_params.yaml`, `mapper_params.yaml` (see `params/AGENTS.md`) |
 | `map/` | Occupancy maps (`my_map`, `pinklab`) (see `map/AGENTS.md`) |
 | `rviz/` | map_building / nav2_view configs (see `rviz/AGENTS.md`) |
@@ -30,6 +31,8 @@ Nav2 and SLAM Toolbox launch/config/maps for real robot and Gazebo. ament_cmake.
 
 - Do not extend Flask. D-3: feature parity via `/api/v1/*`.
 - Nav2 velocity_smoother output must be remappable to `nav_cmd_vel` so CommandManager owns `cmd_vel`.
+- Launch files compose. TF/param policy lives in `rosy_navigation.*`, not under `launch/`.
+- `gz_bringup_launch.xml` includes `bringup_launch.xml`; do not fork the robot Nav2 XML.
 - Watch absolute vs namespaced `scan_topic` in mapper params (noted in `gz_multi.launch.py`).
 
 ### Testing Requirements

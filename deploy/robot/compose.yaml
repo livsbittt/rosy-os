@@ -138,19 +138,21 @@ services:
     devices:
       - "${ROSY_MOTOR_DEVICE:-/dev/ttyAMA4}:/dev/rosy-motor"
       - "${ROSY_LIDAR_DEVICE:-/dev/ttyAMA0}:/dev/ttyAMA0"
+    tmpfs:
+      - /tmp:size=256m,mode=1777
     healthcheck:
       test:
         - CMD-SHELL
-        - "ros2 node list 2>/dev/null | grep -Fxq '/${ROSY_NAMESPACE:-rosy_01}/rosy_bringup'"
+        - "nodes=$$(ros2 node list 2>/dev/null); echo \"$$nodes\" | grep -Fxq '/${ROSY_NAMESPACE:-rosy_01}/rosy_bringup' && echo \"$$nodes\" | grep -Fxq '/${ROSY_NAMESPACE:-rosy_01}/lifecycle_manager_navigation'"
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 3
-      start_period: 20s
+      start_period: 60s
     command:
       - ros2
       - launch
-      - rosy_bringup
-      - bringup_robot.launch.py
+      - rosy_navigation
+      - hardware.launch.py
       - "namespace:=${ROSY_NAMESPACE:-rosy_01}"
       - "cmd_vel_timeout_s:=${ROSY_CMD_VEL_TIMEOUT_S:-0.5}"
       - "motor_device:=/dev/rosy-motor"

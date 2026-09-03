@@ -22,6 +22,7 @@ Dated design and execute plans (2026-08-31 onward). These are the working trail 
 | `2026-09-01-rosy-os-v1-image-release-design.md` | Signed image + Host Agent |
 | `2026-09-02-battery-integrity-low-battery-alert.md` (+ `-design`) | SAF-005 curve, hysteresis, D-27 shutdown sentinel |
 | `2026-09-02-docking-station.md` (+ `-design`) | Dock SM; last cm is sensor-closed-loop |
+| `2026-09-03-runtime-maintainability-rules.md` | Runtime slice module rules (catalog, launch compose, Nav2 policy) |
 
 ## Subdirectories
 

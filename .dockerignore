@@ -11,6 +11,8 @@
 !src/rosy_description/**
 !src/rosy_bringup/
 !src/rosy_bringup/**
+!src/rosy_navigation/
+!src/rosy_navigation/**
 **/__pycache__/
 **/*.pyc
 **/.pytest_cache/

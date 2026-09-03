@@ -109,6 +109,13 @@ runtime_ok=1
 configured_mode="$(sed -n 's/^ROSY_RUNTIME_MODE=//p' "$env_file" 2>/dev/null | tail -n 1)"
 configured_mode="${configured_mode%$'\r'}"
 configured_mode="${configured_mode:-core}"
+# shellcheck source=config/resolve-mode.sh
+source "$install_root/deploy/robot/config/resolve-mode.sh"
+configured_mode="$(resolve_runtime_mode "$configured_mode" "$install_root/deploy/robot/config/board.yaml")" || {
+  fail "RUNTIME" "unknown ROSY_RUNTIME_MODE in .env"
+  runtime_ok=0
+  configured_mode="core"
+}
 runtime_profile=()
 runtime_service=""
 case "$configured_mode" in
