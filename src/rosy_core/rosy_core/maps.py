@@ -26,15 +26,38 @@ class GridFrame:
     def from_dict(cls, grid: dict[str, Any]) -> "GridFrame":
         origin = grid.get("origin") or {}
         raw = grid.get("data") or ()
+        width = int(grid["width"])
+        height = int(grid["height"])
+        resolution = float(grid["resolution"])
+        data = tuple(int(value) for value in raw)
+        if width < 1 or height < 1 or resolution <= 0:
+            raise ValueError("grid width, height and resolution must be positive")
+        if len(data) != width * height:
+            raise ValueError(
+                f"grid data length {len(data)} does not match {width}x{height}"
+            )
         return cls(
-            width=int(grid["width"]),
-            height=int(grid["height"]),
-            resolution=float(grid["resolution"]),
+            width=width,
+            height=height,
+            resolution=resolution,
             origin_x=float(origin.get("x", 0.0)),
             origin_y=float(origin.get("y", 0.0)),
             origin_yaw=float(origin.get("yaw", 0.0)),
-            data=tuple(int(value) for value in raw),
+            data=data,
         )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "width": self.width,
+            "height": self.height,
+            "resolution": self.resolution,
+            "origin": {
+                "x": self.origin_x,
+                "y": self.origin_y,
+                "yaw": self.origin_yaw,
+            },
+            "data": list(self.data),
+        }
 
     def world_to_cell(self, x: float, y: float) -> Optional[tuple[int, int]]:
         if self.resolution <= 0 or self.width <= 0 or self.height <= 0:
@@ -73,16 +96,24 @@ class MapSnapshotStore:
         self._costmaps: dict[str, dict[str, Any]] = {}
 
     def set_map(self, grid: dict[str, Any]) -> None:
+        normalized = GridFrame.from_dict(grid).to_dict()
         with self._lock:
-            self._map = dict(grid)
+            self._map = normalized
 
     def get_map(self) -> Optional[dict[str, Any]]:
         with self._lock:
             return None if self._map is None else dict(self._map)
 
     def set_path(self, poses: list[dict[str, float]]) -> None:
+        cleaned: list[dict[str, float]] = []
+        for pose in poses:
+            x = float(pose["x"])
+            y = float(pose["y"])
+            if not math.isfinite(x) or not math.isfinite(y):
+                raise ValueError("path poses must be finite x,y")
+            cleaned.append({"x": x, "y": y})
         with self._lock:
-            self._path = list(poses)
+            self._path = cleaned
 
     def get_path(self) -> list[dict[str, float]]:
         with self._lock:
@@ -91,8 +122,9 @@ class MapSnapshotStore:
     def set_costmap(self, scope: str, grid: dict[str, Any]) -> None:
         if not valid_costmap_scope(scope):
             raise ValueError(f"costmap scope must be global or local, got {scope!r}")
+        normalized = GridFrame.from_dict(grid).to_dict()
         with self._lock:
-            self._costmaps[scope] = dict(grid)
+            self._costmaps[scope] = normalized
 
     def get_costmap(self, scope: str) -> Optional[dict[str, Any]]:
         if not valid_costmap_scope(scope):

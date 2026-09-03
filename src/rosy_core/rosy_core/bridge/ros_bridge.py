@@ -256,19 +256,31 @@ class RosBridge:
         self._svc.power.on_robot_mode(snapshot.mode)
 
     def _on_map(self, msg: OccupancyGrid) -> None:
-        self._svc.maps.set_map(_grid_from_occupancy(msg))
+        try:
+            self._svc.maps.set_map(_grid_from_occupancy(msg))
+        except ValueError as exc:
+            self._node.get_logger().warning(f"ignored occupancy map: {exc}")
 
     def _on_plan(self, msg: Path) -> None:
-        self._svc.maps.set_path([
-            {"x": float(ps.pose.position.x), "y": float(ps.pose.position.y)}
-            for ps in msg.poses
-        ])
+        try:
+            self._svc.maps.set_path([
+                {"x": float(ps.pose.position.x), "y": float(ps.pose.position.y)}
+                for ps in msg.poses
+            ])
+        except ValueError as exc:
+            self._node.get_logger().warning(f"ignored nav path: {exc}")
 
     def _on_local_costmap(self, msg: Costmap) -> None:
-        self._svc.maps.set_costmap("local", _grid_from_costmap(msg))
+        try:
+            self._svc.maps.set_costmap("local", _grid_from_costmap(msg))
+        except ValueError as exc:
+            self._node.get_logger().warning(f"ignored local costmap: {exc}")
 
     def _on_global_costmap(self, msg: Costmap) -> None:
-        self._svc.maps.set_costmap("global", _grid_from_costmap(msg))
+        try:
+            self._svc.maps.set_costmap("global", _grid_from_costmap(msg))
+        except ValueError as exc:
+            self._node.get_logger().warning(f"ignored global costmap: {exc}")
 
     def _on_scan(self, msg: LaserScan) -> None:
         self._svc.state.set_sensor("lidar", {

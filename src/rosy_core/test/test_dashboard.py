@@ -173,6 +173,9 @@ def test_dashboard_draws_occupancy_map_path_and_click_goal():
     assert "/api/v1/map/costmap" in mapper
     assert "/api/v1/navigation/goal" in mapper
     assert "putImageData" in mapper
+    assert "fitCanvas" in mapper
+    assert "ResizeObserver" in mapper
+    assert "refreshPath" in mapper
     assert "window.confirm" in mapper
     assert "https://" not in mapper
     assert "localStorage" not in mapper

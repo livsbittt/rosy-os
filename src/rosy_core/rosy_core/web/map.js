@@ -79,12 +79,13 @@ export function createFieldMap(options) {
   const api = options.api;
   const apiMaybe = options.apiMaybe;
   const getPose = options.getPose;
+  const getNavigation = options.getNavigation;
   const canGoal = options.canGoal;
   const setAction = options.setAction;
   const layerButtons = [...(options.layerRoot?.querySelectorAll("[data-map-layer]") || [])];
 
   const layers = { occupancy: true, costmap: true, path: true };
-  const state = { occupancy: null, path: [], costmap: null, raster: null };
+  const state = { occupancy: null, path: [], costmap: null, raster: null, lastNav: null };
   const ctx = canvas?.getContext("2d") || null;
 
   function setStatus(text) {
@@ -96,8 +97,25 @@ export function createFieldMap(options) {
     empty.hidden = Boolean(state.occupancy);
   }
 
+  function fitCanvas() {
+    if (!canvas) return false;
+    const ratio = window.devicePixelRatio || 1;
+    const width = Math.max(1, Math.round((canvas.clientWidth || canvas.width || 1) * ratio));
+    const height = Math.max(1, Math.round((canvas.clientHeight || canvas.height || 1) * ratio));
+    if (canvas.width === width && canvas.height === height) return false;
+    canvas.width = width;
+    canvas.height = height;
+    return true;
+  }
+
+  function syncCursor() {
+    if (!canvas) return;
+    canvas.style.cursor = canGoal?.() ? "crosshair" : "default";
+  }
+
   function rebuildRaster() {
     if (!ctx || !canvas) return;
+    fitCanvas();
     if (!state.occupancy) {
       state.raster = null;
       ctx.fillStyle = "#0d1210";
@@ -145,6 +163,18 @@ export function createFieldMap(options) {
   }
 
   function setPose() {
+    const nav = getNavigation?.();
+    if (nav && nav !== state.lastNav) {
+      state.lastNav = nav;
+      refreshPath();
+    }
+    syncCursor();
+    paint();
+  }
+
+  async function refreshPath() {
+    const path = await apiMaybe("/api/v1/navigation/path");
+    state.path = path?.poses || [];
     paint();
   }
 
@@ -158,6 +188,7 @@ export function createFieldMap(options) {
     state.path = path?.poses || [];
     state.costmap = costmap;
     syncEmpty();
+    syncCursor();
     if (!grid) setStatus("맵 수신 대기");
     else setStatus(`${grid.width}×${grid.height}${grid.map_id ? ` · ${grid.map_id}` : ""}`);
     rebuildRaster();
@@ -174,6 +205,15 @@ export function createFieldMap(options) {
       paint();
     });
   });
+
+  if (typeof ResizeObserver === "function" && canvas) {
+    new ResizeObserver(() => {
+      if (fitCanvas()) {
+        rebuildRaster();
+        paint();
+      }
+    }).observe(canvas);
+  }
 
   canvas?.addEventListener("click", async (event) => {
     if (!state.occupancy || !canvas) return;

@@ -121,3 +121,28 @@ def test_grid_frame_samples_costmap_in_world_coordinates():
     })
     assert occupancy.sample_other(cost, -0.95, -0.5) == 254
     assert occupancy.sample_other(cost, -1.0, -0.5) is None
+
+
+def test_grid_frame_rejects_mismatched_data():
+    from rosy_core.maps import GridFrame, MapSnapshotStore
+
+    with pytest.raises(ValueError):
+        GridFrame.from_dict({**GRID, "data": [0]})
+    with pytest.raises(ValueError):
+        GridFrame.from_dict({**GRID, "width": 0})
+    store = MapSnapshotStore()
+    with pytest.raises(ValueError):
+        store.set_map({**GRID, "data": [1, 2, 3]})
+    store.set_map(GRID)
+    assert store.get_map()["data"] == GRID["data"]
+    assert store.get_map()["origin"]["yaw"] == 0.0
+
+
+def test_path_rejects_non_finite_poses():
+    from rosy_core.maps import MapSnapshotStore
+
+    store = MapSnapshotStore()
+    with pytest.raises(ValueError):
+        store.set_path([{"x": float("nan"), "y": 0.0}])
+    store.set_path([{"x": 1.5, "y": -0.25}])
+    assert store.get_path() == [{"x": 1.5, "y": -0.25}]

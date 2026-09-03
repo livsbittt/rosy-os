@@ -113,6 +113,7 @@ const fieldMap = createFieldMap({
   api,
   apiMaybe,
   getPose: () => session.robotState?.pose,
+  getNavigation: () => session.robotState?.navigation,
   canGoal: () => session.capabilities?.navigation?.goal_navigation === true,
   setAction: (text) => setText("action-message", text),
 });
