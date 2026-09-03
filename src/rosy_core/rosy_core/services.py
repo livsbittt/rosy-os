@@ -15,6 +15,7 @@ from rosy_core.docking.agent import DockAgent
 from rosy_core.docking.database import DockDatabase
 from rosy_core.docking.detector import SimulatedDetector
 from rosy_core.docking.manager import DockingConfig, DockingManager
+from rosy_core.events.audit import FileAuditLog
 from rosy_core.events.bus import EventBus
 from rosy_core.identity import RobotIdentity
 from rosy_core.maps import MapSnapshotStore
@@ -135,6 +136,7 @@ class CoreServices:
     docking: DockingManager
     runtime_probe: HostRuntimeProbe
     maps: MapSnapshotStore
+    audit: FileAuditLog
     started_at: float = field(default_factory=time.time)
 
     @classmethod
@@ -142,6 +144,8 @@ class CoreServices:
               capability_data: dict, waypoints_path) -> "CoreServices":
         robot_id = config.get("robot", {}).get("id", "rosy_01")
         events = EventBus(robot_id, buffer_size=int(config.get("events", {}).get("ring_buffer_size", 1000)))
+        audit = FileAuditLog(Path(waypoints_path).parent / "audit.jsonl")
+        events.subscribe(audit.record)
 
         safety_cfg = config.get("safety", {})
         nav_cfg = config.get("navigation", {})
@@ -196,4 +200,5 @@ class CoreServices:
                    events=events, state=state, registry=registry, modes=modes,
                    command=command, safety=safety, waypoints=waypoints, nav=nav,
                    power=power, battery=battery, docking=docking,
-                   runtime_probe=runtime_probe, maps=MapSnapshotStore())
+                   runtime_probe=runtime_probe, maps=MapSnapshotStore(),
+                   audit=audit)

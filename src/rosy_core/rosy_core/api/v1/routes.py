@@ -260,6 +260,7 @@ def delete_waypoint(name: str, auth: AuthContext = Depends(operator),
 
 
 events_router = APIRouter(prefix="/api/v1/events", tags=["events"])
+logs_router = APIRouter(prefix="/api/v1/logs", tags=["logs"])
 
 
 @events_router.get("")
@@ -267,6 +268,17 @@ def list_events(since_seq: int | None = None, limit: int = 100,
                 _: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
     events = svc.events.history(since_seq=since_seq, limit=limit)
     return {"events": [e.model_dump() for e in events], "last_seq": svc.events.last_seq}
+
+
+@logs_router.get("/audit")
+def list_audit_logs(
+    since_seq: int | None = None,
+    limit: int = 500,
+    _: AuthContext = Depends(admin),
+    svc: CoreServices = Depends(get_services),
+):
+    events = svc.audit.history(since_seq=since_seq, limit=min(limit, 2000))
+    return {"events": [e.model_dump() for e in events]}
 
 
 sensors_router = APIRouter(prefix="/api/v1/sensors", tags=["sensors"])

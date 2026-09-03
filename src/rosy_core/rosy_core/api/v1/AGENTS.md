@@ -12,7 +12,7 @@ REST routers under `/api/v1/*` (API Ref §5). One module: `routes.py`.
 | File | Description |
 |------|-------------|
 | `__init__.py` | Package marker |
-| `routes.py` | Routers: system, robot, control, safety, navigation, waypoints, events, power, sensors, slam, docking, metrics, host |
+| `routes.py` | Routers: system, robot, control, safety, navigation, waypoints, events, logs, power, sensors, slam, docking, metrics, host |
 
 ## Subdirectories
 

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from rosy_core.api.app import create_app
 from rosy_core.command.manager import Twist
+from rosy_core.events.audit import FileAuditLog
 from rosy_core.profile import RobotProfile
 from rosy_core.services import CoreServices
 
@@ -165,6 +166,18 @@ def test_disabled_navigation_capabilities_return_501(client):
     assert goal.json()["error"]["code"] == "CAPABILITY_NOT_SUPPORTED"
     assert home.status_code == 501
     assert home.json()["error"]["code"] == "CAPABILITY_NOT_SUPPORTED"
+
+
+def test_audit_log_is_admin_only_and_survives_the_ring_buffer(client):
+    tc, svc = client
+    svc.events.publish("mode.changed", source="api")
+    assert tc.get("/api/v1/logs/audit", headers=VIEWER).status_code == 403
+    assert tc.get("/api/v1/logs/audit", headers=OPERATOR).status_code == 403
+    body = tc.get("/api/v1/logs/audit", headers=ADMIN).json()
+    types = [event["type"] for event in body["events"]]
+    assert "mode.changed" in types
+    restarted = FileAuditLog(svc.audit.path).history()
+    assert any(event.type == "mode.changed" for event in restarted)
 
 
 def test_events_since_seq(client):

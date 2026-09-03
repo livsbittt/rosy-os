@@ -13,6 +13,7 @@ EVT-001–005 in-process bus (D-8): monotonic seq, ring buffer, subscriber broad
 |------|-------------|
 | `__init__.py` | Package marker |
 | `bus.py` | `EventBus` |
+| `audit.py` | `FileAuditLog` JSONL under the data dir (LOG-001, 30-day retention) |
 
 ## Subdirectories
 
