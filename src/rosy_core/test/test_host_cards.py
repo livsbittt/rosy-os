@@ -231,6 +231,7 @@ def test_the_commissioning_card_works_without_the_agent(client):
     assert body["lidar_hold"] is True
     assert body["battery_hold"] is True
     assert body["imu_hold"] is True
+    assert body["slam_hold"] is True
     assert "정상" in body["detail"], "core-only is the correct state, not a fault"
 
 
@@ -248,7 +249,9 @@ def test_the_commissioning_card_reports_a_promoted_device():
     assert body["lidar_hold"] is False
     assert body["battery_hold"] is True
     assert body["imu_hold"] is True
+    assert body["slam_hold"] is True
     assert "ADC" in body["detail"] or "배터리" in body["detail"]
+    assert "SLAM" in body["detail"]
 
 
 def test_the_commissioning_card_keeps_lidar_hold_in_motor_mode():
@@ -265,6 +268,7 @@ def test_the_commissioning_card_keeps_lidar_hold_in_motor_mode():
     assert body["lidar_hold"] is True
     assert body["battery_hold"] is True
     assert body["imu_hold"] is True
+    assert body["slam_hold"] is True
     assert "LiDAR" in body["detail"]
 
 
@@ -435,6 +439,8 @@ def test_the_commissioning_script_shows_motor_and_lidar_holds():
     assert "LIDAR_HOLD" in body
     assert "BATTERY_HOLD" in body
     assert "IMU_HOLD" in body
+    assert "slam_hold" in body
+    assert "SLAM_HOLD" in body
 
 
 def test_the_script_marks_a_card_unavailable_instead_of_blanking_it():
