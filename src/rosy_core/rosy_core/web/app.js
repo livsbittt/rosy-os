@@ -615,6 +615,8 @@ function renderCommissioning(payload) {
     const holds = [
       payload.motor_hold ? "MOTOR_HOLD" : null,
       payload.lidar_hold ? "LIDAR_HOLD" : null,
+      payload.battery_hold ? "BATTERY_HOLD" : null,
+      payload.imu_hold ? "IMU_HOLD" : null,
     ].filter(Boolean);
     const holdText = holds.length ? `${holds.join(" · ")}. ` : "";
     note.textContent = `${holdText}${payload.detail || ""}`;

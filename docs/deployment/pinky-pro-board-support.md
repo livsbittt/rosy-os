@@ -23,10 +23,13 @@ Command Manager만 `cmd_vel`을 발행한다(D-2). odom/base TF는 `rosy_01/` �
 `/var/lib/rosy/maps/site.yaml`(+이미지)이다. 파일이 없으면 패키지 데모
 `map/my_map.yaml`로 떨어진다. 데모 맵으로 맵 클릭을 현장 주행으로 보지 마라.
 SLAM은 런치하지 않는다.
-IMU·ADC·LCD·LED·lamp는 io 이미지에 넣지 않았다.
+IMU·ADC·LCD·LED·lamp는 io 이미지에 넣지 않았다. ADC는 I2C로 아날로그
+전압(배터리, IR, 초음파)을 읽는 칩이다. 지금 슬라이스는 그 노드를 띄우지
+않으므로 배터리 %는 팩 전압이 아니다.
 
 `GET /api/v1/host/commissioning`은 모드를 CORE가 직접 보고한다.
 `motor_hold`는 `core`에서만 참, `lidar_hold`는 `hardware`가 아니면 참이다.
+`battery_hold`와 `imu_hold`는 ADC/IMU 드라이버가 이미지에 없는 동안 항상 참이다.
 
 ## 시운전 순서
 
