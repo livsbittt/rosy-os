@@ -230,6 +230,11 @@ def initialpose(body: InitialPoseRequest, auth: AuthContext = Depends(operator),
     if svc.nav.executor is None:
         raise ApiError("CAPABILITY_NOT_SUPPORTED", 501, "localization executor unavailable")
     svc.nav.executor.send_initial_pose(body.x, body.y, body.yaw)
+    svc.events.publish(
+        "localization.initialpose",
+        source=f"api:{auth.role}",
+        data={"x": body.x, "y": body.y, "yaw": body.yaw},
+    )
     return {"accepted": True}
 
 

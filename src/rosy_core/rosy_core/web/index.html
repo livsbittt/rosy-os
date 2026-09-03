@@ -235,6 +235,10 @@
         <button type="button" data-map-layer="costmap" aria-pressed="true">코스트</button>
         <button type="button" data-map-layer="path" aria-pressed="true">경로</button>
       </div>
+      <div class="map-toolbar" role="group" aria-label="지도 클릭 동작">
+        <button type="button" data-map-click="pose" aria-pressed="true">초기 자세</button>
+        <button type="button" data-map-click="goal" aria-pressed="false">목표</button>
+      </div>
       <div class="map-stage">
         <canvas id="map-canvas" width="800" height="480" role="img" aria-label="점유 격자 지도"></canvas>
         <p id="map-empty" class="map-empty">맵 토픽을 기다리는 중입니다.</p>
@@ -247,7 +251,7 @@
         <li data-swatch="path">경로</li>
         <li data-swatch="robot">로봇</li>
       </ul>
-      <p class="map-hint">지도를 클릭하면 현재 방향으로 목표를 보냅니다. operator 권한이 필요합니다.</p>
+      <p class="map-hint">먼저 로봇이 있는 칸을 찍어 AMCL 초기 자세를 맞춘 뒤, 목표로 전환하세요. operator 권한이 필요합니다.</p>
     </section>
 
     <section class="panel control-panel" aria-labelledby="control-heading">

@@ -157,7 +157,11 @@ def test_dashboard_draws_occupancy_map_path_and_click_goal():
     assert 'data-map-layer="occupancy"' in html
     assert 'data-map-layer="costmap"' in html
     assert 'data-map-layer="path"' in html
-    assert "지도를 클릭하면" in html
+    assert 'data-map-click="pose"' in html
+    assert 'data-map-click="goal"' in html
+    assert "초기 자세" in html
+    assert "/api/v1/localization/initialpose" in mapper
+    assert "/api/v1/navigation/goal" in mapper
 
     assert 'from "./map.js"' in app
     assert "createFieldMap" in app

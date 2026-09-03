@@ -149,6 +149,27 @@ def test_waypoints_crud_and_goal(client):
     missing = tc.post("/api/v1/navigation/goal", json={"waypoint": "ghost"}, headers=OPERATOR)
     assert missing.status_code == 404 and missing.json()["error"]["code"] == "NOT_FOUND"
 
+    poses = []
+
+    class PoseExecutor(LocalExecutor):
+        def send_initial_pose(self, x, y, yaw):
+            poses.append((x, y, yaw))
+
+    svc.nav.executor = PoseExecutor()
+    pose = tc.post(
+        "/api/v1/localization/initialpose",
+        json={"x": 0.4, "y": -1.2, "yaw": 1.57},
+        headers=OPERATOR,
+    )
+    assert pose.status_code == 200
+    assert poses == [(0.4, -1.2, 1.57)]
+    assert any(event.type == "localization.initialpose" for event in svc.events.history())
+    assert tc.post(
+        "/api/v1/localization/initialpose",
+        json={"x": 0.0, "y": 0.0},
+        headers=VIEWER,
+    ).status_code == 403
+
 
 def test_disabled_navigation_capabilities_return_501(client):
     tc, svc = client

@@ -83,8 +83,10 @@ export function createFieldMap(options) {
   const canGoal = options.canGoal;
   const setAction = options.setAction;
   const layerButtons = [...(options.layerRoot?.querySelectorAll("[data-map-layer]") || [])];
+  const clickButtons = [...(options.layerRoot?.querySelectorAll("[data-map-click]") || [])];
 
   const layers = { occupancy: true, costmap: true, path: true };
+  let clickMode = "pose";
   const state = { occupancy: null, path: [], costmap: null, raster: null, lastNav: null };
   const ctx = canvas?.getContext("2d") || null;
 
@@ -206,6 +208,17 @@ export function createFieldMap(options) {
     });
   });
 
+  clickButtons.forEach((button) => {
+    const mode = button.dataset.mapClick;
+    button.setAttribute("aria-pressed", clickMode === mode ? "true" : "false");
+    button.addEventListener("click", () => {
+      clickMode = mode;
+      clickButtons.forEach((item) => {
+        item.setAttribute("aria-pressed", item.dataset.mapClick === clickMode ? "true" : "false");
+      });
+    });
+  });
+
   if (typeof ResizeObserver === "function" && canvas) {
     new ResizeObserver(() => {
       if (fitCanvas()) {
@@ -225,17 +238,22 @@ export function createFieldMap(options) {
     const px = ((event.clientX - rect.left) / rect.width) * canvas.width;
     const py = ((event.clientY - rect.top) / rect.height) * canvas.height;
     const world = new GridFrame(state.occupancy).canvasToWorld(px, py, canvas.width, canvas.height);
-    if (!window.confirm(`목표 ${world.x.toFixed(2)}, ${world.y.toFixed(2)} 로 보낼까요?`)) return;
     const yaw = Number(getPose?.()?.yaw) || 0;
+    const locating = clickMode === "pose";
+    const label = locating ? "초기 자세" : "목표";
+    const path = locating
+      ? "/api/v1/localization/initialpose"
+      : "/api/v1/navigation/goal";
+    if (!window.confirm(`${label} ${world.x.toFixed(2)}, ${world.y.toFixed(2)} 로 보낼까요?`)) return;
     try {
-      await api("/api/v1/navigation/goal", {
+      await api(path, {
         method: "POST",
         body: JSON.stringify({ x: world.x, y: world.y, yaw }),
       });
-      setAction?.(`목표 ${world.x.toFixed(2)}, ${world.y.toFixed(2)} 전송`);
-      setStatus(`goal ${world.x.toFixed(2)}, ${world.y.toFixed(2)}`);
+      setAction?.(`${label} ${world.x.toFixed(2)}, ${world.y.toFixed(2)} 전송`);
+      setStatus(`${locating ? "pose" : "goal"} ${world.x.toFixed(2)}, ${world.y.toFixed(2)}`);
     } catch (error) {
-      setStatus(`목표 전송 실패: ${error.message}`);
+      setStatus(`${label} 전송 실패: ${error.message}`);
     }
   });
 
