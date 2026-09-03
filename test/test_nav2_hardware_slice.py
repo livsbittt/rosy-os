@@ -74,10 +74,41 @@ def test_hardware_launch_composes_bringup_and_imports_nav_policy():
     assert "bringup_launch.xml" in launch
     assert "my_map.yaml" in launch
     assert "from rosy_navigation.params_rewrite import write_prefixed_nav2_params" in launch
+    assert "from rosy_navigation.site_map import resolve_occupancy_map" in launch
     assert "sys.path.insert" not in launch
     assert "map_building" not in launch
     assert "slam_toolbox" not in launch
     assert "nav2_web_server" not in launch
+
+
+def test_hardware_io_mounts_a_host_site_map_directory():
+    io = compose()["services"]["rosy-io"]
+    motor = compose()["services"]["rosy-motor"]
+
+    assert io["environment"]["ROSY_MAP"] == "${ROSY_MAP:-/var/lib/rosy/maps/site.yaml}"
+    assert "${ROSY_DATA_PATH:-/var/lib/rosy}/maps:/var/lib/rosy/maps:ro" in io["volumes"]
+    assert "volumes" not in motor
+    installer = (DEPLOY / "install-pi.sh").read_text(encoding="utf-8")
+    assert '"$ROSY_DATA/maps"' in installer
+
+
+def test_resolve_occupancy_map_uses_site_yaml_only_when_the_image_exists(tmp_path):
+    from rosy_navigation.site_map import resolve_occupancy_map
+
+    fallback = tmp_path / "demo.yaml"
+    fallback.write_text("image: demo.pgm\n", encoding="utf-8")
+    (tmp_path / "demo.pgm").write_bytes(b"P5\n")
+
+    missing = tmp_path / "maps" / "site.yaml"
+    assert resolve_occupancy_map(missing, fallback) == str(fallback)
+
+    site = tmp_path / "maps" / "site.yaml"
+    site.parent.mkdir()
+    site.write_text("image: site.pgm\n", encoding="utf-8")
+    assert resolve_occupancy_map(site, fallback) == str(fallback)
+
+    (tmp_path / "maps" / "site.pgm").write_bytes(b"P5\n")
+    assert resolve_occupancy_map(site, fallback) == str(site)
 
 
 def test_nav2_frame_prefix_module_prefixes_odom_not_map():

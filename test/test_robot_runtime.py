@@ -117,6 +117,7 @@ def test_example_environment_exposes_motor_limits_as_data_only_values():
     assert "ROSY_MAX_ANGULAR_RPS=2.5" in environment
     assert "ROSY_MAX_WHEEL_RPM=100.0" in environment
     assert "ROSY_MOTOR_PROFILE_ACCELERATION=200" in environment
+    assert "ROSY_MAP=/var/lib/rosy/maps/site.yaml" in environment
 
 
 def test_io_health_requires_the_motor_node_to_be_discoverable():

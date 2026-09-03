@@ -169,6 +169,7 @@ write_initial_config() {
     [[ "$(readlink -f /etc/rosy)" == "/etc/rosy" ]] || fail "/etc/rosy is not canonical"
     [[ ! -L "$ROSY_DATA" ]] || fail "$ROSY_DATA must not be a symbolic link"
     install -d -o "$RUN_USER" -g "$run_group" -m 0750 "$ROSY_DATA"
+    install -d -o "$RUN_USER" -g "$run_group" -m 0750 "$ROSY_DATA/maps"
     [[ "$(readlink -f "$ROSY_DATA")" == "$ROSY_DATA" ]] || fail "$ROSY_DATA is not canonical"
     [[ ! -L "$ROSY_CONFIG" ]] || fail "$ROSY_CONFIG must not be a symbolic link"
 

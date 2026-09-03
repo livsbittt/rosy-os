@@ -166,8 +166,10 @@ sudo docker compose --env-file .env logs --tail 100 rosy-core rosy-motor
 ```
 
 After motor-only physical acceptance, build the hardware profile and change
-`ROSY_RUNTIME_MODE=hardware` to add LiDAR and Nav2. The bundled demo map is
-not a warehouse map; replace it before treating goal clicks as accepted motion.
+`ROSY_RUNTIME_MODE=hardware` to add LiDAR and Nav2. Put the site occupancy
+YAML and image in `/var/lib/rosy/maps/` as `site.yaml`. If that pair is
+missing, Nav2 loads the packaged demo map; do not treat demo-map goals as
+accepted field motion.
 
 The installer already installs boot-time supervision. Verify it after the
 interactive checks:

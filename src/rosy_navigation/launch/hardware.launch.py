@@ -21,12 +21,18 @@ from launch.launch_description_sources import (
 from launch.substitutions import LaunchConfiguration
 
 from rosy_navigation.params_rewrite import write_prefixed_nav2_params
+from rosy_navigation.site_map import resolve_occupancy_map
 
 
 def _include_nav2(context, *args, **kwargs):
     nav_share = get_package_share_directory("rosy_navigation")
     namespace = LaunchConfiguration("namespace").perform(context)
     source = LaunchConfiguration("params_file").perform(context)
+    fallback_map = os.path.join(nav_share, "map", "my_map.yaml")
+    map_yaml = resolve_occupancy_map(
+        LaunchConfiguration("map").perform(context),
+        fallback_map,
+    )
     return [
         IncludeLaunchDescription(
             AnyLaunchDescriptionSource(
@@ -35,7 +41,7 @@ def _include_nav2(context, *args, **kwargs):
             launch_arguments={
                 "namespace": namespace,
                 "use_sim_time": LaunchConfiguration("use_sim_time").perform(context),
-                "map": LaunchConfiguration("map").perform(context),
+                "map": map_yaml,
                 "params_file": write_prefixed_nav2_params(source, namespace),
                 "use_composition": "True",
             }.items(),
@@ -46,7 +52,6 @@ def _include_nav2(context, *args, **kwargs):
 def generate_launch_description():
     bringup_share = get_package_share_directory("rosy_bringup")
     nav_share = get_package_share_directory("rosy_navigation")
-    default_map = os.path.join(nav_share, "map", "my_map.yaml")
     default_params = os.path.join(nav_share, "params", "nav2_params.yaml")
 
     namespace = LaunchConfiguration("namespace")
@@ -82,7 +87,10 @@ def generate_launch_description():
         DeclareLaunchArgument("max_angular_rps", default_value="2.5"),
         DeclareLaunchArgument("max_wheel_rpm", default_value="100.0"),
         DeclareLaunchArgument("motor_profile_acceleration", default_value="200"),
-        DeclareLaunchArgument("map", default_value=default_map),
+        DeclareLaunchArgument(
+            "map",
+            default_value=os.environ.get("ROSY_MAP", "/var/lib/rosy/maps/site.yaml"),
+        ),
         DeclareLaunchArgument("params_file", default_value=default_params),
 
         IncludeLaunchDescription(

@@ -5,7 +5,8 @@
 
 ## Purpose
 
-Occupancy maps for localization/nav demos.
+Packaged occupancy maps used only when the host has no site map at
+`/var/lib/rosy/maps/site.yaml`.
 
 ## Key Files
 

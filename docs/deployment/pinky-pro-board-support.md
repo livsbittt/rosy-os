@@ -19,8 +19,10 @@ Pinky Pro는 ROSY OS의 첫 하드웨어다. 이 문서는 그 보드 지원 범
 `hardware`는 `rosy_navigation/hardware.launch.py`로 모터·LiDAR와 Nav2
 localization/navigation을 같이 띄운다. velocity_smoother 출력은 `nav_cmd_vel`이라
 Command Manager만 `cmd_vel`을 발행한다(D-2). odom/base TF는 `rosy_01/` 접두를
-붙이고 `map`은 전역으로 둔다(D-4). 기본 맵은 패키지 `map/my_map.yaml`이다.
-현장 맵을 넣기 전에는 AMCL이 맞지 않을 수 있다. SLAM은 런치하지 않는다.
+붙이고 `map`은 전역으로 둔다(D-4). 현장 맵은 호스트
+`/var/lib/rosy/maps/site.yaml`(+이미지)이다. 파일이 없으면 패키지 데모
+`map/my_map.yaml`로 떨어진다. 데모 맵으로 맵 클릭을 현장 주행으로 보지 마라.
+SLAM은 런치하지 않는다.
 IMU·ADC·LCD·LED·lamp는 io 이미지에 넣지 않았다.
 
 `GET /api/v1/host/commissioning`은 모드를 CORE가 직접 보고한다.

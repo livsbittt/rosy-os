@@ -135,6 +135,9 @@ services:
     environment:
       <<: *ros-environment
       HOME: /var/lib/rosy
+      ROSY_MAP: "${ROSY_MAP:-/var/lib/rosy/maps/site.yaml}"
+    volumes:
+      - "${ROSY_DATA_PATH:-/var/lib/rosy}/maps:/var/lib/rosy/maps:ro"
     devices:
       - "${ROSY_MOTOR_DEVICE:-/dev/ttyAMA4}:/dev/rosy-motor"
       - "${ROSY_LIDAR_DEVICE:-/dev/ttyAMA0}:/dev/ttyAMA0"
