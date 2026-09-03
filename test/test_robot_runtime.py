@@ -136,26 +136,104 @@ def test_io_health_requires_the_motor_node_to_be_discoverable():
     )
 
 
+def _board_caps(mode: str) -> dict:
+    return yaml.safe_load(
+        (DEPLOY / "config" / f"capabilities.{mode}.yaml").read_text(encoding="utf-8")
+    )
+
+
+def _board_profile(mode: str) -> dict:
+    return yaml.safe_load(
+        (DEPLOY / "config" / f"profile.{mode}.yaml").read_text(encoding="utf-8")
+    )
+
+
 def test_core_data_is_a_host_owned_bind_and_capabilities_match_the_slice():
     compose = _compose()
     core = compose["services"]["rosy-core"]
-    capabilities = yaml.safe_load(
-        (DEPLOY / "config" / "capabilities.pi5-lite.yaml").read_text(encoding="utf-8")
-    )
-    profile = yaml.safe_load(
-        (DEPLOY / "config" / "profile.pi5-lite.yaml").read_text(encoding="utf-8")
-    )
 
     assert "${ROSY_DATA_PATH:-/var/lib/rosy}:/var/lib/rosy" in core["volumes"]
     assert "volumes" not in compose
-    assert capabilities["sensors"] == ["lidar", "encoder"]
-    assert capabilities["navigation"]["goal_navigation"] is False
-    assert capabilities["navigation"]["return_home"] is False
-    assert capabilities["slam"] is False
+    assert (
+        "./config/profile.${ROSY_RUNTIME_MODE:-core}.yaml:/etc/rosy/profile.yaml:ro"
+        in core["volumes"]
+    )
+    assert (
+        "./config/capabilities.${ROSY_RUNTIME_MODE:-core}.yaml"
+        ":/etc/rosy/capabilities.yaml:ro"
+        in core["volumes"]
+    )
+
+
+def test_core_mode_does_not_advertise_motion_hardware():
+    caps = _board_caps("core")
+    profile = _board_profile("core")
+
+    assert caps["teleop"] is False
+    assert caps["sensors"] == []
+    assert caps["navigation"]["goal_navigation"] is False
+    assert caps["slam"] is False
+    assert profile["profile"]["sensors"] == []
+
+
+def test_motor_mode_advertises_teleop_without_lidar():
+    caps = _board_caps("motor")
+    profile = _board_profile("motor")
+
+    assert caps["teleop"] is True
+    assert caps["sensors"] == ["encoder"]
+    assert "lidar" not in caps["sensors"]
+    assert caps["navigation"]["goal_navigation"] is False
+    assert profile["profile"]["sensors"] == [{"encoder": "dynamixel"}]
+
+
+def test_hardware_mode_advertises_lidar_without_nav_stack():
+    caps = _board_caps("hardware")
+    profile = _board_profile("hardware")
+    io = _compose()["services"]["rosy-io"]
+
+    assert caps["teleop"] is True
+    assert caps["sensors"] == ["lidar", "encoder"]
+    assert caps["navigation"]["goal_navigation"] is False
+    assert caps["slam"] is False
     assert profile["profile"]["sensors"] == [
         {"lidar": "rplidar_c1"},
         {"encoder": "dynamixel"},
     ]
+    assert "enable_lidar:=true" in io["command"]
+    assert any("ttyAMA0" in device for device in io["devices"])
+
+
+def test_pi5_lite_overlay_aliases_hardware_board_support():
+    assert _board_caps("pi5-lite") == _board_caps("hardware")
+    assert _board_profile("pi5-lite") == _board_profile("hardware")
+
+
+def test_board_catalog_lists_every_runtime_overlay():
+    catalog = yaml.safe_load((DEPLOY / "config" / "board.yaml").read_text(encoding="utf-8"))
+    assert catalog["board"] == "pinky_pro"
+    assert set(catalog["modes"]) == {"core", "motor", "hardware"}
+    for mode, spec in catalog["modes"].items():
+        assert spec["capabilities"] == f"capabilities.{mode}.yaml"
+        assert spec["profile"] == f"profile.{mode}.yaml"
+        assert (DEPLOY / "config" / spec["capabilities"]).is_file()
+        assert (DEPLOY / "config" / spec["profile"]).is_file()
+        caps = _board_caps(mode)
+        assert caps["teleop"] is spec["teleop"]
+        assert caps["sensors"] == spec["sensors"]
+    assert catalog["aliases"]["pi5-lite"] == "hardware"
+
+
+def test_core_container_receives_runtime_mode():
+    env = _compose()["services"]["rosy-core"]["environment"]
+    assert env["ROSY_RUNTIME_MODE"] == "${ROSY_RUNTIME_MODE:-core}"
+
+
+def test_runtime_mode_wrapper_requires_overlay_files():
+    script = (DEPLOY / "runtime-mode.sh").read_text(encoding="utf-8")
+    assert "capabilities.${MODE}.yaml" in script
+    assert "profile.${MODE}.yaml" in script
+    assert "missing board overlay" in script
 
 
 def test_core_reads_only_bounded_host_telemetry_paths():

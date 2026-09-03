@@ -1,3 +1,5 @@
+import { createFieldMap } from "./map.js";
+
 const elements = Object.fromEntries(
   [...document.querySelectorAll("[id]")].map((element) => [element.id, element]),
 );
@@ -86,9 +88,38 @@ async function api(path, options = {}) {
   return response.json();
 }
 
+async function apiMaybe(path) {
+  if (!session.token) return null;
+  const response = await fetch(path, { headers: authHeaders() });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    let message = `${response.status} ${response.statusText}`;
+    try {
+      const body = await response.json();
+      message = body.error?.message || message;
+    } catch (_error) {
+      // Keep the status text.
+    }
+    throw new Error(message);
+  }
+  return response.json();
+}
+
+const fieldMap = createFieldMap({
+  canvas: elements["map-canvas"],
+  empty: elements["map-empty"],
+  status: elements["map-status"],
+  layerRoot: document.getElementById("field-map-panel"),
+  api,
+  apiMaybe,
+  getPose: () => session.robotState?.pose,
+  canGoal: () => session.capabilities?.navigation?.goal_navigation === true,
+  setAction: (text) => setText("action-message", text),
+});
+
 function renderRobotInfo(info) {
   setText("robot-name", info.name || "Rosy");
-  setText("robot-id", `${info.robot_id || "—"} / ${info.hardware_model || "unknown model"}`);
+  setText("robot-id", `${info.robot_id || "—"} / ${info.hardware_model || "unknown model"} / ${info.runtime_mode || "core"}`);
 }
 
 function renderRobotState(state) {
@@ -120,6 +151,7 @@ function renderRobotState(state) {
   setText("last-sync", `마지막 동기화 ${new Date().toLocaleTimeString("ko-KR")}`);
   if (session.teleopActive && !teleopEligible()) stopTeleop("운전 조건이 변경되어 정지했습니다.");
   updateTeleopControls();
+  fieldMap.setPose();
 }
 
 function renderSafety(safety) {
@@ -578,7 +610,14 @@ function renderHostRelease(payload) {
 function renderCommissioning(payload) {
   setChip("commissioning-mode", payload.runtime_mode);
   const note = document.getElementById("commissioning-note");
-  if (note) note.textContent = payload.detail || "";
+  if (note) {
+    const holds = [
+      payload.motor_hold ? "MOTOR_HOLD" : null,
+      payload.lidar_hold ? "LIDAR_HOLD" : null,
+    ].filter(Boolean);
+    const holdText = holds.length ? `${holds.join(" · ")}. ` : "";
+    note.textContent = `${holdText}${payload.detail || ""}`;
+  }
 }
 
 function setEnabled(id, enabled) {
@@ -601,10 +640,12 @@ async function refreshSlowData() {
     api("/api/v1/host/network"),
     api("/api/v1/host/release"),
     api("/api/v1/host/commissioning"),
+    fieldMap.refresh(),
   ]);
   const renderers = [
     renderRuntime, renderRobotInfo, renderCapabilities, renderSafety, renderEvents,
     renderHostNetwork, renderHostRelease, renderCommissioning,
+    () => {},
   ];
   requests.forEach((result, index) => {
     if (result.status === "fulfilled") renderers[index](result.value);

@@ -14,6 +14,9 @@ state:
 profile: profile.pinky_pro.yaml   # HWA-001 Robot Profile
 capabilities: capabilities.yaml
 
+runtime:
+  mode: core                      # ROSY_RUNTIME_MODE overrides on the robot
+
 auth:                         # SEC-101 정적 토큰 (운용 시 교체 필수)
   tokens:
     - token: rosy-dev-admin

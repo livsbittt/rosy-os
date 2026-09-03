@@ -11,7 +11,8 @@ Operator runbooks for Raspberry Pi 5: first Wi-Fi image, runtime services, power
 
 | File | Description |
 |------|-------------|
-| `raspberry-pi-runtime.md` | Device permissions, systemd/compose runtime, core/motor/io modes |
+| `raspberry-pi-runtime.md` | Device permissions, systemd/compose runtime, core/motor/hardware modes |
+| `pinky-pro-board-support.md` | First ROSY OS board: mode-specific capabilities, LiDAR hardware slice |
 | `raspberry-pi-wifi-image.md` | Headless SD burn, Wi-Fi, SSH, Windows deploy |
 | `pi5-acceptance-checklist.md` | Physical acceptance tests |
 | `power-bench-verification.md` | Power/idle/standby bench |

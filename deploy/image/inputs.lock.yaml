@@ -12,6 +12,14 @@
 
 schema_version: 1
 
+board:
+  name: pinky_pro
+  host: raspberry-pi-5
+  first_runtime: core
+  note: >-
+    First ROSY OS board support. Runtime overlays live in
+    deploy/robot/config/capabilities.{core,motor,hardware}.yaml.
+
 image_tool:
   name: rpi-image-gen
   repository: https://github.com/raspberrypi/rpi-image-gen

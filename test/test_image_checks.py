@@ -77,6 +77,17 @@ def image(tmp_path: Path) -> Path:
     _write(root / "opt/rosy/deploy/robot/compose.yaml", "services: {}\n")
     _write(root / "opt/rosy/deploy/robot/runtime-mode.sh", "#!/usr/bin/env bash\n")
     _write(root / "opt/rosy/deploy/robot/release-recover.sh", "#!/usr/bin/env bash\n")
+    config = root / "opt/rosy/deploy/robot/config"
+    for name in (
+        "board.yaml",
+        "capabilities.core.yaml",
+        "capabilities.motor.yaml",
+        "capabilities.hardware.yaml",
+        "profile.core.yaml",
+        "profile.motor.yaml",
+        "profile.hardware.yaml",
+    ):
+        _write(config / name, "board: pinky_pro\n")
     _write(root / "opt/rosy/deploy/release/manifest.py", "# tools\n")
     _write(root / "opt/rosy/images/rosy-core.oci.tar", "oci\n")
     _write(root / "opt/rosy/images/rosy-io.oci.tar", "oci\n")

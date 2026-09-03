@@ -17,6 +17,7 @@ from rosy_core.docking.detector import SimulatedDetector
 from rosy_core.docking.manager import DockingConfig, DockingManager
 from rosy_core.events.bus import EventBus
 from rosy_core.identity import RobotIdentity
+from rosy_core.maps import MapSnapshotStore
 from rosy_core.navigation.manager import NavigationManager
 from rosy_core.power.battery import (
     BatteryConfig,
@@ -133,6 +134,7 @@ class CoreServices:
     battery: BatteryMonitor
     docking: DockingManager
     runtime_probe: HostRuntimeProbe
+    maps: MapSnapshotStore
     started_at: float = field(default_factory=time.time)
 
     @classmethod
@@ -194,4 +196,4 @@ class CoreServices:
                    events=events, state=state, registry=registry, modes=modes,
                    command=command, safety=safety, waypoints=waypoints, nav=nav,
                    power=power, battery=battery, docking=docking,
-                   runtime_probe=runtime_probe)
+                   runtime_probe=runtime_probe, maps=MapSnapshotStore())

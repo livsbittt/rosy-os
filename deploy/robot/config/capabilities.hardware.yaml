@@ -1,4 +1,5 @@
-# Alias of capabilities.hardware.yaml (older docs named this overlay pi5-lite).
+# Pinky Pro board support — runtime mode `hardware`.
+# Motor + RPLidar. Nav2/SLAM are not in the image yet.
 capability_version: 1
 navigation:
   goal_navigation: false

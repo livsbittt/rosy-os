@@ -17,7 +17,7 @@ XML launches for Nav2, SLAM, localization, and Gazebo/web variants.
 | `map_building.launch.xml` / `map_view.launch.xml` | SLAM mapping |
 | `nav2_view.launch.xml` | RViz nav view |
 | `gz_bringup_launch.xml` / `gz_map_building.launch.xml` / `gz_map_view.launch.xml` / `gz_nav2_view.launch.xml` / `gz_web_nav2.launch.xml` / `gz_web_slam.launch.xml` | Gazebo counterparts |
-| `web_nav2.launch.xml` / `web_slam.launch.xml` | Legacy Flask web + nav/slam |
+| `web_nav2.launch.xml` / `web_slam.launch.xml` | Nav2/SLAM + `rosy_core` FastAPI (Flask node removed, D-3) |
 
 ## Subdirectories
 

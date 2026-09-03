@@ -13,6 +13,7 @@ from rosy_core.api.v1.routes import (
     control_router,
     events_router,
     host_router,
+    map_router,
     metrics_router,
     navigation_router,
     power_router,
@@ -41,6 +42,7 @@ def create_app(config: dict[str, Any], services: CoreServices) -> FastAPI:
     dashboard_assets = {
         "styles.css": "text/css",
         "app.js": "application/javascript",
+        "map.js": "application/javascript",
     }
 
     app.include_router(system_router)
@@ -48,6 +50,7 @@ def create_app(config: dict[str, Any], services: CoreServices) -> FastAPI:
     app.include_router(control_router)
     app.include_router(safety_router)
     app.include_router(navigation_router)
+    app.include_router(map_router)
     app.include_router(waypoints_router)
     app.include_router(events_router)
     app.include_router(power_router)

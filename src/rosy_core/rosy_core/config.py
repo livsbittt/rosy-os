@@ -16,6 +16,7 @@ import yaml
 
 DEFAULT_CONFIG_NAME = "rosy_default.yaml"
 LOCAL_CONFIG_PATH = Path.home() / ".rosy" / "rosy.yaml"
+RUNTIME_MODES = frozenset({"core", "motor", "hardware"})
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -57,5 +58,15 @@ def load_config(explicit_path: Optional[str] = None) -> dict[str, Any]:
     namespace = os.environ.get("ROSY_NAMESPACE", "").strip().strip("/")
     if namespace:
         config.setdefault("robot", {})["frame_prefix"] = f"{namespace}/"
+
+    mode = os.environ.get("ROSY_RUNTIME_MODE", "").strip()
+    if mode:
+        if mode not in RUNTIME_MODES:
+            raise ValueError(
+                f"ROSY_RUNTIME_MODE must be core, motor, or hardware, got {mode!r}"
+            )
+        config.setdefault("runtime", {})["mode"] = mode
+    else:
+        config.setdefault("runtime", {}).setdefault("mode", "core")
 
     return config

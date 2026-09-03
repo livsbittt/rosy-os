@@ -1,4 +1,3 @@
-# Alias of profile.hardware.yaml (older docs named this overlay pi5-lite).
 profile:
   model: Pinky Pro Pi5 Lite
   vendor: pinklab
@@ -6,6 +5,4 @@ profile:
   wheel_base: 0.15
   max_linear_velocity: 0.20
   max_angular_velocity: 0.80
-  sensors:
-    - lidar: rplidar_c1
-    - encoder: dynamixel
+  sensors: []

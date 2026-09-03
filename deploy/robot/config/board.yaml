@@ -1,0 +1,22 @@
+# Pinky Pro — first ROSY OS board catalog.
+# Compose mounts capabilities.${ROSY_RUNTIME_MODE}.yaml and profile.${ROSY_RUNTIME_MODE}.yaml.
+board: pinky_pro
+host: raspberry-pi-5
+modes:
+  core:
+    capabilities: capabilities.core.yaml
+    profile: profile.core.yaml
+    teleop: false
+    sensors: []
+  motor:
+    capabilities: capabilities.motor.yaml
+    profile: profile.motor.yaml
+    teleop: true
+    sensors: [encoder]
+  hardware:
+    capabilities: capabilities.hardware.yaml
+    profile: profile.hardware.yaml
+    teleop: true
+    sensors: [lidar, encoder]
+aliases:
+  pi5-lite: hardware

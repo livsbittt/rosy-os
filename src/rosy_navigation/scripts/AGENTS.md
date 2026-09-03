@@ -38,7 +38,7 @@ Flask + rclpy in one process (historical; CORE replaced this with FastAPI).
 
 ### Internal
 
-- Still launched from `web_nav2.launch.xml` / `web_slam.launch.xml`
+- Not launched. `web_nav2.launch.xml` / `web_slam.launch.xml` start `rosy_core` (D-3).
 
 ### External
 

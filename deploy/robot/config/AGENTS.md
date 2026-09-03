@@ -5,14 +5,17 @@
 
 ## Purpose
 
-Pi 5 lite overlays mounted into `rosy-core`. These replace the full Pinky Pro profile/capabilities when running the lite image.
+Pinky Pro board overlays mounted into `rosy-core`. `ROSY_RUNTIME_MODE` selects `core`, `motor`, or `hardware`. The full in-tree `src/rosy_core/config/capabilities.yaml` is the Pinky source profile; these files are what the robot actually advertises.
 
 ## Key Files
 
 | File | Description |
 |------|-------------|
-| `profile.pi5-lite.yaml` | Hardware profile for Pi 5 lite (kinematics, model) |
-| `capabilities.pi5-lite.yaml` | CAP-001 flags: `slam: false`, `goal_navigation: false`, `swarm.follow/lead: false` |
+| `profile.core.yaml` / `capabilities.core.yaml` | Dashboard only: no teleop, no lidar |
+| `profile.motor.yaml` / `capabilities.motor.yaml` | Dynamixel teleop, encoder only |
+| `profile.hardware.yaml` / `capabilities.hardware.yaml` | Motor + RPLidar; nav/slam still false |
+| `profile.pi5-lite.yaml` / `capabilities.pi5-lite.yaml` | Alias of the hardware overlay |
+| `board.yaml` | Catalog of modes, overlay files, and the pi5-lite alias |
 | `rosy.pi5.example.yaml` | Example `ROSY_CONFIG` for the device |
 
 ## Subdirectories

@@ -61,6 +61,13 @@ def test_the_lock_file_exists(lock):
     assert lock["schema_version"] == 1
 
 
+def test_the_lock_names_pinky_pro_as_the_first_board(lock):
+    board = lock["board"]
+    assert board["name"] == "pinky_pro"
+    assert board["host"] == "raspberry-pi-5"
+    assert board["first_runtime"] == "core"
+
+
 @pytest.mark.parametrize(
     "path",
     [

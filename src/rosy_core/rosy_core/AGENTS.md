@@ -19,6 +19,7 @@ Importable middleware. `main.py` starts rclpy; `node.py` builds `CoreServices`, 
 | `identity.py` | IDN-001 robot id/name/IP/version |
 | `profile.py` | HWA-001 `RobotProfile` loader |
 | `capability.py` | CAP-001 dotted lookup + `CapabilityError` |
+| `maps.py` | MAP-003 last OccupancyGrid / Path / Costmap snapshots (ROS-free) |
 
 ## Subdirectories
 

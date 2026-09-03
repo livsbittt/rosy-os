@@ -40,6 +40,7 @@ def test_system_info_and_capabilities(client):
     assert r.status_code == 200
     assert r.json()["robot_id"] == "rosy_01"
     assert r.json()["hardware_model"] == "Pinky Pro"
+    assert r.json()["runtime_mode"] == "core"
     r = tc.get("/api/v1/system/capabilities", headers=VIEWER)
     assert r.json()["swarm"] == {"follow": True, "lead": True}
 

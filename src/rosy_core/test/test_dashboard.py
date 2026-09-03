@@ -41,6 +41,7 @@ def test_dashboard_assets_are_local_and_reference_runtime_contract(dashboard_cli
 
     assert script.status_code == 200
     assert "sessionStorage" in script.text
+    assert "runtime_mode" in script.text
     assert "localStorage" not in script.text
     assert "/api/v1/system/runtime" in script.text
     assert "/api/v1/robot/state" in script.text
@@ -140,3 +141,51 @@ def test_dashboard_exposes_ros_domain_bandwidth_and_topology_panel():
     assert "https://" not in script
     assert ".ros-network-panel" in css
     assert ".ros-graph-map" in css
+
+
+def test_dashboard_draws_occupancy_map_path_and_click_goal():
+    html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+    app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+    mapper = (WEB_ROOT / "map.js").read_text(encoding="utf-8")
+    css = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+    for element_id in (
+        "field-map-panel", "map-canvas", "map-status", "map-empty", "map-legend",
+    ):
+        assert f'id="{element_id}"' in html
+    assert 'aria-label="점유 격자 지도"' in html
+    assert 'data-map-layer="occupancy"' in html
+    assert 'data-map-layer="costmap"' in html
+    assert 'data-map-layer="path"' in html
+    assert "지도를 클릭하면" in html
+
+    assert 'from "./map.js"' in app
+    assert "createFieldMap" in app
+    assert "putImageData" not in app
+
+    assert "export function createFieldMap" in mapper
+    assert "export function GridFrame" not in mapper
+    assert "function GridFrame" in mapper
+    assert "worldToCell" in mapper
+    assert "sampleWorld" in mapper
+    assert "/api/v1/map" in mapper
+    assert "/api/v1/navigation/path" in mapper
+    assert "/api/v1/map/costmap" in mapper
+    assert "/api/v1/navigation/goal" in mapper
+    assert "putImageData" in mapper
+    assert "window.confirm" in mapper
+    assert "https://" not in mapper
+    assert "localStorage" not in mapper
+
+    assert ".field-map-panel" in css
+    assert ".map-stage" in css
+    assert "#map-canvas" in css
+    assert ".map-legend" in css
+    assert ".map-empty" in css
+
+
+def test_dashboard_serves_map_module(dashboard_client):
+    response = dashboard_client.get("/dashboard/assets/map.js")
+    assert response.status_code == 200
+    assert "javascript" in response.headers["content-type"]
+    assert "createFieldMap" in response.text

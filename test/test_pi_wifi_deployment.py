@@ -140,6 +140,8 @@ def test_network_verifier_separates_wifi_lan_internet_and_dashboard():
     assert "curl --interface wlan0" in script
     assert 'runtime_service="rosy-motor"' in script
     assert 'runtime_service="rosy-io"' in script
+    assert "capabilities.${configured_mode}.yaml" in script
+    assert "missing board overlay" in script
     assert "requires running $runtime_service" in script
 
 

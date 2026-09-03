@@ -228,6 +228,7 @@ def test_the_commissioning_card_works_without_the_agent(client):
 
     assert body["runtime_mode"] == "core"
     assert body["motor_hold"] is True
+    assert body["lidar_hold"] is True
     assert "정상" in body["detail"], "core-only is the correct state, not a fault"
 
 
@@ -242,7 +243,23 @@ def test_the_commissioning_card_reports_a_promoted_device():
 
     assert body["runtime_mode"] == "hardware"
     assert body["motor_hold"] is False
+    assert body["lidar_hold"] is False
     assert "안전 절차" in body["detail"]
+
+
+def test_the_commissioning_card_keeps_lidar_hold_in_motor_mode():
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+
+    config = dict(CONFIG, runtime={"mode": "motor"})
+    client = TestClient(create_app(config, SimpleNamespace(config=config)))
+
+    body = client.get("/api/v1/host/commissioning", headers=_auth(VIEWER_TOKEN)).json()
+
+    assert body["runtime_mode"] == "motor"
+    assert body["motor_hold"] is False
+    assert body["lidar_hold"] is True
+    assert "LiDAR" in body["detail"]
 
 
 # --- nothing secret reaches a card ----------------------------------------
@@ -400,6 +417,14 @@ def test_the_script_asks_for_all_three_cards():
 
     for path in ("/api/v1/host/network", "/api/v1/host/release", "/api/v1/host/commissioning"):
         assert f'api("{path}")' in script, f"the dashboard never requests {path}"
+
+
+def test_the_commissioning_script_shows_motor_and_lidar_holds():
+    body = _function_body(_script(), "renderCommissioning")
+    assert "motor_hold" in body
+    assert "lidar_hold" in body
+    assert "MOTOR_HOLD" in body
+    assert "LIDAR_HOLD" in body
 
 
 def test_the_script_marks_a_card_unavailable_instead_of_blanking_it():

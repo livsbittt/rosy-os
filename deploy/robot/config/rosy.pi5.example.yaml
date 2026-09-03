@@ -13,6 +13,9 @@ state:
 profile: /etc/rosy/profile.yaml
 capabilities: /etc/rosy/capabilities.yaml
 
+runtime:
+  mode: core
+
 auth:
   tokens:
     - token: CHANGE_ME_ADMIN

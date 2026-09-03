@@ -23,22 +23,26 @@ def _primary_ip() -> str:
 
 class RobotIdentity:
     def __init__(self, robot_id: str, robot_name: str, profile_model: str = "unknown",
-                 serial: Optional[str] = None, hardware_version: Optional[str] = None) -> None:
+                 serial: Optional[str] = None, hardware_version: Optional[str] = None,
+                 runtime_mode: str = "core") -> None:
         self.robot_id = robot_id
         self.robot_name = robot_name
         self.profile_model = profile_model
         self.serial = serial
         self.hardware_version = hardware_version
+        self.runtime_mode = runtime_mode
 
     @classmethod
     def from_config(cls, config: dict[str, Any], profile_model: str = "unknown") -> "RobotIdentity":
         robot = config.get("robot", {})
+        mode = str((config.get("runtime") or {}).get("mode") or "core")
         return cls(
             robot_id=robot.get("id", "rosy_01"),
             robot_name=robot.get("name", "Rosy 01"),
             profile_model=profile_model,
             serial=robot.get("serial"),
             hardware_version=robot.get("hardware_version"),
+            runtime_mode=mode,
         )
 
     def info(self) -> dict[str, Any]:
@@ -53,5 +57,6 @@ class RobotIdentity:
             "serial_number": self.serial,
             "software_version": SOFTWARE_VERSION,
             "ros_version": os.environ.get("ROS_DISTRO", "unknown"),
+            "runtime_mode": self.runtime_mode,
             "uptime_seconds": None,
         }

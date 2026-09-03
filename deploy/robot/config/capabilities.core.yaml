@@ -1,18 +1,19 @@
-# Alias of capabilities.hardware.yaml (older docs named this overlay pi5-lite).
+# Pinky Pro board support — runtime mode `core`.
+# CORE only. No /dev. Do not advertise motors, lidar, or Nav2.
 capability_version: 1
 navigation:
   goal_navigation: false
   return_home: false
   max_linear_velocity: 0.20
   max_angular_velocity: 0.80
-teleop: true
+teleop: false
 slam: false
 swarm:
   follow: false
   lead: false
 docking:
   supported: false
-sensors: [lidar, encoder]
+sensors: []
 events: ["safety.*", "mode.*", "waypoint.*", "system.*", "command.*"]
 api_versions: [v1]
 protocol_version: "1.0"

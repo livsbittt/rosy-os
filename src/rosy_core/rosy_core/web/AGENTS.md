@@ -34,7 +34,7 @@ None.
 
 ### Common Patterns
 
-Vanilla JS. Viewer/operator/admin tokens from config. Teleop is hold-to-drive (~100 ms), not latched.
+Vanilla JS modules. `app.js` owns session/auth/teleop; `map.js` owns GridFrame, occupancy/costmap/path layers, and click-to-goal. Costmap is sampled in occupancy world coordinates. Teleop is hold-to-drive (~100 ms).
 
 ## Dependencies
 

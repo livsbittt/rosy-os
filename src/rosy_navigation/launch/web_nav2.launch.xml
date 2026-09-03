@@ -1,15 +1,11 @@
 <?xml version='1.0'?>
 <launch>
+    <!-- D-3: Flask nav2_web_server 대신 rosy_core FastAPI (:8080). -->
     <arg name="map" default=""/>
-    <arg name="ip" default="0.0.0.0"/>
-    <arg name="port" default="8080"/>
     <arg name="use_sim_time" default="False"/>
     <arg name="params_file" default="$(find-pkg-share rosy_navigation)/params/nav2_params.yaml"/>
 
-    <node pkg="rosy_navigation" exec="nav2_web_server.py" name="nav2_web_server" output="screen">
-        <param name="ip" value="$(var ip)"/>
-        <param name="port" value="$(var port)"/>
-    </node>
+    <node pkg="rosy_core" exec="rosy_core" name="rosy_core" output="screen"/>
 
     <include file="$(find-pkg-share rosy_navigation)/launch/bringup_launch.xml">
         <arg name="params_file" value="$(var params_file)"/>

@@ -40,6 +40,7 @@ services:
       HOME: /var/lib/rosy
       ROSY_CONFIG: /etc/rosy/rosy.yaml
       ROSY_HOST_ROOT: "${ROSY_HOST_ROOT:-/host}"
+      ROSY_RUNTIME_MODE: "${ROSY_RUNTIME_MODE:-core}"
     command:
       - ros2
       - run
@@ -50,8 +51,8 @@ services:
       - "__ns:=/${ROSY_NAMESPACE:-rosy_01}"
     volumes:
       - "${ROSY_CONFIG_PATH:-/etc/rosy/rosy.yaml}:/etc/rosy/rosy.yaml:ro"
-      - "./config/profile.pi5-lite.yaml:/etc/rosy/profile.yaml:ro"
-      - "./config/capabilities.pi5-lite.yaml:/etc/rosy/capabilities.yaml:ro"
+      - "./config/profile.${ROSY_RUNTIME_MODE:-core}.yaml:/etc/rosy/profile.yaml:ro"
+      - "./config/capabilities.${ROSY_RUNTIME_MODE:-core}.yaml:/etc/rosy/capabilities.yaml:ro"
       - "${ROSY_DATA_PATH:-/var/lib/rosy}:/var/lib/rosy"
       - "/proc/uptime:/host/proc/uptime:ro"
       - "/proc/loadavg:/host/proc/loadavg:ro"

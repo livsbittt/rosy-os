@@ -5,7 +5,7 @@
 
 ## Purpose
 
-Nav2 and SLAM Toolbox launch/config/maps for real robot and Gazebo. ament_cmake. The Flask `scripts/nav2_web_server.py` is the pre-D-3 UI; new web control belongs in `rosy_core`.
+Nav2 and SLAM Toolbox launch/config/maps for real robot and Gazebo. ament_cmake. `scripts/nav2_web_server.py` is leftover Flask; web launches start `rosy_core`.
 
 ## Key Files
 

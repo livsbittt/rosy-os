@@ -46,6 +46,13 @@ REQUIRED_PATHS = (
     "opt/rosy/deploy/robot/runtime-mode.sh",
     "opt/rosy/deploy/robot/release-recover.sh",
     "opt/rosy/deploy/release",
+    "opt/rosy/deploy/robot/config/board.yaml",
+    "opt/rosy/deploy/robot/config/capabilities.core.yaml",
+    "opt/rosy/deploy/robot/config/capabilities.motor.yaml",
+    "opt/rosy/deploy/robot/config/capabilities.hardware.yaml",
+    "opt/rosy/deploy/robot/config/profile.core.yaml",
+    "opt/rosy/deploy/robot/config/profile.motor.yaml",
+    "opt/rosy/deploy/robot/config/profile.hardware.yaml",
 )
 
 #: The OCI archives the first boot imports locally. Without them the first

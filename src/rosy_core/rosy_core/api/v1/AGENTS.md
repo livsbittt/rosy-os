@@ -23,6 +23,7 @@ None.
 ### Working In This Directory
 
 - Prefixes are the contract. Do not rename `/api/v1/robot/state` etc. without API ref + tests.
+- Map snapshots: `GET /api/v1/map`, `/navigation/path`, `/map/costmap?scope=global|local`. Missing grid is 404; empty path is `[]`.
 - `POST /mode` allows IDLE|MANUAL|NAVIGATION only (not DOCKING/EMERGENCY via this body).
 - Host card endpoints proxy Host Agent; never fabricate telemetry (`host_agent_client`).
 - Docking and battery routes were extended on `feat/battery-integrity-low-battery-alert`.

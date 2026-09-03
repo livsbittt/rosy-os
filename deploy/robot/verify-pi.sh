@@ -127,6 +127,12 @@ case "$configured_mode" in
     runtime_ok=0
     ;;
 esac
+overlay="$install_root/deploy/robot/config/capabilities.${configured_mode}.yaml"
+profile="$install_root/deploy/robot/config/profile.${configured_mode}.yaml"
+if [[ ! -f "$overlay" || ! -f "$profile" ]]; then
+  fail "RUNTIME" "missing board overlay for $configured_mode"
+  runtime_ok=0
+fi
 if ! systemctl is-active --quiet rosy-runtime.service 2>/dev/null; then
   fail "RUNTIME" "rosy-runtime.service is not active"
   runtime_ok=0

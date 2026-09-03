@@ -1,4 +1,5 @@
-# Alias of capabilities.hardware.yaml (older docs named this overlay pi5-lite).
+# Pinky Pro board support — runtime mode `motor`.
+# Dynamixel UART only. LiDAR and Nav2 stay off until hardware acceptance.
 capability_version: 1
 navigation:
   goal_navigation: false
@@ -12,7 +13,7 @@ swarm:
   lead: false
 docking:
   supported: false
-sensors: [lidar, encoder]
+sensors: [encoder]
 events: ["safety.*", "mode.*", "waypoint.*", "system.*", "command.*"]
 api_versions: [v1]
 protocol_version: "1.0"

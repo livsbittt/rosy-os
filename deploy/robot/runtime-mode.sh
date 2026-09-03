@@ -23,6 +23,7 @@ compose() {
     docker compose --env-file "$ENV_FILE" "$@"
 }
 
+# Compose bind-mounts config/{profile,capabilities}.${MODE}.yaml into CORE.
 case "$MODE" in
     "core"|"motor"|"hardware") ;;
     *)
@@ -30,6 +31,13 @@ case "$MODE" in
         exit 2
         ;;
 esac
+
+CAP_FILE="$SCRIPT_DIR/config/capabilities.${MODE}.yaml"
+PROF_FILE="$SCRIPT_DIR/config/profile.${MODE}.yaml"
+if [[ ! -f "$CAP_FILE" || ! -f "$PROF_FILE" ]]; then
+    echo "error: missing board overlay for mode '$MODE' ($CAP_FILE / $PROF_FILE)" >&2
+    exit 2
+fi
 
 case "$ACTION" in
     up)

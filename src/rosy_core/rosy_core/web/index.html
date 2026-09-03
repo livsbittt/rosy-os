@@ -222,6 +222,34 @@
       </div>
     </section>
 
+    <section id="field-map-panel" class="panel field-map-panel" aria-labelledby="field-map-heading">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">OCCUPANCY FIELD</p>
+          <h2 id="field-map-heading">점유 지도</h2>
+        </div>
+        <span id="map-status" class="machine-tag">맵 수신 대기</span>
+      </div>
+      <div class="map-toolbar" role="group" aria-label="지도 레이어">
+        <button type="button" data-map-layer="occupancy" aria-pressed="true">격자</button>
+        <button type="button" data-map-layer="costmap" aria-pressed="true">코스트</button>
+        <button type="button" data-map-layer="path" aria-pressed="true">경로</button>
+      </div>
+      <div class="map-stage">
+        <canvas id="map-canvas" width="800" height="480" role="img" aria-label="점유 격자 지도"></canvas>
+        <p id="map-empty" class="map-empty">맵 토픽을 기다리는 중입니다.</p>
+      </div>
+      <ul id="map-legend" class="map-legend">
+        <li data-swatch="free">자유</li>
+        <li data-swatch="occupied">점유</li>
+        <li data-swatch="unknown">미지</li>
+        <li data-swatch="cost">코스트</li>
+        <li data-swatch="path">경로</li>
+        <li data-swatch="robot">로봇</li>
+      </ul>
+      <p class="map-hint">지도를 클릭하면 현재 방향으로 목표를 보냅니다. operator 권한이 필요합니다.</p>
+    </section>
+
     <section class="panel control-panel" aria-labelledby="control-heading">
       <div class="panel-heading">
         <div>

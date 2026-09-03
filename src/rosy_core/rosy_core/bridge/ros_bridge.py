@@ -3,6 +3,7 @@
 - 유일한 cmd_vel 퍼블리셔 (D-2): 50 Hz select_output → publish
 - 구독: odom / battery/voltage / nav_cmd_vel(Nav2 출력 리매핑 입력)
        / us_sensor/range, batt_state (PWR-002 근접 웨이크·배터리 표시)
+       / map, plan, local/global costmap (MAP-003 스냅샷)
 - 발행: power/mode, display/info (PWR-003) — LED는 set_led 서비스로 구동
 - LiDAR 모터: start_motor / stop_motor 서비스로 STANDBY 듀티 조정 (PWR-005)
 - Nav2 NavigateToPose 액션 클라이언트 (NavExecutor 구현)
@@ -25,8 +26,9 @@ from rclpy.action import ActionClient
 from rclpy.node import Node
 
 from geometry_msgs.msg import PoseWithCovarianceStamped, Twist
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import OccupancyGrid, Odometry, Path
 from nav2_msgs.action import NavigateToPose
+from nav2_msgs.msg import Costmap
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import BatteryState, Imu, LaserScan, Range
 from std_msgs.msg import Bool, Float32, String
@@ -51,6 +53,40 @@ from rosy_core.protocol.schemas import HealthState
 # 늦게 뜬 노드도 현재 모드를 즉시 받도록 latch 한다 (PWR-003).
 _LATCHED = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
                       durability=DurabilityPolicy.TRANSIENT_LOCAL)
+
+
+def _yaw_from_quat(q) -> float:
+    return math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y ** 2 + q.z ** 2))
+
+
+def _grid_from_occupancy(msg: OccupancyGrid) -> dict:
+    info = msg.info
+    return {
+        "width": int(info.width),
+        "height": int(info.height),
+        "resolution": float(info.resolution),
+        "origin": {
+            "x": float(info.origin.position.x),
+            "y": float(info.origin.position.y),
+            "yaw": _yaw_from_quat(info.origin.orientation),
+        },
+        "data": list(msg.data),
+    }
+
+
+def _grid_from_costmap(msg: Costmap) -> dict:
+    meta = msg.metadata
+    return {
+        "width": int(meta.size_x),
+        "height": int(meta.size_y),
+        "resolution": float(meta.resolution),
+        "origin": {
+            "x": float(meta.origin.position.x),
+            "y": float(meta.origin.position.y),
+            "yaw": _yaw_from_quat(meta.origin.orientation),
+        },
+        "data": list(msg.data),
+    }
 
 # 정보 창이 열려 있는 동안 display/info 재발행 간격 (s).
 _INFO_REPUBLISH_S = 1.0
@@ -82,6 +118,12 @@ class RosBridge:
         node.create_subscription(Imu, "imu_raw", self._on_imu, 10)
         node.create_subscription(Range, "us_sensor/range", self._on_us_range, 10)
         node.create_subscription(BatteryState, "batt_state", self._on_batt_state, 10)
+        node.create_subscription(OccupancyGrid, "map", self._on_map, _LATCHED)
+        node.create_subscription(Path, "plan", self._on_plan, 10)
+        node.create_subscription(Costmap, "local_costmap/costmap", self._on_local_costmap, 10)
+        node.create_subscription(Costmap, "local_costmap/costmap_raw", self._on_local_costmap, 10)
+        node.create_subscription(Costmap, "global_costmap/costmap", self._on_global_costmap, 10)
+        node.create_subscription(Costmap, "global_costmap/costmap_raw", self._on_global_costmap, 10)
 
         self.power_mode_pub = node.create_publisher(String, "power/mode", _LATCHED)
         self.display_info_pub = node.create_publisher(String, "display/info", 10)
@@ -212,6 +254,21 @@ class RosBridge:
         snapshot = self._svc.state.snapshot()
         # 로봇 모드가 IDLE이 아니면 절전 진입을 막는다 (PWR-001 안전 인터록).
         self._svc.power.on_robot_mode(snapshot.mode)
+
+    def _on_map(self, msg: OccupancyGrid) -> None:
+        self._svc.maps.set_map(_grid_from_occupancy(msg))
+
+    def _on_plan(self, msg: Path) -> None:
+        self._svc.maps.set_path([
+            {"x": float(ps.pose.position.x), "y": float(ps.pose.position.y)}
+            for ps in msg.poses
+        ])
+
+    def _on_local_costmap(self, msg: Costmap) -> None:
+        self._svc.maps.set_costmap("local", _grid_from_costmap(msg))
+
+    def _on_global_costmap(self, msg: Costmap) -> None:
+        self._svc.maps.set_costmap("global", _grid_from_costmap(msg))
 
     def _on_scan(self, msg: LaserScan) -> None:
         self._svc.state.set_sensor("lidar", {

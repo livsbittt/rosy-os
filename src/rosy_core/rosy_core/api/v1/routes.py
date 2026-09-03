@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from rosy_core.api.deps import AuthContext, get_services, require_role
 from rosy_core.api.errors import ApiError
+from rosy_core.maps import valid_costmap_scope
 from rosy_core.command.arbitration import Mode
 from rosy_core.protocol.schemas import PowerMode, RobotMode
 from rosy_core.docking.database import DockError, DockInstance, DockType
@@ -187,6 +188,33 @@ def navigation_home(auth: AuthContext = Depends(operator),
 @navigation_router.get("/navigation/state")
 def navigation_state(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
     return {"navigation": svc.nav.nav_state.value, "map_id": svc.state.map_id}
+
+
+@navigation_router.get("/navigation/path")
+def navigation_path(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
+    return {"poses": svc.maps.get_path()}
+
+
+map_router = APIRouter(prefix="/api/v1/map", tags=["map"])
+
+
+@map_router.get("")
+def current_map(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
+    grid = svc.maps.get_map()
+    if grid is None:
+        raise ApiError("NOT_FOUND", 404, "no occupancy map received yet")
+    return {"map_id": svc.state.map_id, **grid}
+
+
+@map_router.get("/costmap")
+def costmap(scope: str | None = Query(default=None),
+            _: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
+    if scope is None or not valid_costmap_scope(scope):
+        raise ApiError("VALIDATION_ERROR", 400, "scope must be global or local")
+    grid = svc.maps.get_costmap(scope)
+    if grid is None:
+        raise ApiError("NOT_FOUND", 404, f"no {scope} costmap received yet")
+    return {"scope": scope, **grid}
 
 
 class InitialPoseRequest(BaseModel):
@@ -626,13 +654,24 @@ def host_commissioning(_: AuthContext = Depends(viewer), svc: CoreServices = Dep
     묻지 않아도 된다. 그래서 이 카드는 에이전트가 없어도 절반은 정직하게 채운다.
     """
     mode = (svc.config or {}).get("runtime", {}).get("mode", "core")
+    if mode == "core":
+        detail = (
+            "UART·모터 미승인 상태입니다. 이것은 정상이며, 승격은 별도 현장 안전 "
+            "절차를 따릅니다."
+        )
+    elif mode == "motor":
+        detail = (
+            "모터 벤치 모드입니다. LiDAR는 아직 꺼져 있으며 hardware 모드는 "
+            "별도 수락이 필요합니다."
+        )
+    else:
+        detail = (
+            f"현재 {mode} 모드로 기동되어 있습니다. 현장 안전 절차가 완료되었는지 "
+            "확인하십시오."
+        )
     return {
         "runtime_mode": mode,
         "motor_hold": mode == "core",
-        "detail": (
-            "UART·모터 미승인 상태입니다. 이것은 정상이며, 승격은 별도 현장 안전 "
-            "절차를 따릅니다."
-            if mode == "core"
-            else f"현재 {mode} 모드로 기동되어 있습니다. 현장 안전 절차가 완료되었는지 확인하십시오."
-        ),
+        "lidar_hold": mode != "hardware",
+        "detail": detail,
     }
