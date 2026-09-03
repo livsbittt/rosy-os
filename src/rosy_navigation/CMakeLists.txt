@@ -25,16 +25,6 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-install(PROGRAMS
-  scripts/nav2_web_server.py
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-install(FILES
-  scripts/index.html scripts/pinklab_logo.png
-  DESTINATION lib/${PROJECT_NAME}
-)
-
 install(
   DIRECTORY launch params map rviz
   DESTINATION share/${PROJECT_NAME}

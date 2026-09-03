@@ -250,6 +250,12 @@ def test_systemd_unit_delegates_to_runtime_mode_wrapper():
     assert "docker compose" not in unit
 
 
+def test_teleop_watchdog_lives_in_safety_manager_not_a_stub():
+    safety = ROOT / "src" / "rosy_core" / "rosy_core" / "safety"
+    assert not (safety / "watchdog.py").is_file()
+    assert "class TeleopWatchdog" in (safety / "manager.py").read_text(encoding="utf-8")
+
+
 def test_container_entrypoint_is_forced_to_unix_line_endings():
     entrypoint = (DEPLOY / "entrypoint.sh").read_bytes()
     attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")

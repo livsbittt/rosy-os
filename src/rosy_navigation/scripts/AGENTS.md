@@ -23,6 +23,7 @@ None.
 
 ### Working In This Directory
 
+- Not launched and not installed into the robot image. `web_nav2` / `web_slam` start `rosy_core` (D-3).
 - Implementation Plan P0-7 / Flask parity checklist tracks remaining gaps.
 - New endpoints go to `src/rosy_core/rosy_core/api/v1/routes.py`.
 
@@ -38,7 +39,7 @@ Flask + rclpy in one process (historical; CORE replaced this with FastAPI).
 
 ### Internal
 
-- Not launched. `web_nav2.launch.xml` / `web_slam.launch.xml` start `rosy_core` (D-3).
+- Legacy only. Do not add a launch or CMake install back.
 
 ### External
 

@@ -45,7 +45,7 @@ Importable middleware. `main.py` starts rclpy; `node.py` builds `CoreServices`, 
 
 ### Working In This Directory
 
-- `SOFTWARE_VERSION` is `"0.1.0"` in `node.py` / `identity.py` — keep in sync with `package.xml`.
+- `SOFTWARE_VERSION` lives in `identity.py` and must match `package.xml`. `node.py` imports it.
 - Waypoints default path: `~/.rosy/waypoints.json` (on Pi, `HOME=/var/lib/rosy`).
 - `SHUTDOWN_SENTINEL_NAME = "battery-shutdown-request.json"` in `services.py`. Dock database JSON lives beside waypoints.
 

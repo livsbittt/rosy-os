@@ -1,6 +1,10 @@
 """Deployment environment overrides that keep ROS graph and TF aligned."""
 
+from pathlib import Path
+import xml.etree.ElementTree as ET
+
 import rosy_core.config as config_module
+from rosy_core.identity import SOFTWARE_VERSION
 
 
 def test_runtime_mode_env_overrides_config(tmp_path, monkeypatch):
@@ -41,3 +45,16 @@ def test_ros_namespace_derives_core_frame_prefix(tmp_path, monkeypatch):
     config = config_module.load_config(str(config_path))
 
     assert config["robot"]["frame_prefix"] == "rosy_07/"
+
+
+def test_software_version_has_one_source():
+    root = Path(__file__).resolve().parents[1]
+    node_src = (root / "rosy_core" / "node.py").read_text(encoding="utf-8")
+    assert "from rosy_core.identity import SOFTWARE_VERSION" in node_src
+    assert 'SOFTWARE_VERSION = "' not in node_src
+    tree = ET.parse(root / "package.xml")
+    version = tree.find("{http://www.ros.org/schema/package_format3.xsd}version")
+    if version is None:
+        version = tree.find("version")
+    assert version is not None
+    assert version.text == SOFTWARE_VERSION

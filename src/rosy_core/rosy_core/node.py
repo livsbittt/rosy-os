@@ -10,9 +10,8 @@ import rclpy
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 
+from rosy_core.identity import SOFTWARE_VERSION
 from rosy_core.services import CoreServices
-
-SOFTWARE_VERSION = "0.1.0"
 
 
 def _resolve_path(config: dict[str, Any], key: str, fallback: Path) -> Path:

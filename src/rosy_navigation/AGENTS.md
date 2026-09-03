@@ -12,7 +12,7 @@ Nav2 and SLAM Toolbox launch/config/maps for real robot and Gazebo. ament_cmake.
 | File | Description |
 |------|-------------|
 | `package.xml` | Depends on navigation2, nav2_bringup |
-| `CMakeLists.txt` | Installs the Python policy package, launch, params, maps, rviz, scripts |
+| `CMakeLists.txt` | Installs the Python policy package, launch, params, maps, rviz. Does not install leftover Flask scripts. |
 
 ## Subdirectories
 

@@ -24,3 +24,12 @@ def test_web_launches_start_rosy_core_instead():
         text = (LAUNCH / name).read_text(encoding="utf-8")
         assert 'pkg="rosy_core"' in text, name
         assert "rosy_core" in text, name
+
+
+def test_navigation_package_does_not_install_flask():
+    cmake = (ROOT / "src" / "rosy_navigation" / "CMakeLists.txt").read_text(
+        encoding="utf-8"
+    )
+    assert "nav2_web_server.py" not in cmake
+    assert "index.html" not in cmake
+    assert "pinklab_logo.png" not in cmake

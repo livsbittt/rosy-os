@@ -13,7 +13,6 @@ SAF-001–005: e-stop, teleop timeout, speed limits, battery policy hooks. ROS-f
 |------|-------------|
 | `__init__.py` | Package marker |
 | `manager.py` | `SafetyManager`, `TeleopWatchdog`, `SpeedLimits`, `BatteryPolicy` |
-| `watchdog.py` | Stub (`TODO` Phase 1) — live watchdog is in `manager.py` |
 
 ## Subdirectories
 
@@ -25,7 +24,7 @@ None.
 
 - Battery *integrity* (curve, hysteresis, sentinel) is `power/battery.py`, not this package. Keep SAF-005 policy flags here (`warning`/`critical`/`RETURN_HOME`).
 - Do not implement halt in SafetyManager (D-27 is host-side).
-- Prefer extending `manager.py` rather than filling the stub unless you delete the duplicate.
+- Prefer extending `manager.py`. Do not add a second watchdog module.
 
 ### Testing Requirements
 
