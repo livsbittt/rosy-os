@@ -151,6 +151,22 @@ def safety_limits(body: LimitsRequest, auth: AuthContext = Depends(admin),
     return safety_state(svc)
 
 
+def _enter_navigation_mode(svc: CoreServices, auth: AuthContext) -> None:
+    """D-2: Nav2 velocity only reaches the wheels in NAVIGATION."""
+    if svc.modes.mode is Mode.NAVIGATION:
+        return
+    svc.command.clear_navigation()
+    ok, reason = svc.modes.transition(Mode.NAVIGATION)
+    if not ok:
+        raise ApiError("MODE_CONFLICT", 409, reason)
+    svc.state.set_mode(RobotMode.NAVIGATION)
+    svc.events.publish(
+        "mode.changed",
+        source="api",
+        data={"from": "api", "to": Mode.NAVIGATION.value, "by": auth.role},
+    )
+
+
 navigation_router = APIRouter(prefix="/api/v1", tags=["navigation"])
 
 
@@ -166,8 +182,13 @@ def navigation_goal(body: GoalRequest, auth: AuthContext = Depends(operator),
                     svc: CoreServices = Depends(get_services)):
     svc.capability.require("navigation.goal_navigation")
     spec = svc.nav.resolve_goal(x=body.x, y=body.y, yaw=body.yaw, waypoint=body.waypoint)
+    _enter_navigation_mode(svc, auth)
     svc.nav.goal(spec, source=f"api:{auth.role}")
-    return {"accepted": True, "goal": {"x": spec.x, "y": spec.y, "yaw": spec.yaw}}
+    return {
+        "accepted": True,
+        "mode": svc.modes.mode.value,
+        "goal": {"x": spec.x, "y": spec.y, "yaw": spec.yaw},
+    }
 
 
 @navigation_router.post("/navigation/cancel")
@@ -181,8 +202,9 @@ def navigation_cancel(auth: AuthContext = Depends(operator),
 def navigation_home(auth: AuthContext = Depends(operator),
                     svc: CoreServices = Depends(get_services)):
     svc.capability.require("navigation.return_home")
+    _enter_navigation_mode(svc, auth)
     svc.nav.home(source=f"api:{auth.role}")
-    return {"accepted": True}
+    return {"accepted": True, "mode": svc.modes.mode.value}
 
 
 @navigation_router.get("/navigation/state")

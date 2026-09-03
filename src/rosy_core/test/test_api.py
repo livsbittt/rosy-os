@@ -1,6 +1,7 @@
 """API 통합 테스트 — 실제 서비스(ROS 무의존) + FastAPI TestClient (P1-9)."""
 
 import importlib
+import time
 
 import pytest
 
@@ -110,6 +111,37 @@ def test_navigation_mode_requires_capability_and_clears_stale_twist(client):
 
     assert accepted.status_code == 200
     assert svc.command.select_output().linear == 0.0
+
+
+def test_a_goal_enters_navigation_mode_so_nav_cmd_vel_reaches_the_wheels(client):
+    tc, svc = client
+
+    class LocalExecutor:
+        def send_goal(self, spec):
+            return None
+
+        def cancel_goal(self):
+            return None
+
+        def send_initial_pose(self, *a):
+            return None
+
+    svc.nav.executor = LocalExecutor()
+    assert svc.modes.mode.value == "IDLE"
+    svc.command.set_nav_twist(Twist(0.12, 0.0), now=time.monotonic())
+    assert svc.command.select_output(now=time.monotonic()).linear == 0.0
+
+    accepted = tc.post(
+        "/api/v1/navigation/goal",
+        json={"x": 1.0, "y": 0.5, "yaw": 0.0},
+        headers=OPERATOR,
+    )
+    assert accepted.status_code == 200
+    assert svc.modes.mode.value == "NAVIGATION"
+    assert accepted.json()["mode"] == "NAVIGATION"
+    now = time.monotonic()
+    svc.command.set_nav_twist(Twist(0.12, 0.0), now=now)
+    assert svc.command.select_output(now=now).linear == pytest.approx(0.12)
 
 
 def test_safety_stop_release_cycle(client):
