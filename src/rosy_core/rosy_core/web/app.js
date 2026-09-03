@@ -618,6 +618,7 @@ function renderCommissioning(payload) {
       payload.battery_hold ? "BATTERY_HOLD" : null,
       payload.imu_hold ? "IMU_HOLD" : null,
       payload.slam_hold ? "SLAM_HOLD" : null,
+      payload.fleet_hold ? "FLEET_HOLD" : null,
     ].filter(Boolean);
     const holdText = holds.length ? `${holds.join(" · ")}. ` : "";
     note.textContent = `${holdText}${payload.detail || ""}`;

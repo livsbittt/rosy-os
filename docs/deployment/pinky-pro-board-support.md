@@ -32,6 +32,8 @@ IMU·ADC·LCD·LED·lamp는 io 이미지에 넣지 않았다. ADC는 I2C로 아�
 `battery_hold`와 `imu_hold`는 ADC/IMU 드라이버가 이미지에 없는 동안 항상 참이다.
 `slam_hold`는 slam_toolbox를 런치하지 않는 동안 항상 참이다. 현장 맵은 SLAM이
 아니라 `/var/lib/rosy/maps/site.yaml`을 넣어서 쓴다.
+`fleet_hold`는 Fleet 서버와 outbound WS가 없는 동안 항상 참이다. `swarm`은
+꺼져 있다.
 
 ## 시운전 순서
 

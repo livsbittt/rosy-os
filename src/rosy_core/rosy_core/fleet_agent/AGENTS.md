@@ -1,46 +1,25 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-03 -->
 
 # fleet_agent
 
 ## Purpose
 
-Placeholder for Phase 4 outbound Fleet WebSocket (D-5): hello/welcome, heartbeat, backoff, gap fill. **Not implemented** — `agent.py` is a TODO stub.
+Outbound Fleet WebSocket (D-5) is **disabled**. `FleetAgent.start()` does not open a socket. This repository has no Fleet server. The robot stays local-first.
 
 ## Key Files
 
 | File | Description |
 |------|-------------|
 | `__init__.py` | Package marker |
-| `agent.py` | Stub documenting P4-2 / D-5 |
-
-## Subdirectories
-
-None.
+| `agent.py` | `FleetAgent`: `enabled`/`connected` stay false |
 
 ## For AI Agents
 
-### Working In This Directory
-
-- Do not pretend this speaks to a fleet server. Implement against API ref §7 and `protocol/schemas.py`.
-- Robot remains local-first: this agent must not be required for teleop/nav/safety.
+- Do not add a connection, URL, token, or heartbeat here until a Fleet server exists.
+- Teleop, navigation, and safety must not import or wait on this agent.
+- Commissioning reports `fleet_hold: true`. Robot overlay `swarm.follow` / `swarm.lead` stay false.
 
 ### Testing Requirements
 
-None until the stub grows. Protocol tests already cover envelope types.
-
-### Common Patterns
-
-Outbound WS from robot; Fleet sends commands over REST (D-5).
-
-## Dependencies
-
-### Internal
-
-- `protocol.schemas` envelope types
-
-### External
-
-- websockets (future)
-
-<!-- MANUAL: -->
+`src/rosy_core/test/test_fleet_agent.py`, commissioning fields in `test_host_cards.py`.

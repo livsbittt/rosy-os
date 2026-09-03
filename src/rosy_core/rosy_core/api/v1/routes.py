@@ -662,12 +662,13 @@ def host_commissioning(_: AuthContext = Depends(viewer), svc: CoreServices = Dep
     elif mode == "motor":
         detail = (
             "모터 벤치 모드입니다. LiDAR는 아직 꺼져 있으며 hardware 모드는 "
-            "별도 수락이 필요합니다. 배터리 ADC, IMU, SLAM은 이미지에 없습니다."
+            "별도 수락이 필요합니다. 배터리 ADC, IMU, SLAM, Fleet는 없습니다."
         )
     else:
         detail = (
             f"현재 {mode} 모드로 기동되어 있습니다. 모터와 LiDAR와 Nav2는 이 "
-            "슬라이스에 있습니다. 배터리 전압(ADC), IMU, SLAM은 띄우지 않습니다."
+            "슬라이스에 있습니다. 배터리 전압(ADC), IMU, SLAM, Fleet는 "
+            "띄우지 않습니다."
         )
     return {
         "runtime_mode": mode,
@@ -676,5 +677,6 @@ def host_commissioning(_: AuthContext = Depends(viewer), svc: CoreServices = Dep
         "battery_hold": True,
         "imu_hold": True,
         "slam_hold": True,
+        "fleet_hold": True,
         "detail": detail,
     }

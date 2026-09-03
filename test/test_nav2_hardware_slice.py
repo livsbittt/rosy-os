@@ -23,6 +23,7 @@ def test_hardware_mode_advertises_lidar_and_goal_navigation():
     assert caps["navigation"]["goal_navigation"] is True
     assert caps["navigation"]["return_home"] is True
     assert caps["slam"] is False
+    assert caps["swarm"] == {"follow": False, "lead": False}
     assert profile["profile"]["sensors"] == [
         {"lidar": "rplidar_c1"},
         {"encoder": "dynamixel"},

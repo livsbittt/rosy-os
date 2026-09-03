@@ -39,7 +39,7 @@ Importable middleware. `main.py` starts rclpy; `node.py` builds `CoreServices`, 
 | `docking/` | Dock SM, DB, detector (see `docking/AGENTS.md`) |
 | `diagnostics/` | Health providers (see `diagnostics/AGENTS.md`) |
 | `system/` | Host probe, ROS graph, host-agent client (see `system/AGENTS.md`) |
-| `fleet_agent/` | Outbound Fleet WS stub (Phase 4) (see `fleet_agent/AGENTS.md`) |
+| `fleet_agent/` | Disabled outbound Fleet WS; does not connect (see `fleet_agent/AGENTS.md`) |
 
 ## For AI Agents
 

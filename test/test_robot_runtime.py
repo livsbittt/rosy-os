@@ -154,6 +154,7 @@ def test_core_mode_does_not_advertise_motion_hardware():
     assert caps["sensors"] == []
     assert caps["navigation"]["goal_navigation"] is False
     assert caps["slam"] is False
+    assert caps["swarm"] == {"follow": False, "lead": False}
     assert profile["profile"]["sensors"] == []
 
 
@@ -165,6 +166,7 @@ def test_motor_mode_advertises_teleop_without_lidar():
     assert caps["sensors"] == ["encoder"]
     assert "lidar" not in caps["sensors"]
     assert caps["navigation"]["goal_navigation"] is False
+    assert caps["swarm"] == {"follow": False, "lead": False}
     assert profile["profile"]["sensors"] == [{"encoder": "dynamixel"}]
 
 

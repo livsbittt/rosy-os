@@ -23,6 +23,7 @@ pytest for rosy_core policy, API, dashboard, and protocol. Most tests import Pyt
 | `test_host_runtime.py` | `HostRuntimeProbe` read-only telemetry |
 | `test_ros_graph_monitor.py` | ROS graph snapshot bounds |
 | `test_runtime_config.py` | YAML merge / ROSY_CONFIG |
+| `test_fleet_agent.py` | FleetAgent stays disconnected |
 
 ## Subdirectories
 
