@@ -34,6 +34,7 @@ from sensor_msgs.msg import BatteryState, Imu, LaserScan, Range
 from std_msgs.msg import Bool, Float32, String
 from std_srvs.srv import Empty
 
+from rosy_core.bridge import translate
 from rosy_core.maps import occupancy_map_id
 from rosy_core.navigation.initial_pose import amcl_pose_covariance
 from rosy_interfaces.srv import SetLed
@@ -56,39 +57,6 @@ from rosy_core.protocol.schemas import HealthState
 _LATCHED = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
                       durability=DurabilityPolicy.TRANSIENT_LOCAL)
 
-
-def _yaw_from_quat(q) -> float:
-    return math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y ** 2 + q.z ** 2))
-
-
-def _grid_from_occupancy(msg: OccupancyGrid) -> dict:
-    info = msg.info
-    return {
-        "width": int(info.width),
-        "height": int(info.height),
-        "resolution": float(info.resolution),
-        "origin": {
-            "x": float(info.origin.position.x),
-            "y": float(info.origin.position.y),
-            "yaw": _yaw_from_quat(info.origin.orientation),
-        },
-        "data": list(msg.data),
-    }
-
-
-def _grid_from_costmap(msg: Costmap) -> dict:
-    meta = msg.metadata
-    return {
-        "width": int(meta.size_x),
-        "height": int(meta.size_y),
-        "resolution": float(meta.resolution),
-        "origin": {
-            "x": float(meta.origin.position.x),
-            "y": float(meta.origin.position.y),
-            "yaw": _yaw_from_quat(meta.origin.orientation),
-        },
-        "data": list(msg.data),
-    }
 
 # 정보 창이 열려 있는 동안 display/info 재발행 간격 (s).
 _INFO_REPUBLISH_S = 1.0
@@ -177,15 +145,11 @@ class RosBridge:
 
     def _on_odom(self, msg: Odometry) -> None:
         self._last_odom_ts = time.monotonic()
-        pose = msg.pose.pose
-        yaw = math.atan2(
-            2.0 * (pose.orientation.w * pose.orientation.z + pose.orientation.x * pose.orientation.y),
-            1.0 - 2.0 * (pose.orientation.y ** 2 + pose.orientation.z ** 2),
-        )
-        self._svc.state.set_pose(pose.position.x, pose.position.y, yaw)
-        self._svc.state.set_velocity(msg.twist.twist.linear.x, msg.twist.twist.angular.z)
-        self._last_odom_xy = (pose.position.x, pose.position.y)
-        self._svc.nav.on_pose_progress(pose.position.x, pose.position.y)
+        sample = translate.odom_sample(msg)
+        self._svc.state.set_pose(sample["x"], sample["y"], sample["yaw"])
+        self._svc.state.set_velocity(sample["linear_x"], sample["angular_z"])
+        self._last_odom_xy = (sample["x"], sample["y"])
+        self._svc.nav.on_pose_progress(sample["x"], sample["y"])
 
     def _on_battery(self, msg: Float32) -> None:
         self._voltage_topic_seen = True
@@ -259,7 +223,7 @@ class RosBridge:
 
     def _on_map(self, msg: OccupancyGrid) -> None:
         try:
-            grid = _grid_from_occupancy(msg)
+            grid = translate.grid_from_occupancy(msg)
             self._svc.maps.set_map(grid)
             current = self._svc.state.map_id
             if current is None or str(current).startswith("occupancy:"):
@@ -269,72 +233,41 @@ class RosBridge:
 
     def _on_plan(self, msg: Path) -> None:
         try:
-            self._svc.maps.set_path([
-                {"x": float(ps.pose.position.x), "y": float(ps.pose.position.y)}
-                for ps in msg.poses
-            ])
+            self._svc.maps.set_path(translate.path_points(msg))
         except ValueError as exc:
             self._node.get_logger().warning(f"ignored nav path: {exc}")
 
     def _on_local_costmap(self, msg: Costmap) -> None:
         try:
-            self._svc.maps.set_costmap("local", _grid_from_costmap(msg))
+            self._svc.maps.set_costmap("local", translate.grid_from_costmap(msg))
         except ValueError as exc:
             self._node.get_logger().warning(f"ignored local costmap: {exc}")
 
     def _on_global_costmap(self, msg: Costmap) -> None:
         try:
-            self._svc.maps.set_costmap("global", _grid_from_costmap(msg))
+            self._svc.maps.set_costmap("global", translate.grid_from_costmap(msg))
         except ValueError as exc:
             self._node.get_logger().warning(f"ignored global costmap: {exc}")
 
     def _on_scan(self, msg: LaserScan) -> None:
-        self._svc.state.set_sensor("lidar", {
-            "frame_id": msg.header.frame_id,
-            "range_min": msg.range_min,
-            "range_max": msg.range_max,
-            "angle_min": msg.angle_min,
-            "angle_max": msg.angle_max,
-            "num_ranges": len(msg.ranges),
-            "ranges": list(msg.ranges),
-            "received_at": time.time(),
-        })
+        self._svc.state.set_sensor("lidar", translate.lidar_sample(msg, time.time()))
 
     def _on_imu(self, msg: Imu) -> None:
-        q = msg.orientation
-        yaw = math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y ** 2 + q.z ** 2))
-        self._svc.state.set_sensor("imu", {
-            "orientation_yaw": yaw,
-            "angular_velocity_z": msg.angular_velocity.z,
-            "linear_accel_x": msg.linear_acceleration.x,
-            "received_at": time.time(),
-        })
+        self._svc.state.set_sensor("imu", translate.imu_sample(msg, time.time()))
 
     # --- PWR-002~004 근접 웨이크 --------------------------------------------
 
     def _on_us_range(self, msg: Range) -> None:
-        range_m = float(msg.range)
-        self._svc.state.set_sensor("ultrasonic", {
-            "frame_id": msg.header.frame_id,
-            "range": range_m,
-            "min_range": msg.min_range,
-            "max_range": msg.max_range,
-            "field_of_view": msg.field_of_view,
-            "received_at": time.time(),
-        })
-        # 센서가 스스로 보고한 유효 구간 밖 표본은 정책에 넣지 않는다.
-        if math.isfinite(range_m) and msg.min_range <= range_m <= msg.max_range:
-            self._svc.power.on_range(range_m)
+        sample = translate.ultrasonic_sample(msg, time.time())
+        self._svc.state.set_sensor("ultrasonic", sample)
+        usable = translate.usable_range(sample)
+        if usable is not None:
+            self._svc.power.on_range(usable)
 
     def _on_batt_state(self, msg: BatteryState) -> None:
-        voltage = float(msg.voltage)
-        self._svc.state.set_sensor("battery", {
-            "voltage": voltage,
-            "percentage": float(msg.percentage),
-            "power_supply_status": int(msg.power_supply_status),
-            "location": msg.location,
-            "received_at": time.time(),
-        })
+        sample = translate.battery_sample(msg, time.time())
+        self._svc.state.set_sensor("battery", sample)
+        voltage = sample["voltage"]
         # battery/voltage 퍼블리셔가 없는 구성(ADC 노드 단독)에서는 이 토픽이
         # 유일한 전압원이므로 SAF-005 경로를 그대로 태운다.
         if not self._voltage_topic_seen:
