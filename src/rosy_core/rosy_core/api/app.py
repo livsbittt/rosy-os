@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 
-from rosy_core.api.errors import ApiError, register_exception_handlers
+from rosy_core.api.errors import register_exception_handlers
 from rosy_core.api.v1.routes import (
     control_router,
     events_router,
@@ -22,8 +22,10 @@ from rosy_core.api.v1.routes import (
     safety_router,
     sensors_router,
     slam_router,
+    swarm_router,
     system_router,
     waypoints_router,
+    diagnostics_router,
     docking_router,
 )
 from rosy_core.api.ws import ws_router
@@ -57,11 +59,13 @@ def create_app(config: dict[str, Any], services: CoreServices) -> FastAPI:
     app.include_router(map_router)
     app.include_router(waypoints_router)
     app.include_router(events_router)
+    app.include_router(diagnostics_router)
     app.include_router(logs_router)
     app.include_router(power_router)
     app.include_router(sensors_router)
     app.include_router(slam_router)
     app.include_router(docking_router)
+    app.include_router(swarm_router)
     app.include_router(metrics_router)
     app.include_router(host_router)
     app.include_router(ws_router)

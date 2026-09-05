@@ -15,7 +15,7 @@ FastAPI surface for ROSY-API-REF-001. Factory builds the app, serves `/dashboard
 | `app.py` | `create_app`; routers; static dashboard; CSP on HTML |
 | `deps.py` | SEC-101 token auth (sha256 at rest, opaque ids); `require_role`; `get_services` |
 | `errors.py` | ERR-101 `ApiError` + domain exception mapping |
-| `ws.py` | `/ws/state` (10 Hz) and `/ws/events` with type glob filters |
+| `ws.py` | `/ws/state` (10 Hz), `/ws/events` glob filters, `/ws/swarm/pose` (SWM-003) and `/ws/swarm/reference` (SWM-007 ingest, operator) |
 
 ## Subdirectories
 
@@ -31,6 +31,7 @@ FastAPI surface for ROSY-API-REF-001. Factory builds the app, serves `/dashboard
 - REST uses `Authorization: Bearer`; WebSocket auth is `?token=` (close 4401 on bad token).
 - Tokens are stored as `sha256` only (D-30). `AuthContext` carries `token_id`, never the secret — do not add a field that echoes a token or anything derived from one, including to the Host Agent.
 - `/metrics` is unauthenticated Prometheus text — do not put secrets there.
+- `/ws/swarm/reference` is the only inbound stream (D-31). It takes operator, and a malformed frame is dropped rather than closing the socket — closing would let one bad sample put the formation into HOLD.
 - Dashboard is first-party static files from `../web/`. Do not add inline scripts (CSP `script-src 'self'`).
 - `app.state.core` is `CoreServices`. Routes must not touch rclpy.
 - Domain conflicts (`MODE_CONFLICT`, `EMERGENCY_ACTIVE`) map to HTTP 409.

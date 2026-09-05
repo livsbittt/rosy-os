@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends
 
 from rosy_core.api.v1.common import admin, viewer
 from rosy_core.api.deps import AuthContext, get_services
+from rosy_core.api.errors import ApiError
+from rosy_core.diagnostics.collector import worst
 from rosy_core.services import CoreServices
 
 
@@ -29,6 +31,34 @@ def list_audit_logs(
 ):
     events = svc.audit.history(since_seq=since_seq, limit=min(limit, 2000))
     return {"events": [e.model_dump() for e in events]}
+
+diagnostics_router = APIRouter(prefix="/api/v1/diagnostics", tags=["diagnostics"])
+
+
+def _components(svc: CoreServices) -> dict:
+    """DIAG-001. `/metrics` 와 같은 출처를 읽는다 — 두 화면이 다른 값을 보이면
+    운영자는 어느 쪽을 믿을지 알 수 없다."""
+    return svc.state.snapshot().diagnostics_summary
+
+
+@diagnostics_router.get("")
+def list_diagnostics(_: AuthContext = Depends(viewer),
+                     svc: CoreServices = Depends(get_services)):
+    components = _components(svc)
+    return {
+        "health": worst(list(components.values())).value,
+        "components": {name: health.value for name, health in components.items()},
+    }
+
+
+@diagnostics_router.get("/{component}")
+def diagnostic_detail(component: str, _: AuthContext = Depends(viewer),
+                      svc: CoreServices = Depends(get_services)):
+    components = _components(svc)
+    if component not in components:
+        raise ApiError("NOT_FOUND", 404, f"unknown diagnostics component: {component}")
+    return {"component": component, "health": components[component].value}
+
 
 metrics_router = APIRouter(tags=["metrics"])
 

@@ -51,6 +51,9 @@ class SafetyManager:
         self.estop: bool = False
         self.estop_source: str = ""
         self._battery_state: str = "ok"
+        #: E-Stop 이 실제로 걸릴 때 한 번 불린다. API·배터리·어느 경로로
+        #: 들어오든 같은 자리를 지나므로, 중단해야 할 활동은 여기에 붙는다.
+        self.estop_listeners: list = []
 
     def _emit(self, type_: str, severity: str, source: str, data: dict | None = None) -> None:
         if self._events is not None:
@@ -62,6 +65,12 @@ class SafetyManager:
         self.estop = True
         self.estop_source = source
         self._emit("safety.estop", "critical", source, {"source": source})
+        for listener in list(self.estop_listeners):
+            try:
+                listener()
+            except Exception:
+                # 한 구독자의 실패가 E-Stop 경로를 막으면 안 된다.
+                pass
         return True
 
     def release(self, by: str) -> bool:

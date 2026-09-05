@@ -9,6 +9,7 @@ navigation:
 teleop: true
 slam: false
 swarm:
+  # Motor bench: no LiDAR and no Nav2 goal navigation yet.
   follow: false
   lead: false
 docking:

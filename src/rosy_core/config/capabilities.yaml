@@ -9,6 +9,9 @@ navigation:
 teleop: true
 slam: true
 swarm:                      # D-20 (SWM-005)
+  # follow: SwarmManager + POST /api/v1/swarm/follow (SWM-002)
+  # lead:   WS /ws/swarm/pose, >=10 Hz (SWM-003)
+  # 둘 다 서빙되는 경로가 있을 때만 true 다 — CAP-001 을 읽고 Fleet 이 호출한다.
   follow: true
   lead: true
 docking:

@@ -15,11 +15,13 @@ from rosy_core.docking.agent import DockAgent
 from rosy_core.docking.database import DockDatabase
 from rosy_core.docking.detector import SimulatedDetector
 from rosy_core.docking.manager import DockingConfig, DockingManager
+from rosy_core.protocol.schemas import DockState
 from rosy_core.events.audit import FileAuditLog
 from rosy_core.events.bus import EventBus
 from rosy_core.identity import RobotIdentity
 from rosy_core.maps import MapSnapshotStore
 from rosy_core.navigation.manager import NavigationManager
+from rosy_core.navigation.swarm import SwarmManager
 from rosy_core.power.battery import (
     BatteryConfig,
     BatteryCurve,
@@ -134,6 +136,7 @@ class CoreServices:
     power: PowerManager
     battery: BatteryMonitor
     docking: DockingManager
+    swarm: SwarmManager
     runtime_probe: HostRuntimeProbe
     maps: MapSnapshotStore
     audit: FileAuditLog
@@ -192,6 +195,16 @@ class CoreServices:
             map_id_provider=lambda: state.map_id,
             battery=battery,
         )
+        swarm = SwarmManager(
+            events, state, nav, safety, capability,
+            # Nav2 를 두고 다투는 것은 DOCKING/UNDOCKING 뿐이다. DOCKED·CHARGING 은
+            # 주차 상태이고, DOCK_FAILED 는 설계상 종착이라 그것으로 막으면
+            # 도킹 실패 한 번이 군집을 영구히 비활성화한다.
+            docking_active_provider=lambda: docking.state in (
+                DockState.DOCKING, DockState.UNDOCKING),
+        )
+        nav.session_closed_listener = swarm.on_navigation_session_closed
+        safety.estop_listeners.append(swarm.on_estop)
         runtime_probe = HostRuntimeProbe(
             host_root=os.environ.get("ROSY_HOST_ROOT", "/"),
             data_path=waypoints_path.parent,
@@ -199,6 +212,6 @@ class CoreServices:
         return cls(config=config, identity=identity, profile=profile, capability=capability,
                    events=events, state=state, registry=registry, modes=modes,
                    command=command, safety=safety, waypoints=waypoints, nav=nav,
-                   power=power, battery=battery, docking=docking,
+                   power=power, battery=battery, docking=docking, swarm=swarm,
                    runtime_probe=runtime_probe, maps=MapSnapshotStore(),
                    audit=audit)

@@ -9,6 +9,8 @@ navigation:
 teleop: true
 slam: false
 swarm:
+  # Implemented in CORE, held for this slice: following drives the robot
+  # autonomously and needs field acceptance before it is advertised.
   follow: false
   lead: false
 docking:

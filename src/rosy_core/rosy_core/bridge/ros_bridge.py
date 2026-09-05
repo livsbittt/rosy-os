@@ -35,6 +35,7 @@ from std_msgs.msg import Bool, Float32, String
 from std_srvs.srv import Empty
 
 from rosy_core.bridge import translate
+from rosy_core.bridge.goal_tracker import GoalTracker
 from rosy_core.maps import occupancy_map_id
 from rosy_core.navigation.initial_pose import amcl_pose_covariance
 from rosy_interfaces.srv import SetLed
@@ -109,8 +110,9 @@ class RosBridge:
         self._diag_timer = node.create_timer(1.0, self._tick_diagnostics)
         self._power_timer = node.create_timer(1.0 / 5.0, self._tick_power)
         self._dock_timer = node.create_timer(1.0 / 5.0, self._tick_docking)
+        self._swarm_timer = node.create_timer(1.0 / 5.0, self._tick_swarm)
+        self._goals = GoalTracker()
 
-        self._goal_handle = None
         self._last_odom_ts = 0.0
         self._last_odom_xy = None
         self._dock_odom_mark = None
@@ -436,6 +438,14 @@ class RosBridge:
         return math.hypot(self._last_odom_xy[0] - self._dock_odom_mark[0],
                           self._last_odom_xy[1] - self._dock_odom_mark[1])
 
+    def _tick_swarm(self) -> None:
+        """SWM-004 는 마감시각으로 판정한다 — 스트림이 끊기면 아무 프레임도
+        오지 않으므로 소켓 쪽에서는 알아챌 수 없다."""
+        try:
+            self._svc.swarm.tick()
+        except Exception as exc:  # 추종 실패가 브리지 루프를 멈추면 안 된다
+            self._node.get_logger().warning(f"swarm tick failed: {exc}")
+
     def _tick_docking(self) -> None:
         docking = self._svc.docking
         docking.on_navigation_state(self._svc.nav.nav_state)
@@ -455,22 +465,32 @@ class RosBridge:
         goal.pose.pose.orientation.w = math.cos(spec.yaw / 2.0)
         if not self.nav_client.wait_for_server(timeout_sec=0.0):
             self._node.get_logger().warn("navigate_to_pose server not ready; goal queued anyway")
+        generation = self._goals.opening()
         future = self.nav_client.send_goal_async(goal)
-        future.add_done_callback(self._goal_response_cb)
+        future.add_done_callback(
+            lambda done, gen=generation: self._goal_response_cb(done, gen))
 
-    def _goal_response_cb(self, future) -> None:
+    def _goal_response_cb(self, future, generation: int) -> None:
         goal_handle = future.result()
         if goal_handle is None or not goal_handle.accepted:
-            self._svc.nav.on_result(False, "REJECTED")
+            if self._goals.rejected(generation):
+                self._svc.nav.on_result(False, "REJECTED")
             return
-        self._goal_handle = goal_handle
+        if not self._goals.accepted(generation, goal_handle):
+            # 이미 지나간 목표의 수락이다(선점됐거나, 보내는 사이 취소됐다).
+            # 살려두면 아무도 거두지 않는 Nav2 목표가 남는다.
+            goal_handle.cancel_goal_async()
+            return
         self._svc.nav.on_goal_accepted()
         result_future = goal_handle.get_result_async()
-        result_future.add_done_callback(self._result_cb)
+        result_future.add_done_callback(
+            lambda done, gen=generation: self._result_cb(done, gen))
 
-    def _result_cb(self, future) -> None:
-        self._goal_handle = None
-        if self._svc.nav.nav_state.value == "CANCELED":
+    def _result_cb(self, future, generation: int) -> None:
+        if not self._goals.finished(generation):
+            # 선점된 목표의 뒤늦은 결과. moving goal 에서는 abort 로 끝나며,
+            # 이것을 현재 목표의 실패로 읽으면 nav_state 가 FAILED 로 떨어져
+            # 이어지는 HOLD 의 취소가 통째로 무시된다.
             return
         try:
             result = future.result()
@@ -479,10 +499,12 @@ class RosBridge:
             self._svc.nav.on_result(False, str(exc))
 
     def cancel_goal(self) -> None:
-        if self._goal_handle is not None:
-            self._goal_handle.cancel_goal_async()
-            self._goal_handle = None
-            self._node.get_logger().info("navigation cancel requested")
+        handles = self._goals.cancel_all()
+        for handle in handles:
+            handle.cancel_goal_async()
+        if handles:
+            self._node.get_logger().info(
+                f"navigation cancel requested ({len(handles)} goal(s))")
 
     def send_initial_pose(self, x: float, y: float, yaw: float) -> None:
         msg = PoseWithCovarianceStamped()

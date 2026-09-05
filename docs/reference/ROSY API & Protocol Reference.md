@@ -2,7 +2,7 @@
 ## 공유 인터페이스 계약서
 
 **Document ID:** ROSY-API-REF-001
-**Version:** v1.5
+**Version:** v1.6
 **Status:** Approved
 **대상 독자:** rosy_core 개발자, rosy_fleet 개발자, 외부 SDK·AI·연동 시스템
 
@@ -97,6 +97,7 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 | `CAPABILITY_NOT_SUPPORTED` | 501 | 로봇이 미지원하는 기능 (CAP-003) | 로봇 |
 | `MAP_MISMATCH` | 409 | Goal의 map_id 불일치 (MAP-002) | 로봇 |
 | `MAPPING_ACTIVE` | 409 | 매핑 세션 중 명령 거부 (NAV-005) | 로봇 |
+| `DOCKING_ACTIVE` | 409 | 도킹/언도킹이 주행을 쥐고 있다 (DNC-003, §8.1 DOCKING > NAVIGATION) | 로봇 |
 | `ROBOT_OFFLINE` | 503 | 대상 로봇 미접속 | Fleet |
 | `COMMAND_TIMEOUT` | 504 | 명령 추적 타임아웃 (PRT-004) | Fleet |
 | `PAIRING_INVALID` | 401 | 페어링 토큰 무효/만료 | Fleet |
@@ -193,9 +194,9 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 |---|---|---|---|
 | POST | `/api/v1/teleop` | Operator | §11 |
 | POST | `/api/v1/mode` | Operator | `{mode: MANUAL\|NAVIGATION\|IDLE}` |
-| POST | `/api/v1/swarm/follow` | Operator | **미구현 (Phase 5)** — SWM-002 `{target_robot_id, distance, lateral, max_speed, stream_timeout_ms, source}` — `source: fleet(기본)\|peer(예약, D-21)` |
-| POST | `/api/v1/swarm/cancel` | Operator | **미구현 (Phase 5)** — SWM-002 |
-| GET | `/api/v1/swarm/state` | Viewer | **미구현 (Phase 5)** — SWM-006. 스냅샷의 `swarm` 필드는 이미 제공된다 |
+| POST | `/api/v1/swarm/follow` | Operator | SWM-002 `{target_robot_id, distance, lateral, max_speed, stream_timeout_ms, source}`. `source: fleet(기본)\|peer(예약, D-21 — 요청하면 501)`. `max_speed` 는 SAF-004 상한을 넘으면 400 이지만, **v1 에서는 Nav2 파라미터로 내려가지 않는다** — 실제 주행 속도를 제한하는 것은 프로필 상한과 Nav2 설정이다(D-31). 미지원 로봇은 501 `CAPABILITY_NOT_SUPPORTED` (SWM-005/CAP-003), 도킹/언도킹 중에는 409 `DOCKING_ACTIVE`, E-Stop 중에는 409 `EMERGENCY_ACTIVE`. 추종 중 `POST /navigation/cancel` 이나 MANUAL 전환은 대형을 끝내고 `swarm.aborted` 를 낸다 |
+| POST | `/api/v1/swarm/cancel` | Operator | SWM-002 |
+| GET | `/api/v1/swarm/state` | Viewer | SWM-006 — `{role, formation, active, holding, target_robot_id, source, stream_age_s}`. 상태 스냅샷의 `swarm` 필드는 그중 `role`·`formation`·`active` 다 |
 | POST | `/api/v1/safety/stop` | Viewer↑ | SAF-001 (누구나) |
 | POST | `/api/v1/safety/release` | Admin | SAF-001 |
 | GET | `/api/v1/safety/state` | Viewer | SAF-001 |
@@ -206,8 +207,8 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 | Method | Path | Role | 요구사항 |
 |---|---|---|---|
 | GET | `/api/v1/events?since_seq=N&types=...` | Viewer | EVT-003 |
-| GET | `/api/v1/diagnostics` | Viewer | **미구현** — DIAG-001. 현재는 `/metrics` 와 상태 스냅샷의 `diagnostics_summary` 로만 노출된다 |
-| GET | `/api/v1/diagnostics/{component}` | Viewer | **미구현** — DIAG-001 |
+| GET | `/api/v1/diagnostics` | Viewer | DIAG-001 — `{health, components}`. `health` 는 최악값 롤업, 수집 전이면 `UNKNOWN` |
+| GET | `/api/v1/diagnostics/{component}` | Viewer | DIAG-001 — 모르는 이름은 404. `/metrics` 의 `rosy_diagnostics_health` 와 같은 출처다 |
 | GET | `/api/v1/logs/audit` | Admin | LOG-001 |
 | GET | `/metrics` | 내부/모니터링 | OBS-101 (Prometheus 형식, 토큰 면제는 배포 정책) |
 | GET | `/api/v1/ros/nodes\|topics\|services` | Admin | **미구현** — ROS-102. 그래프 스냅샷은 `/api/v1/system/runtime` 이 제공한다 |
@@ -367,6 +368,16 @@ Leader 로봇 → Fleet ≥10 Hz, Fleet → Follower 릴레이 ≥5 Hz. envelope
 
 Follower의 rosy_core은 스트림 수신 여부를 `stream_timeout_ms`(기본 1000 ms)로 감시하고 단절 시 SWM-004 정책(HOLD)을 적용한다.
 
+로봇은 이 envelope 을 쓰는 소켓 두 개를 직접 제공한다(D-31). Fleet 이 가운데 서지 않아도 군집이 성립하고,
+Fleet 이 들어오면 같은 envelope 을 중계하므로 어느 쪽 끝도 바뀌지 않는다.
+
+| Path | Role | 방향 | 요구사항 |
+|---|---|---|---|
+| `WS /ws/swarm/pose?token=` | Viewer + capability `swarm.lead` | 로봇 → 밖 | SWM-003 리더 pose 스트림. ≥10 Hz 는 하한이며 설정으로 낮출 수 없다 |
+| `WS /ws/swarm/reference?token=` | Operator | 밖 → 로봇 | 팔로워의 참조 pose 입구 (SWM-007). 형식이 어긋난 프레임은 버리고 소켓은 유지한다 |
+
+close code: `4401` 은 토큰이 없거나 틀린 것(`/ws/state` 와 동일), `4403` 은 인증은 됐지만 허용되지 않는 것 — 역할이 모자라거나 capability 가 그 기능을 선언하지 않은 경우(CAP-003)다.
+
 ---
 
 # 8. 이벤트 카탈로그
@@ -404,9 +415,9 @@ Follower의 rosy_core은 스트림 수신 여부를 `stream_timeout_ms`(기본 1
 | `mission.completed/failed/canceled` | info/error/info | Fleet | `{mission_id, reason}` |
 | `robot.online/offline` | info/warning | Fleet | `{robot_id}` |
 | `pairing.requested/approved/revoked` | warning | Fleet | `{robot_id}` |
-| `swarm.role_assigned` | info | Fleet | `{robot_id, role, formation}` |
-| `swarm.hold` | warning | 로봇 | `{robot_id, reason}` |
-| `swarm.aborted` | warning | Fleet | `{formation, reason, robots[]}` |
+| `swarm.role_assigned` | info | 로봇 | `{role, formation, target_robot_id, reference_source, by}` |
+| `swarm.hold` | warning | 로봇 | `{reason, formation, stream_timeout_ms}` |
+| `swarm.aborted` | warning | 로봇 | `{formation, reason, robots[], by}` — `reason`: `canceled` \| `estop` \| `docking` \| `stuck` \| `manual` \| `navigation_canceled` |
 
 ---
 
@@ -538,6 +549,7 @@ Fleet(rosy_fleet)이 제공하는 엔드포인트. Base: `http://<fleet-host>:80
 
 | 버전 | 일자 | 내용 |
 |---|---|---|
+| v1.6 | 2026-09-06 | Additive: DIAG-001 `diagnostics` 조회 구현. 군집 추종 구현 — `swarm/follow·cancel·state` 가 실제로 서빙되고, `/ws/swarm/pose`(SWM-003)·`/ws/swarm/reference`(SWM-007) 소켓 신설(§7.8, D-31). `swarm/state` 에 `holding`·`target_robot_id`·`source`·`stream_age_s` 추가 |
 | v1.5 | 2026-09-06 | Additive: 현장 설정 — `PUT system/info`, `system/tokens/*`, `system/runtime`, `host/*` 릴레이 카탈로그(§5.7) 신설. `safety/limits` 에 `fleet_loss_policy`·배터리 임계값 추가(SAF-004/005). 미구현 상태였던 `diagnostics/*`·`ros/*`·`swarm/*` 행에 표시. 토큰은 해시 저장이며 목록은 불투명 `id` 로 식별한다(D-30) |
 | v1.4 | 2026-09-01 | Additive: 절전/근접 웨이크 — `power/*` REST, 스냅샷 `power` 필드, 이벤트 `power.*`·`presence.*`, 센서 `ultrasonic` (PWR-001~004, D-24) |
 | v1.3 | 2026-08-29 | Additive: 이벤트 `slam.started`/`slam.stopped` (NAV-005 세션 API 구현에 수반) |
