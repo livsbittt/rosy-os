@@ -20,6 +20,7 @@ REST routers under `/api/v1/*` (API Ref §5). One module per domain; `routes.py`
 | `safety.py` | SAF-001 stop/release, SAF-004 limits, SAF-005 battery policy |
 | `navigation.py` | NAV-001~005 goals and SLAM, MAP-003 snapshots, WPT-002 waypoints |
 | `docking.py` | DNC-003/005 dock registry, teach, dock/undock |
+| `swarm.py` | SWM-002 follow/cancel/state. 501 when the capability does not declare `swarm.follow` |
 | `observability.py` | EVT-003 events, LOG-001 audit, OBS-101 `/metrics` |
 | `host.py` | Host Agent relay: network, release, commissioning |
 

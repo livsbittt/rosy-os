@@ -27,6 +27,9 @@ pytest for rosy_core policy, API, dashboard, and protocol. Most tests import Pyt
 | `test_audit.py` | LOG-001 file audit retention |
 | `test_initial_pose.py` | AMCL covariance, occupancy map id |
 | `test_bridge_translate.py` | ROS message → domain dict conversion, with duck-typed messages |
+| `test_swarm.py` | SWM follow state machine, formation geometry, 2 Hz cap, stream-loss HOLD |
+| `test_swarm_api.py` | SWM-002 REST contract, including the 501 on a capability that says false |
+| `test_swarm_stream.py` | `/ws/swarm/pose` envelope and `/ws/swarm/reference` ingest |
 
 ## Subdirectories
 

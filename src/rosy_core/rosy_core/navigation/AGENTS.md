@@ -5,7 +5,7 @@
 
 ## Purpose
 
-NAV-001–004/006 facade. ROS-free. Nav2 action client lives behind `NavExecutor` (implemented by `RosBridge`).
+NAV-001–004/006 and SWM-001~007 facade. ROS-free. Nav2 action client lives behind `NavExecutor` (implemented by `RosBridge`).
 
 ## Key Files
 
@@ -14,6 +14,7 @@ NAV-001–004/006 facade. ROS-free. Nav2 action client lives behind `NavExecutor
 | `__init__.py` | Package marker |
 | `manager.py` | `NavigationManager`, `NavGoalSpec`, `NavExecutor` protocol, `NavigationError` |
 | `initial_pose.py` | AMCL covariance for `/initialpose` (zero covariance is ignored) |
+| `swarm.py` | SWM-001~007 follow state machine: moving goal at <=2 Hz, stream-loss HOLD |
 
 ## Subdirectories
 

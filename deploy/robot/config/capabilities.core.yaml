@@ -9,6 +9,7 @@ navigation:
 teleop: false
 slam: false
 swarm:
+  # CORE only: no motors and no Nav2, so there is nothing to follow with.
   follow: false
   lead: false
 docking:
