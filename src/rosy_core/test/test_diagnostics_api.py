@@ -9,30 +9,16 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import pytest
-import yaml
-from rosy_core.api.app import create_app
-from rosy_core.profile import RobotProfile
 from rosy_core.protocol.schemas import HealthState
-from rosy_core.services import CoreServices
-
-CONFIG_DIR = Path(__file__).parent.parent / "config"
 
 VIEWER = {"Authorization": "Bearer rosy-dev-viewer"}
 
 
 @pytest.fixture
-def client(tmp_path):
-    pytest.importorskip("httpx")
-    from fastapi.testclient import TestClient
-
-    config = yaml.safe_load((CONFIG_DIR / "rosy_default.yaml").read_text(encoding="utf-8"))
-    profile = RobotProfile.load(CONFIG_DIR / "profile.pinky_pro.yaml")
-    caps = yaml.safe_load((CONFIG_DIR / "capabilities.yaml").read_text(encoding="utf-8"))
-    services = CoreServices.build(config, profile, caps, tmp_path / "wp.json")
-    return TestClient(create_app(config, services)), services
+def client(core_client):
+    return core_client()
 
 
 def seed(svc):

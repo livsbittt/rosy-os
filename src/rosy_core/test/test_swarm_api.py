@@ -7,37 +7,16 @@ CAPABILITY_NOT_SUPPORTED"(SWM-005/CAP-003)는 지원 로봇에서는 확인할 �
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
-import yaml
-from rosy_core.api.app import create_app
-from rosy_core.profile import RobotProfile
 from rosy_core.protocol.schemas import SwarmRole
-from rosy_core.services import CoreServices
 
-CONFIG_DIR = Path(__file__).parent.parent / "config"
-
-ADMIN = {"Authorization": "Bearer rosy-dev-admin"}
 OPERATOR = {"Authorization": "Bearer rosy-dev-operator"}
 VIEWER = {"Authorization": "Bearer rosy-dev-viewer"}
 
 
-def build_client(tmp_path, *, swarm_follow: bool = True):
-    pytest.importorskip("httpx")
-    from fastapi.testclient import TestClient
-
-    config = yaml.safe_load((CONFIG_DIR / "rosy_default.yaml").read_text(encoding="utf-8"))
-    profile = RobotProfile.load(CONFIG_DIR / "profile.pinky_pro.yaml")
-    caps = yaml.safe_load((CONFIG_DIR / "capabilities.yaml").read_text(encoding="utf-8"))
-    caps["swarm"] = {"follow": swarm_follow, "lead": caps.get("swarm", {}).get("lead", False)}
-    services = CoreServices.build(config, profile, caps, tmp_path / "wp.json")
-    return TestClient(create_app(config, services)), services
-
-
 @pytest.fixture
-def client(tmp_path):
-    return build_client(tmp_path)
+def client(core_client):
+    return core_client()
 
 
 FOLLOW = {"target_robot_id": "rosy_02", "distance": 0.5, "lateral": 0.0}
@@ -130,9 +109,9 @@ def test_follow_announces_the_role_and_cancel_announces_the_abort(client):
     assert "swarm.aborted" in types
 
 
-def test_a_robot_that_does_not_declare_follow_answers_501(tmp_path):
+def test_a_robot_that_does_not_declare_follow_answers_501(core_client):
     """SWM-005: 미지원 로봇은 CAPABILITY_NOT_SUPPORTED 로 답한다 (CAP-003)."""
-    tc, _svc = build_client(tmp_path, swarm_follow=False)
+    tc, _svc = core_client(capabilities={"swarm": {"follow": False, "lead": False}})
 
     response = tc.post("/api/v1/swarm/follow", json=FOLLOW, headers=OPERATOR)
 

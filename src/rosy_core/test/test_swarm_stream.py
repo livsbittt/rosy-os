@@ -8,33 +8,20 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
-import yaml
-from rosy_core.api.app import create_app
-from rosy_core.profile import RobotProfile
 from rosy_core.protocol.schemas import EnvelopeType
-from rosy_core.services import CoreServices
-
-CONFIG_DIR = Path(__file__).parent.parent / "config"
 
 ADMIN_TOKEN = "rosy-dev-admin"
 OPERATOR_TOKEN = "rosy-dev-operator"
 VIEWER_TOKEN = "rosy-dev-viewer"
 
+LEADS = {"swarm": {"follow": True, "lead": True}}
+
 
 @pytest.fixture
-def client(tmp_path):
-    pytest.importorskip("httpx")
-    from fastapi.testclient import TestClient
-
-    config = yaml.safe_load((CONFIG_DIR / "rosy_default.yaml").read_text(encoding="utf-8"))
-    profile = RobotProfile.load(CONFIG_DIR / "profile.pinky_pro.yaml")
-    caps = yaml.safe_load((CONFIG_DIR / "capabilities.yaml").read_text(encoding="utf-8"))
-    caps["swarm"] = {"follow": True, "lead": True}
-    services = CoreServices.build(config, profile, caps, tmp_path / "wp.json")
-    return TestClient(create_app(config, services)), services
+def client(core_client):
+    return core_client(capabilities=LEADS)
 
 
 class RecordingNav:
@@ -50,9 +37,6 @@ class RecordingNav:
         self._counter += 1
         self._session = self._counter
         return self._session
-
-    def close_moving_session(self):
-        self._session = None
 
     def moving_goal(self, spec, source="swarm", session=None):
         if session is not None and session != self._session:
@@ -115,17 +99,10 @@ def test_the_leader_stream_advances_its_sequence(client):
     assert second["payload"]["seq"] == first["payload"]["seq"] + 1
 
 
-def test_the_leader_rate_cannot_be_configured_below_the_requirement(tmp_path):
+def test_the_leader_rate_cannot_be_configured_below_the_requirement(core_client):
     """SWM-003 의 10 Hz 는 하한이다. 설정으로 내려가면 대형이 흔들린다."""
-    pytest.importorskip("httpx")
-    from fastapi.testclient import TestClient
-
-    config = yaml.safe_load((CONFIG_DIR / "rosy_default.yaml").read_text(encoding="utf-8"))
-    config["swarm"] = {"pose_rate_hz": 1.0}
-    profile = RobotProfile.load(CONFIG_DIR / "profile.pinky_pro.yaml")
-    caps = yaml.safe_load((CONFIG_DIR / "capabilities.yaml").read_text(encoding="utf-8"))
-    services = CoreServices.build(config, profile, caps, tmp_path / "wp.json")
-    tc = TestClient(create_app(config, services))
+    tc, _svc = core_client(capabilities=LEADS,
+                           config_overrides={"swarm": {"pose_rate_hz": 1.0}})
 
     import time
 
@@ -248,18 +225,11 @@ def test_the_reference_socket_requires_an_operator(client):
         socket.send_text(json.dumps(pose_frame()))
 
 
-def test_the_leader_socket_is_closed_when_lead_is_not_declared(tmp_path):
+def test_the_leader_socket_is_closed_when_lead_is_not_declared(core_client):
     """CAP-003: 선언하지 않은 기능을 소켓으로 우회 제공하면 CAP-001 이 거짓말이 된다."""
-    pytest.importorskip("httpx")
-    from fastapi.testclient import TestClient
     from starlette.websockets import WebSocketDisconnect
 
-    config = yaml.safe_load((CONFIG_DIR / "rosy_default.yaml").read_text(encoding="utf-8"))
-    profile = RobotProfile.load(CONFIG_DIR / "profile.pinky_pro.yaml")
-    caps = yaml.safe_load((CONFIG_DIR / "capabilities.yaml").read_text(encoding="utf-8"))
-    caps["swarm"] = {"follow": True, "lead": False}
-    services = CoreServices.build(config, profile, caps, tmp_path / "wp.json")
-    tc = TestClient(create_app(config, services))
+    tc, _svc = core_client(capabilities={"swarm": {"follow": True, "lead": False}})
 
     with pytest.raises(WebSocketDisconnect) as raised:
         with tc.websocket_connect(f"/ws/swarm/pose?token={VIEWER_TOKEN}") as socket:

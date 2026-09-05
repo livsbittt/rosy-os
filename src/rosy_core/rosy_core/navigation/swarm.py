@@ -102,11 +102,6 @@ class SwarmManager:
         with self._lock:
             return self._holding
 
-    @property
-    def params(self) -> Optional[SwarmFollowParams]:
-        with self._lock:
-            return self._params.model_copy() if self._params is not None else None
-
     def status(self) -> SwarmStatus:
         with self._lock:
             if self._params is None:

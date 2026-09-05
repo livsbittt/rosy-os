@@ -67,9 +67,6 @@ class FakeNav:
         self._session = self._counter
         return self._session
 
-    def close_moving_session(self) -> None:
-        self._session = None
-
     def moving_goal(self, spec, source="swarm", session=None):
         if session is not None and session != self._session:
             return False

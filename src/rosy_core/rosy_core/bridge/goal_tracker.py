@@ -28,11 +28,6 @@ class GoalTracker:
         self._live: dict[int, Any] = {}
 
     @property
-    def generation(self) -> int:
-        with self._lock:
-            return self._generation
-
-    @property
     def live_count(self) -> int:
         with self._lock:
             return len(self._live)

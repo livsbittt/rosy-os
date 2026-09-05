@@ -123,12 +123,6 @@ class NavigationManager:
             self._moving_session = self._session_counter
             return self._moving_session
 
-    def close_moving_session(self, session: Optional[int] = None) -> None:
-        with self._lock:
-            if session is not None and self._moving_session != session:
-                return
-            self._moving_session = None
-
     def moving_goal(self, spec: NavGoalSpec, source: str = "swarm",
                     session: Optional[int] = None) -> bool:
         """SWM-001: 이미 주행 중이어도 목표를 갈아끼운다.

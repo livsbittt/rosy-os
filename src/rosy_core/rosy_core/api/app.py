@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 
-from rosy_core.api.errors import ApiError, register_exception_handlers
+from rosy_core.api.errors import register_exception_handlers
 from rosy_core.api.v1.routes import (
     control_router,
     events_router,
