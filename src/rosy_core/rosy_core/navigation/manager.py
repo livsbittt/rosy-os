@@ -95,6 +95,30 @@ class NavigationManager:
         self._events.publish("nav.started", source="navigation_manager",
                              data={"goal": {"x": spec.x, "y": spec.y, "yaw": spec.yaw}, "by": source})
 
+    def moving_goal(self, spec: NavGoalSpec, source: str = "swarm") -> None:
+        """SWM-001: 이미 주행 중이어도 목표를 갈아끼운다.
+
+        `goal()` 은 진행 중인 주행을 NAVIGATION_ACTIVE 로 막는다 — 운영자가
+        실수로 목표를 덮어쓰지 않게 하려는 것이다. 군집 추종은 정반대로,
+        리더가 움직이는 동안 목표가 계속 갱신되는 것이 정상이다. 그래서
+        진행 중 거부만 빼고 안전 게이트는 그대로 지난다: e-stop 과 맵핑
+        세션은 여기서도 막는다.
+
+        Nav2 NavigateToPose 는 새 목표를 받으면 이전 목표를 선점하므로
+        취소를 먼저 보내지 않는다 — 그 사이에 로봇이 멈춰 서기 때문이다.
+        """
+        executor = self._require_executor()
+        if self._safety.estop:
+            raise NavigationError("EMERGENCY_ACTIVE", "e-stop is active")
+        if self.mapping_active:
+            raise NavigationError("MAPPING_ACTIVE", "mapping session active")
+        executor.send_goal(spec)
+        if self._nav_state not in (NavigationState.NAVIGATING, NavigationState.PLANNING):
+            self._set_state(NavigationState.PLANNING)
+            self._events.publish(
+                "nav.started", source="navigation_manager",
+                data={"goal": {"x": spec.x, "y": spec.y, "yaw": spec.yaw}, "by": source})
+
     def home(self, source: str = "api") -> None:
         spec = self.resolve_goal(waypoint="__home__")
         self.goal(spec, source=source)
