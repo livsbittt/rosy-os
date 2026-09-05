@@ -30,6 +30,7 @@ pytest for rosy_core policy, API, dashboard, and protocol. Most tests import Pyt
 | `test_swarm.py` | SWM follow state machine, formation geometry, 2 Hz cap, stream-loss HOLD |
 | `test_swarm_api.py` | SWM-002 REST contract, including the 501 on a capability that says false |
 | `test_swarm_stream.py` | `/ws/swarm/pose` envelope and `/ws/swarm/reference` ingest |
+| `test_diagnostics_api.py` | DIAG-001 rollup, unknown component, agreement with `/metrics` |
 
 ## Subdirectories
 
