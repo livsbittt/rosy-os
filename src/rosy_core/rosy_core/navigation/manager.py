@@ -63,8 +63,11 @@ class NavigationManager:
         #: 취소 뒤에 뒤늦은 목표가 새어 들어오지 못한다.
         self._moving_session: Optional[int] = None
         self._session_counter = 0
-        #: NAV-006 stuck 은 세션을 끝낸다. 재시도 판단은 상위 책임이다.
-        self.stuck_listener = None
+        #: 열린 moving goal 세션이 닫힐 때 임자에게 알린다. 세션을 닫는 길은
+        #: 여럿이고(운영자의 /navigation/cancel, MANUAL 전환, NAV-006 stuck),
+        #: 알리지 않으면 추종자는 자기가 살아 있다고 계속 광고하면서 목표를
+        #: 하나도 내지 못하는 상태로 남는다.
+        self.session_closed_listener = None
 
     @property
     def nav_state(self) -> NavigationState:
@@ -208,6 +211,7 @@ class NavigationManager:
         """
         with self._lock:
             session = self._moving_session
+            closed = close_session and session is not None
             if close_session:
                 self._moving_session = None
             if self._nav_state in _IDLE_STATES and session is None:
@@ -220,6 +224,18 @@ class NavigationManager:
             self._last_progress_pos = None
             self._last_progress_ts = time.monotonic()
         self._events.publish("nav.canceled", source="navigation_manager", data={"source": source})
+        if closed:
+            self._notify_session_closed(source)
+
+    def _notify_session_closed(self, source: str) -> None:
+        listener = self.session_closed_listener
+        if listener is None:
+            return
+        try:
+            listener(source)
+        except Exception:
+            # 임자의 실패가 취소 경로를 막으면 안 된다.
+            pass
 
     def on_goal_accepted(self) -> None:
         with self._lock:
@@ -261,12 +277,6 @@ class NavigationManager:
             self.cancel(source="stuck_detector")
             self._events.publish("nav.stuck", severity="error", source="navigation_manager",
                                  data={"timeout_s": self._stuck_timeout})
-            # NAV-006: 자동 재시도는 하지 않는다. 추종 세션이 열려 있으면
-            # 0.5 초 뒤 스트림이 목표를 다시 밀어넣으므로, 세션 임자에게
-            # 알려 끝내게 한다 — 아니면 그것이 곧 자동 재시도다.
-            listener = self.stuck_listener
-            if listener is not None:
-                try:
-                    listener()
-                except Exception:
-                    pass
+            # NAV-006 자동 재시도 금지는 위의 cancel 이 세션을 닫고 임자에게
+            # 알리는 것으로 지켜진다 — 알리지 않으면 0.5 초 뒤 스트림이 목표를
+            # 다시 밀어넣고, 그것이 곧 자동 재시도다.

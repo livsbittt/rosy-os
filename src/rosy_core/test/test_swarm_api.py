@@ -231,3 +231,27 @@ def test_a_follow_can_be_reissued_to_change_the_formation(client):
 
     assert second.status_code == 200
     assert second.json()["formation"].endswith("@0.90/0.00")
+
+
+def test_navigation_cancel_ends_the_formation(client):
+    """세션만 닫히고 추종이 남으면 대형이 멀쩡해 보이는 채로 아무 일도 안 한다."""
+    tc, svc = client
+    tc.post("/api/v1/swarm/follow", json=FOLLOW, headers=OPERATOR)
+
+    assert tc.post("/api/v1/navigation/cancel", headers=OPERATOR).status_code == 200
+
+    assert svc.swarm.active is False
+    assert tc.get("/api/v1/swarm/state", headers=VIEWER).json()["active"] is False
+    assert tc.get("/api/v1/robot/state", headers=VIEWER).json()["swarm"]["active"] is False
+
+
+def test_taking_manual_control_ends_the_formation(client):
+    """운영자가 수동으로 넘어가면 대형은 끝난 것이다. 되돌려줘도 되살아나지 않는다."""
+    tc, svc = client
+    tc.post("/api/v1/swarm/follow", json=FOLLOW, headers=OPERATOR)
+
+    assert tc.post("/api/v1/mode", json={"mode": "MANUAL"}, headers=OPERATOR).status_code == 200
+
+    assert svc.swarm.active is False
+    types = [event["type"] for event in tc.get("/api/v1/events", headers=VIEWER).json()["events"]]
+    assert "swarm.aborted" in types

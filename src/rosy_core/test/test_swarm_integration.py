@@ -123,6 +123,9 @@ def build():
                          Capability({"swarm": {"follow": True, "lead": True}}),
                          clock=clock,
                          docking_active_provider=lambda: docking["active"])
+    # services.py 와 같은 배선. 세션을 닫는 모든 길이 추종자에게 닿는다.
+    nav.session_closed_listener = swarm.on_navigation_session_closed
+    safety.estop_listeners.append(swarm.on_estop)
     return swarm, nav, executor, clock, events, safety, docking
 
 
@@ -335,7 +338,6 @@ def test_a_hold_keeps_the_session_open_so_the_stream_can_resume():
 def test_a_stuck_follower_ends_the_session_instead_of_retrying_forever():
     """리뷰가 재현한 경로: 취소하고 0.5 초 뒤 다시 목표를 내며 무한 반복했다."""
     swarm, nav, executor, clock, events, _safety, _docking = build()
-    nav.stuck_listener = swarm.on_navigation_stuck
     swarm.follow(params())
     stream(swarm, executor, clock, 1.0)
     nav.on_pose_progress(0.0, 0.0)
@@ -402,7 +404,6 @@ def test_a_follow_is_refused_while_a_docking_run_owns_navigation():
 
 def test_the_estop_listener_ends_the_follow_without_waiting_for_a_tick():
     swarm, _nav, executor, clock, events, safety, _docking = build()
-    safety.estop_listeners.append(swarm.on_estop)
     swarm.follow(params())
     stream(swarm, executor, clock, 1.0)
 
@@ -425,3 +426,76 @@ def test_an_operator_goal_stays_refused_while_the_follow_is_merely_holding():
     with pytest.raises(NavigationError) as raised:
         nav.goal(NavGoalSpec(9.0, 9.0, 0.0))
     assert raised.value.code == "NAVIGATION_ACTIVE"
+
+
+# --- A1: 세션을 닫는 길은 추종자 말고도 있다 -------------------------------------
+
+
+def test_an_operator_navigation_cancel_ends_the_follow():
+    """세션만 닫히고 추종이 남으면, 목표를 하나도 못 내면서 스냅샷에는
+    active: true 로 보인다 — 참조가 계속 오니 스트림도 신선해 보인다."""
+    swarm, nav, executor, clock, events, _safety, _docking = build()
+    swarm.follow(params())
+    stream(swarm, executor, clock, 1.0)
+
+    nav.cancel(source="api:operator")
+
+    assert swarm.active is False
+    aborted = [data for type_, data in events.published if type_ == "swarm.aborted"]
+    assert aborted and aborted[-1]["reason"] == "navigation_canceled"
+
+    before = len(executor.goals)
+    swarm.on_reference_pose(ReferencePose("rosy_02", 5.0, 0.0, 0.0))
+    assert len(executor.goals) == before
+
+
+def test_the_swarms_own_cancel_does_not_bounce_back_through_the_listener():
+    swarm, _nav, _executor, clock, events, _safety, _docking = build()
+    swarm.follow(params())
+
+    swarm.cancel()
+
+    assert [t for t, _ in events.published].count("swarm.aborted") == 1
+
+
+def test_a_follow_never_outlives_its_session():
+    """어느 길로 세션이 닫히든 추종 상태와 어긋나지 않는다."""
+    for closer in ("api:operator", "mode_change", "stuck_detector"):
+        swarm, nav, _executor, clock, _events, _safety, _docking = build()
+        swarm.follow(params())
+        stream(swarm, nav.executor, clock, 1.0)
+
+        nav.cancel(source=closer)
+
+        assert swarm.active is False, closer
+        assert nav._moving_session is None, closer
+        assert swarm.state_payload()["active"] is False, closer
+
+
+def test_cancelling_a_follow_that_never_armed_does_not_brick_navigation():
+    """무장 전 창에서 세션만 열린 채 남으면 단발 목표가 영영 거절당한다."""
+    swarm, nav, executor, _clock, _events, _safety, _docking = build()
+    nav.open_moving_session()
+
+    swarm.cancel()
+
+    nav.goal(NavGoalSpec(1.0, 0.0, 0.0))
+    assert executor.goals[-1].x == pytest.approx(1.0)
+
+
+def test_an_estop_landing_during_arming_does_not_leave_a_follow_armed():
+    """check_follow 와 무장 사이의 창. 무장 직전에 한 번 더 본다."""
+    swarm, _nav, _executor, _clock, _events, safety, _docking = build()
+    original = swarm.check_follow
+
+    def trip(body):
+        original(body)
+        safety.trigger_estop("operator")
+
+    swarm.check_follow = trip
+
+    with pytest.raises(SwarmError) as raised:
+        swarm.follow(params())
+
+    assert raised.value.code == "EMERGENCY_ACTIVE"
+    assert swarm.active is False

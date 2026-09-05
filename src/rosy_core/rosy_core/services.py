@@ -203,7 +203,7 @@ class CoreServices:
             docking_active_provider=lambda: docking.state in (
                 DockState.DOCKING, DockState.UNDOCKING),
         )
-        nav.stuck_listener = swarm.on_navigation_stuck
+        nav.session_closed_listener = swarm.on_navigation_session_closed
         safety.estop_listeners.append(swarm.on_estop)
         runtime_probe = HostRuntimeProbe(
             host_root=os.environ.get("ROSY_HOST_ROOT", "/"),
