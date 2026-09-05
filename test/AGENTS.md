@@ -46,6 +46,8 @@ None (ignore `__pycache__/`).
 - If you add a deploy script, add a contract test here — CI only started covering this tree after a comment in `.github/workflows/ci.yml`.
 - Do not mock away the refusal paths in Host Agent; they are the product.
 - Changing SITE_STA / relay wording in one doc without the others fails `test_network_topology_contracts.py`.
+- In `test_dashboard_browser.py`, waiting on `window.__apiCalls` proves the click fired, not that the handler finished — the fetch stub records the call before it answers. Wait on the visible outcome (the message element) or the assertion races the promise.
+- Run it before shipping dashboard JS: `ROSY_RUN_BROWSER_TESTS=1 python -m pytest test/test_dashboard_browser.py`. Opt-in tests that are never run are not coverage.
 
 ### Testing Requirements
 

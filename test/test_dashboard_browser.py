@@ -203,23 +203,21 @@ def test_field_settings_save_limits_waypoint_and_dock_without_navigation():
         page.locator("#waypoint-name").fill("zone_a")
         page.locator("#waypoint-save").click()
         page.wait_for_function(
-            "window.__apiCalls.some((c) => c.method === 'POST' && c.path === '/api/v1/waypoints')"
+            "document.getElementById('waypoint-message')?.textContent?.includes('zone_a')"
         )
 
         page.locator("#limit-manual-linear").fill("0.11")
         page.locator("#limit-manual-angular").fill("0.41")
         page.locator("#limits-save").click()
         page.wait_for_function(
-            "window.__apiCalls.some((c) => c.method === 'PUT' && c.path === '/api/v1/safety/limits')"
+            "document.getElementById('limits-message')?.textContent?.includes('rosy.yaml')"
         )
-        assert "rosy.yaml" in page.locator("#limits-message").inner_text()
 
         page.locator("#dock-id").fill("dock_1")
         page.locator("#dock-register").click()
         page.wait_for_function(
-            "window.__apiCalls.some((c) => c.method === 'POST' && c.path === '/api/v1/docking/docks')"
+            "document.getElementById('dock-message')?.textContent?.includes('등록')"
         )
-        assert "등록" in page.locator("#dock-message").inner_text()
         assert page.url.startswith("http://rosy.test/dashboard")
 
         calls = page.evaluate("window.__apiCalls")
