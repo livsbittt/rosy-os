@@ -67,27 +67,85 @@ def test_tokens_are_admin_only_and_never_echo_secrets(client):
     blob = json.dumps(listed)
     assert "rosy-dev-admin" not in blob
     assert "rosy-dev-operator" not in blob
-    assert all("fingerprint" in item and "hint" in item and "role" in item for item in listed)
+    # Nothing in the listing is derived from the secret — no fingerprint, no hint.
+    assert all(set(item) == {"id", "role", "label", "created_at", "legacy"} for item in listed)
+
     created = tc.post(
         "/api/v1/system/tokens",
-        json={"token": "rosy-extra-operator", "role": "operator"},
+        json={"token": "rosy-extra-operator-token", "role": "operator", "label": "bay 7 tablet"},
         headers=ADMIN,
     )
     assert created.status_code == 201
-    assert "rosy-extra-operator" not in json.dumps(created.json())
-    extra = {"Authorization": "Bearer rosy-extra-operator"}
+    assert "rosy-extra-operator-token" not in json.dumps(created.json())
+    assert created.json()["label"] == "bay 7 tablet"
+    extra = {"Authorization": "Bearer rosy-extra-operator-token"}
     assert tc.get("/api/v1/system/info", headers=extra).status_code == 200
+
     duplicate = tc.post(
         "/api/v1/system/tokens",
-        json={"token": "rosy-extra-operator", "role": "viewer"},
+        json={"token": "rosy-extra-operator-token", "role": "viewer"},
         headers=ADMIN,
     )
     assert duplicate.status_code == 409
-    admin_fp = next(item["fingerprint"] for item in listed if item["role"] == "administrator")
-    assert tc.delete(f"/api/v1/system/tokens/{admin_fp}", headers=ADMIN).status_code == 400
-    fp = created.json()["fingerprint"]
-    assert tc.delete(f"/api/v1/system/tokens/{fp}", headers=ADMIN).status_code == 204
+
+    token_id = created.json()["id"]
+    assert tc.delete(f"/api/v1/system/tokens/{token_id}", headers=ADMIN).status_code == 204
     assert tc.get("/api/v1/system/info", headers=extra).status_code == 401
+
+
+def test_a_generated_token_is_returned_once_and_then_only_by_id(client):
+    tc, _svc = client
+    created = tc.post("/api/v1/system/tokens", json={"role": "viewer"}, headers=ADMIN)
+    assert created.status_code == 201
+    secret = created.json()["token"]
+    assert len(secret) >= 32
+    assert tc.get("/api/v1/system/info", headers={"Authorization": f"Bearer {secret}"}).status_code == 200
+
+    listed = tc.get("/api/v1/system/tokens", headers=ADMIN).json()["tokens"]
+    assert secret not in json.dumps(listed)
+    assert any(item["id"] == created.json()["id"] for item in listed)
+
+
+def test_an_operator_chosen_token_must_be_long_enough(client):
+    tc, _svc = client
+    too_short = tc.post("/api/v1/system/tokens",
+                        json={"token": "short", "role": "viewer"}, headers=ADMIN)
+    assert too_short.status_code == 400
+    bad_role = tc.post("/api/v1/system/tokens",
+                       json={"token": "x" * 20, "role": "wizard"}, headers=ADMIN)
+    assert bad_role.status_code == 400
+    assert "role" in bad_role.text
+
+
+def test_writing_a_token_migrates_the_plaintext_defaults_to_hashes(client, tmp_path):
+    tc, _svc = client
+    overlay = tmp_path / "rosy.yaml"
+    assert tc.post("/api/v1/system/tokens", json={"role": "viewer"}, headers=ADMIN).status_code == 201
+
+    saved = yaml.safe_load(overlay.read_text(encoding="utf-8"))
+    stored = saved["auth"]["tokens"]
+    raw = overlay.read_text(encoding="utf-8")
+    assert "rosy-dev-admin" not in raw
+    assert "rosy-dev-viewer" not in raw
+    assert all(set(item) == {"id", "role", "sha256", "label", "created_at"} for item in stored)
+    assert all(len(item["sha256"]) == 64 for item in stored)
+    # The packaged plaintext tokens still authenticate; only their storage changed.
+    assert tc.get("/api/v1/system/info", headers=ADMIN).status_code == 200
+
+
+def test_the_last_administrator_and_the_token_in_use_cannot_be_deleted(client):
+    tc, _svc = client
+    listed = tc.get("/api/v1/system/tokens", headers=ADMIN).json()["tokens"]
+    admins = [item for item in listed if item["role"] == "administrator"]
+    assert len(admins) == 1
+    assert tc.delete(f"/api/v1/system/tokens/{admins[0]['id']}", headers=ADMIN).status_code == 400
+
+    second = tc.post("/api/v1/system/tokens", json={"role": "administrator"}, headers=ADMIN)
+    other = {"Authorization": f"Bearer {second.json()['token']}"}
+    # With two administrators the original goes, and then the survivor is pinned.
+    assert tc.delete(f"/api/v1/system/tokens/{admins[0]['id']}", headers=other).status_code == 204
+    assert tc.delete(f"/api/v1/system/tokens/{second.json()['id']}", headers=other).status_code == 400
+    assert tc.delete("/api/v1/system/tokens/nope", headers=other).status_code == 404
 
 
 def test_system_info_and_capabilities(client):

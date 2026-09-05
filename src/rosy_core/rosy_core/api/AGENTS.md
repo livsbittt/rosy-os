@@ -13,7 +13,7 @@ FastAPI surface for ROSY-API-REF-001. Factory builds the app, serves `/dashboard
 |------|-------------|
 | `__init__.py` | Package marker |
 | `app.py` | `create_app`; routers; static dashboard; CSP on HTML |
-| `deps.py` | SEC-101 static-token auth; `require_role`; `get_services` |
+| `deps.py` | SEC-101 token auth (sha256 at rest, opaque ids); `require_role`; `get_services` |
 | `errors.py` | ERR-101 `ApiError` + domain exception mapping |
 | `ws.py` | `/ws/state` (10 Hz) and `/ws/events` with type glob filters |
 
@@ -29,6 +29,7 @@ FastAPI surface for ROSY-API-REF-001. Factory builds the app, serves `/dashboard
 
 - Roles: viewer < operator < administrator. Teleop/mode/nav mutations need operator+.
 - REST uses `Authorization: Bearer`; WebSocket auth is `?token=` (close 4401 on bad token).
+- Tokens are stored as `sha256` only (D-30). `AuthContext` carries `token_id`, never the secret — do not add a field that echoes a token or anything derived from one, including to the Host Agent.
 - `/metrics` is unauthenticated Prometheus text — do not put secrets there.
 - Dashboard is first-party static files from `../web/`. Do not add inline scripts (CSP `script-src 'self'`).
 - `app.state.core` is `CoreServices`. Routes must not touch rclpy.

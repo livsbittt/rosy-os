@@ -481,3 +481,30 @@ def test_rollback_is_offered_only_when_there_is_somewhere_to_go():
 
     assert "Boolean(data.previous)" in body, "rollback must require a previous release"
     assert "RECOVERY_HOLD" in body, "a held device offers clear-hold, not rollback"
+
+
+def test_core_never_sends_a_piece_of_the_caller_token_to_the_agent(client, monkeypatch):
+    """The actor id used to be the token's first 8 characters (D-30).
+
+    That put a third of a short secret into the host's audit log, where CORE has
+    no say over retention. The actor is now the opaque token id.
+    """
+    connection = FakeConnection({"ok": True, "code": "OK", "data": {}})
+
+    def fake_agent(_svc):
+        return HostAgentClient(connect=lambda: connection)
+
+    monkeypatch.setattr("rosy_core.api.v1.routes._agent", fake_agent)
+
+    client.post(
+        "/api/v1/host/network/apply",
+        json={"profile_id": "rosy-site-sta", "confirmed": True},
+        headers=_auth(ADMIN_TOKEN),
+    )
+
+    sent = json.loads(connection.sent.decode("utf-8"))
+    user_id = sent["actor"]["user_id"]
+    assert ADMIN_TOKEN not in connection.sent.decode("utf-8")
+    for size in range(4, len(ADMIN_TOKEN) + 1):
+        assert ADMIN_TOKEN[:size] != user_id
+    assert sent["actor"]["role"] == "administrator"

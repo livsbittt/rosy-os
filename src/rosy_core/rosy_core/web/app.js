@@ -217,11 +217,14 @@ function renderTokens(payload) {
   }
   tokens.forEach((item) => {
     const row = document.createElement("li");
-    row.dataset.fingerprint = item.fingerprint || "";
+    row.dataset.tokenId = item.id || "";
     const title = document.createElement("strong");
     title.textContent = item.role || "viewer";
     const meta = document.createElement("span");
-    meta.textContent = item.hint || "••••";
+    const created = item.created_at ? String(item.created_at).slice(0, 10) : "";
+    const parts = [item.label || item.id || "", created].filter(Boolean);
+    if (item.legacy) parts.push("설정 파일 평문");
+    meta.textContent = parts.join(" · ");
     const actions = document.createElement("div");
     actions.className = "waypoint-actions";
     const remove = document.createElement("button");
@@ -1275,19 +1278,27 @@ elements["identity-save"]?.addEventListener("click", async () => {
 });
 
 elements["token-add"]?.addEventListener("click", async () => {
-  const token = elements["token-new"]?.value.trim();
+  const token = elements["token-new"]?.value.trim() || "";
+  const label = elements["token-label"]?.value.trim() || "";
   const role = elements["token-role"]?.value || "viewer";
-  if (!token || token.length < 8) {
-    setFieldMessage("token-message", "토큰은 8자 이상이어야 합니다.");
+  if (token && token.length < 16) {
+    setFieldMessage("token-message", "직접 정하는 토큰은 16자 이상이어야 합니다. 비우면 서버가 생성합니다.");
     return;
   }
+  const body = token ? { token, role, label } : { role, label };
   try {
     const created = await api("/api/v1/system/tokens", {
       method: "POST",
-      body: JSON.stringify({ token, role }),
+      body: JSON.stringify(body),
     });
     if (elements["token-new"]) elements["token-new"].value = "";
-    setFieldMessage("token-message", `${created.role} 토큰 ${created.hint} 을(를) 추가했습니다.`);
+    if (elements["token-label"]) elements["token-label"].value = "";
+    setFieldMessage(
+      "token-message",
+      created.token
+        ? `${created.role} 토큰을 만들었습니다. 지금 옮겨 적으세요 — 다시 볼 수 없습니다: ${created.token}`
+        : `${created.role} 토큰을 추가했습니다.`,
+    );
     await refreshTokens();
   } catch (error) {
     setFieldMessage("token-message", `토큰 추가 실패: ${error.message}`);
@@ -1296,12 +1307,12 @@ elements["token-add"]?.addEventListener("click", async () => {
 
 elements["token-list"]?.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-token-action='delete']");
-  const row = event.target.closest("li[data-fingerprint]");
+  const row = event.target.closest("li[data-token-id]");
   if (!button || !row) return;
-  const fingerprint = row.dataset.fingerprint;
-  if (!window.confirm("이 토큰을 삭제할까요? 전문은 다시 볼 수 없습니다.")) return;
+  const tokenId = row.dataset.tokenId;
+  if (!window.confirm("이 토큰을 삭제할까요? 되돌릴 수 없습니다.")) return;
   try {
-    await api(`/api/v1/system/tokens/${encodeURIComponent(fingerprint)}`, { method: "DELETE" });
+    await api(`/api/v1/system/tokens/${encodeURIComponent(tokenId)}`, { method: "DELETE" });
     setFieldMessage("token-message", "토큰을 삭제했습니다.");
     await refreshTokens();
   } catch (error) {

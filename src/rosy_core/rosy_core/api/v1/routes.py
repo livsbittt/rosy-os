@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import math
 
 from fastapi import APIRouter, Depends, Query
@@ -9,13 +10,17 @@ from pydantic import BaseModel, Field, field_validator
 
 from rosy_core.api.deps import (
     AuthContext,
+    MAX_TOKEN_LENGTH,
+    MIN_TOKEN_LENGTH,
     ROLE_RANK,
     auth_entries,
+    generate_token,
     get_services,
+    new_token_record,
     public_token_records,
     require_role,
-    token_fingerprint,
-    token_hint,
+    stored_token_entries,
+    token_digest,
 )
 from rosy_core.identity import validate_robot_id, validate_robot_name
 from rosy_core.api.errors import ApiError
@@ -80,8 +85,21 @@ def list_tokens(_: AuthContext = Depends(admin), svc: CoreServices = Depends(get
 
 
 class TokenRequest(BaseModel):
-    token: str = Field(min_length=8, max_length=128)
+    """`token` 을 비우면 서버가 만들어 응답에 한 번만 싣는다."""
+
+    token: str | None = Field(default=None, min_length=MIN_TOKEN_LENGTH,
+                              max_length=MAX_TOKEN_LENGTH)
     role: str
+    label: str = Field(default="", max_length=64)
+
+
+def _persist_tokens(svc: CoreServices, records: list[dict]) -> None:
+    stored = stored_token_entries(records)
+    try:
+        patch_local_config({"auth": {"tokens": stored}})
+    except (ConfigError, OSError) as exc:
+        raise ApiError("INTERNAL_ERROR", 500, f"failed to persist tokens: {exc}")
+    svc.config.setdefault("auth", {})["tokens"] = stored
 
 
 @system_router.post("/tokens", status_code=201)
@@ -90,42 +108,47 @@ def add_token(body: TokenRequest, _: AuthContext = Depends(admin),
     role = body.role.strip()
     if role not in ROLE_RANK:
         raise ApiError("VALIDATION_ERROR", 400, "role must be viewer, operator or administrator")
-    token = body.token.strip()
-    entries = auth_entries(svc.config)
-    if any(item["token"] == token for item in entries):
+    generated = body.token is None
+    token = generate_token() if generated else body.token.strip()
+    if len(token) < MIN_TOKEN_LENGTH:
+        raise ApiError("VALIDATION_ERROR", 400,
+                       f"token must be at least {MIN_TOKEN_LENGTH} characters")
+
+    records = auth_entries(svc.config)
+    digest = token_digest(token)
+    if any(hmac.compare_digest(digest, item["digest"]) for item in records):
         raise ApiError("VALIDATION_ERROR", 409, "token already exists")
-    entries.append({"token": token, "role": role})
-    try:
-        patch_local_config({"auth": {"tokens": entries}})
-    except (ConfigError, OSError) as exc:
-        raise ApiError("INTERNAL_ERROR", 500, f"failed to persist tokens: {exc}")
-    svc.config.setdefault("auth", {})["tokens"] = entries
+
+    record = new_token_record(token, role, body.label.strip())
+    records.append(record)
+    _persist_tokens(svc, records)
     svc.events.publish(
         "config.changed", source="api",
-        data={"key": "auth.tokens", "fingerprint": token_fingerprint(token), "role": role},
+        data={"key": "auth.tokens", "id": record["id"], "role": role},
     )
-    return {"fingerprint": token_fingerprint(token), "role": role, "hint": token_hint(token)}
+    created = {"id": record["id"], "role": role, "label": record["label"],
+               "created_at": record["created_at"]}
+    if generated:
+        # 원문이 나가는 유일한 지점이다. 저장도 재조회도 되지 않는다.
+        created["token"] = token
+    return created
 
 
-@system_router.delete("/tokens/{fingerprint}", status_code=204)
-def delete_token(fingerprint: str, auth: AuthContext = Depends(admin),
+@system_router.delete("/tokens/{token_id}", status_code=204)
+def delete_token(token_id: str, auth: AuthContext = Depends(admin),
                  svc: CoreServices = Depends(get_services)):
-    if token_fingerprint(auth.token) == fingerprint:
+    if auth.token_id == token_id:
         raise ApiError("VALIDATION_ERROR", 400, "cannot delete the token in use")
-    entries = auth_entries(svc.config)
-    remaining = [item for item in entries if token_fingerprint(item["token"]) != fingerprint]
-    if len(remaining) == len(entries):
-        raise ApiError("NOT_FOUND", 404, "token fingerprint not found")
+    records = auth_entries(svc.config)
+    remaining = [item for item in records if item["id"] != token_id]
+    if len(remaining) == len(records):
+        raise ApiError("NOT_FOUND", 404, "token id not found")
     if not any(item["role"] == "administrator" for item in remaining):
         raise ApiError("VALIDATION_ERROR", 409, "cannot delete the last administrator token")
-    try:
-        patch_local_config({"auth": {"tokens": remaining}})
-    except (ConfigError, OSError) as exc:
-        raise ApiError("INTERNAL_ERROR", 500, f"failed to persist tokens: {exc}")
-    svc.config.setdefault("auth", {})["tokens"] = remaining
+    _persist_tokens(svc, remaining)
     svc.events.publish(
         "config.changed", source="api",
-        data={"key": "auth.tokens", "fingerprint": fingerprint, "deleted": True},
+        data={"key": "auth.tokens", "id": token_id, "deleted": True},
     )
 
 
@@ -825,7 +848,7 @@ def host_network_apply(
     reply = _agent(svc).request(
         "network.apply_profile",
         role="administrator",
-        user_id=auth.token[:8],
+        user_id=auth.token_id,
         confirmed=body.confirmed,
         params={"profile_id": body.profile_id},
         idempotency_key=body.idempotency_key,
@@ -864,7 +887,7 @@ def host_release_install(
     reply = _agent(svc).request(
         "release.install",
         role="administrator",
-        user_id=auth.token[:8],
+        user_id=auth.token_id,
         confirmed=body.confirmed,
         params={"release_id": body.release_id},
         idempotency_key=body.idempotency_key,
@@ -881,7 +904,7 @@ def host_release_rollback(
     reply = _agent(svc).request(
         "release.rollback",
         role="administrator",
-        user_id=auth.token[:8],
+        user_id=auth.token_id,
         confirmed=body.confirmed,
         idempotency_key=body.idempotency_key,
     )
@@ -898,7 +921,7 @@ def host_release_clear_hold(
     reply = _agent(svc).request(
         "release.clear_hold",
         role="administrator",
-        user_id=auth.token[:8],
+        user_id=auth.token_id,
         confirmed=body.confirmed,
         idempotency_key=body.idempotency_key,
     )

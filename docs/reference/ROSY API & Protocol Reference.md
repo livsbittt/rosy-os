@@ -143,9 +143,9 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 | PUT | `/api/v1/system/info` | Admin | IDN-003 (payload: `{robot_id?, robot_name?}`) — 로컬 오버레이에 영속 |
 | GET | `/api/v1/system/capabilities` | Viewer | CAP-001 |
 | GET | `/api/v1/system/runtime` | Viewer | ROS-102 — 호스트 OS/CPU/RAM/디스크/온도 + 읽기 전용 ROS 그래프 스냅샷 |
-| GET | `/api/v1/system/tokens` | Admin | SEC-101 — `fingerprint`·`role`·마스킹된 `hint`만. 토큰 원문은 반환하지 않는다 |
-| POST | `/api/v1/system/tokens` | Admin | SEC-101 (payload: `{token, role}`) |
-| DELETE | `/api/v1/system/tokens/{fingerprint}` | Admin | SEC-101 — 호출자 자신의 토큰과 마지막 administrator 는 거부(409) |
+| GET | `/api/v1/system/tokens` | Admin | SEC-101 — `{id, role, label, created_at, legacy}`. 토큰에서 유도된 값은 싣지 않는다 |
+| POST | `/api/v1/system/tokens` | Admin | SEC-101 (payload: `{role, label?, token?}`) — `token` 을 비우면 서버가 생성해 응답에 **단 한 번** 싣는다. 직접 정하면 16자 이상 |
+| DELETE | `/api/v1/system/tokens/{id}` | Admin | SEC-101 — 호출자 자신의 토큰(400)과 마지막 administrator(409) 는 거부 |
 
 ## 5.2 Robot 상태·센서
 
@@ -377,7 +377,7 @@ Follower의 rosy_core은 스트림 수신 여부를 `stream_timeout_ms`(기본 1
 |---|---|---|---|
 | `system.boot` | info | 로봇 | `{version}` |
 | `system.shutdown` | warning | 로봇 | `{reason}` |
-| `config.changed` | warning | 로봇 | `{key}` — `key`: `robot.identity` \| `auth.tokens` \| `safety.limits`. `auth.tokens` 는 `{fingerprint, role}` 또는 `{fingerprint, deleted}` 를 함께 싣는다. 토큰 원문은 이벤트에 싣지 않는다 |
+| `config.changed` | warning | 로봇 | `{key}` — `key`: `robot.identity` \| `auth.tokens` \| `safety.limits`. `auth.tokens` 는 `{id, role}` 또는 `{id, deleted}` 를 함께 싣는다. 토큰 원문도, 원문에서 유도된 값도 싣지 않는다 |
 | `mode.changed` | info | 로봇 | `{from, to, source}` |
 | `nav.started` | info | 로봇 | `{goal\|waypoint}` |
 | `nav.completed` | info | 로봇 | `{goal\|waypoint, duration_ms}` |
@@ -538,7 +538,7 @@ Fleet(rosy_fleet)이 제공하는 엔드포인트. Base: `http://<fleet-host>:80
 
 | 버전 | 일자 | 내용 |
 |---|---|---|
-| v1.5 | 2026-09-05 | Additive: 현장 설정 — `PUT system/info`, `system/tokens/*`, `system/runtime`, `host/*` 릴레이 카탈로그(§5.7) 신설. `safety/limits` 에 `fleet_loss_policy`·배터리 임계값 추가(SAF-004/005). 미구현 상태였던 `diagnostics/*`·`ros/*`·`swarm/*` 행에 표시 |
+| v1.5 | 2026-09-06 | Additive: 현장 설정 — `PUT system/info`, `system/tokens/*`, `system/runtime`, `host/*` 릴레이 카탈로그(§5.7) 신설. `safety/limits` 에 `fleet_loss_policy`·배터리 임계값 추가(SAF-004/005). 미구현 상태였던 `diagnostics/*`·`ros/*`·`swarm/*` 행에 표시. 토큰은 해시 저장이며 목록은 불투명 `id` 로 식별한다(D-30) |
 | v1.4 | 2026-09-01 | Additive: 절전/근접 웨이크 — `power/*` REST, 스냅샷 `power` 필드, 이벤트 `power.*`·`presence.*`, 센서 `ultrasonic` (PWR-001~004, D-24) |
 | v1.3 | 2026-08-29 | Additive: 이벤트 `slam.started`/`slam.stopped` (NAV-005 세션 API 구현에 수반) |
 | v1.2 | 2026-08-29 | Additive: `swarm/follow`에 `source` 필드(fleet 기본, peer 예약 — D-21 분산 진화 훅), SWM-007 |
