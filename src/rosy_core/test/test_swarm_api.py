@@ -160,3 +160,31 @@ def test_a_max_speed_above_the_ceiling_is_refused(client):
 
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_a_mode_conflict_leaves_no_armed_follow_behind(client):
+    """거절을 받은 운영자와 '달릴 준비가 된' 로봇이 동시에 존재하면 안 된다."""
+    tc, svc = client
+    from rosy_core.command.arbitration import Mode
+
+    svc.modes.transition(Mode.DOCKING)
+
+    response = tc.post("/api/v1/swarm/follow", json=FOLLOW, headers=OPERATOR)
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "MODE_CONFLICT"
+    assert svc.swarm.active is False
+    assert tc.get("/api/v1/swarm/state", headers=VIEWER).json()["active"] is False
+    types = [event["type"] for event in tc.get("/api/v1/events", headers=VIEWER).json()["events"]]
+    assert "swarm.role_assigned" not in types
+
+
+def test_an_estop_during_a_follow_is_reported_as_such_not_as_a_mode_conflict(client):
+    """가장 알려주는 바가 많은 거절 사유가 먼저 나와야 한다."""
+    tc, _svc = client
+    tc.post("/api/v1/safety/stop", headers=VIEWER)
+
+    response = tc.post("/api/v1/swarm/follow", json=FOLLOW, headers=OPERATOR)
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "EMERGENCY_ACTIVE"

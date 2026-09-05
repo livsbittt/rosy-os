@@ -375,7 +375,7 @@ Fleet 이 들어오면 같은 envelope 을 중계하므로 어느 쪽 끝도 바
 | `WS /ws/swarm/pose?token=` | Viewer | 로봇 → 밖 | SWM-003 리더 pose 스트림. ≥10 Hz 는 하한이며 설정으로 낮출 수 없다 |
 | `WS /ws/swarm/reference?token=` | Operator | 밖 → 로봇 | 팔로워의 참조 pose 입구 (SWM-007). 형식이 어긋난 프레임은 버리고 소켓은 유지한다 |
 
-인증 실패는 `/ws/state` 와 같이 close code `4401` 이다.
+close code: `4401` 은 토큰이 없거나 틀린 것(`/ws/state` 와 동일), `4403` 은 인증은 됐지만 허용되지 않는 것 — 역할이 모자라거나 capability 가 그 기능을 선언하지 않은 경우(CAP-003)다.
 
 ---
 
@@ -414,9 +414,9 @@ Fleet 이 들어오면 같은 envelope 을 중계하므로 어느 쪽 끝도 바
 | `mission.completed/failed/canceled` | info/error/info | Fleet | `{mission_id, reason}` |
 | `robot.online/offline` | info/warning | Fleet | `{robot_id}` |
 | `pairing.requested/approved/revoked` | warning | Fleet | `{robot_id}` |
-| `swarm.role_assigned` | info | Fleet | `{robot_id, role, formation}` |
-| `swarm.hold` | warning | 로봇 | `{robot_id, reason}` |
-| `swarm.aborted` | warning | Fleet | `{formation, reason, robots[]}` |
+| `swarm.role_assigned` | info | 로봇 | `{role, formation, target_robot_id, reference_source, by}` |
+| `swarm.hold` | warning | 로봇 | `{reason, formation, stream_timeout_ms}` |
+| `swarm.aborted` | warning | 로봇 | `{formation, reason, robots[], by}` — `reason`: `canceled` \| `estop` \| `docking` |
 
 ---
 

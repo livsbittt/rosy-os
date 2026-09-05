@@ -14,7 +14,7 @@ NAV-001–004/006 and SWM-001~007 facade. ROS-free. Nav2 action client lives beh
 | `__init__.py` | Package marker |
 | `manager.py` | `NavigationManager`, `NavGoalSpec`, `NavExecutor` protocol, `NavigationError` |
 | `initial_pose.py` | AMCL covariance for `/initialpose` (zero covariance is ignored) |
-| `swarm.py` | SWM-001~007 follow state machine: moving goal at <=2 Hz, stream-loss HOLD |
+| `swarm.py` | SWM-001~007 follow state machine: moving goal at <=2 Hz, stream-loss HOLD, estop/docking yield |
 
 ## Subdirectories
 

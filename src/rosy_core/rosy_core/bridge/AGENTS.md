@@ -14,6 +14,7 @@ ROS-101: the only module allowed to import rclpy message types and talk to the R
 | `__init__.py` | Package marker |
 | `ros_bridge.py` | Subs (odom, battery, nav_cmd_vel, range, batt_state), pubs (cmd_vel, power/mode, display/info), Nav2 action, TF, LiDAR motor services, SetLed |
 | `translate.py` | ROS-free message → domain dict conversion. Imports no ROS type, so host pytest runs it |
+| `goal_tracker.py` | ROS-free Nav2 goal generations: which result is current, what to cancel |
 
 ## Subdirectories
 
@@ -27,6 +28,7 @@ None.
 - Topics: `cmd_vel` out; `nav_cmd_vel` in from Nav2; `battery/voltage`; `us_sensor/range`; `batt_state`.
 - LED and LiDAR start/stop are services, not CORE GPIO.
 - Do not put policy here. Policy lives in command/safety/power; bridge only adapts.
+- More than one Nav2 goal can be in flight (SWM-001 moving goal). Route every acceptance, result and cancel through `GoalTracker`: a preempted goal's late abort must not be read as the current goal's failure, and a cancel must reach every live handle.
 - Message → dict conversion belongs in `translate.py`, not in a callback. A callback should read one line: translate, then hand the result to a service. Anything computed inline in `ros_bridge.py` cannot be tested on the host, and the source-grep tests that stand in for it pass on wrong values.
 
 ### Testing Requirements

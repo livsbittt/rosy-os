@@ -31,6 +31,8 @@ pytest for rosy_core policy, API, dashboard, and protocol. Most tests import Pyt
 | `test_swarm_api.py` | SWM-002 REST contract, including the 501 on a capability that says false |
 | `test_swarm_stream.py` | `/ws/swarm/pose` envelope and `/ws/swarm/reference` ingest |
 | `test_diagnostics_api.py` | DIAG-001 rollup, unknown component, agreement with `/metrics` |
+| `test_goal_tracker.py` | Nav2 goal generations: stale results, the cancel-before-accept window |
+| `test_swarm_integration.py` | Real `NavigationManager` + replayed bridge callbacks — the seam a `FakeNav` hides |
 
 ## Subdirectories
 
@@ -42,6 +44,7 @@ None (ignore `__pycache__/`).
 
 - Inject clocks. Power, battery, and docking tests advance time explicitly.
 - Do not import `ros_bridge` at module top in these tests (optional ROS deps).
+- A `FakeNav`-style double proves the caller, not the seam. Swarm's two worst defects (a HOLD whose cancel never reached Nav2, NAV-006 silently disabled) both lived between the real managers — keep `test_swarm_integration.py` covering that path.
 - Asserting that a source file contains a string proves only the wiring. Where a value matters, put the computation in a ROS-free module (`bridge/translate.py`, `navigation/initial_pose.py`) and assert the value.
 - When adding an API field, assert it here **and** in `protocol/schemas.py`.
 

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import math
+import threading
 import time
 from dataclasses import dataclass
 from typing import Optional, Protocol
@@ -54,6 +55,11 @@ class NavigationManager:
         self._stuck_min_progress = stuck_min_progress
         self._last_progress_pos: Optional[tuple[float, float]] = None
         self._last_progress_ts: float = 0.0
+        # 목표는 uvicorn 워커(REST·WS)와 rclpy executor(브리지 타이머) 양쪽에서
+        # 건드려진다(D-1). check-send-set 이 쪼개지면 취소가 목표를 놓친다.
+        self._lock = threading.RLock()
+        #: moving goal 세션이 잡혀 있으면 목표의 임자는 그쪽이다 (SWM-001).
+        self._moving_session = False
 
     @property
     def nav_state(self) -> NavigationState:
@@ -87,11 +93,18 @@ class NavigationManager:
             raise NavigationError("EMERGENCY_ACTIVE", "e-stop is active")
         if self.mapping_active:
             raise NavigationError("MAPPING_ACTIVE", "mapping session active")
-        if self._nav_state not in _IDLE_STATES:
-            raise NavigationError("NAVIGATION_ACTIVE",
-                                  f"navigation in progress ({self._nav_state.value}) — cancel first")
-        executor.send_goal(spec)
-        self._set_state(NavigationState.PLANNING)
+        with self._lock:
+            if self._moving_session:
+                # 추종 중에 들어온 단발 목표는 0.5 초 뒤 스트림에 덮인다.
+                # 조용히 덮이느니 거절하는 편이 낫다.
+                raise NavigationError("NAVIGATION_ACTIVE",
+                                      "a swarm follow session owns the goal — cancel it first")
+            if self._nav_state not in _IDLE_STATES:
+                raise NavigationError(
+                    "NAVIGATION_ACTIVE",
+                    f"navigation in progress ({self._nav_state.value}) — cancel first")
+            executor.send_goal(spec)
+            self._set_state(NavigationState.PLANNING)
         self._events.publish("nav.started", source="navigation_manager",
                              data={"goal": {"x": spec.x, "y": spec.y, "yaw": spec.yaw}, "by": source})
 
@@ -112,9 +125,14 @@ class NavigationManager:
             raise NavigationError("EMERGENCY_ACTIVE", "e-stop is active")
         if self.mapping_active:
             raise NavigationError("MAPPING_ACTIVE", "mapping session active")
-        executor.send_goal(spec)
-        if self._nav_state not in (NavigationState.NAVIGATING, NavigationState.PLANNING):
-            self._set_state(NavigationState.PLANNING)
+        with self._lock:
+            self._moving_session = True
+            executor.send_goal(spec)
+            started = self._nav_state not in (NavigationState.NAVIGATING,
+                                              NavigationState.PLANNING)
+            if started:
+                self._set_state(NavigationState.PLANNING)
+        if started:
             self._events.publish(
                 "nav.started", source="navigation_manager",
                 data={"goal": {"x": spec.x, "y": spec.y, "yaw": spec.yaw}, "by": source})
@@ -156,17 +174,32 @@ class NavigationManager:
                              data={"by": source, "reset": True})
 
     def cancel(self, source: str = "api") -> None:
-        if self._nav_state in _IDLE_STATES:
-            return
-        if self.executor is not None:
-            self.executor.cancel_goal()
-        self._set_state(NavigationState.CANCELED)
+        """진행 중 목표를 거둔다.
+
+        moving goal 세션에서는 상태가 IDLE 계열이어도 취소를 보낸다. 선점된
+        목표의 abort 가 상태를 FAILED 로 떨어뜨려 놓았을 수 있고, 그때 여기서
+        돌아서면 살아 있는 Nav2 목표가 그대로 남아 로봇이 계속 달린다.
+        """
+        with self._lock:
+            session = self._moving_session
+            self._moving_session = False
+            if self._nav_state in _IDLE_STATES and not session:
+                return
+            if self.executor is not None:
+                self.executor.cancel_goal()
+            self._set_state(NavigationState.CANCELED)
         self._events.publish("nav.canceled", source="navigation_manager", data={"source": source})
 
     def on_goal_accepted(self) -> None:
-        self._set_state(NavigationState.NAVIGATING)
-        self._last_progress_pos = None
-        self._last_progress_ts = time.monotonic()
+        with self._lock:
+            self._set_state(NavigationState.NAVIGATING)
+            if self._moving_session and self._last_progress_pos is not None:
+                # SWM-002 는 NAV-006 이 그대로 적용된다고 못박았다. 0.5 초마다
+                # 기준점을 초기화하면 30 초 무진척 조건은 영원히 성립하지 않고,
+                # 문틀에 낀 팔로워가 아무 신호 없이 계속 밀어붙인다.
+                return
+            self._last_progress_pos = None
+            self._last_progress_ts = time.monotonic()
 
     def on_result(self, succeeded: bool, error: Optional[str] = None) -> None:
         if succeeded:

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends
 from rosy_core.api.v1.common import enter_navigation_mode, operator, viewer
 from rosy_core.api.deps import AuthContext, get_services
 from rosy_core.api.errors import ApiError
+from rosy_core.command.arbitration import Mode
 from rosy_core.navigation.swarm import SwarmError
 from rosy_core.protocol.schemas import SwarmFollowParams
 from rosy_core.services import CoreServices
@@ -29,13 +30,24 @@ def _swarm_error(exc: SwarmError) -> ApiError:
 def swarm_follow(body: SwarmFollowParams, auth: AuthContext = Depends(operator),
                  svc: CoreServices = Depends(get_services)):
     """추종 시작. 목표는 NAVIGATION 모드에서만 바퀴에 닿는다 (D-2, SWM-001)."""
+    # 아무것도 바꾸기 전에 두 문을 다 통과시킨다. follow() 는 상태를 바꾸고
+    # 이벤트를 내므로, 그 뒤에 모드 전이가 409 로 막히면 운영자는 거절을 받는데
+    # 로봇은 참조 프레임 하나에 달려나갈 준비가 된 채로 남는다.
     try:
-        status = svc.swarm.follow(body, source=f"api:{auth.role}")
+        svc.swarm.check_follow(body)
     except SwarmError as exc:
         raise _swarm_error(exc)
-    # 모드 전이는 follow 가 성공한 뒤에만 한다. 거부된 명령이 모드를 바꾸면
-    # 로봇은 아무 목표도 없이 NAVIGATION 에 앉아 있게 된다.
-    enter_navigation_mode(svc, auth)
+    if not svc.modes.can_transition(Mode.NAVIGATION):
+        raise ApiError("MODE_CONFLICT", 409,
+                       f"cannot follow from {svc.modes.mode.value}")
+
+    status = svc.swarm.follow(body, source=f"api:{auth.role}")
+    try:
+        enter_navigation_mode(svc, auth)
+    except ApiError:
+        # 여기까지 올 일은 없어야 하지만, 왔다면 무장된 채로 두지 않는다.
+        svc.swarm.cancel(source="api", reason="mode_conflict")
+        raise
     return {**svc.swarm.state_payload(), "role": status.role.value}
 
 

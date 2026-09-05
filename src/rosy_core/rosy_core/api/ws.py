@@ -89,8 +89,9 @@ async def ws_events(websocket: WebSocket):
         unsubscribe()
 
 
-async def _authorize(websocket: WebSocket, min_role: str = "viewer"):
-    """토큰과 역할을 확인한다. 실패는 /ws/state 와 같은 4401 로 닫는다."""
+async def _authorize(websocket: WebSocket, min_role: str = "viewer",
+                     capability: str = ""):
+    """4401 은 토큰이 없거나 틀린 것, 4403 은 인증은 됐지만 허용되지 않는 것."""
     svc = websocket.app.state.core
     try:
         auth = authenticate(svc.config, None, websocket.query_params.get("token", ""))
@@ -98,7 +99,12 @@ async def _authorize(websocket: WebSocket, min_role: str = "viewer"):
         await websocket.close(code=4401)
         return None
     if auth.rank < ROLE_RANK[min_role]:
-        await websocket.close(code=4401)
+        await websocket.close(code=4403)
+        return None
+    if capability and not svc.capability.supports(capability):
+        # CAP-003. 선언하지 않은 기능을 소켓으로 우회해 제공하면 CAP-001 이
+        # 다시 거짓말이 된다 — D-31 이 없애려던 바로 그 어긋남이다.
+        await websocket.close(code=4403)
         return None
     return svc
 
@@ -113,20 +119,29 @@ def _pose_envelope(robot_id: str, pose, seq: int) -> dict:
 @ws_router.websocket("/ws/swarm/pose")
 async def ws_swarm_pose(websocket: WebSocket):
     """SWM-003 Leader Pose Stream. heartbeat 와 별개의 전용 스트림이다."""
-    svc = await _authorize(websocket)
+    svc = await _authorize(websocket, capability="swarm.lead")
     if svc is None:
         return
     await websocket.accept()
     rate = float(svc.config.get("swarm", {}).get("pose_rate_hz", 10.0))
     rate = max(rate, 10.0)  # SWM-003 은 하한이다. 설정으로 내릴 수 없다.
+    period = 1.0 / rate
     seq = 0
+    # 보낸 뒤 period 만큼 자면 주기가 항상 period + 전송시간이 되어 10 Hz 아래로
+    # 내려간다. 마감시각을 따라간다.
+    next_at = asyncio.get_event_loop().time()
     try:
         while True:
             snapshot = svc.state.snapshot()
             seq += 1
             await websocket.send_json(
                 _pose_envelope(svc.identity.robot_id, snapshot.pose, seq))
-            await asyncio.sleep(1.0 / rate)
+            next_at += period
+            delay = next_at - asyncio.get_event_loop().time()
+            if delay <= 0:
+                next_at = asyncio.get_event_loop().time()
+            else:
+                await asyncio.sleep(delay)
     except WebSocketDisconnect:
         return
     except Exception:

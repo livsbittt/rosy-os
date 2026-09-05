@@ -110,13 +110,19 @@ def test_the_leader_rate_cannot_be_configured_below_the_requirement(tmp_path):
 
     import time
 
+    frames = 20
     with tc.websocket_connect(f"/ws/swarm/pose?token={VIEWER_TOKEN}") as socket:
         socket.receive_json()
         started = time.monotonic()
-        socket.receive_json()
+        for _ in range(frames):
+            socket.receive_json()
         elapsed = time.monotonic() - started
 
-    assert elapsed < 0.5, "a 1 Hz setting must not slow the leader stream below 10 Hz"
+    achieved = frames / elapsed
+    # 서버는 마감시각을 따라가므로 예약 주기는 정확히 1/rate 다. 남는 오차는
+    # TestClient 가 같은 프로세스에서 프레임을 받아가는 비용이다. 보낸 뒤에
+    # period 만큼 자던 예전 구현은 여기서 ~9.2 Hz 로 측정됐다.
+    assert achieved >= 9.5, f"SWM-003 asks for >=10 Hz; measured {achieved:.2f} Hz"
 
 
 # --- 참조 스트림 입구 -----------------------------------------------------------
@@ -206,7 +212,10 @@ def test_a_bad_token_is_closed_with_4401_like_ws_state(client, path):
 
 
 def test_the_reference_socket_requires_an_operator(client):
-    """읽기는 viewer 로 되지만, 로봇을 움직이는 스트림을 밀어 넣는 것은 아니다."""
+    """읽기는 viewer 로 되지만, 로봇을 움직이는 스트림을 밀어 넣는 것은 아니다.
+
+    4401 은 토큰이 없거나 틀린 것이고, 인증은 됐는데 허용되지 않는 것은 4403 이다.
+    """
     tc, _svc = client
     from starlette.websockets import WebSocketDisconnect
 
@@ -214,7 +223,27 @@ def test_the_reference_socket_requires_an_operator(client):
         with tc.websocket_connect(f"/ws/swarm/reference?token={VIEWER_TOKEN}") as socket:
             socket.send_text(json.dumps(pose_frame()))
             socket.receive_json()
-    assert raised.value.code == 4401
+    assert raised.value.code == 4403
 
     with tc.websocket_connect(f"/ws/swarm/reference?token={ADMIN_TOKEN}") as socket:
         socket.send_text(json.dumps(pose_frame()))
+
+
+def test_the_leader_socket_is_closed_when_lead_is_not_declared(tmp_path):
+    """CAP-003: 선언하지 않은 기능을 소켓으로 우회 제공하면 CAP-001 이 거짓말이 된다."""
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from starlette.websockets import WebSocketDisconnect
+
+    config = yaml.safe_load((CONFIG_DIR / "rosy_default.yaml").read_text(encoding="utf-8"))
+    profile = RobotProfile.load(CONFIG_DIR / "profile.pinky_pro.yaml")
+    caps = yaml.safe_load((CONFIG_DIR / "capabilities.yaml").read_text(encoding="utf-8"))
+    caps["swarm"] = {"follow": True, "lead": False}
+    services = CoreServices.build(config, profile, caps, tmp_path / "wp.json")
+    tc = TestClient(create_app(config, services))
+
+    with pytest.raises(WebSocketDisconnect) as raised:
+        with tc.websocket_connect(f"/ws/swarm/pose?token={VIEWER_TOKEN}") as socket:
+            socket.receive_json()
+
+    assert raised.value.code == 4403

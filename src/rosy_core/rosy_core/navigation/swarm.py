@@ -67,13 +67,17 @@ class SwarmManager:
     """SWM-002 follow 프리미티브와 SWM-004 단절 정책."""
 
     def __init__(self, events, state_manager, nav, safety, capability,
-                 clock=time.monotonic) -> None:
+                 clock=time.monotonic, docking_active_provider=None) -> None:
         self._events = events
         self._state = state_manager
         self.nav = nav
         self._safety = safety
         self._capability = capability
         self._clock = clock
+        # DOCKING(4) 이 NAVIGATION(5) 보다 우선한다(§8.1). 도킹은 같은 Nav2
+        # 액션을 쓰므로, 추종이 계속 목표를 갈아끼우면 도크로 가던 주행을
+        # 선점해버린다 — SAF-005 저배터리 복귀가 조용히 실패하는 경로다.
+        self._docking_active = docking_active_provider or (lambda: False)
         self._lock = threading.RLock()
 
         self._params: Optional[SwarmFollowParams] = None
@@ -132,7 +136,12 @@ class SwarmManager:
 
     # --- SWM-002 follow / cancel ---------------------------------------------
 
-    def follow(self, params: SwarmFollowParams, source: str = "api") -> SwarmStatus:
+    def check_follow(self, params: SwarmFollowParams) -> None:
+        """follow() 가 받아들일지를 아무것도 바꾸지 않고 확인한다.
+
+        상태를 바꾸고 이벤트를 낸 뒤에 다른 이유로 거절당하면 되돌릴 것이
+        생긴다. 호출자가 먼저 물어볼 수 있게 게이트만 떼어 둔다.
+        """
         if not self._capability.supports("swarm.follow"):
             raise SwarmError("CAPABILITY_NOT_SUPPORTED",
                              "this robot does not support swarm follow")
@@ -157,6 +166,9 @@ class SwarmManager:
                 "VALIDATION_ERROR",
                 f"max_speed {params.max_speed} exceeds the SAF-004 ceiling {ceiling}")
 
+
+    def follow(self, params: SwarmFollowParams, source: str = "api") -> SwarmStatus:
+        self.check_follow(params)
         with self._lock:
             self._params = params.model_copy()
             self._last_sample_at = None
@@ -169,25 +181,31 @@ class SwarmManager:
         self._events.publish(
             "swarm.role_assigned", source="swarm_manager",
             data={"role": SwarmRole.FOLLOWER.value,
+                  "formation": self._formation_label(params),
                   "target_robot_id": params.target_robot_id,
                   "reference_source": params.source.value, "by": source},
         )
         return status
 
-    def cancel(self, source: str = "api") -> SwarmStatus:
+    def cancel(self, source: str = "api", reason: str = "canceled") -> SwarmStatus:
         with self._lock:
             was_active = self._params is not None
+            formation = self._formation_label(self._params) if self._params else None
+            target = self._params.target_robot_id if self._params else None
             self._params = None
             self._last_sample_at = None
             self._last_goal_at = None
             self._pending = None
             self._holding = False
+            if was_active:
+                self.nav.cancel(source="swarm")
 
         if was_active:
-            self.nav.cancel(source="swarm")
             self._state.set_swarm(SwarmStatus())
-            self._events.publish("swarm.aborted", source="swarm_manager",
-                                 data={"reason": "canceled", "by": source})
+            self._events.publish(
+                "swarm.aborted", source="swarm_manager",
+                data={"formation": formation, "reason": reason, "by": source,
+                      "robots": [target] if target else []})
         return SwarmStatus()
 
     # --- 참조 스트림 (SWM-007: 소스를 묻지 않는다) ----------------------------
@@ -209,14 +227,35 @@ class SwarmManager:
             self._last_goal_at = now
             self._pending = None
             spec = follow_goal(reference, params.distance, params.lateral)
+            # 락 안에서 부른다. NavigationManager 는 여기로 되돌아오지 않으므로
+            # 교착이 없고, 이렇게 해야 cancel 과 목표 투입이 뒤바뀌지 않는다 —
+            # 취소 뒤에 목표가 나가면 아무도 그것을 거두지 않는다.
+            self.nav.moving_goal(spec, source="swarm")
 
         if resumed:
             self._state.set_swarm(self.status())
-        self.nav.moving_goal(spec, source="swarm")
         return True
 
     def tick(self, now: Optional[float] = None) -> None:
-        """SWM-004: 스트림이 끊기면 HOLD. 밀린 목표가 있으면 여기서 낸다."""
+        """SWM-004 단절 판정, 밀린 목표 투입, 그리고 추종을 끝내야 할 사유들.
+
+        follow() 의 게이트는 시작 시점만 본다. 대형은 몇 분씩 유지되고 그
+        사이에 e-stop 이 걸리거나 저배터리 복귀가 시작될 수 있으므로, 여기서
+        매 틱 다시 본다 — docking 매니저가 어느 단계에서든 e-stop 에 중단되는
+        것과 같은 규칙이다.
+        """
+        if not self.active:
+            return
+        if self._safety.estop:
+            # 해제 뒤 참조 프레임 하나만으로 다시 달리기 시작하면 안 된다.
+            # 운영자가 다시 명령해야 한다.
+            self.cancel(source="safety", reason="estop")
+            return
+        if self._docking_active():
+            # DOCKING(4) > NAVIGATION(5). 같은 Nav2 액션을 두고 다투면
+            # 추종이 도크 진입 주행을 계속 선점한다.
+            self.cancel(source="docking", reason="docking")
+            return
         current = self._clock() if now is None else now
         spec: Optional[NavGoalSpec] = None
         hold = False
@@ -225,6 +264,7 @@ class SwarmManager:
             if params is None:
                 return
             timeout_ms = params.stream_timeout_ms
+            formation = self._formation_label(params)
             if self._last_sample_at is not None:
                 age_ms = (current - self._last_sample_at) * 1000.0
                 if age_ms >= timeout_ms and not self._holding:
@@ -246,6 +286,12 @@ class SwarmManager:
             self._state.set_swarm(self.status())
             self._events.publish("swarm.hold", severity="warning", source="swarm_manager",
                                  data={"reason": "reference stream lost",
+                                       "formation": formation,
                                        "stream_timeout_ms": timeout_ms})
         elif spec is not None:
             self.nav.moving_goal(spec, source="swarm")
+
+    def on_estop(self) -> None:
+        """안전 경로에서 직접 부를 수 있는 입구. tick 을 기다리지 않는다."""
+        if self.active:
+            self.cancel(source="safety", reason="estop")
