@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from urllib.parse import urlparse
 from pathlib import Path
 
 import pytest
@@ -121,7 +122,6 @@ def _launch_page(playwright):
     page = browser.new_page(viewport={"width": 390, "height": 844})
     page.set_default_timeout(5_000)
     html = (WEB / "index.html").read_text(encoding="utf-8")
-    script = (WEB / "app.js").read_text(encoding="utf-8")
     page.route(
         "http://rosy.test/dashboard",
         lambda route: route.fulfill(status=200, content_type="text/html", body=html),
@@ -130,18 +130,26 @@ def _launch_page(playwright):
         "http://rosy.test/dashboard/assets/styles.css",
         lambda route: route.fulfill(status=200, content_type="text/css", body=""),
     )
-    page.route(
-        "http://rosy.test/dashboard/assets/app.js",
-        lambda route: route.fulfill(
-            status=200, content_type="application/javascript", body=script
-        ),
-    )
-    page.route(
-        "http://rosy.test/dashboard/assets/map.js",
-        lambda route: route.fulfill(
-            status=200, content_type="application/javascript", body=MAP_STUB
-        ),
-    )
+
+    def _serve_module(route):
+        """Serve every real ES module from the tree; only map.js is stubbed.
+
+        Listing files here meant a new module 404'd silently and the page died
+        before the first assertion, with the failure pointing at the assertion
+        rather than the missing import.
+        """
+        name = Path(urlparse(route.request.url).path).name
+        if name == "map.js":
+            body = MAP_STUB
+        else:
+            source = WEB / name
+            if not source.is_file():
+                route.fulfill(status=404, body="")
+                return
+            body = source.read_text(encoding="utf-8")
+        route.fulfill(status=200, content_type="application/javascript", body=body)
+
+    page.route("http://rosy.test/dashboard/assets/*.js", _serve_module)
     page.add_init_script(script=FETCH_INIT)
     page.on("dialog", lambda dialog: dialog.accept())
     return browser, page

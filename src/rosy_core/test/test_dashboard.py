@@ -9,6 +9,21 @@ from rosy_core.api.app import create_app
 WEB_ROOT = Path(__file__).parent.parent / "rosy_core" / "web"
 
 
+def dashboard_js(*, without: tuple[str, ...] = ()) -> str:
+    """Every ES module the dashboard loads, concatenated.
+
+    The dashboard is `app.js` plus the modules it imports. A test that reads
+    only `app.js` starts passing or failing for the wrong reason the moment a
+    handler moves between modules, so read them all.
+    """
+    return "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted(WEB_ROOT.glob("*.js"))
+        if path.name not in without
+    )
+
+
+
 @pytest.fixture
 def dashboard_client():
     pytest.importorskip("httpx")
@@ -40,26 +55,27 @@ def test_dashboard_assets_are_local_and_reference_runtime_contract(dashboard_cli
     assert "prefers-reduced-motion" in css.text
 
     assert script.status_code == 200
-    assert "sessionStorage" in script.text
-    assert "runtime_mode" in script.text
-    assert "localStorage" not in script.text
-    assert "/api/v1/system/runtime" in script.text
-    assert "/api/v1/robot/state" in script.text
-    assert "/api/v1/safety/stop" in script.text
-    assert "/ws/state" in script.text
-    assert "modeChangePending" in script.text
-    assert "window.confirm" in script.text
-    assert "navigation?.goal_navigation" in script.text
-    assert "/api/v1/teleop" in script.text
-    assert "pointerdown" in script.text
-    assert "pointerup" in script.text
-    assert "pointercancel" in script.text
-    assert "pointerleave" in script.text
-    assert "visibilitychange" in script.text
-    assert "pagehide" in script.text
-    assert "window.addEventListener(\"blur\"" in script.text
-    assert "sendTeleop(0, 0, true)" in script.text
-    assert "teleopIntervalMs: 100" in script.text
+    bundle = dashboard_js()
+    assert "sessionStorage" in bundle
+    assert "runtime_mode" in bundle
+    assert "localStorage" not in bundle
+    assert "/api/v1/system/runtime" in bundle
+    assert "/api/v1/robot/state" in bundle
+    assert "/api/v1/safety/stop" in bundle
+    assert "/ws/state" in bundle
+    assert "modeChangePending" in bundle
+    assert "window.confirm" in bundle
+    assert "navigation?.goal_navigation" in bundle
+    assert "/api/v1/teleop" in bundle
+    assert "pointerdown" in bundle
+    assert "pointerup" in bundle
+    assert "pointercancel" in bundle
+    assert "pointerleave" in bundle
+    assert "visibilitychange" in bundle
+    assert "pagehide" in bundle
+    assert "window.addEventListener(\"blur\"" in bundle
+    assert "sendTeleop(0, 0, true)" in bundle
+    assert "teleopIntervalMs: 100" in bundle
 
 
 def test_dashboard_requires_local_bench_acknowledgement_for_motion():
@@ -74,7 +90,7 @@ def test_dashboard_requires_local_bench_acknowledgement_for_motion():
 
 
 def test_dashboard_motion_fails_to_zero_on_release_and_page_loss():
-    script = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+    script = dashboard_js()
 
     assert "/api/v1/teleop" in script
     assert "sendTeleop(0, 0, true)" in script
@@ -113,7 +129,7 @@ def test_dashboard_asset_directory_is_an_explicit_python_package():
 
 def test_dashboard_exposes_ros_domain_bandwidth_and_topology_panel():
     html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
-    script = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+    script = dashboard_js()
     css = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
 
     for element_id in (
@@ -145,7 +161,7 @@ def test_dashboard_exposes_ros_domain_bandwidth_and_topology_panel():
 
 def test_dashboard_draws_occupancy_map_path_and_click_goal():
     html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
-    app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+    app = dashboard_js(without=("map.js",))
     mapper = (WEB_ROOT / "map.js").read_text(encoding="utf-8")
     css = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
 
@@ -210,7 +226,7 @@ def test_dashboard_assets_send_no_cache_so_field_settings_keep_pace(dashboard_cl
 
 def test_dashboard_field_settings_use_click_handlers_not_form_submit():
     html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
-    script = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+    script = dashboard_js()
     settings = html.split('id="field-settings-panel"', 1)[1]
     assert 'type="submit"' not in settings
     assert 'id="waypoint-save"' in settings
@@ -245,7 +261,7 @@ def test_dashboard_field_settings_use_click_handlers_not_form_submit():
 
 def test_dashboard_exposes_local_field_settings_not_fleet():
     html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
-    script = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+    script = dashboard_js()
     css = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
 
     for element_id in (
