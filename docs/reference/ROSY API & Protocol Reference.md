@@ -2,7 +2,7 @@
 ## 공유 인터페이스 계약서
 
 **Document ID:** ROSY-API-REF-001
-**Version:** v1.0
+**Version:** v1.5
 **Status:** Approved
 **대상 독자:** rosy_core 개발자, rosy_fleet 개발자, 외부 SDK·AI·연동 시스템
 
@@ -140,7 +140,12 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 | Method | Path | Role | 요구사항 |
 |---|---|---|---|
 | GET | `/api/v1/system/info` | Viewer | IDN-003 |
+| PUT | `/api/v1/system/info` | Admin | IDN-003 (payload: `{robot_id?, robot_name?}`) — 로컬 오버레이에 영속 |
 | GET | `/api/v1/system/capabilities` | Viewer | CAP-001 |
+| GET | `/api/v1/system/runtime` | Viewer | ROS-102 — 호스트 OS/CPU/RAM/디스크/온도 + 읽기 전용 ROS 그래프 스냅샷 |
+| GET | `/api/v1/system/tokens` | Admin | SEC-101 — `{id, role, label, created_at, legacy}`. 토큰에서 유도된 값은 싣지 않는다 |
+| POST | `/api/v1/system/tokens` | Admin | SEC-101 (payload: `{role, label?, token?}`) — `token` 을 비우면 서버가 생성해 응답에 **단 한 번** 싣는다. 직접 정하면 16자 이상 |
+| DELETE | `/api/v1/system/tokens/{id}` | Admin | SEC-101 — 호출자 자신의 토큰(400)과 마지막 administrator(409) 는 거부 |
 
 ## 5.2 Robot 상태·센서
 
@@ -188,25 +193,25 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 |---|---|---|---|
 | POST | `/api/v1/teleop` | Operator | §11 |
 | POST | `/api/v1/mode` | Operator | `{mode: MANUAL\|NAVIGATION\|IDLE}` |
-| POST | `/api/v1/swarm/follow` | Operator | SWM-002 `{target_robot_id, distance, lateral, max_speed, stream_timeout_ms, source}` — `source: fleet(기본)\|peer(예약, D-21)` |
-| POST | `/api/v1/swarm/cancel` | Operator | SWM-002 |
-| GET | `/api/v1/swarm/state` | Viewer | SWM-006 |
+| POST | `/api/v1/swarm/follow` | Operator | **미구현 (Phase 5)** — SWM-002 `{target_robot_id, distance, lateral, max_speed, stream_timeout_ms, source}` — `source: fleet(기본)\|peer(예약, D-21)` |
+| POST | `/api/v1/swarm/cancel` | Operator | **미구현 (Phase 5)** — SWM-002 |
+| GET | `/api/v1/swarm/state` | Viewer | **미구현 (Phase 5)** — SWM-006. 스냅샷의 `swarm` 필드는 이미 제공된다 |
 | POST | `/api/v1/safety/stop` | Viewer↑ | SAF-001 (누구나) |
 | POST | `/api/v1/safety/release` | Admin | SAF-001 |
 | GET | `/api/v1/safety/state` | Viewer | SAF-001 |
-| PUT | `/api/v1/safety/limits` | Admin | SAF-004 |
+| PUT | `/api/v1/safety/limits` | Admin | SAF-004 — `{manual_linear?, manual_angular?}` 는 프로필 최대값으로 clamp. SAF-005 배터리 임계값 `{battery_warning_percent?, battery_critical_percent?, battery_deep_percent?, battery_critical_policy?}` 과 `{fleet_loss_policy?}` 도 같은 경로로 받는다. 임계값은 `0 < deep < critical < warning <= 100` 을 만족해야 한다 |
 
 ## 5.6 이벤트·진단·관리
 
 | Method | Path | Role | 요구사항 |
 |---|---|---|---|
 | GET | `/api/v1/events?since_seq=N&types=...` | Viewer | EVT-003 |
-| GET | `/api/v1/diagnostics` | Viewer | DIAG-001 |
-| GET | `/api/v1/diagnostics/{component}` | Viewer | DIAG-001 |
+| GET | `/api/v1/diagnostics` | Viewer | **미구현** — DIAG-001. 현재는 `/metrics` 와 상태 스냅샷의 `diagnostics_summary` 로만 노출된다 |
+| GET | `/api/v1/diagnostics/{component}` | Viewer | **미구현** — DIAG-001 |
 | GET | `/api/v1/logs/audit` | Admin | LOG-001 |
 | GET | `/metrics` | 내부/모니터링 | OBS-101 (Prometheus 형식, 토큰 면제는 배포 정책) |
-| GET | `/api/v1/ros/nodes\|topics\|services` | Admin | ROS-102 |
-| POST | `/api/v1/ros/publish` | Admin + 설정 ON | ROS-102 (기본 비활성) |
+| GET | `/api/v1/ros/nodes\|topics\|services` | Admin | **미구현** — ROS-102. 그래프 스냅샷은 `/api/v1/system/runtime` 이 제공한다 |
+| POST | `/api/v1/ros/publish` | Admin + 설정 ON | **미구현** — ROS-102. D-2(단일 퍼블리셔)와 충돌하므로 구현 시 별도 ADR 필요 |
 | POST | `/api/v1/docking/dock` | Operator | DNC-003 (미지원 시 501). body: `{"dock": "dock_1"}` — 도크가 1개면 생략 가능 |
 | POST | `/api/v1/docking/undock` | Operator | DNC-003 |
 | POST | `/api/v1/docking/cancel` | Operator | DNC-003 |
@@ -216,6 +221,21 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 | POST | `/api/v1/docking/docks` | Admin | DNC-005 도크 개체 등록 |
 | DELETE | `/api/v1/docking/docks/{id}` | Admin | DNC-005 |
 | POST | `/api/v1/docking/docks/{id}/teach` | Operator | DNC-005 teach-by-docking |
+
+## 5.7 Host (Host Agent 릴레이)
+
+CORE 는 이 경로들을 처리하지 않고 unix 소켓으로 Host Agent 에 넘긴다(`docs/reference/rosy-host-agent-contract.md`). 에이전트가 없으면 503 과 사유를 돌려준다.
+파괴적 명령은 `{confirmed: true}` 와 `idempotency_key` 를 받는다.
+
+| Method | Path | Role | 요구사항 |
+|---|---|---|---|
+| GET | `/api/v1/host/network` | Viewer | NET-001 — 현재 모드와 도달성. SSID 는 싣되 PSK 는 절대 싣지 않는다 |
+| POST | `/api/v1/host/network/apply` | Admin | NET-001 (payload: `{profile_id, confirmed, idempotency_key?}`) — 등록된 NetworkManager 프로파일로 전환. PSK 는 호스트에 남고 CORE 에 들어오지 않는다 |
+| GET | `/api/v1/host/release` | Viewer | OPS — current/previous/staged 와 마지막 실패 사유 |
+| POST | `/api/v1/host/release/install` | Admin | OPS — 서명 검증된 릴리스 설치 |
+| POST | `/api/v1/host/release/rollback` | Admin | OPS — previous 로 복귀 |
+| POST | `/api/v1/host/release/clear-hold` | Admin | OPS — RECOVERY HOLD 해제 |
+| GET | `/api/v1/host/commissioning` | Viewer | HWA-001 — runtime mode 와 hardware 재승인 사유 |
 
 ---
 
@@ -357,7 +377,7 @@ Follower의 rosy_core은 스트림 수신 여부를 `stream_timeout_ms`(기본 1
 |---|---|---|---|
 | `system.boot` | info | 로봇 | `{version}` |
 | `system.shutdown` | warning | 로봇 | `{reason}` |
-| `config.changed` | warning | 로봇 | `{key}` |
+| `config.changed` | warning | 로봇 | `{key}` — `key`: `robot.identity` \| `auth.tokens` \| `safety.limits`. `auth.tokens` 는 `{id, role}` 또는 `{id, deleted}` 를 함께 싣는다. 토큰 원문도, 원문에서 유도된 값도 싣지 않는다 |
 | `mode.changed` | info | 로봇 | `{from, to, source}` |
 | `nav.started` | info | 로봇 | `{goal\|waypoint}` |
 | `nav.completed` | info | 로봇 | `{goal\|waypoint, duration_ms}` |
@@ -518,6 +538,7 @@ Fleet(rosy_fleet)이 제공하는 엔드포인트. Base: `http://<fleet-host>:80
 
 | 버전 | 일자 | 내용 |
 |---|---|---|
+| v1.5 | 2026-09-06 | Additive: 현장 설정 — `PUT system/info`, `system/tokens/*`, `system/runtime`, `host/*` 릴레이 카탈로그(§5.7) 신설. `safety/limits` 에 `fleet_loss_policy`·배터리 임계값 추가(SAF-004/005). 미구현 상태였던 `diagnostics/*`·`ros/*`·`swarm/*` 행에 표시. 토큰은 해시 저장이며 목록은 불투명 `id` 로 식별한다(D-30) |
 | v1.4 | 2026-09-01 | Additive: 절전/근접 웨이크 — `power/*` REST, 스냅샷 `power` 필드, 이벤트 `power.*`·`presence.*`, 센서 `ultrasonic` (PWR-001~004, D-24) |
 | v1.3 | 2026-08-29 | Additive: 이벤트 `slam.started`/`slam.stopped` (NAV-005 세션 API 구현에 수반) |
 | v1.2 | 2026-08-29 | Additive: `swarm/follow`에 `source` 필드(fleet 기본, peer 예약 — D-21 분산 진화 훅), SWM-007 |

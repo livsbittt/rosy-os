@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from urllib.parse import urlparse
 from pathlib import Path
 
 import pytest
@@ -121,7 +122,6 @@ def _launch_page(playwright):
     page = browser.new_page(viewport={"width": 390, "height": 844})
     page.set_default_timeout(5_000)
     html = (WEB / "index.html").read_text(encoding="utf-8")
-    script = (WEB / "app.js").read_text(encoding="utf-8")
     page.route(
         "http://rosy.test/dashboard",
         lambda route: route.fulfill(status=200, content_type="text/html", body=html),
@@ -130,18 +130,26 @@ def _launch_page(playwright):
         "http://rosy.test/dashboard/assets/styles.css",
         lambda route: route.fulfill(status=200, content_type="text/css", body=""),
     )
-    page.route(
-        "http://rosy.test/dashboard/assets/app.js",
-        lambda route: route.fulfill(
-            status=200, content_type="application/javascript", body=script
-        ),
-    )
-    page.route(
-        "http://rosy.test/dashboard/assets/map.js",
-        lambda route: route.fulfill(
-            status=200, content_type="application/javascript", body=MAP_STUB
-        ),
-    )
+
+    def _serve_module(route):
+        """Serve every real ES module from the tree; only map.js is stubbed.
+
+        Listing files here meant a new module 404'd silently and the page died
+        before the first assertion, with the failure pointing at the assertion
+        rather than the missing import.
+        """
+        name = Path(urlparse(route.request.url).path).name
+        if name == "map.js":
+            body = MAP_STUB
+        else:
+            source = WEB / name
+            if not source.is_file():
+                route.fulfill(status=404, body="")
+                return
+            body = source.read_text(encoding="utf-8")
+        route.fulfill(status=200, content_type="application/javascript", body=body)
+
+    page.route("http://rosy.test/dashboard/assets/*.js", _serve_module)
     page.add_init_script(script=FETCH_INIT)
     page.on("dialog", lambda dialog: dialog.accept())
     return browser, page
@@ -203,23 +211,21 @@ def test_field_settings_save_limits_waypoint_and_dock_without_navigation():
         page.locator("#waypoint-name").fill("zone_a")
         page.locator("#waypoint-save").click()
         page.wait_for_function(
-            "window.__apiCalls.some((c) => c.method === 'POST' && c.path === '/api/v1/waypoints')"
+            "document.getElementById('waypoint-message')?.textContent?.includes('zone_a')"
         )
 
         page.locator("#limit-manual-linear").fill("0.11")
         page.locator("#limit-manual-angular").fill("0.41")
         page.locator("#limits-save").click()
         page.wait_for_function(
-            "window.__apiCalls.some((c) => c.method === 'PUT' && c.path === '/api/v1/safety/limits')"
+            "document.getElementById('limits-message')?.textContent?.includes('rosy.yaml')"
         )
-        assert "rosy.yaml" in page.locator("#limits-message").inner_text()
 
         page.locator("#dock-id").fill("dock_1")
         page.locator("#dock-register").click()
         page.wait_for_function(
-            "window.__apiCalls.some((c) => c.method === 'POST' && c.path === '/api/v1/docking/docks')"
+            "document.getElementById('dock-message')?.textContent?.includes('등록')"
         )
-        assert "등록" in page.locator("#dock-message").inner_text()
         assert page.url.startswith("http://rosy.test/dashboard")
 
         calls = page.evaluate("window.__apiCalls")

@@ -1,113 +1,32 @@
 import { createFieldMap } from "./map.js";
-
-const elements = Object.fromEntries(
-  [...document.querySelectorAll("[id]")].map((element) => [element.id, element]),
-);
-
-const session = {
-  token: sessionStorage.getItem("rosy.dashboard.token") || "",
-  socket: null,
-  fallbackTimer: null,
-  refreshTimer: null,
-  capabilities: null,
-  robotState: null,
-  waypoints: [],
-  docks: [],
-  dockingSupported: false,
-  role: "",
-  modeChangePending: false,
-  teleopTimer: null,
-  teleopActive: false,
-  teleopPending: null,
-  teleopIntervalMs: 100,
-  networkHistory: { rx: [], tx: [] },
-};
-
-const authHeaders = () => ({
-  "Content-Type": "application/json",
-  Authorization: `Bearer ${session.token}`,
-});
-
-function setText(id, value, fallback = "—") {
-  if (elements[id]) elements[id].textContent = value ?? fallback;
-}
-
-function number(value, digits = 1) {
-  return Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : "—";
-}
-
-function percent(value) {
-  return Number.isFinite(Number(value)) ? `${Math.round(Number(value))}%` : "—";
-}
-
-function bytes(value) {
-  if (!Number.isFinite(Number(value))) return "—";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let amount = Number(value);
-  let unit = 0;
-  while (amount >= 1024 && unit < units.length - 1) {
-    amount /= 1024;
-    unit += 1;
-  }
-  return `${amount.toFixed(unit > 2 ? 1 : 0)} ${units[unit]}`;
-}
-
-function duration(value) {
-  if (!Number.isFinite(Number(value))) return "—";
-  const total = Math.floor(Number(value));
-  const days = Math.floor(total / 86400);
-  const hours = Math.floor((total % 86400) / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  return `${days}일 ${hours}시간 ${minutes}분`;
-}
-
-function setMeter(id, value) {
-  const safe = Number.isFinite(Number(value)) ? Math.max(0, Math.min(100, Number(value))) : 0;
-  elements[id]?.style.setProperty("--meter", `${safe}%`);
-}
-
-function setConnection(kind, label) {
-  const badge = elements["connection-badge"];
-  badge.className = `status-badge status-${kind}`;
-  badge.querySelector("span").textContent = label;
-}
-
-async function api(path, options = {}) {
-  if (!session.token) throw new Error("접속 키가 필요합니다.");
-  const response = await fetch(path, {
-    ...options,
-    headers: { ...authHeaders(), ...(options.headers || {}) },
-  });
-  if (!response.ok) {
-    let message = `${response.status} ${response.statusText}`;
-    try {
-      const body = await response.json();
-      message = body.error?.message || body.detail || message;
-    } catch (_error) {
-      // The HTTP status remains the safest fallback.
-    }
-    throw new Error(message);
-  }
-  if (response.status === 204) return null;
-  return response.json();
-}
-
-async function apiMaybe(path) {
-  if (!session.token) return null;
-  const response = await fetch(path, { headers: authHeaders() });
-  if (response.status === 404) return null;
-  if (!response.ok) {
-    let message = `${response.status} ${response.statusText}`;
-    try {
-      const body = await response.json();
-      message = body.error?.message || message;
-    } catch (_error) {
-      // Keep the status text.
-    }
-    throw new Error(message);
-  }
-  return response.json();
-}
+import {
+  bindFormSave,
+  bytes,
+  duration,
+  elements,
+  metricNumber,
+  number,
+  percent,
+  rate,
+  setEnabled,
+  setFieldMessage,
+  setMeter,
+  setText,
+  svgText,
+} from "./dom.js";
+import { api, apiMaybe, authHeaders, isAdmin, session, setConnection } from "./client.js";
+import {
+  fillIdentityForm,
+  fillSafetyForm,
+  initSettings,
+  refreshDocks,
+  refreshTokens,
+  refreshWaypoints,
+  renderDockingStatus,
+  renderDocks,
+  renderTokens,
+  renderWaypoints,
+} from "./settings.js";
 
 const fieldMap = createFieldMap({
   canvas: elements["map-canvas"],
@@ -126,8 +45,7 @@ function renderRobotInfo(info) {
   const name = info.robot_name || info.name || "Rosy";
   setText("robot-name", name);
   setText("robot-id", `${info.robot_id || "—"} / ${info.hardware_model || "unknown model"} / ${info.runtime_mode || "core"}`);
-  fillTextInput("robot-id-input", info.robot_id);
-  fillTextInput("robot-name-input", name);
+  fillIdentityForm(info.robot_id, name);
 }
 
 function renderRobotState(state) {
@@ -171,191 +89,11 @@ function renderSafety(safety) {
   elements["safety-indicator"].className = `hero-safety ${stopped ? "danger" : "safe"}`;
   setText("safety-label", stopped ? "STOPPED" : "READY");
   setText("safety-source", safety.source || (stopped ? "source unknown" : "주행 회로 정상"));
-  const limits = safety.limits || {};
-  setText("limit-max-linear", Number.isFinite(Number(limits.max_linear)) ? `${number(limits.max_linear, 2)} m/s` : "—");
-  setText("limit-max-angular", Number.isFinite(Number(limits.max_angular)) ? `${number(limits.max_angular, 2)} rad/s` : "—");
-  fillSelect("fleet-loss-policy", safety.fleet_loss_policy);
-  fillNumberInput("limit-manual-linear", limits.manual_linear);
-  fillNumberInput("limit-manual-angular", limits.manual_angular);
-  const battery = safety.battery || {};
-  fillNumberInput("battery-warning", battery.warning_percent);
-  fillNumberInput("battery-critical", battery.critical_percent);
-  fillNumberInput("battery-deep", battery.deep_percent);
-  fillSelect("battery-critical-policy", battery.critical_policy);
+  fillSafetyForm(safety);
+  updateTeleopControls();
   updateTeleopControls();
 }
 
-function fillNumberInput(id, value) {
-  const input = elements[id];
-  if (!input || document.activeElement === input) return;
-  input.value = Number.isFinite(Number(value)) ? Number(value).toFixed(2) : "";
-}
-
-function fillSelect(id, value) {
-  const input = elements[id];
-  if (!input || document.activeElement === input || value == null || value === "") return;
-  input.value = value;
-}
-
-function fillTextInput(id, value) {
-  const input = elements[id];
-  if (!input || document.activeElement === input) return;
-  input.value = value == null ? "" : String(value);
-}
-
-function renderTokens(payload) {
-  const list = elements["token-list"];
-  if (!list) return;
-  const tokens = payload.tokens || [];
-  list.replaceChildren();
-  if (!tokens.length) {
-    const empty = document.createElement("li");
-    empty.className = "empty-state";
-    empty.textContent = "저장된 토큰이 없습니다.";
-    list.append(empty);
-    return;
-  }
-  tokens.forEach((item) => {
-    const row = document.createElement("li");
-    row.dataset.fingerprint = item.fingerprint || "";
-    const title = document.createElement("strong");
-    title.textContent = item.role || "viewer";
-    const meta = document.createElement("span");
-    meta.textContent = item.hint || "••••";
-    const actions = document.createElement("div");
-    actions.className = "waypoint-actions";
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.dataset.tokenAction = "delete";
-    remove.textContent = "삭제";
-    actions.append(remove);
-    row.append(title, meta, actions);
-    list.append(row);
-  });
-}
-
-async function refreshTokens() {
-  if (!isAdmin()) return;
-  renderTokens(await api("/api/v1/system/tokens"));
-}
-
-function renderDockingStatus(payload) {
-  const supported = payload.supported === true;
-  session.dockingSupported = supported;
-  const chip = elements["dock-capability"];
-  if (chip) {
-    chip.dataset.mode = supported ? "AVAILABLE" : "HOLD";
-    chip.textContent = supported ? "AVAILABLE" : "HOLD";
-  }
-  const state = payload.state || "UNDOCKED";
-  const dockId = payload.dock_id || "없음";
-  const phase = payload.phase ? ` · ${payload.phase}` : "";
-  const error = payload.error ? ` · ${payload.error}` : "";
-  const hold = supported
-    ? ""
-    : "이 프로필은 도킹 명령을 지원하지 않습니다. 등록과 teach만 저장됩니다. ";
-  setText(
-    "dock-status-note",
-    `${hold}상태 ${state} · 도크 ${dockId}${phase}${error}`,
-  );
-  setEnabled("dock-undock", supported);
-  setEnabled("dock-cancel", supported);
-}
-
-function renderDocks(payload) {
-  const list = elements["dock-list"];
-  if (!list) return;
-  const docks = payload.docks || [];
-  session.docks = docks;
-  list.replaceChildren();
-  if (!docks.length) {
-    const empty = document.createElement("li");
-    empty.className = "empty-state";
-    empty.textContent = "등록된 도크가 없습니다.";
-    list.append(empty);
-    return;
-  }
-  docks.forEach((dock) => {
-    const row = document.createElement("li");
-    row.dataset.id = dock.id || "";
-    const title = document.createElement("strong");
-    title.textContent = dock.id || "(id 없음)";
-    const meta = document.createElement("span");
-    meta.textContent = `${dock.type || "?"} · ${number(dock.x, 2)}, ${number(dock.y, 2)}`;
-    const actions = document.createElement("div");
-    actions.className = "waypoint-actions";
-    const teach = document.createElement("button");
-    teach.type = "button";
-    teach.dataset.dockAction = "teach";
-    teach.textContent = "현재 자리 teach";
-    const go = document.createElement("button");
-    go.type = "button";
-    go.dataset.dockAction = "dock";
-    go.textContent = "도킹";
-    go.disabled = !session.dockingSupported;
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.dataset.dockAction = "delete";
-    remove.textContent = "삭제";
-    remove.disabled = session.role !== "administrator";
-    actions.append(teach, go, remove);
-    row.append(title, meta, actions);
-    list.append(row);
-  });
-}
-
-async function refreshDocks() {
-  const [status, docks] = await Promise.all([
-    api("/api/v1/docking/status"),
-    api("/api/v1/docking/docks"),
-  ]);
-  renderDockingStatus(status);
-  renderDocks(docks);
-}
-
-function renderWaypoints(payload) {
-  const list = elements["waypoint-list"];
-  if (!list) return;
-  const waypoints = payload.waypoints || [];
-  session.waypoints = waypoints;
-  list.replaceChildren();
-  if (!waypoints.length) {
-    const empty = document.createElement("li");
-    empty.className = "empty-state";
-    empty.textContent = "저장된 웨이포인트가 없습니다.";
-    list.append(empty);
-    return;
-  }
-  waypoints.forEach((waypoint) => {
-    const row = document.createElement("li");
-    row.dataset.name = waypoint.name || "";
-    const title = document.createElement("strong");
-    title.textContent = waypoint.name || "(이름 없음)";
-    const meta = document.createElement("span");
-    meta.textContent = `${number(waypoint.x, 2)}, ${number(waypoint.y, 2)} · yaw ${number(waypoint.yaw, 2)}`;
-    const actions = document.createElement("div");
-    actions.className = "waypoint-actions";
-    const go = document.createElement("button");
-    go.type = "button";
-    go.dataset.waypointAction = waypoint.name === "__home__" ? "home" : "go";
-    go.textContent = waypoint.name === "__home__" ? "복귀" : "이동";
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.dataset.waypointAction = "delete";
-    remove.textContent = "삭제";
-    actions.append(go, remove);
-    row.append(title, meta, actions);
-    list.append(row);
-  });
-}
-
-function setFieldMessage(id, text) {
-  setText(id, text, "");
-}
-
-async function refreshWaypoints() {
-  renderWaypoints(await api("/api/v1/waypoints"));
-}
 
 function renderRuntime(runtime) {
   setText("host-name", runtime.hostname);
@@ -383,16 +121,6 @@ function renderRuntime(runtime) {
   renderRosNetwork(runtime);
 }
 
-function rate(value) {
-  const amount = metricNumber(value);
-  return amount === null ? "—" : `${bytes(amount)}/s`;
-}
-
-function metricNumber(value) {
-  if (value === null || value === undefined || value === "") return null;
-  const amount = Number(value);
-  return Number.isFinite(amount) ? amount : null;
-}
 
 function pushNetworkSample(series, value) {
   const amount = metricNumber(value);
@@ -419,14 +147,6 @@ function renderSparkline(id, values) {
   svg.append(line);
 }
 
-function svgText(label, x, y, className) {
-  const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-  text.setAttribute("x", x);
-  text.setAttribute("y", y);
-  text.setAttribute("class", className);
-  text.textContent = label;
-  return text;
-}
 
 function renderRosGraph(graph) {
   const svg = elements["ros-graph-map"];
@@ -830,19 +550,12 @@ function renderCommissioning(payload) {
   }
 }
 
-function setEnabled(id, enabled) {
-  const element = document.getElementById(id);
-  if (element) element.disabled = !enabled;
-}
 
 function setActionsEnabled(enabled) {
   setEnabled("release-rollback", enabled);
   setEnabled("release-clear-hold", enabled);
 }
 
-function isAdmin() {
-  return session.role === "administrator";
-}
 
 function updateAdminControls() {
   setEnabled("limits-save", isAdmin());
@@ -1018,296 +731,7 @@ elements["release-stop"].addEventListener("click", async () => {
   }
 });
 
-elements["waypoint-save"]?.addEventListener("click", async () => {
-  const name = elements["waypoint-name"]?.value.trim();
-  const pose = session.robotState?.pose;
-  if (!name) {
-    setFieldMessage("waypoint-message", "이름을 입력하세요.");
-    return;
-  }
-  if (!pose || !Number.isFinite(Number(pose.x)) || !Number.isFinite(Number(pose.y))) {
-    setFieldMessage("waypoint-message", "현재 자세를 아직 받지 못했습니다.");
-    return;
-  }
-  const body = {
-    name,
-    x: Number(pose.x),
-    y: Number(pose.y),
-    yaw: Number(pose.yaw) || 0,
-    map_id: session.robotState?.map_id || null,
-    metadata: {},
-  };
-  const exists = (session.waypoints || []).some((waypoint) => waypoint.name === name);
-  try {
-    if (exists) {
-      if (!window.confirm(`${name} 웨이포인트를 현재 위치로 덮어쓸까요?`)) return;
-      await api(`/api/v1/waypoints/${encodeURIComponent(name)}`, {
-        method: "PUT",
-        body: JSON.stringify(body),
-      });
-    } else {
-      await api("/api/v1/waypoints", { method: "POST", body: JSON.stringify(body) });
-    }
-    setFieldMessage("waypoint-message", `${name} 을(를) 저장했습니다.`);
-    await refreshWaypoints();
-  } catch (error) {
-    setFieldMessage("waypoint-message", `저장 실패: ${error.message}`);
-  }
-});
 
-elements["waypoint-list"]?.addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-waypoint-action]");
-  const row = event.target.closest("li[data-name]");
-  if (!button || !row) return;
-  const name = row.dataset.name;
-  const action = button.dataset.waypointAction;
-  try {
-    if (action === "delete") {
-      if (!window.confirm(`${name} 웨이포인트를 삭제할까요?`)) return;
-      await api(`/api/v1/waypoints/${encodeURIComponent(name)}`, { method: "DELETE" });
-      setFieldMessage("waypoint-message", `${name} 을(를) 삭제했습니다.`);
-      await refreshWaypoints();
-      return;
-    }
-    if (action === "home") {
-      if (!window.confirm("Home으로 복귀할까요? NAVIGATION 모드로 들어갑니다.")) return;
-      await api("/api/v1/navigation/home", { method: "POST" });
-      setFieldMessage("waypoint-message", "Home 복귀를 요청했습니다.");
-      await refreshRobotState();
-      return;
-    }
-    if (!window.confirm(`${name} 으로 이동할까요? NAVIGATION 모드로 들어갑니다.`)) return;
-    await api("/api/v1/navigation/goal", {
-      method: "POST",
-      body: JSON.stringify({ waypoint: name }),
-    });
-    setFieldMessage("waypoint-message", `${name} 목표를 전송했습니다.`);
-    await refreshRobotState();
-  } catch (error) {
-    setFieldMessage("waypoint-message", `웨이포인트 동작 실패: ${error.message}`);
-  }
-});
-
-elements["limits-save"]?.addEventListener("click", async () => {
-  const linear = Number(elements["limit-manual-linear"].value);
-  const angular = Number(elements["limit-manual-angular"].value);
-  const warning = Number(elements["battery-warning"].value);
-  const critical = Number(elements["battery-critical"].value);
-  const deep = Number(elements["battery-deep"].value);
-  if (!Number.isFinite(linear) || !Number.isFinite(angular) || linear < 0 || angular < 0) {
-    setFieldMessage("limits-message", "속도 한계는 0 이상 숫자여야 합니다.");
-    return;
-  }
-  if (![warning, critical, deep].every((value) => Number.isFinite(value) && value > 0 && value <= 100)) {
-    setFieldMessage("limits-message", "배터리 임계는 0보다 크고 100 이하여야 합니다.");
-    return;
-  }
-  if (!(deep < critical && critical < warning)) {
-    setFieldMessage("limits-message", "배터리 임계는 deep < critical < warning 이어야 합니다.");
-    return;
-  }
-  try {
-    const payload = await api("/api/v1/safety/limits", {
-      method: "PUT",
-      body: JSON.stringify({
-        manual_linear: linear,
-        manual_angular: angular,
-        fleet_loss_policy: elements["fleet-loss-policy"]?.value,
-        battery_warning_percent: warning,
-        battery_critical_percent: critical,
-        battery_deep_percent: deep,
-        battery_critical_policy: elements["battery-critical-policy"]?.value,
-      }),
-    });
-    renderSafety(payload);
-    setFieldMessage("limits-message", "안전 정책을 적용했고 ~/.rosy/rosy.yaml 에 남겼습니다.");
-  } catch (error) {
-    setFieldMessage("limits-message", `정책 적용 실패: ${error.message}`);
-  }
-});
-
-async function runSlam(path, body, successText) {
-  try {
-    const payload = await api(path, {
-      method: "POST",
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    setFieldMessage("slam-message", successText);
-    if (payload?.map_id) setText("map-id", `map ${payload.map_id}`);
-    await refreshRobotState();
-  } catch (error) {
-    setFieldMessage("slam-message", error.message);
-  }
-}
-
-elements["slam-start"]?.addEventListener("click", () => {
-  if (!window.confirm("맵핑 세션을 시작할까요? 세션 중에는 목표 주행이 거부됩니다.")) return;
-  runSlam("/api/v1/slam/start", null, "맵핑을 시작했습니다.");
-});
-elements["slam-stop"]?.addEventListener("click", () => {
-  runSlam("/api/v1/slam/stop", null, "맵핑을 중지했습니다.");
-});
-elements["slam-save"]?.addEventListener("click", () => {
-  const name = elements["slam-map-name"]?.value.trim() || "rosy_map";
-  if (!window.confirm(`${name} 이름으로 맵을 저장할까요?`)) return;
-  runSlam("/api/v1/slam/save", { name }, `${name} 맵을 저장했습니다.`);
-});
-
-elements["dock-register"]?.addEventListener("click", async () => {
-  const id = elements["dock-id"]?.value.trim();
-  const type = elements["dock-type"]?.value.trim() || "rosy_v1";
-  if (!id) {
-    setFieldMessage("dock-message", "도크 ID를 입력하세요.");
-    return;
-  }
-  try {
-    await api("/api/v1/docking/types", {
-      method: "POST",
-      body: JSON.stringify({ name: type, detector: "simulated" }),
-    });
-    await api("/api/v1/docking/docks", {
-      method: "POST",
-      body: JSON.stringify({
-        id,
-        type,
-        x: Number(session.robotState?.pose?.x) || 0,
-        y: Number(session.robotState?.pose?.y) || 0,
-        yaw: Number(session.robotState?.pose?.yaw) || 0,
-        map_id: session.robotState?.map_id || null,
-      }),
-    });
-    setFieldMessage("dock-message", `${id} 을(를) 등록했습니다. 맞물린 자리에서 teach 하세요.`);
-    await refreshDocks();
-  } catch (error) {
-    setFieldMessage("dock-message", `등록 실패: ${error.message}`);
-  }
-});
-
-elements["dock-list"]?.addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-dock-action]");
-  const row = event.target.closest("li[data-id]");
-  if (!button || !row) return;
-  const id = row.dataset.id;
-  const action = button.dataset.dockAction;
-  try {
-    if (action === "delete") {
-      if (!window.confirm(`${id} 도크를 삭제할까요?`)) return;
-      await api(`/api/v1/docking/docks/${encodeURIComponent(id)}`, { method: "DELETE" });
-      setFieldMessage("dock-message", `${id} 을(를) 삭제했습니다.`);
-      await refreshDocks();
-      return;
-    }
-    if (action === "teach") {
-      if (!window.confirm("지금 선 자리를 이 도크 포즈로 기록할까요?")) return;
-      await api(`/api/v1/docking/docks/${encodeURIComponent(id)}/teach`, { method: "POST" });
-      setFieldMessage("dock-message", `${id} 포즈를 현재 자리로 기록했습니다.`);
-      await refreshDocks();
-      return;
-    }
-    if (!window.confirm(`${id} 로 도킹을 시작할까요?`)) return;
-    await api("/api/v1/docking/dock", {
-      method: "POST",
-      body: JSON.stringify({ dock: id }),
-    });
-    setFieldMessage("dock-message", `${id} 도킹을 요청했습니다.`);
-    await refreshDocks();
-    await refreshRobotState();
-  } catch (error) {
-    setFieldMessage("dock-message", `도크 동작 실패: ${error.message}`);
-  }
-});
-
-elements["dock-undock"]?.addEventListener("click", async () => {
-  if (!window.confirm("언도크할까요?")) return;
-  try {
-    await api("/api/v1/docking/undock", { method: "POST" });
-    setFieldMessage("dock-message", "언도크를 요청했습니다.");
-    await refreshDocks();
-    await refreshRobotState();
-  } catch (error) {
-    setFieldMessage("dock-message", `언도크 실패: ${error.message}`);
-  }
-});
-
-elements["dock-cancel"]?.addEventListener("click", async () => {
-  try {
-    await api("/api/v1/docking/cancel", { method: "POST" });
-    setFieldMessage("dock-message", "도킹을 취소했습니다.");
-    await refreshDocks();
-    await refreshRobotState();
-  } catch (error) {
-    setFieldMessage("dock-message", `취소 실패: ${error.message}`);
-  }
-});
-
-function bindFormSave(formId, buttonId) {
-  elements[formId]?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    elements[buttonId]?.click();
-  });
-}
-
-bindFormSave("waypoint-form", "waypoint-save");
-bindFormSave("limits-form", "limits-save");
-bindFormSave("slam-save-form", "slam-save");
-bindFormSave("dock-form", "dock-register");
-bindFormSave("network-apply-form", "network-apply");
-bindFormSave("identity-form", "identity-save");
-bindFormSave("token-form", "token-add");
-
-elements["identity-save"]?.addEventListener("click", async () => {
-  const robotId = elements["robot-id-input"]?.value.trim();
-  const robotName = elements["robot-name-input"]?.value.trim();
-  if (!robotId || !robotName) {
-    setFieldMessage("identity-message", "로봇 ID와 이름을 모두 입력하세요.");
-    return;
-  }
-  try {
-    const info = await api("/api/v1/system/info", {
-      method: "PUT",
-      body: JSON.stringify({ robot_id: robotId, robot_name: robotName }),
-    });
-    renderRobotInfo(info);
-    setFieldMessage("identity-message", "신원을 저장했습니다. ROS namespace는 재시작 후 따라갑니다.");
-  } catch (error) {
-    setFieldMessage("identity-message", `신원 저장 실패: ${error.message}`);
-  }
-});
-
-elements["token-add"]?.addEventListener("click", async () => {
-  const token = elements["token-new"]?.value.trim();
-  const role = elements["token-role"]?.value || "viewer";
-  if (!token || token.length < 8) {
-    setFieldMessage("token-message", "토큰은 8자 이상이어야 합니다.");
-    return;
-  }
-  try {
-    const created = await api("/api/v1/system/tokens", {
-      method: "POST",
-      body: JSON.stringify({ token, role }),
-    });
-    if (elements["token-new"]) elements["token-new"].value = "";
-    setFieldMessage("token-message", `${created.role} 토큰 ${created.hint} 을(를) 추가했습니다.`);
-    await refreshTokens();
-  } catch (error) {
-    setFieldMessage("token-message", `토큰 추가 실패: ${error.message}`);
-  }
-});
-
-elements["token-list"]?.addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-token-action='delete']");
-  const row = event.target.closest("li[data-fingerprint]");
-  if (!button || !row) return;
-  const fingerprint = row.dataset.fingerprint;
-  if (!window.confirm("이 토큰을 삭제할까요? 전문은 다시 볼 수 없습니다.")) return;
-  try {
-    await api(`/api/v1/system/tokens/${encodeURIComponent(fingerprint)}`, { method: "DELETE" });
-    setFieldMessage("token-message", "토큰을 삭제했습니다.");
-    await refreshTokens();
-  } catch (error) {
-    setFieldMessage("token-message", `토큰 삭제 실패: ${error.message}`);
-  }
-});
 
 elements["network-apply"]?.addEventListener("click", async () => {
   const profileId = elements["network-profile-id"]?.value.trim();
@@ -1335,6 +759,13 @@ elements["network-apply"]?.addEventListener("click", async () => {
   } catch (error) {
     setText("network-note", `프로파일 적용 실패: ${error.message}`);
   }
+});
+
+bindFormSave("network-apply-form", "network-apply");
+
+initSettings({
+  onIdentityChanged: renderRobotInfo,
+  refreshRobotState: () => refreshRobotState(),
 });
 
 setInterval(() => setText("clock", new Date().toLocaleTimeString("ko-KR", { hour12: false })), 1000);

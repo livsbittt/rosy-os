@@ -5,14 +5,23 @@
 
 ## Purpose
 
-REST routers under `/api/v1/*` (API Ref §5). One module: `routes.py`.
+REST routers under `/api/v1/*` (API Ref §5). One module per domain; `routes.py` only collects them.
 
 ## Key Files
 
 | File | Description |
 |------|-------------|
 | `__init__.py` | Package marker |
-| `routes.py` | Routers: system, robot, control, safety, navigation, waypoints, events, logs, power, sensors, slam, docking, metrics, host |
+| `routes.py` | Aggregator: re-exports every router for `app.py`. No endpoints live here |
+| `common.py` | `viewer`/`operator`/`admin` role deps and `enter_navigation_mode` (D-2) |
+| `system.py` | IDN-003 identity, CAP-001 capabilities, SEC-101 tokens, host runtime |
+| `robot.py` | State/pose/battery/velocity, sensors, PWR-001 power modes |
+| `control.py` | `POST /mode`, `POST /teleop` |
+| `safety.py` | SAF-001 stop/release, SAF-004 limits, SAF-005 battery policy |
+| `navigation.py` | NAV-001~005 goals and SLAM, MAP-003 snapshots, WPT-002 waypoints |
+| `docking.py` | DNC-003/005 dock registry, teach, dock/undock |
+| `observability.py` | EVT-003 events, LOG-001 audit, OBS-101 `/metrics` |
+| `host.py` | Host Agent relay: network, release, commissioning |
 
 ## Subdirectories
 
@@ -27,6 +36,8 @@ None.
 - `POST /mode` allows IDLE|MANUAL|NAVIGATION only (not DOCKING/EMERGENCY via this body).
 - Host card endpoints proxy Host Agent; never fabricate telemetry (`host_agent_client`).
 - Docking and battery routes were extended on `feat/battery-integrity-low-battery-alert`.
+- A new endpoint goes in its domain module, never in `routes.py`. A new domain gets a module and one line in the aggregator.
+- Tests that patch a route helper must name the domain module (`rosy_core.api.v1.host._agent`); patching the aggregator re-export has no effect.
 
 ### Testing Requirements
 

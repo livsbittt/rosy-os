@@ -219,7 +219,7 @@ def test_an_action_defaults_to_unconfirmed(client):
     assert response.status_code == 200
     # The agent is absent here, so assert on what CORE sent rather than the
     # verdict: the point is that CORE did not fill in a confirmation.
-    from rosy_core.api.v1.routes import HostActionRequest
+    from rosy_core.api.v1.host import HostActionRequest
 
     assert HostActionRequest().confirmed is False
 
@@ -295,7 +295,7 @@ def test_a_card_does_not_echo_a_secret_the_agent_sent(client, monkeypatch):
     def fake_agent(_svc):
         return HostAgentClient(connect=lambda: FakeConnection(payload))
 
-    monkeypatch.setattr("rosy_core.api.v1.routes._agent", fake_agent)
+    monkeypatch.setattr("rosy_core.api.v1.host._agent", fake_agent)
 
     body = client.get("/api/v1/host/network", headers=_auth(VIEWER_TOKEN)).json()
 
@@ -308,7 +308,7 @@ def test_a_card_does_not_echo_a_secret_the_agent_sent(client, monkeypatch):
 def test_a_reachable_agent_marks_the_card_available(client, monkeypatch):
     payload = {"ok": True, "code": "OK", "data": {"current": "2026.09.05-002"}}
     monkeypatch.setattr(
-        "rosy_core.api.v1.routes._agent",
+        "rosy_core.api.v1.host._agent",
         lambda _svc: HostAgentClient(connect=lambda: FakeConnection(payload)),
     )
 
@@ -328,7 +328,7 @@ def test_a_refusal_reaches_the_card_with_its_recovery_action(client, monkeypatch
         "recovery": "release.clear_hold 로 홀드를 해제한 뒤 다시 설치하십시오.",
     }
     monkeypatch.setattr(
-        "rosy_core.api.v1.routes._agent",
+        "rosy_core.api.v1.host._agent",
         lambda _svc: HostAgentClient(connect=lambda: FakeConnection(payload)),
     )
 
@@ -355,9 +355,9 @@ def test_core_only_sends_commands_the_agent_implements():
     if agent_dir not in sys.path:
         sys.path.insert(0, agent_dir)
     from host_agent import ALLOWLIST
-    from rosy_core.api.v1 import routes
+    from rosy_core.api.v1 import host as host_routes
 
-    source = Path(routes.__file__).read_text(encoding="utf-8")
+    source = Path(host_routes.__file__).read_text(encoding="utf-8")
 
     sent = set(re.findall(r'request\(\s*"([a-z_]+\.[a-z_]+)"', source))
 
@@ -481,3 +481,30 @@ def test_rollback_is_offered_only_when_there_is_somewhere_to_go():
 
     assert "Boolean(data.previous)" in body, "rollback must require a previous release"
     assert "RECOVERY_HOLD" in body, "a held device offers clear-hold, not rollback"
+
+
+def test_core_never_sends_a_piece_of_the_caller_token_to_the_agent(client, monkeypatch):
+    """The actor id used to be the token's first 8 characters (D-30).
+
+    That put a third of a short secret into the host's audit log, where CORE has
+    no say over retention. The actor is now the opaque token id.
+    """
+    connection = FakeConnection({"ok": True, "code": "OK", "data": {}})
+
+    def fake_agent(_svc):
+        return HostAgentClient(connect=lambda: connection)
+
+    monkeypatch.setattr("rosy_core.api.v1.host._agent", fake_agent)
+
+    client.post(
+        "/api/v1/host/network/apply",
+        json={"profile_id": "rosy-site-sta", "confirmed": True},
+        headers=_auth(ADMIN_TOKEN),
+    )
+
+    sent = json.loads(connection.sent.decode("utf-8"))
+    user_id = sent["actor"]["user_id"]
+    assert ADMIN_TOKEN not in connection.sent.decode("utf-8")
+    for size in range(4, len(ADMIN_TOKEN) + 1):
+        assert ADMIN_TOKEN[:size] != user_id
+    assert sent["actor"]["role"] == "administrator"

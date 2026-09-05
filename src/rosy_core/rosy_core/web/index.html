@@ -335,13 +335,15 @@
             <h3 id="token-heading">API 토큰</h3>
             <span class="mode-chip" data-mode="ADMIN">ADMIN</span>
           </header>
-          <p class="host-note">전문은 저장 후 다시 보여주지 않습니다. 사용 중인 토큰과 마지막 관리자 토큰은 삭제할 수 없습니다.</p>
+          <p class="host-note">토큰은 해시로만 저장됩니다. 전문은 만들 때 한 번 보여주고 다시 볼 수 없습니다. 사용 중인 토큰과 마지막 관리자 토큰은 삭제할 수 없습니다.</p>
           <ul id="token-list" class="waypoint-list">
             <li class="empty-state">관리자로 연결하면 토큰 목록을 표시합니다.</li>
           </ul>
           <form id="token-form">
-            <label for="token-new">새 토큰</label>
-            <input id="token-new" name="token" type="password" minlength="8" maxlength="128" autocomplete="off">
+            <label for="token-new">새 토큰 (비우면 자동 생성)</label>
+            <input id="token-new" name="token" type="password" minlength="16" maxlength="128" autocomplete="off">
+            <label for="token-label">이름표</label>
+            <input id="token-label" name="label" maxlength="64" placeholder="bay 7 태블릿" autocomplete="off">
             <label for="token-role">역할</label>
             <select id="token-role" name="role">
               <option value="viewer">viewer</option>

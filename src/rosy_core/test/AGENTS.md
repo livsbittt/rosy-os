@@ -25,6 +25,8 @@ pytest for rosy_core policy, API, dashboard, and protocol. Most tests import Pyt
 | `test_runtime_config.py` | YAML merge / ROSY_CONFIG |
 | `test_fleet_agent.py` | FleetAgent stays disconnected |
 | `test_audit.py` | LOG-001 file audit retention |
+| `test_initial_pose.py` | AMCL covariance, occupancy map id |
+| `test_bridge_translate.py` | ROS message → domain dict conversion, with duck-typed messages |
 
 ## Subdirectories
 
@@ -36,6 +38,7 @@ None (ignore `__pycache__/`).
 
 - Inject clocks. Power, battery, and docking tests advance time explicitly.
 - Do not import `ros_bridge` at module top in these tests (optional ROS deps).
+- Asserting that a source file contains a string proves only the wiring. Where a value matters, put the computation in a ROS-free module (`bridge/translate.py`, `navigation/initial_pose.py`) and assert the value.
 - When adding an API field, assert it here **and** in `protocol/schemas.py`.
 
 ### Testing Requirements
