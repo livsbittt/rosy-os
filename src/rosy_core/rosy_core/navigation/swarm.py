@@ -70,7 +70,7 @@ class SwarmManager:
                  clock=time.monotonic) -> None:
         self._events = events
         self._state = state_manager
-        self._nav = nav
+        self.nav = nav
         self._safety = safety
         self._capability = capability
         self._clock = clock
@@ -184,7 +184,7 @@ class SwarmManager:
             self._holding = False
 
         if was_active:
-            self._nav.cancel(source="swarm")
+            self.nav.cancel(source="swarm")
             self._state.set_swarm(SwarmStatus())
             self._events.publish("swarm.aborted", source="swarm_manager",
                                  data={"reason": "canceled", "by": source})
@@ -212,7 +212,7 @@ class SwarmManager:
 
         if resumed:
             self._state.set_swarm(self.status())
-        self._nav.moving_goal(spec, source="swarm")
+        self.nav.moving_goal(spec, source="swarm")
         return True
 
     def tick(self, now: Optional[float] = None) -> None:
@@ -242,10 +242,10 @@ class SwarmManager:
         if hold:
             # 자리를 지킨다: 목표만 거두고 follow 는 살려 둔다. 스트림이 돌아오면
             # 새 follow 명령 없이 이어서 따라간다.
-            self._nav.cancel(source="swarm")
+            self.nav.cancel(source="swarm")
             self._state.set_swarm(self.status())
             self._events.publish("swarm.hold", severity="warning", source="swarm_manager",
                                  data={"reason": "reference stream lost",
                                        "stream_timeout_ms": timeout_ms})
         elif spec is not None:
-            self._nav.moving_goal(spec, source="swarm")
+            self.nav.moving_goal(spec, source="swarm")

@@ -109,6 +109,7 @@ class RosBridge:
         self._diag_timer = node.create_timer(1.0, self._tick_diagnostics)
         self._power_timer = node.create_timer(1.0 / 5.0, self._tick_power)
         self._dock_timer = node.create_timer(1.0 / 5.0, self._tick_docking)
+        self._swarm_timer = node.create_timer(1.0 / 5.0, self._tick_swarm)
 
         self._goal_handle = None
         self._last_odom_ts = 0.0
@@ -435,6 +436,14 @@ class RosBridge:
             return 0.0
         return math.hypot(self._last_odom_xy[0] - self._dock_odom_mark[0],
                           self._last_odom_xy[1] - self._dock_odom_mark[1])
+
+    def _tick_swarm(self) -> None:
+        """SWM-004 는 마감시각으로 판정한다 — 스트림이 끊기면 아무 프레임도
+        오지 않으므로 소켓 쪽에서는 알아챌 수 없다."""
+        try:
+            self._svc.swarm.tick()
+        except Exception as exc:  # 추종 실패가 브리지 루프를 멈추면 안 된다
+            self._node.get_logger().warning(f"swarm tick failed: {exc}")
 
     def _tick_docking(self) -> None:
         docking = self._svc.docking
