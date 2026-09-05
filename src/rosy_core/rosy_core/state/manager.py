@@ -41,6 +41,10 @@ class StateManager:
         self._errors: list[str] = []
         self._sensors: dict[str, dict] = {}
 
+    def set_robot_id(self, robot_id: str) -> None:
+        with self._lock:
+            self._robot_id = robot_id
+
     def set_mode(self, mode: RobotMode) -> None:
         with self._lock:
             self._mode = mode

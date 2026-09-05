@@ -19,6 +19,16 @@ LOCAL_CONFIG_PATH = Path.home() / ".rosy" / "rosy.yaml"
 RUNTIME_MODES = frozenset({"core", "motor", "hardware"})
 
 
+class ConfigError(Exception):
+    """Local overlay could not be written."""
+
+
+def overlay_path() -> Path:
+    """Where dashboard/API writes persist: ROSY_CONFIG if set, else ~/.rosy/rosy.yaml."""
+    env = os.environ.get("ROSY_CONFIG", "").strip()
+    return Path(env) if env else LOCAL_CONFIG_PATH
+
+
 def _deep_merge(base: dict, override: dict) -> dict:
     merged = dict(base)
     for key, value in override.items():
@@ -70,3 +80,36 @@ def load_config(explicit_path: Optional[str] = None) -> dict[str, Any]:
         config.setdefault("runtime", {}).setdefault("mode", "core")
 
     return config
+
+
+def patch_local_config(patch: dict[str, Any], path: Optional[Path] = None) -> Path:
+    """Deep-merge `patch` into the local overlay file. Never writes package defaults.
+
+    Only the overlay is updated, so unrelated keys (auth tokens, robot id) stay
+    as they were. Used by runtime settings such as SAF-004 manual speed limits.
+    """
+    target = Path(path) if path is not None else overlay_path()
+    default = _find_default_config()
+    if target.resolve() == default.resolve():
+        raise ConfigError("refusing to write package default config")
+
+    existing: dict[str, Any] = {}
+    if target.exists():
+        loaded = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
+        if not isinstance(loaded, dict):
+            raise ConfigError("local overlay is not a mapping")
+        existing = loaded
+
+    merged = _deep_merge(existing, patch)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_name(target.name + ".tmp")
+    try:
+        tmp.write_text(
+            yaml.safe_dump(merged, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+        os.replace(tmp, target)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+    return target

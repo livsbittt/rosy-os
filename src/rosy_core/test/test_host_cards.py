@@ -192,10 +192,15 @@ def test_a_card_requires_authentication(client, path):
 
 @pytest.mark.parametrize(
     "path",
-    ["/api/v1/host/release/install", "/api/v1/host/release/rollback", "/api/v1/host/release/clear-hold"],
+    [
+        "/api/v1/host/release/install",
+        "/api/v1/host/release/rollback",
+        "/api/v1/host/release/clear-hold",
+        "/api/v1/host/network/apply",
+    ],
 )
 def test_an_action_requires_administrator(client, path):
-    body = {"confirmed": True, "release_id": "2026.09.05-002"}
+    body = {"confirmed": True, "release_id": "2026.09.05-002", "profile_id": "rosy-site-sta"}
 
     assert client.post(path, json=body, headers=_auth(VIEWER_TOKEN)).status_code == 403
     # An administrator gets through the role gate and is stopped by the absent

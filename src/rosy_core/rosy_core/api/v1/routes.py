@@ -2,11 +2,24 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field
+import math
 
-from rosy_core.api.deps import AuthContext, get_services, require_role
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field, field_validator
+
+from rosy_core.api.deps import (
+    AuthContext,
+    ROLE_RANK,
+    auth_entries,
+    get_services,
+    public_token_records,
+    require_role,
+    token_fingerprint,
+    token_hint,
+)
+from rosy_core.identity import validate_robot_id, validate_robot_name
 from rosy_core.api.errors import ApiError
+from rosy_core.config import ConfigError, patch_local_config
 from rosy_core.maps import valid_costmap_scope
 from rosy_core.command.arbitration import Mode
 from rosy_core.protocol.schemas import PowerMode, RobotMode
@@ -25,6 +38,95 @@ system_router = APIRouter(prefix="/api/v1/system", tags=["system"])
 @system_router.get("/info")
 def system_info(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
     return svc.identity.info()
+
+
+class IdentityRequest(BaseModel):
+    robot_id: str | None = None
+    robot_name: str | None = None
+
+
+@system_router.put("/info")
+def update_system_info(body: IdentityRequest, _: AuthContext = Depends(admin),
+                       svc: CoreServices = Depends(get_services)):
+    patch_robot: dict[str, str] = {}
+    try:
+        if body.robot_id is not None:
+            patch_robot["id"] = validate_robot_id(body.robot_id)
+        if body.robot_name is not None:
+            patch_robot["name"] = validate_robot_name(body.robot_name)
+    except ValueError as exc:
+        raise ApiError("VALIDATION_ERROR", 400, str(exc))
+    if not patch_robot:
+        return svc.identity.info()
+    try:
+        patch_local_config({"robot": patch_robot})
+    except (ConfigError, OSError) as exc:
+        raise ApiError("INTERNAL_ERROR", 500, f"failed to persist robot identity: {exc}")
+    if "id" in patch_robot:
+        svc.identity.robot_id = patch_robot["id"]
+        svc.state.set_robot_id(patch_robot["id"])
+        svc.events.set_robot_id(patch_robot["id"])
+        svc.config.setdefault("robot", {})["id"] = patch_robot["id"]
+    if "name" in patch_robot:
+        svc.identity.robot_name = patch_robot["name"]
+        svc.config.setdefault("robot", {})["name"] = patch_robot["name"]
+    svc.events.publish("config.changed", source="api", data={"key": "robot.identity"})
+    return svc.identity.info()
+
+
+@system_router.get("/tokens")
+def list_tokens(_: AuthContext = Depends(admin), svc: CoreServices = Depends(get_services)):
+    return {"tokens": public_token_records(svc.config)}
+
+
+class TokenRequest(BaseModel):
+    token: str = Field(min_length=8, max_length=128)
+    role: str
+
+
+@system_router.post("/tokens", status_code=201)
+def add_token(body: TokenRequest, _: AuthContext = Depends(admin),
+              svc: CoreServices = Depends(get_services)):
+    role = body.role.strip()
+    if role not in ROLE_RANK:
+        raise ApiError("VALIDATION_ERROR", 400, "role must be viewer, operator or administrator")
+    token = body.token.strip()
+    entries = auth_entries(svc.config)
+    if any(item["token"] == token for item in entries):
+        raise ApiError("VALIDATION_ERROR", 409, "token already exists")
+    entries.append({"token": token, "role": role})
+    try:
+        patch_local_config({"auth": {"tokens": entries}})
+    except (ConfigError, OSError) as exc:
+        raise ApiError("INTERNAL_ERROR", 500, f"failed to persist tokens: {exc}")
+    svc.config.setdefault("auth", {})["tokens"] = entries
+    svc.events.publish(
+        "config.changed", source="api",
+        data={"key": "auth.tokens", "fingerprint": token_fingerprint(token), "role": role},
+    )
+    return {"fingerprint": token_fingerprint(token), "role": role, "hint": token_hint(token)}
+
+
+@system_router.delete("/tokens/{fingerprint}", status_code=204)
+def delete_token(fingerprint: str, auth: AuthContext = Depends(admin),
+                 svc: CoreServices = Depends(get_services)):
+    if token_fingerprint(auth.token) == fingerprint:
+        raise ApiError("VALIDATION_ERROR", 400, "cannot delete the token in use")
+    entries = auth_entries(svc.config)
+    remaining = [item for item in entries if token_fingerprint(item["token"]) != fingerprint]
+    if len(remaining) == len(entries):
+        raise ApiError("NOT_FOUND", 404, "token fingerprint not found")
+    if not any(item["role"] == "administrator" for item in remaining):
+        raise ApiError("VALIDATION_ERROR", 409, "cannot delete the last administrator token")
+    try:
+        patch_local_config({"auth": {"tokens": remaining}})
+    except (ConfigError, OSError) as exc:
+        raise ApiError("INTERNAL_ERROR", 500, f"failed to persist tokens: {exc}")
+    svc.config.setdefault("auth", {})["tokens"] = remaining
+    svc.events.publish(
+        "config.changed", source="api",
+        data={"key": "auth.tokens", "fingerprint": fingerprint, "deleted": True},
+    )
 
 
 @system_router.get("/capabilities")
@@ -125,30 +227,124 @@ def safety_release(auth: AuthContext = Depends(admin), svc: CoreServices = Depen
     return {"estop": False}
 
 
+_FLEET_LOSS_POLICIES = {"STOP", "HOLD", "RETURN_HOME", "CONTINUE"}
+_CRITICAL_POLICIES = {"RETURN_HOME", "STOP"}
+
+
+def _safety_payload(svc: CoreServices) -> dict:
+    battery = svc.safety.battery_policy
+    deep = getattr(getattr(svc.battery, "_cfg", None), "deep_percent", 5.0)
+    return {
+        "estop": svc.safety.estop,
+        "source": svc.safety.estop_source,
+        "fleet_loss_policy": svc.safety.fleet_loss_policy,
+        "limits": {
+            "max_linear": svc.safety.limits.max_linear,
+            "max_angular": svc.safety.limits.max_angular,
+            "manual_linear": svc.safety.limits.manual_linear,
+            "manual_angular": svc.safety.limits.manual_angular,
+        },
+        "battery": {
+            "warning_percent": battery.warning_percent,
+            "critical_percent": battery.critical_percent,
+            "deep_percent": deep,
+            "critical_policy": battery.critical_action,
+        },
+    }
+
+
 @safety_router.get("/state")
 def safety_state(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
-    return {"estop": svc.safety.estop, "source": svc.safety.estop_source,
-            "fleet_loss_policy": svc.safety.fleet_loss_policy,
-            "limits": {"max_linear": svc.safety.limits.max_linear,
-                       "max_angular": svc.safety.limits.max_angular,
-                       "manual_linear": svc.safety.limits.manual_linear,
-                       "manual_angular": svc.safety.limits.manual_angular}}
+    return _safety_payload(svc)
 
 
 class LimitsRequest(BaseModel):
-    manual_linear: float | None = None
-    manual_angular: float | None = None
+    manual_linear: float | None = Field(default=None, ge=0)
+    manual_angular: float | None = Field(default=None, ge=0)
+    fleet_loss_policy: str | None = None
+    battery_warning_percent: float | None = Field(default=None, gt=0, le=100)
+    battery_critical_percent: float | None = Field(default=None, gt=0, le=100)
+    battery_deep_percent: float | None = Field(default=None, gt=0, le=100)
+    battery_critical_policy: str | None = None
+
+    @field_validator(
+        "manual_linear", "manual_angular",
+        "battery_warning_percent", "battery_critical_percent", "battery_deep_percent",
+    )
+    @classmethod
+    def _finite(cls, value: float | None) -> float | None:
+        if value is not None and not math.isfinite(value):
+            raise ValueError("must be a finite number")
+        return value
+
+
+def _apply_safety_patch(svc: CoreServices, patch: dict) -> None:
+    if "manual_linear" in patch:
+        svc.safety.limits.manual_linear = patch["manual_linear"]
+    if "manual_angular" in patch:
+        svc.safety.limits.manual_angular = patch["manual_angular"]
+    if "fleet_loss_policy" in patch:
+        svc.safety.fleet_loss_policy = patch["fleet_loss_policy"]
+    if "battery_warning_percent" in patch:
+        svc.safety.battery_policy.warning_percent = patch["battery_warning_percent"]
+    if "battery_critical_percent" in patch:
+        svc.safety.battery_policy.critical_percent = patch["battery_critical_percent"]
+    if "battery_critical_policy" in patch:
+        svc.safety.battery_policy.critical_action = patch["battery_critical_policy"]
+    if any(key.startswith("battery_") and key.endswith("_percent") for key in patch):
+        svc.battery.apply_thresholds(
+            warning_percent=patch.get("battery_warning_percent"),
+            critical_percent=patch.get("battery_critical_percent"),
+            deep_percent=patch.get("battery_deep_percent"),
+        )
 
 
 @safety_router.put("/limits")
 def safety_limits(body: LimitsRequest, auth: AuthContext = Depends(admin),
                   svc: CoreServices = Depends(get_services)):
+    patch_safety: dict = {}
     if body.manual_linear is not None:
-        svc.safety.limits.manual_linear = min(body.manual_linear, svc.safety.limits.max_linear)
+        patch_safety["manual_linear"] = min(body.manual_linear, svc.safety.limits.max_linear)
     if body.manual_angular is not None:
-        svc.safety.limits.manual_angular = min(body.manual_angular, svc.safety.limits.max_angular)
+        patch_safety["manual_angular"] = min(body.manual_angular, svc.safety.limits.max_angular)
+    if body.fleet_loss_policy is not None:
+        policy = body.fleet_loss_policy
+        if policy == "CONTINUE_CURRENT_NAVIGATION":
+            policy = "CONTINUE"
+        if policy not in _FLEET_LOSS_POLICIES:
+            raise ApiError("VALIDATION_ERROR", 400, "unknown fleet_loss_policy")
+        patch_safety["fleet_loss_policy"] = policy
+    if body.battery_critical_policy is not None:
+        if body.battery_critical_policy not in _CRITICAL_POLICIES:
+            raise ApiError("VALIDATION_ERROR", 400, "unknown battery_critical_policy")
+        patch_safety["battery_critical_policy"] = body.battery_critical_policy
+    if body.battery_warning_percent is not None:
+        patch_safety["battery_warning_percent"] = body.battery_warning_percent
+    if body.battery_critical_percent is not None:
+        patch_safety["battery_critical_percent"] = body.battery_critical_percent
+    if body.battery_deep_percent is not None:
+        patch_safety["battery_deep_percent"] = body.battery_deep_percent
+    warning = patch_safety.get(
+        "battery_warning_percent", svc.safety.battery_policy.warning_percent)
+    critical = patch_safety.get(
+        "battery_critical_percent", svc.safety.battery_policy.critical_percent)
+    deep = patch_safety.get(
+        "battery_deep_percent", getattr(getattr(svc.battery, "_cfg", None), "deep_percent", 5.0))
+    if not (0 < float(deep) < float(critical) < float(warning) <= 100):
+        raise ApiError(
+            "VALIDATION_ERROR", 400,
+            "battery thresholds must satisfy 0 < deep < critical < warning <= 100",
+        )
+    if not patch_safety:
+        return _safety_payload(svc)
+    try:
+        patch_local_config({"safety": patch_safety})
+    except (ConfigError, OSError) as exc:
+        raise ApiError("INTERNAL_ERROR", 500, f"failed to persist safety.limits: {exc}")
+    _apply_safety_patch(svc, patch_safety)
+    svc.config.setdefault("safety", {}).update(patch_safety)
     svc.events.publish("config.changed", source="api", data={"key": "safety.limits"})
-    return safety_state(svc)
+    return _safety_payload(svc)
 
 
 def _enter_navigation_mode(svc: CoreServices, auth: AuthContext) -> None:
@@ -611,6 +807,30 @@ def host_network(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(g
     """현재 네트워크 모드와 도달성. SSID 는 표시하되 secret 은 절대 싣지 않는다."""
     reply = _agent(svc).request("network.status", role="viewer")
     return _relay(reply, absent_detail="Host Agent 에 연결할 수 없어 네트워크 상태를 알 수 없습니다.")
+
+
+class NetworkApplyRequest(BaseModel):
+    profile_id: str = Field(min_length=1, max_length=64)
+    confirmed: bool = False
+    idempotency_key: str | None = None
+
+
+@host_router.post("/network/apply")
+def host_network_apply(
+    body: NetworkApplyRequest,
+    auth: AuthContext = Depends(admin),
+    svc: CoreServices = Depends(get_services),
+):
+    """Switch to a registered NetworkManager profile. PSK never enters CORE."""
+    reply = _agent(svc).request(
+        "network.apply_profile",
+        role="administrator",
+        user_id=auth.token[:8],
+        confirmed=body.confirmed,
+        params={"profile_id": body.profile_id},
+        idempotency_key=body.idempotency_key,
+    )
+    return _relay(reply, absent_detail="Host Agent 에 연결할 수 없어 네트워크 프로파일을 바꾸지 못했습니다.")
 
 
 @host_router.get("/release")

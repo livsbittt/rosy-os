@@ -21,6 +21,10 @@ class EventBus:
         self._buffer: deque[EventMessage] = deque(maxlen=buffer_size)
         self._subscribers: list[Callable[[EventMessage], None]] = []
 
+    def set_robot_id(self, robot_id: str) -> None:
+        with self._lock:
+            self._robot_id = robot_id
+
     @property
     def last_seq(self) -> int:
         with self._lock:

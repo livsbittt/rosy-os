@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 import threading
 from dataclasses import dataclass
@@ -80,6 +82,23 @@ class GridFrame:
 
     def sample_other(self, other: "GridFrame", x: float, y: float) -> Optional[int]:
         return other.sample_world(x, y)
+
+
+def occupancy_map_id(grid: dict[str, Any]) -> str:
+    """Stable id for an occupancy grid so MAP-001 can name an unsaved map."""
+    payload = json.dumps(
+        {
+            "width": grid.get("width"),
+            "height": grid.get("height"),
+            "resolution": grid.get("resolution"),
+            "origin": grid.get("origin") or {},
+            "data": list(grid.get("data") or ()),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12]
+    return f"occupancy:{digest}"
 
 
 def valid_costmap_scope(scope: str) -> bool:

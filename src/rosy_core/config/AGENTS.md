@@ -34,7 +34,7 @@ None.
 
 ### Common Patterns
 
-Deep-merge; missing keys keep dataclass defaults.
+Deep-merge; missing keys keep dataclass defaults. Runtime settings (SAF-004 limits) write only the overlay via `patch_local_config` — never `rosy_default.yaml`.
 
 ## Dependencies
 
