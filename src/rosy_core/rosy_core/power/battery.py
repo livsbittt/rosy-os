@@ -233,6 +233,21 @@ class BatteryMonitor:
         self._sentinel_written = False
         self._charging = False
 
+    def apply_thresholds(
+        self,
+        warning_percent: Optional[float] = None,
+        critical_percent: Optional[float] = None,
+        deep_percent: Optional[float] = None,
+    ) -> None:
+        """Runtime SAF-005 thresholds. Does not rewrite the OCV curve."""
+        with self._lock:
+            if warning_percent is not None:
+                self._cfg.warning_percent = float(warning_percent)
+            if critical_percent is not None:
+                self._cfg.critical_percent = float(critical_percent)
+            if deep_percent is not None:
+                self._cfg.deep_percent = float(deep_percent)
+
     # --- 조회 -----------------------------------------------------------------
 
     @property

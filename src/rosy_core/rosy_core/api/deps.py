@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from typing import Optional
 
 from fastapi import Depends, Header, Query, Request
@@ -10,6 +11,39 @@ from rosy_core.api.errors import ApiError
 from rosy_core.services import CoreServices
 
 ROLE_RANK = {"viewer": 0, "operator": 1, "administrator": 2}
+
+
+def token_fingerprint(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()[:12]
+
+
+def token_hint(token: str) -> str:
+    value = str(token)
+    if len(value) <= 6:
+        return "••••"
+    return f"{value[:3]}…{value[-2:]}"
+
+
+def auth_entries(config: dict) -> list[dict]:
+    entries = (config.get("auth") or {}).get("tokens", [])
+    if isinstance(entries, dict):
+        return [{"token": str(k), "role": str(v)} for k, v in entries.items() if k]
+    return [
+        {"token": str(item.get("token")), "role": str(item.get("role", "viewer"))}
+        for item in entries
+        if isinstance(item, dict) and item.get("token")
+    ]
+
+
+def public_token_records(config: dict) -> list[dict]:
+    return [
+        {
+            "fingerprint": token_fingerprint(item["token"]),
+            "role": item["role"] if item["role"] in ROLE_RANK else "viewer",
+            "hint": token_hint(item["token"]),
+        }
+        for item in auth_entries(config)
+    ]
 
 
 class AuthContext:
@@ -27,10 +61,7 @@ def get_services(request: Request) -> CoreServices:
 
 
 def _token_table(config: dict) -> dict[str, str]:
-    entries = config.get("auth", {}).get("tokens", [])
-    if isinstance(entries, dict):
-        return {str(k): str(v) for k, v in entries.items()}
-    return {str(e.get("token")): str(e.get("role", "viewer")) for e in entries if e.get("token")}
+    return {item["token"]: item["role"] for item in auth_entries(config)}
 
 
 def authenticate(config: dict, bearer: Optional[str], query_token: Optional[str]) -> AuthContext:

@@ -1,6 +1,7 @@
 """API 통합 테스트 — 실제 서비스(ROS 무의존) + FastAPI TestClient (P1-9)."""
 
 import importlib
+import json
 import time
 
 import pytest
@@ -19,10 +20,12 @@ import yaml
 
 
 @pytest.fixture
-def client(tmp_path):
+def client(tmp_path, monkeypatch):
     httpx = pytest.importorskip("httpx")
     from fastapi.testclient import TestClient
 
+    monkeypatch.setattr("rosy_core.config.LOCAL_CONFIG_PATH", tmp_path / "rosy.yaml")
+    monkeypatch.delenv("ROSY_CONFIG", raising=False)
     config = yaml.safe_load((Path(__file__).parent.parent / "config" / "rosy_default.yaml").read_text(encoding="utf-8"))
     profile = RobotProfile.load(Path(__file__).parent.parent / "config" / "profile.pinky_pro.yaml")
     caps = yaml.safe_load((Path(__file__).parent.parent / "config" / "capabilities.yaml").read_text(encoding="utf-8"))
@@ -34,6 +37,57 @@ def client(tmp_path):
 ADMIN = {"Authorization": "Bearer rosy-dev-admin"}
 OPERATOR = {"Authorization": "Bearer rosy-dev-operator"}
 VIEWER = {"Authorization": "Bearer rosy-dev-viewer"}
+
+
+def test_admin_can_update_robot_identity(client, tmp_path, monkeypatch):
+    overlay = tmp_path / "rosy.yaml"
+    monkeypatch.setattr("rosy_core.config.LOCAL_CONFIG_PATH", overlay)
+    monkeypatch.delenv("ROSY_CONFIG", raising=False)
+    tc, svc = client
+    updated = tc.put(
+        "/api/v1/system/info",
+        json={"robot_id": "rosy_07", "robot_name": "Bay 7"},
+        headers=ADMIN,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["robot_id"] == "rosy_07"
+    assert updated.json()["robot_name"] == "Bay 7"
+    assert svc.identity.robot_id == "rosy_07"
+    assert svc.state.snapshot().robot_id == "rosy_07"
+    saved = yaml.safe_load(overlay.read_text(encoding="utf-8"))
+    assert saved["robot"]["id"] == "rosy_07"
+    assert tc.put("/api/v1/system/info", json={"robot_id": "NOPE"}, headers=ADMIN).status_code == 400
+    assert tc.put("/api/v1/system/info", json={"robot_id": "rosy_08"}, headers=OPERATOR).status_code == 403
+
+
+def test_tokens_are_admin_only_and_never_echo_secrets(client):
+    tc, _svc = client
+    assert tc.get("/api/v1/system/tokens", headers=VIEWER).status_code == 403
+    listed = tc.get("/api/v1/system/tokens", headers=ADMIN).json()["tokens"]
+    blob = json.dumps(listed)
+    assert "rosy-dev-admin" not in blob
+    assert "rosy-dev-operator" not in blob
+    assert all("fingerprint" in item and "hint" in item and "role" in item for item in listed)
+    created = tc.post(
+        "/api/v1/system/tokens",
+        json={"token": "rosy-extra-operator", "role": "operator"},
+        headers=ADMIN,
+    )
+    assert created.status_code == 201
+    assert "rosy-extra-operator" not in json.dumps(created.json())
+    extra = {"Authorization": "Bearer rosy-extra-operator"}
+    assert tc.get("/api/v1/system/info", headers=extra).status_code == 200
+    duplicate = tc.post(
+        "/api/v1/system/tokens",
+        json={"token": "rosy-extra-operator", "role": "viewer"},
+        headers=ADMIN,
+    )
+    assert duplicate.status_code == 409
+    admin_fp = next(item["fingerprint"] for item in listed if item["role"] == "administrator")
+    assert tc.delete(f"/api/v1/system/tokens/{admin_fp}", headers=ADMIN).status_code == 400
+    fp = created.json()["fingerprint"]
+    assert tc.delete(f"/api/v1/system/tokens/{fp}", headers=ADMIN).status_code == 204
+    assert tc.get("/api/v1/system/info", headers=extra).status_code == 401
 
 
 def test_system_info_and_capabilities(client):
@@ -155,6 +209,167 @@ def test_safety_stop_release_cycle(client):
     assert "safety.estop" in types and "safety.estop_released" in types
 
 
+def test_admin_can_update_manual_speed_limits(client):
+    tc, svc = client
+    ceiling = svc.safety.limits.max_linear
+    updated = tc.put(
+        "/api/v1/safety/limits",
+        json={"manual_linear": 0.10, "manual_angular": 0.40},
+        headers=ADMIN,
+    )
+    assert updated.status_code == 200
+    body = updated.json()
+    assert body["limits"]["manual_linear"] == pytest.approx(0.10)
+    assert body["limits"]["manual_angular"] == pytest.approx(0.40)
+    assert svc.safety.limits.manual_linear == pytest.approx(0.10)
+    assert "config.changed" in [event.type for event in svc.events.history()]
+
+    denied = tc.put("/api/v1/safety/limits", json={"manual_linear": 0.05}, headers=OPERATOR)
+    assert denied.status_code == 403
+
+    clipped = tc.put("/api/v1/safety/limits", json={"manual_linear": ceiling + 1.0}, headers=ADMIN)
+    assert clipped.status_code == 200
+    assert clipped.json()["limits"]["manual_linear"] == pytest.approx(ceiling)
+
+
+def test_safety_state_includes_battery_policy(client):
+    tc, _svc = client
+    body = tc.get("/api/v1/safety/state", headers=VIEWER).json()
+    assert body["fleet_loss_policy"] == "STOP"
+    assert body["battery"]["warning_percent"] == pytest.approx(20)
+    assert body["battery"]["critical_percent"] == pytest.approx(10)
+    assert body["battery"]["deep_percent"] == pytest.approx(5)
+    assert body["battery"]["critical_policy"] == "RETURN_HOME"
+
+
+def test_admin_can_update_battery_and_fleet_policy(client, tmp_path, monkeypatch):
+    overlay = tmp_path / "rosy.yaml"
+    monkeypatch.setattr("rosy_core.config.LOCAL_CONFIG_PATH", overlay)
+    monkeypatch.delenv("ROSY_CONFIG", raising=False)
+    tc, svc = client
+    updated = tc.put(
+        "/api/v1/safety/limits",
+        json={
+            "fleet_loss_policy": "HOLD",
+            "battery_warning_percent": 25,
+            "battery_critical_percent": 12,
+            "battery_deep_percent": 6,
+            "battery_critical_policy": "STOP",
+        },
+        headers=ADMIN,
+    )
+    assert updated.status_code == 200
+    body = updated.json()
+    assert body["fleet_loss_policy"] == "HOLD"
+    assert body["battery"]["warning_percent"] == pytest.approx(25)
+    assert body["battery"]["critical_policy"] == "STOP"
+    assert svc.safety.fleet_loss_policy == "HOLD"
+    assert svc.safety.battery_policy.critical_action == "STOP"
+    assert svc.battery._cfg.warning_percent == pytest.approx(25)
+    saved = yaml.safe_load(overlay.read_text(encoding="utf-8"))
+    assert saved["safety"]["fleet_loss_policy"] == "HOLD"
+    assert saved["safety"]["battery_warning_percent"] == pytest.approx(25)
+
+
+def test_inverted_battery_thresholds_are_rejected(client):
+    tc, svc = client
+    before = svc.safety.battery_policy.warning_percent
+    denied = tc.put(
+        "/api/v1/safety/limits",
+        json={"battery_warning_percent": 8, "battery_critical_percent": 12, "battery_deep_percent": 5},
+        headers=ADMIN,
+    )
+    assert denied.status_code == 400
+    assert svc.safety.battery_policy.warning_percent == before
+
+
+def test_negative_speed_limits_are_rejected(client):
+    tc, svc = client
+    before = svc.safety.limits.manual_linear
+    denied = tc.put(
+        "/api/v1/safety/limits",
+        json={"manual_linear": -0.2},
+        headers=ADMIN,
+    )
+    assert denied.status_code == 400
+    assert denied.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert svc.safety.limits.manual_linear == before
+
+
+def test_empty_limits_put_does_not_write_overlay(client, tmp_path, monkeypatch):
+    overlay = tmp_path / "rosy.yaml"
+    monkeypatch.setattr("rosy_core.config.LOCAL_CONFIG_PATH", overlay)
+    monkeypatch.delenv("ROSY_CONFIG", raising=False)
+    tc, svc = client
+    before = svc.safety.limits.manual_linear
+    updated = tc.put("/api/v1/safety/limits", json={}, headers=ADMIN)
+    assert updated.status_code == 200
+    assert svc.safety.limits.manual_linear == before
+    assert not overlay.exists()
+
+
+def test_failed_overlay_write_does_not_apply_limits(client, tmp_path, monkeypatch):
+    blocker = tmp_path / "not-a-directory"
+    blocker.write_text("file", encoding="utf-8")
+    monkeypatch.setattr("rosy_core.config.LOCAL_CONFIG_PATH", blocker / "rosy.yaml")
+    monkeypatch.delenv("ROSY_CONFIG", raising=False)
+    tc, svc = client
+    before = svc.safety.limits.manual_linear
+    updated = tc.put(
+        "/api/v1/safety/limits",
+        json={"manual_linear": 0.01},
+        headers=ADMIN,
+    )
+    assert updated.status_code == 500
+    assert updated.json()["error"]["code"] == "INTERNAL_ERROR"
+    assert svc.safety.limits.manual_linear == before
+
+
+def test_limits_persist_follow_rosy_config_env(client, tmp_path, monkeypatch):
+    env_overlay = tmp_path / "from-env.yaml"
+    env_overlay.write_text("robot:\n  id: env_robot\n", encoding="utf-8")
+    local = tmp_path / "rosy.yaml"
+    local.write_text("robot:\n  id: local_robot\n", encoding="utf-8")
+    monkeypatch.setattr("rosy_core.config.LOCAL_CONFIG_PATH", local)
+    monkeypatch.setenv("ROSY_CONFIG", str(env_overlay))
+    tc, _svc = client
+    updated = tc.put(
+        "/api/v1/safety/limits",
+        json={"manual_linear": 0.07, "manual_angular": 0.22},
+        headers=ADMIN,
+    )
+    assert updated.status_code == 200
+    env_saved = yaml.safe_load(env_overlay.read_text(encoding="utf-8"))
+    local_saved = yaml.safe_load(local.read_text(encoding="utf-8"))
+    assert env_saved["robot"]["id"] == "env_robot"
+    assert env_saved["safety"]["manual_linear"] == pytest.approx(0.07)
+    assert "safety" not in local_saved
+
+
+def test_admin_speed_limits_persist_to_local_overlay(client, tmp_path, monkeypatch):
+    overlay = tmp_path / "rosy.yaml"
+    overlay.write_text("robot:\n  id: rosy_01\n", encoding="utf-8")
+    monkeypatch.setattr("rosy_core.config.LOCAL_CONFIG_PATH", overlay)
+    monkeypatch.delenv("ROSY_CONFIG", raising=False)
+
+    tc, svc = client
+    updated = tc.put(
+        "/api/v1/safety/limits",
+        json={"manual_linear": 0.09, "manual_angular": 0.33},
+        headers=ADMIN,
+    )
+    assert updated.status_code == 200
+    saved = yaml.safe_load(overlay.read_text(encoding="utf-8"))
+    assert saved["robot"]["id"] == "rosy_01"
+    assert saved["safety"]["manual_linear"] == pytest.approx(0.09)
+    assert saved["safety"]["manual_angular"] == pytest.approx(0.33)
+    assert svc.config["safety"]["manual_linear"] == pytest.approx(0.09)
+
+    from rosy_core.config import load_config
+    reloaded = load_config()
+    assert reloaded["safety"]["manual_linear"] == pytest.approx(0.09)
+
+
 def test_waypoints_crud_and_goal(client):
     tc, svc = client
     wp = {"name": "zone_a", "x": 1.5, "y": 2.5, "yaw": 0.0, "map_id": None, "metadata": {}}
@@ -255,11 +470,13 @@ def test_error_shape_err101(client):
 
 
 @pytest.fixture
-def docking_client(tmp_path):
+def docking_client(tmp_path, monkeypatch):
     """docking.supported=true 로 켜진 로봇. 기본 capabilities 는 false 다."""
     httpx = pytest.importorskip("httpx")
     from fastapi.testclient import TestClient
 
+    monkeypatch.setattr("rosy_core.config.LOCAL_CONFIG_PATH", tmp_path / "rosy.yaml")
+    monkeypatch.delenv("ROSY_CONFIG", raising=False)
     config = yaml.safe_load((Path(__file__).parent.parent / "config" / "rosy_default.yaml").read_text(encoding="utf-8"))
     profile = RobotProfile.load(Path(__file__).parent.parent / "config" / "profile.pinky_pro.yaml")
     caps = yaml.safe_load((Path(__file__).parent.parent / "config" / "capabilities.yaml").read_text(encoding="utf-8"))

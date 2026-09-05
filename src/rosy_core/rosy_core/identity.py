@@ -3,10 +3,26 @@
 from __future__ import annotations
 
 import os
+import re
 import socket
 from typing import Any, Optional
 
 SOFTWARE_VERSION = "0.1.0"
+ROBOT_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+
+
+def validate_robot_id(robot_id: str) -> str:
+    value = (robot_id or "").strip()
+    if not ROBOT_ID_PATTERN.fullmatch(value):
+        raise ValueError("robot id must be lowercase letters, digits, underscore or hyphen")
+    return value
+
+
+def validate_robot_name(name: str) -> str:
+    value = (name or "").strip()
+    if not value or len(value) > 64:
+        raise ValueError("robot name must be 1 to 64 characters")
+    return value
 
 
 def _primary_ip() -> str:
