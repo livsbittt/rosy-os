@@ -15,7 +15,7 @@ Importable middleware. `main.py` starts rclpy; `node.py` builds `CoreServices`, 
 | `main.py` | Entry: `rclpy.init` → `RosyCoreNode.run` → shutdown |
 | `node.py` | Assembles profile/capabilities/services, starts uvicorn thread |
 | `services.py` | `CoreServices` DI; battery/power config mapping; shutdown sentinel name |
-| `config.py` | YAML load/merge (`rosy_default` → `~/.rosy/rosy.yaml` → `ROSY_CONFIG`) |
+| `config.py` | YAML load/merge + local overlay patch (`~/.rosy/rosy.yaml` / `ROSY_CONFIG`) |
 | `identity.py` | IDN-001 robot id/name/IP/version |
 | `profile.py` | HWA-001 `RobotProfile` loader |
 | `capability.py` | CAP-001 dotted lookup + `CapabilityError` |
