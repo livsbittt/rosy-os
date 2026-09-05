@@ -253,5 +253,7 @@ def test_taking_manual_control_ends_the_formation(client):
     assert tc.post("/api/v1/mode", json={"mode": "MANUAL"}, headers=OPERATOR).status_code == 200
 
     assert svc.swarm.active is False
-    types = [event["type"] for event in tc.get("/api/v1/events", headers=VIEWER).json()["events"]]
-    assert "swarm.aborted" in types
+    events = tc.get("/api/v1/events", headers=VIEWER).json()["events"]
+    aborted = [e for e in events if e["type"] == "swarm.aborted"]
+    # 감사 로그를 읽는 사람이 "주행 취소"와 "누가 수동으로 잡았다"를 구분할 수 있어야 한다.
+    assert aborted and aborted[-1]["data"]["reason"] == "manual"

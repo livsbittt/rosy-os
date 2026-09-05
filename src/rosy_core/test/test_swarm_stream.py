@@ -60,7 +60,9 @@ class RecordingNav:
         self.goals.append(spec)
         return True
 
-    def cancel(self, source="api", close_session=True):
+    def cancel(self, source="api", close_session=True, session=None):
+        if session is not None and session != self._session:
+            return
         self.cancels.append(source)
         if close_session:
             self._session = None

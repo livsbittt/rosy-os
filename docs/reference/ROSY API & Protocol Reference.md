@@ -417,7 +417,7 @@ close code: `4401` 은 토큰이 없거나 틀린 것(`/ws/state` 와 동일), `
 | `pairing.requested/approved/revoked` | warning | Fleet | `{robot_id}` |
 | `swarm.role_assigned` | info | 로봇 | `{role, formation, target_robot_id, reference_source, by}` |
 | `swarm.hold` | warning | 로봇 | `{reason, formation, stream_timeout_ms}` |
-| `swarm.aborted` | warning | 로봇 | `{formation, reason, robots[], by}` — `reason`: `canceled` \| `estop` \| `docking` |
+| `swarm.aborted` | warning | 로봇 | `{formation, reason, robots[], by}` — `reason`: `canceled` \| `estop` \| `docking` \| `stuck` \| `manual` \| `navigation_canceled` |
 
 ---
 

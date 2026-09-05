@@ -177,7 +177,6 @@ class SwarmManager:
 
     def follow(self, params: SwarmFollowParams, source: str = "api") -> SwarmStatus:
         self.check_follow(params)
-        session = self.nav.open_moving_session()
         with self._lock:
             # check_follow 와 무장 사이에도 e-stop 은 걸릴 수 있다. 여기서는
             # 평범한 읽기뿐이라 항법 락을 잡지 않는다.
@@ -187,15 +186,18 @@ class SwarmManager:
             elif self._docking_active():
                 blocked = ("DOCKING_ACTIVE", "a docking run owns navigation")
             if blocked is None:
+                # 세션은 여기서 연다. 락 밖에서 열면 그 사이에 도착한 cancel 이
+                # 임자 없는 세션을 남긴다. `open_moving_session` 은 항법 락 안의
+                # 카운터 증가일 뿐 executor 를 건드리지 않으므로, 이 한 줄은
+                # 목표·취소를 락 밖으로 뺀 이유(R1)와 충돌하지 않는다.
+                self._session = self.nav.open_moving_session()
                 self._params = params.model_copy()
-                self._session = session
                 self._last_sample_at = None
                 self._last_goal_at = None
                 self._pending = None
                 self._holding = False
                 status = self.status()
         if blocked is not None:
-            self.nav.close_moving_session()
             raise SwarmError(*blocked)
 
         self._state.set_swarm(status)
@@ -213,6 +215,7 @@ class SwarmManager:
             was_active = self._params is not None
             formation = self._formation_label(self._params) if self._params else None
             target = self._params.target_robot_id if self._params else None
+            session = self._session
             self._params = None
             self._last_sample_at = None
             self._last_goal_at = None
@@ -221,12 +224,12 @@ class SwarmManager:
             self._session = None
 
         if not was_active:
-            # 세션을 여는 것은 여기뿐이므로, 추종이 없는데 세션이 열려 있다면
-            # 임자 없는 세션이다. 그대로 두면 단발 목표가 영영 거절당한다.
-            self.nav.close_moving_session()
             return SwarmStatus()
 
-        self.nav.cancel(source="swarm")
+        # 우리 세션만 닫는다. 락을 놓은 사이에 운영자가 follow 를 다시 걸었다면
+        # 그 새 세션은 우리 것이 아니다 — 닫으면 살아 있어 보이는데 목표는
+        # 하나도 못 내는, A1 과 똑같은 상태가 새 대형에 생긴다.
+        self.nav.cancel(source="swarm", session=session)
         self._state.set_swarm(SwarmStatus())
         self._events.publish(
             "swarm.aborted", source="swarm_manager",
@@ -321,8 +324,9 @@ class SwarmManager:
         if self.active:
             self.cancel(source="safety", reason="estop")
 
-    #: 세션을 닫은 주체 → swarm.aborted 에 실을 사유.
-    _CLOSE_REASONS = {"stuck_detector": "stuck"}
+    #: 세션을 닫은 주체 → swarm.aborted 에 실을 사유. 감사 로그를 읽는 사람이
+    #: "주행을 취소했다"와 "누가 수동으로 잡았다"를 구분할 수 있어야 한다.
+    _CLOSE_REASONS = (("stuck_detector", "stuck"), ("mode:", "manual"))
 
     def on_navigation_session_closed(self, source: str) -> None:
         """항법이 moving goal 세션을 닫았다. 추종도 여기서 끝난다.
@@ -336,8 +340,11 @@ class SwarmManager:
         stuck 의 경우 세션을 살려두는 것은 곧 SRS 가 금지한 자동 재시도다:
         0.5 초 뒤 스트림이 목표를 다시 밀어넣는다.
         """
-        if source.startswith("swarm"):
-            return  # 우리가 부른 취소다
-        if self.active:
-            self.cancel(source="navigation",
-                        reason=self._CLOSE_REASONS.get(source, "navigation_canceled"))
+        if not self.active:
+            return  # 우리가 부른 취소이거나, 이미 끝난 추종이다
+        reason = "navigation_canceled"
+        for prefix, mapped in self._CLOSE_REASONS:
+            if source.startswith(prefix):
+                reason = mapped
+                break
+        self.cancel(source="navigation", reason=reason)

@@ -123,8 +123,10 @@ class NavigationManager:
             self._moving_session = self._session_counter
             return self._moving_session
 
-    def close_moving_session(self) -> None:
+    def close_moving_session(self, session: Optional[int] = None) -> None:
         with self._lock:
+            if session is not None and self._moving_session != session:
+                return
             self._moving_session = None
 
     def moving_goal(self, spec: NavGoalSpec, source: str = "swarm",
@@ -199,7 +201,8 @@ class NavigationManager:
         self._events.publish("slam.started", source="navigation_manager",
                              data={"by": source, "reset": True})
 
-    def cancel(self, source: str = "api", close_session: bool = True) -> None:
+    def cancel(self, source: str = "api", close_session: bool = True,
+               session: Optional[int] = None) -> None:
         """진행 중 목표를 거둔다.
 
         moving goal 세션에서는 상태가 IDLE 계열이어도 취소를 보낸다. 선점된
@@ -208,8 +211,14 @@ class NavigationManager:
 
         `close_session=False` 는 SWM-004 HOLD 전용이다: 목표만 거두고 세션은
         살려 둔다. 그래야 스트림이 돌아왔을 때 새 follow 명령 없이 이어간다.
+
+        `session` 을 주면 그 세션의 임자일 때만 취소한다. 임자가 자기 락을
+        놓은 사이에 새 세션이 열렸다면, 그 취소는 남의 것을 닫는 셈이 된다 —
+        `moving_goal` 이 뒤늦은 목표를 거르는 것과 같은 규칙이다.
         """
         with self._lock:
+            if session is not None and self._moving_session != session:
+                return
             session = self._moving_session
             closed = close_session and session is not None
             if close_session:
@@ -274,9 +283,11 @@ class NavigationManager:
             self._last_progress_ts = now
             return
         if now - self._last_progress_ts > self._stuck_timeout:
-            self.cancel(source="stuck_detector")
+            # 원인을 먼저 싣는다. 취소가 세션 임자에게 알리고 그쪽도 이벤트를
+            # 내므로, 순서를 바꾸면 감사 로그에 결과가 원인보다 앞선다.
             self._events.publish("nav.stuck", severity="error", source="navigation_manager",
                                  data={"timeout_s": self._stuck_timeout})
+            self.cancel(source="stuck_detector")
             # NAV-006 자동 재시도 금지는 위의 cancel 이 세션을 닫고 임자에게
             # 알리는 것으로 지켜진다 — 알리지 않으면 0.5 초 뒤 스트림이 목표를
             # 다시 밀어넣고, 그것이 곧 자동 재시도다.

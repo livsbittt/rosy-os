@@ -460,7 +460,7 @@ def test_the_swarms_own_cancel_does_not_bounce_back_through_the_listener():
 
 def test_a_follow_never_outlives_its_session():
     """어느 길로 세션이 닫히든 추종 상태와 어긋나지 않는다."""
-    for closer in ("api:operator", "mode_change", "stuck_detector"):
+    for closer in ("api:operator", "mode:operator", "stuck_detector"):
         swarm, nav, _executor, clock, _events, _safety, _docking = build()
         swarm.follow(params())
         stream(swarm, nav.executor, clock, 1.0)
@@ -472,15 +472,41 @@ def test_a_follow_never_outlives_its_session():
         assert swarm.state_payload()["active"] is False, closer
 
 
-def test_cancelling_a_follow_that_never_armed_does_not_brick_navigation():
-    """무장 전 창에서 세션만 열린 채 남으면 단발 목표가 영영 거절당한다."""
-    swarm, nav, executor, _clock, _events, _safety, _docking = build()
-    nav.open_moving_session()
+def test_a_refused_arming_leaves_no_session_behind():
+    """세션을 여는 것과 무장은 한 구간이다.
 
-    swarm.cancel()
+    락 밖에서 열면 그 사이에 도착한 cancel 이 임자 없는 세션을 남기고,
+    그러면 단발 목표가 영영 NAVIGATION_ACTIVE 로 거절당한다.
+    """
+    swarm, nav, executor, _clock, _events, safety, _docking = build()
+    original = swarm.check_follow
 
+    def trip(body):
+        original(body)
+        safety.trigger_estop("operator")
+
+    swarm.check_follow = trip
+    with pytest.raises(SwarmError):
+        swarm.follow(params())
+
+    assert nav._moving_session is None
+    safety.release("admin")
     nav.goal(NavGoalSpec(1.0, 0.0, 0.0))
     assert executor.goals[-1].x == pytest.approx(1.0)
+
+
+def test_a_stale_cancel_does_not_close_a_reissued_follow():
+    """추종자가 락을 놓은 사이에 새 follow 가 무장하면, 옛 취소는 남의 세션이다."""
+    swarm, nav, executor, clock, _events, _safety, _docking = build()
+    swarm.follow(params())
+    stale_session = nav._moving_session
+
+    swarm.follow(params(distance=0.9))   # 새 세션
+    nav.cancel(source="swarm", session=stale_session)
+
+    assert swarm.active is True
+    assert nav._moving_session is not None
+    assert swarm.on_reference_pose(ReferencePose("rosy_02", 3.0, 0.0, 0.0)) is True
 
 
 def test_an_estop_landing_during_arming_does_not_leave_a_follow_armed():
