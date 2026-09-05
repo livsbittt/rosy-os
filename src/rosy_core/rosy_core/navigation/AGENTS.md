@@ -13,6 +13,7 @@ NAV-001–004/006 facade. ROS-free. Nav2 action client lives behind `NavExecutor
 |------|-------------|
 | `__init__.py` | Package marker |
 | `manager.py` | `NavigationManager`, `NavGoalSpec`, `NavExecutor` protocol, `NavigationError` |
+| `initial_pose.py` | AMCL covariance for `/initialpose` (zero covariance is ignored) |
 
 ## Subdirectories
 

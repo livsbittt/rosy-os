@@ -34,6 +34,8 @@ from sensor_msgs.msg import BatteryState, Imu, LaserScan, Range
 from std_msgs.msg import Bool, Float32, String
 from std_srvs.srv import Empty
 
+from rosy_core.maps import occupancy_map_id
+from rosy_core.navigation.initial_pose import amcl_pose_covariance
 from rosy_interfaces.srv import SetLed
 import tf2_ros
 from tf2_ros import Buffer, TransformListener
@@ -257,7 +259,11 @@ class RosBridge:
 
     def _on_map(self, msg: OccupancyGrid) -> None:
         try:
-            self._svc.maps.set_map(_grid_from_occupancy(msg))
+            grid = _grid_from_occupancy(msg)
+            self._svc.maps.set_map(grid)
+            current = self._svc.state.map_id
+            if current is None or str(current).startswith("occupancy:"):
+                self._svc.state.set_map_id(occupancy_map_id(grid))
         except ValueError as exc:
             self._node.get_logger().warning(f"ignored occupancy map: {exc}")
 
@@ -553,6 +559,7 @@ class RosBridge:
         msg.pose.pose.position.y = y
         msg.pose.pose.orientation.z = math.sin(yaw / 2.0)
         msg.pose.pose.orientation.w = math.cos(yaw / 2.0)
+        msg.pose.covariance = amcl_pose_covariance()
         self.initialpose_pub.publish(msg)
 
     def save_map(self, name: str) -> str:
