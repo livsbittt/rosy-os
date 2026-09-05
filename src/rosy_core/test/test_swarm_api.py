@@ -1,0 +1,162 @@
+"""SWM-002 REST 계약: /api/v1/swarm/follow|cancel|state.
+
+Capability 를 바꿔 끼운 클라이언트를 따로 세운다 — "미지원 로봇은
+CAPABILITY_NOT_SUPPORTED"(SWM-005/CAP-003)는 지원 로봇에서는 확인할 수 없는
+성질이고, 이 계약이 깨지면 Fleet 은 없는 기능을 호출한다.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+import yaml
+from rosy_core.api.app import create_app
+from rosy_core.profile import RobotProfile
+from rosy_core.protocol.schemas import SwarmRole
+from rosy_core.services import CoreServices
+
+CONFIG_DIR = Path(__file__).parent.parent / "config"
+
+ADMIN = {"Authorization": "Bearer rosy-dev-admin"}
+OPERATOR = {"Authorization": "Bearer rosy-dev-operator"}
+VIEWER = {"Authorization": "Bearer rosy-dev-viewer"}
+
+
+def build_client(tmp_path, *, swarm_follow: bool = True):
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+
+    config = yaml.safe_load((CONFIG_DIR / "rosy_default.yaml").read_text(encoding="utf-8"))
+    profile = RobotProfile.load(CONFIG_DIR / "profile.pinky_pro.yaml")
+    caps = yaml.safe_load((CONFIG_DIR / "capabilities.yaml").read_text(encoding="utf-8"))
+    caps["swarm"] = {"follow": swarm_follow, "lead": caps.get("swarm", {}).get("lead", False)}
+    services = CoreServices.build(config, profile, caps, tmp_path / "wp.json")
+    return TestClient(create_app(config, services)), services
+
+
+@pytest.fixture
+def client(tmp_path):
+    return build_client(tmp_path)
+
+
+FOLLOW = {"target_robot_id": "rosy_02", "distance": 0.5, "lateral": 0.0}
+
+
+def test_follow_starts_a_formation_and_reports_it(client):
+    tc, svc = client
+
+    response = tc.post("/api/v1/swarm/follow", json=FOLLOW, headers=OPERATOR)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["role"] == "follower"
+    assert body["active"] is True
+    assert body["target_robot_id"] == "rosy_02"
+    assert body["source"] == "fleet"
+    assert svc.swarm.active is True
+
+
+def test_follow_takes_the_robot_into_navigation_mode(client):
+    """D-2: Nav2 출력은 NAVIGATION 에서만 바퀴에 닿는다 (SWM-001)."""
+    tc, svc = client
+
+    tc.post("/api/v1/swarm/follow", json=FOLLOW, headers=OPERATOR)
+
+    assert svc.state.snapshot().mode.value == "NAVIGATION"
+
+
+def test_a_refused_follow_does_not_move_the_mode(client):
+    """거부된 명령이 모드를 바꾸면 로봇은 목표 없이 NAVIGATION 에 앉는다."""
+    tc, svc = client
+    tc.post("/api/v1/safety/stop", headers=VIEWER)
+
+    response = tc.post("/api/v1/swarm/follow", json=FOLLOW, headers=OPERATOR)
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "EMERGENCY_ACTIVE"
+    assert svc.state.snapshot().mode.value != "NAVIGATION"
+
+
+def test_the_snapshot_carries_the_swarm_field(client):
+    """SWM-006 additive 필드. Fleet 과 대시보드가 여기서 역할을 읽는다."""
+    tc, _svc = client
+    tc.post("/api/v1/swarm/follow", json=FOLLOW, headers=OPERATOR)
+
+    swarm = tc.get("/api/v1/robot/state", headers=VIEWER).json()["swarm"]
+
+    assert swarm["role"] == SwarmRole.FOLLOWER.value
+    assert swarm["active"] is True
+    assert swarm["formation"].startswith("follow:rosy_02")
+
+
+def test_cancel_clears_the_role(client):
+    tc, svc = client
+    tc.post("/api/v1/swarm/follow", json=FOLLOW, headers=OPERATOR)
+
+    body = tc.post("/api/v1/swarm/cancel", headers=OPERATOR).json()
+
+    assert body["active"] is False and body["role"] == "none"
+    assert svc.swarm.active is False
+    assert tc.get("/api/v1/robot/state", headers=VIEWER).json()["swarm"]["active"] is False
+
+
+def test_state_is_readable_before_any_follow(client):
+    tc, _svc = client
+
+    body = tc.get("/api/v1/swarm/state", headers=VIEWER).json()
+
+    assert body == {"role": "none", "formation": None, "active": False, "holding": False,
+                    "target_robot_id": None, "source": None, "stream_age_s": None}
+
+
+def test_follow_and_cancel_need_an_operator_and_state_needs_a_viewer(client):
+    tc, _svc = client
+
+    assert tc.post("/api/v1/swarm/follow", json=FOLLOW, headers=VIEWER).status_code == 403
+    assert tc.post("/api/v1/swarm/cancel", headers=VIEWER).status_code == 403
+    assert tc.get("/api/v1/swarm/state", headers=VIEWER).status_code == 200
+    assert tc.get("/api/v1/swarm/state").status_code == 401
+
+
+def test_follow_announces_the_role_and_cancel_announces_the_abort(client):
+    tc, _svc = client
+    tc.post("/api/v1/swarm/follow", json=FOLLOW, headers=OPERATOR)
+    tc.post("/api/v1/swarm/cancel", headers=OPERATOR)
+
+    types = [event["type"] for event in tc.get("/api/v1/events", headers=VIEWER).json()["events"]]
+
+    assert "swarm.role_assigned" in types
+    assert "swarm.aborted" in types
+
+
+def test_a_robot_that_does_not_declare_follow_answers_501(tmp_path):
+    """SWM-005: 미지원 로봇은 CAPABILITY_NOT_SUPPORTED 로 답한다 (CAP-003)."""
+    tc, _svc = build_client(tmp_path, swarm_follow=False)
+
+    response = tc.post("/api/v1/swarm/follow", json=FOLLOW, headers=OPERATOR)
+
+    assert response.status_code == 501
+    assert response.json()["error"]["code"] == "CAPABILITY_NOT_SUPPORTED"
+    assert tc.get("/api/v1/swarm/state", headers=VIEWER).json()["active"] is False
+
+
+def test_a_reserved_peer_source_is_refused(client):
+    tc, _svc = client
+
+    response = tc.post("/api/v1/swarm/follow", json={**FOLLOW, "source": "peer"},
+                       headers=OPERATOR)
+
+    assert response.status_code == 501
+    assert "peer" in response.json()["error"]["message"]
+
+
+def test_a_max_speed_above_the_ceiling_is_refused(client):
+    tc, svc = client
+    ceiling = svc.safety.limits.max_linear
+
+    response = tc.post("/api/v1/swarm/follow",
+                       json={**FOLLOW, "max_speed": ceiling + 0.5}, headers=OPERATOR)
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"

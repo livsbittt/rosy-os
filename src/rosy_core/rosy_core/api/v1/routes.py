@@ -21,6 +21,7 @@ from rosy_core.api.v1.navigation import (
 from rosy_core.api.v1.observability import events_router, logs_router, metrics_router
 from rosy_core.api.v1.robot import power_router, robot_router, sensors_router
 from rosy_core.api.v1.safety import safety_router
+from rosy_core.api.v1.swarm import swarm_router
 from rosy_core.api.v1.system import system_router
 
 __all__ = [
@@ -40,6 +41,7 @@ __all__ = [
     "safety_router",
     "sensors_router",
     "slam_router",
+    "swarm_router",
     "system_router",
     "viewer",
     "waypoints_router",
