@@ -188,3 +188,46 @@ def test_an_estop_during_a_follow_is_reported_as_such_not_as_a_mode_conflict(cli
 
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "EMERGENCY_ACTIVE"
+
+
+def test_a_follow_while_docking_is_refused_at_the_door(client):
+    """받아들이고 200 ms 뒤 조용히 푸는 것은 거절보다 나쁘다 — 운영자는 200 을
+    보고, 로봇은 충전기 위에서 NAVIGATION 에 남는다."""
+    tc, svc = client
+    from rosy_core.protocol.schemas import DockState
+
+    svc.docking._state = DockState.DOCKING
+
+    response = tc.post("/api/v1/swarm/follow", json=FOLLOW, headers=OPERATOR)
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "DOCKING_ACTIVE"
+    assert svc.swarm.active is False
+    assert svc.state.snapshot().mode.value != "NAVIGATION"
+
+
+def test_a_parked_robot_can_still_be_told_to_follow(client):
+    """DOCKED·CHARGING·DOCK_FAILED 는 Nav2 를 쓰지 않는다. 그것으로 막으면
+    도킹 실패 한 번이 군집을 영구히 비활성화한다."""
+    tc, svc = client
+    from rosy_core.protocol.schemas import DockState
+
+    for parked in (DockState.DOCKED, DockState.CHARGING, DockState.DOCK_FAILED):
+        svc.docking._state = parked
+        svc.swarm.cancel()
+        response = tc.post("/api/v1/swarm/follow", json=FOLLOW, headers=OPERATOR)
+        assert response.status_code == 200, parked
+        svc.swarm.tick()
+        assert svc.swarm.active is True, f"{parked} must not silently end the follow"
+
+
+def test_a_follow_can_be_reissued_to_change_the_formation(client):
+    """이미 NAVIGATION 인 것은 모드 충돌이 아니다."""
+    tc, svc = client
+    assert tc.post("/api/v1/swarm/follow", json=FOLLOW, headers=OPERATOR).status_code == 200
+
+    second = tc.post("/api/v1/swarm/follow",
+                     json={**FOLLOW, "distance": 0.9}, headers=OPERATOR)
+
+    assert second.status_code == 200
+    assert second.json()["formation"].endswith("@0.90/0.00")

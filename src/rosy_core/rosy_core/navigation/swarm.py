@@ -81,6 +81,10 @@ class SwarmManager:
         self._lock = threading.RLock()
 
         self._params: Optional[SwarmFollowParams] = None
+        #: NavigationManager 가 발급한다. 목표에 붙여 보내면, 취소 뒤에 뒤늦게
+        #: 도착한 목표가 저쪽 락 안에서 걸러진다 — 이쪽 락을 쥔 채로 저쪽을
+        #: 부를 필요가 없어진다.
+        self._session: Optional[int] = None
         self._last_sample_at: Optional[float] = None
         self._last_goal_at: Optional[float] = None
         self._pending: Optional[ReferencePose] = None
@@ -152,6 +156,10 @@ class SwarmManager:
                 f"reference source {params.source.value} is reserved, not implemented")
         if self._safety.estop:
             raise SwarmError("EMERGENCY_ACTIVE", "e-stop is active")
+        if self._docking_active():
+            # 받아들인 뒤 다음 틱에 조용히 푸는 것은 거절보다 나쁘다 —
+            # 운영자는 200 을 보고, 로봇은 NAVIGATION 에 남는다.
+            raise SwarmError("DOCKING_ACTIVE", "a docking run owns navigation")
         if not math.isfinite(params.distance) or params.distance <= 0:
             raise SwarmError("VALIDATION_ERROR", "distance must be a positive number")
         if not math.isfinite(params.lateral):
@@ -169,8 +177,10 @@ class SwarmManager:
 
     def follow(self, params: SwarmFollowParams, source: str = "api") -> SwarmStatus:
         self.check_follow(params)
+        session = self.nav.open_moving_session()
         with self._lock:
             self._params = params.model_copy()
+            self._session = session
             self._last_sample_at = None
             self._last_goal_at = None
             self._pending = None
@@ -197,10 +207,10 @@ class SwarmManager:
             self._last_goal_at = None
             self._pending = None
             self._holding = False
-            if was_active:
-                self.nav.cancel(source="swarm")
+            self._session = None
 
         if was_active:
+            self.nav.cancel(source="swarm")
             self._state.set_swarm(SwarmStatus())
             self._events.publish(
                 "swarm.aborted", source="swarm_manager",
@@ -227,14 +237,12 @@ class SwarmManager:
             self._last_goal_at = now
             self._pending = None
             spec = follow_goal(reference, params.distance, params.lateral)
-            # 락 안에서 부른다. NavigationManager 는 여기로 되돌아오지 않으므로
-            # 교착이 없고, 이렇게 해야 cancel 과 목표 투입이 뒤바뀌지 않는다 —
-            # 취소 뒤에 목표가 나가면 아무도 그것을 거두지 않는다.
-            self.nav.moving_goal(spec, source="swarm")
+            session = self._session
 
         if resumed:
             self._state.set_swarm(self.status())
-        return True
+        # 락 밖에서 부른다. 취소와 뒤바뀌어도 토큰이 맞지 않으면 저쪽이 버린다.
+        return self.nav.moving_goal(spec, source="swarm", session=session)
 
     def tick(self, now: Optional[float] = None) -> None:
         """SWM-004 단절 판정, 밀린 목표 투입, 그리고 추종을 끝내야 할 사유들.
@@ -278,20 +286,31 @@ class SwarmManager:
                     spec = follow_goal(self._pending, params.distance, params.lateral)
                     self._pending = None
                     self._last_goal_at = current
+            session = self._session
 
         if hold:
             # 자리를 지킨다: 목표만 거두고 follow 는 살려 둔다. 스트림이 돌아오면
-            # 새 follow 명령 없이 이어서 따라간다.
-            self.nav.cancel(source="swarm")
+            # 새 follow 명령 없이 이어서 따라간다 — 그래서 세션은 닫지 않는다.
+            self.nav.cancel(source="swarm", close_session=False)
             self._state.set_swarm(self.status())
             self._events.publish("swarm.hold", severity="warning", source="swarm_manager",
                                  data={"reason": "reference stream lost",
                                        "formation": formation,
                                        "stream_timeout_ms": timeout_ms})
         elif spec is not None:
-            self.nav.moving_goal(spec, source="swarm")
+            self.nav.moving_goal(spec, source="swarm", session=session)
 
     def on_estop(self) -> None:
         """안전 경로에서 직접 부를 수 있는 입구. tick 을 기다리지 않는다."""
         if self.active:
             self.cancel(source="safety", reason="estop")
+
+    def on_navigation_stuck(self) -> None:
+        """NAV-006 이 목표를 거뒀다. 추종을 끝낸다.
+
+        세션을 살려두면 0.5 초 뒤 스트림이 목표를 다시 밀어넣고, 그것이 곧
+        SRS 가 금지한 자동 재시도다 — 끼인 로봇이 아무 신호 없이 계속 밀면서
+        분당 수백 개의 nav.stuck 을 감사 로그에 쌓는다.
+        """
+        if self.active:
+            self.cancel(source="navigation", reason="stuck")

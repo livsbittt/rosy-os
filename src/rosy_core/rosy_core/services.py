@@ -197,8 +197,14 @@ class CoreServices:
         )
         swarm = SwarmManager(
             events, state, nav, safety, capability,
-            docking_active_provider=lambda: docking.state is not DockState.UNDOCKED,
+            # Nav2 를 두고 다투는 것은 DOCKING/UNDOCKING 뿐이다. DOCKED·CHARGING 은
+            # 주차 상태이고, DOCK_FAILED 는 설계상 종착이라 그것으로 막으면
+            # 도킹 실패 한 번이 군집을 영구히 비활성화한다.
+            docking_active_provider=lambda: docking.state in (
+                DockState.DOCKING, DockState.UNDOCKING),
         )
+        nav.stuck_listener = swarm.on_navigation_stuck
+        safety.estop_listeners.append(swarm.on_estop)
         runtime_probe = HostRuntimeProbe(
             host_root=os.environ.get("ROSY_HOST_ROOT", "/"),
             data_path=waypoints_path.parent,

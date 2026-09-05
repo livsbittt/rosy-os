@@ -129,7 +129,8 @@ async def ws_swarm_pose(websocket: WebSocket):
     seq = 0
     # 보낸 뒤 period 만큼 자면 주기가 항상 period + 전송시간이 되어 10 Hz 아래로
     # 내려간다. 마감시각을 따라간다.
-    next_at = asyncio.get_event_loop().time()
+    loop = asyncio.get_running_loop()
+    next_at = loop.time()
     try:
         while True:
             snapshot = svc.state.snapshot()
@@ -137,9 +138,9 @@ async def ws_swarm_pose(websocket: WebSocket):
             await websocket.send_json(
                 _pose_envelope(svc.identity.robot_id, snapshot.pose, seq))
             next_at += period
-            delay = next_at - asyncio.get_event_loop().time()
+            delay = next_at - loop.time()
             if delay <= 0:
-                next_at = asyncio.get_event_loop().time()
+                next_at = loop.time()
             else:
                 await asyncio.sleep(delay)
     except WebSocketDisconnect:

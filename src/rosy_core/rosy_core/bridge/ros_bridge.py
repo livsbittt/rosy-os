@@ -492,8 +492,6 @@ class RosBridge:
             # 이것을 현재 목표의 실패로 읽으면 nav_state 가 FAILED 로 떨어져
             # 이어지는 HOLD 의 취소가 통째로 무시된다.
             return
-        if self._svc.nav.nav_state.value == "CANCELED":
-            return
         try:
             result = future.result()
             self._svc.nav.on_result(result.status == 4)

@@ -38,15 +38,32 @@ def client(tmp_path):
 
 
 class RecordingNav:
+    """세션 토큰 규약을 지키는 최소 구현 (실제 NavigationManager 와 같은 계약)."""
+
     def __init__(self) -> None:
         self.goals = []
         self.cancels = []
+        self._session = None
+        self._counter = 0
 
-    def moving_goal(self, spec, source="swarm"):
+    def open_moving_session(self):
+        self._counter += 1
+        self._session = self._counter
+        return self._session
+
+    def close_moving_session(self):
+        self._session = None
+
+    def moving_goal(self, spec, source="swarm", session=None):
+        if session is not None and session != self._session:
+            return False
         self.goals.append(spec)
+        return True
 
-    def cancel(self, source="api"):
+    def cancel(self, source="api", close_session=True):
         self.cancels.append(source)
+        if close_session:
+            self._session = None
 
 
 def follow(tc, target="rosy_02"):

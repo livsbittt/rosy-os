@@ -52,17 +52,35 @@ class FakeEvents:
 
 
 class FakeNav:
-    """SwarmManager 가 실제로 쓰는 두 가지만."""
+    """SwarmManager 가 실제로 쓰는 것만. 세션 토큰 규약도 그대로 지킨다 —
+    지키지 않는 double 은 취소 뒤 목표 누수를 잡아낼 수 없다."""
 
     def __init__(self) -> None:
         self.goals: list[NavGoalSpec] = []
         self.cancels: list[str] = []
+        self.closed: list[bool] = []
+        self._session = None
+        self._counter = 0
 
-    def moving_goal(self, spec, source="swarm"):
+    def open_moving_session(self) -> int:
+        self._counter += 1
+        self._session = self._counter
+        return self._session
+
+    def close_moving_session(self) -> None:
+        self._session = None
+
+    def moving_goal(self, spec, source="swarm", session=None):
+        if session is not None and session != self._session:
+            return False
         self.goals.append(spec)
+        return True
 
-    def cancel(self, source="api"):
+    def cancel(self, source="api", close_session=True):
         self.cancels.append(source)
+        self.closed.append(close_session)
+        if close_session:
+            self._session = None
 
 
 class FakeExecutor:

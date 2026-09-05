@@ -14,7 +14,7 @@ import pytest
 from rosy_core.bridge.goal_tracker import GoalTracker
 from rosy_core.capability import Capability
 from rosy_core.navigation.manager import NavGoalSpec, NavigationError, NavigationManager
-from rosy_core.navigation.swarm import ReferencePose, SwarmManager
+from rosy_core.navigation.swarm import ReferencePose, SwarmError, SwarmManager
 from rosy_core.protocol.schemas import NavigationState, SwarmFollowParams
 from rosy_core.safety.manager import BatteryPolicy, SafetyManager, SpeedLimits
 from rosy_core.state.manager import StateManager
@@ -198,27 +198,26 @@ def test_a_goal_cancelled_before_acceptance_is_still_cancelled():
 # --- NAV-006 는 추종 중에도 살아 있어야 한다 (SWM-002) ---------------------------
 
 
-def test_stuck_detection_survives_goal_replacement():
-    """0.5 초마다 기준점을 초기화하면 30 초 무진척은 영원히 성립하지 않는다."""
-    swarm, nav, executor, clock, events, _safety, _docking = build()
+def test_goal_replacement_does_not_reset_the_stuck_baseline():
+    """0.5 초마다 기준점을 초기화하면 30 초 무진척 조건이 성립할 수 없다.
+
+    예전 테스트는 루프 안에서 기준시각을 직접 조작하고 첫 이벤트에서 멈춰,
+    조건이 성립한다는 것만 보이고 그 뒤 무한 반복은 보지 못했다. 여기서는
+    기준점 자체가 목표 교체를 견디는지만 본다.
+    """
+    swarm, nav, executor, clock, _events, _safety, _docking = build()
     swarm.follow(params())
     stream(swarm, executor, clock, 1.0)
     nav.on_pose_progress(0.0, 0.0)
+    baseline = nav._last_progress_ts
 
-    # 리더는 계속 움직이지만 팔로워는 문틀에 끼어 있다.
-    import time as _time
-
-    base = _time.monotonic()
-    for step in range(1, 200):
-        swarm.on_reference_pose(ReferencePose("rosy_02", 1.0 + step, 0.0, 0.0))
+    for step in range(5):
+        swarm.on_reference_pose(ReferencePose("rosy_02", 2.0 + step, 0.0, 0.0))
         executor.settle()
         clock.advance(0.5)
-        nav._last_progress_ts = base - 60.0  # 60 초째 제자리
-        nav.on_pose_progress(0.0, 0.0)
-        if "nav.stuck" in events.types():
-            break
 
-    assert "nav.stuck" in events.types()
+    assert nav._last_progress_ts == baseline
+    assert nav._last_progress_pos == (0.0, 0.0)
 
 
 def test_a_single_goal_still_resets_the_stuck_baseline():
@@ -286,29 +285,92 @@ def test_the_follow_yields_to_a_docking_run():
     assert aborted and aborted[-1]["reason"] == "docking"
 
 
-def test_a_goal_is_never_issued_after_a_cancel():
-    """cancel 과 목표 투입이 뒤바뀌면 아무도 거두지 않는 목표가 남는다."""
+def test_a_goal_that_lost_the_race_with_a_cancel_is_refused_by_navigation():
+    """추종자가 자기 락을 쥔 채 nav 를 부르지 않아도 되는 이유.
+
+    목표에는 세션 토큰이 붙는다. 취소가 먼저 도착하면 토큰이 닫히고, 뒤늦게
+    도착한 목표는 nav 의 락 안에서 버려진다 — 아무도 거두지 않는 목표가
+    남지 않는다.
+    """
+    swarm, nav, executor, clock, _events, _safety, _docking = build()
+    swarm.follow(params())
+    stream(swarm, executor, clock, 1.0)
+    stale_session = nav._moving_session
+    before = len(executor.goals)
+
+    swarm.cancel()
+
+    assert nav.moving_goal(NavGoalSpec(9.0, 9.0, 0.0), session=stale_session) is False
+    assert len(executor.goals) == before
+
+
+def test_a_goal_carrying_the_live_session_is_accepted():
     swarm, nav, executor, clock, _events, _safety, _docking = build()
     swarm.follow(params())
 
-    order: list[str] = []
-    real_moving, real_cancel = nav.moving_goal, nav.cancel
+    assert nav.moving_goal(NavGoalSpec(1.0, 0.0, 0.0),
+                           session=nav._moving_session) is True
 
-    def traced_moving(spec, source="swarm"):
-        order.append("goal")
-        return real_moving(spec, source=source)
 
-    def traced_cancel(source="api"):
-        order.append("cancel")
-        return real_cancel(source=source)
+def test_a_hold_keeps_the_session_open_so_the_stream_can_resume():
+    """HOLD 는 목표만 거둔다. 세션까지 닫으면 돌아온 스트림이 거절당한다."""
+    swarm, nav, executor, clock, _events, _safety, _docking = build()
+    swarm.follow(params(stream_timeout_ms=1000))
+    stream(swarm, executor, clock, 1.0)
 
-    nav.moving_goal, nav.cancel = traced_moving, traced_cancel
+    clock.advance(1.0)
+    swarm.tick()
+    assert swarm.holding is True
 
-    swarm.on_reference_pose(ReferencePose("rosy_02", 1.0, 0.0, 0.0))
-    swarm.cancel()
-    swarm.on_reference_pose(ReferencePose("rosy_02", 2.0, 0.0, 0.0))
+    clock.advance(0.1)
+    issued = swarm.on_reference_pose(ReferencePose("rosy_02", 3.0, 0.0, 0.0))
 
-    assert order == ["goal", "cancel"], order
+    assert issued is True
+    assert executor.goals[-1].x == pytest.approx(2.5)
+
+
+# --- NAV-006 는 추종을 끝낸다. 자동 재시도가 아니다 -------------------------------
+
+
+def test_a_stuck_follower_ends_the_session_instead_of_retrying_forever():
+    """리뷰가 재현한 경로: 취소하고 0.5 초 뒤 다시 목표를 내며 무한 반복했다."""
+    swarm, nav, executor, clock, events, _safety, _docking = build()
+    nav.stuck_listener = swarm.on_navigation_stuck
+    swarm.follow(params())
+    stream(swarm, executor, clock, 1.0)
+    nav.on_pose_progress(0.0, 0.0)
+
+    import time as _time
+    nav._last_progress_ts = _time.monotonic() - 60.0
+    nav.on_pose_progress(0.0, 0.0)
+
+    assert "nav.stuck" in events.types()
+    assert swarm.active is False, "the follow must end; retrying is the operator's call"
+    aborted = [data for type_, data in events.published if type_ == "swarm.aborted"]
+    assert aborted and aborted[-1]["reason"] == "stuck"
+
+    # 리더가 계속 흘려도 다시 달리지 않는다.
+    before = len(executor.goals)
+    for step in range(5):
+        swarm.on_reference_pose(ReferencePose("rosy_02", 10.0 + step, 0.0, 0.0))
+        clock.advance(0.5)
+    assert len(executor.goals) == before
+    assert events.types().count("nav.stuck") == 1
+
+
+def test_a_cancel_resets_the_stuck_baseline():
+    """남겨 두면 다음 목표가 만료된 기준으로 곧장 다시 stuck 판정을 받는다."""
+    swarm, nav, executor, clock, _events, _safety, _docking = build()
+    nav.goal(NavGoalSpec(1.0, 0.0, 0.0))
+    executor.settle()
+    nav.on_pose_progress(0.0, 0.0)
+    import time as _time
+    nav._last_progress_ts = _time.monotonic() - 60.0
+
+    nav.cancel(source="test")
+
+    assert nav._last_progress_pos is None
+    assert nav._last_progress_ts > _time.monotonic() - 1.0
 
 
 def test_the_formation_geometry_reaches_the_executor_unchanged():
@@ -321,3 +383,45 @@ def test_the_formation_geometry_reaches_the_executor_unchanged():
     assert spec.x == pytest.approx(2.0 - 0.3)
     assert spec.y == pytest.approx(1.0 - 0.8)
     assert spec.frame == "map"
+
+
+# --- 도킹은 문 앞에서 막는다 -----------------------------------------------------
+
+
+def test_a_follow_is_refused_while_a_docking_run_owns_navigation():
+    """받아들인 뒤 다음 틱에 조용히 푸는 것은 거절보다 나쁘다."""
+    swarm, _nav, _executor, _clock, _events, _safety, docking = build()
+    docking["active"] = True
+
+    with pytest.raises(SwarmError) as raised:
+        swarm.follow(params())
+
+    assert raised.value.code == "DOCKING_ACTIVE"
+    assert swarm.active is False
+
+
+def test_the_estop_listener_ends_the_follow_without_waiting_for_a_tick():
+    swarm, _nav, executor, clock, events, safety, _docking = build()
+    safety.estop_listeners.append(swarm.on_estop)
+    swarm.follow(params())
+    stream(swarm, executor, clock, 1.0)
+
+    safety.trigger_estop("operator")
+
+    assert swarm.active is False
+    aborted = [data for type_, data in events.published if type_ == "swarm.aborted"]
+    assert aborted and aborted[-1]["reason"] == "estop"
+
+
+def test_an_operator_goal_stays_refused_while_the_follow_is_merely_holding():
+    """HOLD 중이라고 목표의 임자가 바뀌지는 않는다 — 돌아온 스트림이 곧 덮는다."""
+    swarm, nav, executor, clock, _events, _safety, _docking = build()
+    swarm.follow(params(stream_timeout_ms=1000))
+    stream(swarm, executor, clock, 1.0)
+    clock.advance(1.0)
+    swarm.tick()
+    assert swarm.holding is True
+
+    with pytest.raises(NavigationError) as raised:
+        nav.goal(NavGoalSpec(9.0, 9.0, 0.0))
+    assert raised.value.code == "NAVIGATION_ACTIVE"

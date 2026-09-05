@@ -58,8 +58,13 @@ class NavigationManager:
         # 목표는 uvicorn 워커(REST·WS)와 rclpy executor(브리지 타이머) 양쪽에서
         # 건드려진다(D-1). check-send-set 이 쪼개지면 취소가 목표를 놓친다.
         self._lock = threading.RLock()
-        #: moving goal 세션이 잡혀 있으면 목표의 임자는 그쪽이다 (SWM-001).
-        self._moving_session = False
+        #: moving goal 세션이 열려 있으면 목표의 임자는 그쪽이다 (SWM-001).
+        #: 토큰을 여기서 발급해, 추종자가 자기 락을 쥔 채 이쪽을 부르지 않아도
+        #: 취소 뒤에 뒤늦은 목표가 새어 들어오지 못한다.
+        self._moving_session: Optional[int] = None
+        self._session_counter = 0
+        #: NAV-006 stuck 은 세션을 끝낸다. 재시도 판단은 상위 책임이다.
+        self.stuck_listener = None
 
     @property
     def nav_state(self) -> NavigationState:
@@ -94,7 +99,7 @@ class NavigationManager:
         if self.mapping_active:
             raise NavigationError("MAPPING_ACTIVE", "mapping session active")
         with self._lock:
-            if self._moving_session:
+            if self._moving_session is not None:
                 # 추종 중에 들어온 단발 목표는 0.5 초 뒤 스트림에 덮인다.
                 # 조용히 덮이느니 거절하는 편이 낫다.
                 raise NavigationError("NAVIGATION_ACTIVE",
@@ -108,7 +113,19 @@ class NavigationManager:
         self._events.publish("nav.started", source="navigation_manager",
                              data={"goal": {"x": spec.x, "y": spec.y, "yaw": spec.yaw}, "by": source})
 
-    def moving_goal(self, spec: NavGoalSpec, source: str = "swarm") -> None:
+    def open_moving_session(self) -> int:
+        """추종 세션을 연다. 이후 이 토큰을 단 목표만 받아들인다."""
+        with self._lock:
+            self._session_counter += 1
+            self._moving_session = self._session_counter
+            return self._moving_session
+
+    def close_moving_session(self) -> None:
+        with self._lock:
+            self._moving_session = None
+
+    def moving_goal(self, spec: NavGoalSpec, source: str = "swarm",
+                    session: Optional[int] = None) -> bool:
         """SWM-001: 이미 주행 중이어도 목표를 갈아끼운다.
 
         `goal()` 은 진행 중인 주행을 NAVIGATION_ACTIVE 로 막는다 — 운영자가
@@ -126,7 +143,12 @@ class NavigationManager:
         if self.mapping_active:
             raise NavigationError("MAPPING_ACTIVE", "mapping session active")
         with self._lock:
-            self._moving_session = True
+            if session is not None and self._moving_session != session:
+                # 취소된 세션의 뒤늦은 목표. 내보내면 아무도 거두지 않는다.
+                return False
+            if session is None:
+                self._session_counter += 1
+                self._moving_session = self._session_counter
             executor.send_goal(spec)
             started = self._nav_state not in (NavigationState.NAVIGATING,
                                               NavigationState.PLANNING)
@@ -136,6 +158,7 @@ class NavigationManager:
             self._events.publish(
                 "nav.started", source="navigation_manager",
                 data={"goal": {"x": spec.x, "y": spec.y, "yaw": spec.yaw}, "by": source})
+        return True
 
     def home(self, source: str = "api") -> None:
         spec = self.resolve_goal(waypoint="__home__")
@@ -173,27 +196,35 @@ class NavigationManager:
         self._events.publish("slam.started", source="navigation_manager",
                              data={"by": source, "reset": True})
 
-    def cancel(self, source: str = "api") -> None:
+    def cancel(self, source: str = "api", close_session: bool = True) -> None:
         """진행 중 목표를 거둔다.
 
         moving goal 세션에서는 상태가 IDLE 계열이어도 취소를 보낸다. 선점된
         목표의 abort 가 상태를 FAILED 로 떨어뜨려 놓았을 수 있고, 그때 여기서
         돌아서면 살아 있는 Nav2 목표가 그대로 남아 로봇이 계속 달린다.
+
+        `close_session=False` 는 SWM-004 HOLD 전용이다: 목표만 거두고 세션은
+        살려 둔다. 그래야 스트림이 돌아왔을 때 새 follow 명령 없이 이어간다.
         """
         with self._lock:
             session = self._moving_session
-            self._moving_session = False
-            if self._nav_state in _IDLE_STATES and not session:
+            if close_session:
+                self._moving_session = None
+            if self._nav_state in _IDLE_STATES and session is None:
                 return
             if self.executor is not None:
                 self.executor.cancel_goal()
             self._set_state(NavigationState.CANCELED)
+            # 다음 목표는 새 기준점에서 시작한다. 남겨 두면 이미 만료된
+            # 기준으로 곧장 다시 stuck 판정이 나 취소-재목표를 반복한다.
+            self._last_progress_pos = None
+            self._last_progress_ts = time.monotonic()
         self._events.publish("nav.canceled", source="navigation_manager", data={"source": source})
 
     def on_goal_accepted(self) -> None:
         with self._lock:
             self._set_state(NavigationState.NAVIGATING)
-            if self._moving_session and self._last_progress_pos is not None:
+            if self._moving_session is not None and self._last_progress_pos is not None:
                 # SWM-002 는 NAV-006 이 그대로 적용된다고 못박았다. 0.5 초마다
                 # 기준점을 초기화하면 30 초 무진척 조건은 영원히 성립하지 않고,
                 # 문틀에 낀 팔로워가 아무 신호 없이 계속 밀어붙인다.
@@ -202,11 +233,12 @@ class NavigationManager:
             self._last_progress_ts = time.monotonic()
 
     def on_result(self, succeeded: bool, error: Optional[str] = None) -> None:
+        with self._lock:
+            self._set_state(NavigationState.ARRIVED if succeeded
+                            else NavigationState.FAILED)
         if succeeded:
-            self._set_state(NavigationState.ARRIVED)
             self._events.publish("nav.completed", source="navigation_manager")
         else:
-            self._set_state(NavigationState.FAILED)
             self._events.publish("nav.failed", severity="error", source="navigation_manager",
                                  data={"error_code": error or "UNKNOWN"})
 
@@ -229,3 +261,12 @@ class NavigationManager:
             self.cancel(source="stuck_detector")
             self._events.publish("nav.stuck", severity="error", source="navigation_manager",
                                  data={"timeout_s": self._stuck_timeout})
+            # NAV-006: 자동 재시도는 하지 않는다. 추종 세션이 열려 있으면
+            # 0.5 초 뒤 스트림이 목표를 다시 밀어넣으므로, 세션 임자에게
+            # 알려 끝내게 한다 — 아니면 그것이 곧 자동 재시도다.
+            listener = self.stuck_listener
+            if listener is not None:
+                try:
+                    listener()
+                except Exception:
+                    pass

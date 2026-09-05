@@ -18,6 +18,7 @@ swarm_router = APIRouter(prefix="/api/v1/swarm", tags=["swarm"])
 _SWARM_HTTP = {
     "CAPABILITY_NOT_SUPPORTED": 501,
     "EMERGENCY_ACTIVE": 409,
+    "DOCKING_ACTIVE": 409,
     "VALIDATION_ERROR": 400,
 }
 
@@ -37,7 +38,10 @@ def swarm_follow(body: SwarmFollowParams, auth: AuthContext = Depends(operator),
         svc.swarm.check_follow(body)
     except SwarmError as exc:
         raise _swarm_error(exc)
-    if not svc.modes.can_transition(Mode.NAVIGATION):
+    # 이미 NAVIGATION 이면 전이가 아니다 — `transition()` 도 같은 모드를 통과시킨다.
+    # can_transition 만 보면 대형을 바꾸려 follow 를 다시 부를 때 409 가 난다.
+    if (svc.modes.mode is not Mode.NAVIGATION
+            and not svc.modes.can_transition(Mode.NAVIGATION)):
         raise ApiError("MODE_CONFLICT", 409,
                        f"cannot follow from {svc.modes.mode.value}")
 
