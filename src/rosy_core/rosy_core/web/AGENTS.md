@@ -14,7 +14,7 @@ Embedded operator dashboard (D-23). Served by FastAPI from this folder. No Node/
 | `__init__.py` | Package marker so setuptools includes the package |
 | `index.html` | Dashboard shell |
 | `styles.css` | Dashboard CSS (no inline styles in HTML) |
-| `app.js` | Token login, state/events WS, e-stop, host cards |
+| `app.js` | Token login, state/events WS, e-stop, host cards, field settings |
 
 ## Subdirectories
 
@@ -34,7 +34,7 @@ None.
 
 ### Common Patterns
 
-Vanilla JS modules. `app.js` owns session/auth/teleop; `map.js` owns GridFrame, occupancy/costmap/path layers, and click-to-goal. Costmap is sampled in occupancy world coordinates. Teleop is hold-to-drive (~100 ms).
+Vanilla JS modules. `app.js` owns session/auth/teleop and the local field-settings panel (waypoints, YAML safety policy, SLAM session, docks). Admin is detected via `GET /api/v1/logs/audit` (200 vs 403); do not add a whoami path. Settings forms use `type="button"` plus `bindFormSave` so Enter does not navigate. Network profile apply goes through `POST /api/v1/host/network/apply` (Host Agent); never send a PSK. `map.js` owns GridFrame, occupancy/costmap/path layers, and click-to-goal. Costmap is sampled in occupancy world coordinates. Teleop is hold-to-drive (~100 ms). Do not add a Fleet/swarm settings UI here — outbound Fleet is disabled.
 
 ## Dependencies
 

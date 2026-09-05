@@ -94,7 +94,7 @@ def create_app(config: dict[str, Any], services: CoreServices) -> FastAPI:
         return FileResponse(
             web_root / asset_name,
             media_type=media_type,
-            headers={"Cache-Control": "public, max-age=300"},
+            headers={"Cache-Control": "no-cache"},
         )
 
     return app

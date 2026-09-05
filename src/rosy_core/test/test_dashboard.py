@@ -196,3 +196,117 @@ def test_dashboard_serves_map_module(dashboard_client):
     assert response.status_code == 200
     assert "javascript" in response.headers["content-type"]
     assert "createFieldMap" in response.text
+
+
+def test_dashboard_assets_send_no_cache_so_field_settings_keep_pace(dashboard_client):
+    script = dashboard_client.get("/dashboard/assets/app.js")
+    css = dashboard_client.get("/dashboard/assets/styles.css")
+    mapper = dashboard_client.get("/dashboard/assets/map.js")
+    assert script.status_code == 200
+    assert "no-cache" in script.headers["cache-control"]
+    assert "no-cache" in css.headers["cache-control"]
+    assert "no-cache" in mapper.headers["cache-control"]
+
+
+def test_dashboard_field_settings_use_click_handlers_not_form_submit():
+    html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+    script = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+    settings = html.split('id="field-settings-panel"', 1)[1]
+    assert 'type="submit"' not in settings
+    assert 'id="waypoint-save"' in settings
+    assert 'id="limits-save"' in settings
+    assert 'id="dock-register"' in settings
+    assert 'id="limits-save" class="primary-button" disabled' in html
+    assert 'id="dock-register" class="primary-button" disabled' in html
+    assert 'id="identity-save" class="primary-button" disabled' in html
+    assert 'id="token-add" class="primary-button" disabled' in html
+    assert 'id="slam-save"' in settings
+    assert '["waypoint-save"]?.addEventListener("click"' in script
+    assert '["limits-save"]?.addEventListener("click"' in script
+    assert '["dock-register"]?.addEventListener("click"' in script
+    assert '["slam-save"]?.addEventListener("click"' in script
+    assert "detectRole" in script
+    assert "/api/v1/logs/audit" in script
+    assert "bindFormSave" in script
+    assert "const optional" in script
+    assert "requiredResults" in script
+    assert 'bindFormSave("waypoint-form", "waypoint-save")' in script
+    assert "patch_local_config" not in script
+    assert "/api/v1/safety/limits" in script
+    assert "/api/v1/docking/types" in script
+    assert "/api/v1/host/network/apply" in script
+    assert "battery_warning_percent" in script
+    assert "fleet_loss_policy" in script
+    assert "/api/v1/system/tokens" in script
+    assert 'method: "PUT"' in script
+    assert "renderTokens" in script
+    assert "localStorage" not in script
+
+
+def test_dashboard_exposes_local_field_settings_not_fleet():
+    html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+    script = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+    css = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+    for element_id in (
+        "field-settings-panel",
+        "waypoint-form",
+        "waypoint-name",
+        "waypoint-save",
+        "waypoint-list",
+        "limits-form",
+        "limit-manual-linear",
+        "limit-manual-angular",
+        "limits-save",
+        "fleet-loss-policy",
+        "battery-warning",
+        "battery-critical",
+        "battery-deep",
+        "battery-critical-policy",
+        "network-apply",
+        "network-profile-id",
+        "identity-form",
+        "robot-id-input",
+        "robot-name-input",
+        "identity-save",
+        "token-form",
+        "token-new",
+        "token-add",
+        "token-list",
+        "slam-start",
+        "slam-stop",
+        "slam-save-form",
+        "slam-save",
+        "dock-form",
+        "dock-id",
+        "dock-register",
+        "dock-list",
+        "dock-undock",
+        "dock-cancel",
+        "fleet-settings-note",
+    ):
+        assert f'id="{element_id}"' in html
+
+    assert "onclick=" not in html
+    assert "<style" not in html
+    assert 'id="dock-register"' in html
+    assert 'id="waypoint-save"' in html
+    assert 'type="submit"' not in html.split('id="field-settings-panel"')[1]
+    assert "FLEET_HOLD" in html
+    assert "/api/v1/swarm" not in html
+    assert "rosy_fleet" not in html
+
+    assert "/api/v1/waypoints" in script
+    assert "/api/v1/safety/limits" in script
+    assert "/api/v1/slam/start" in script
+    assert "/api/v1/navigation/home" in script
+    assert "/api/v1/docking/docks" in script
+    assert "/api/v1/docking/dock" in script
+    assert "renderDocks" in script
+    assert "renderWaypoints" in script
+    assert "window.confirm" in script
+    assert "/api/v1/swarm" not in script
+
+    assert ".field-settings-panel" in css
+    assert ".waypoint-list" in css
+    assert ".settings-card" in css

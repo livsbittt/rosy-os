@@ -193,6 +193,7 @@ button { color: inherit; }
 .panel {
   position: relative;
   overflow: hidden;
+  scroll-margin-top: 88px;
   border: 1px solid var(--line);
   padding: clamp(20px, 3vw, 34px);
   background: var(--panel);
@@ -381,6 +382,69 @@ button { color: inherit; }
 .capability-item .enabled { color: var(--signal-lime); }
 .capability-item .disabled { color: var(--muted); }
 
+.field-settings-panel { grid-column: 1 / -1; }
+.field-settings-panel::before { background: var(--signal-lime); }
+.settings-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+}
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem 1.15rem;
+  border: 1px solid var(--line);
+  background: rgba(9, 14, 12, 0.84);
+}
+.settings-card > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.settings-card h3 { margin: 0; font: 1.05rem/1.1 var(--display); }
+.settings-card form { display: grid; gap: 0.45rem; }
+.settings-card label { color: var(--muted); font: 0.62rem var(--mono); letter-spacing: 0.08em; }
+.settings-card input {
+  min-height: 42px;
+  padding: 0 12px;
+  color: var(--paper);
+  background: rgba(17, 22, 20, 0.9);
+  border: 1px solid var(--line);
+}
+.settings-card input:focus, .settings-card select:focus { outline: 0; border-color: var(--signal-lime); }
+.settings-card select {
+  min-height: 42px;
+  padding: 0 12px;
+  color: var(--paper);
+  background: rgba(17, 22, 20, 0.9);
+  border: 1px solid var(--line);
+}
+.settings-row { display: flex; gap: 8px; }
+.settings-row input { flex: 1 1 auto; min-width: 0; }
+.waypoint-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.waypoint-list li:not(.empty-state) {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.waypoint-list strong { font: 0.82rem var(--mono); }
+.waypoint-list span { grid-column: 1; color: var(--muted); font: 0.62rem var(--mono); }
+.waypoint-actions { display: flex; gap: 6px; align-items: start; }
+.waypoint-actions button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--paper);
+  font: 0.62rem var(--mono);
+  cursor: pointer;
+}
+.waypoint-actions button:hover { border-color: var(--paper); }
+
 .event-panel { grid-column: 1 / -1; }
 .event-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 24px; margin: 0; padding: 0; list-style: none; }
 .event-list li:not(.empty-state) { display: grid; grid-template-columns: 76px 1fr auto; gap: 12px; align-items: start; min-width: 0; border-top: 1px solid var(--line); padding: 14px 0; }
@@ -401,7 +465,7 @@ button { color: inherit; }
   .dashboard { grid-template-columns: 1fr; }
   .hero-strip { grid-template-columns: 1.2fr 0.8fr; }
   .hero-safety { grid-column: 1 / -1; min-height: 115px; border-top: 1px solid var(--line); border-left: 0; }
-  .event-panel { grid-column: auto; }
+  .field-settings-panel, .event-panel { grid-column: auto; }
   .event-list { grid-template-columns: 1fr; }
 }
 
@@ -549,6 +613,16 @@ button { color: inherit; }
 .host-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.host-card form { display: grid; gap: 0.45rem; margin-top: 0.4rem; }
+.host-card label { color: var(--muted); font: 0.62rem var(--mono); letter-spacing: 0.08em; }
+.host-card input {
+  min-height: 42px;
+  padding: 0 12px;
+  color: var(--paper);
+  background: rgba(17, 22, 20, 0.9);
+  border: 1px solid var(--line);
 }
 
 @media (prefers-reduced-motion: no-preference) {

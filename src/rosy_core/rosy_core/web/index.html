@@ -126,6 +126,13 @@
             <div><dt>같은 WLAN 단말 접근</dt><dd id="network-peer">—</dd></div>
           </dl>
           <p class="host-note" id="network-note" role="status"></p>
+          <form id="network-apply-form">
+            <label for="network-profile-id">네트워크 프로파일</label>
+            <div class="settings-row">
+              <input id="network-profile-id" name="profile_id" maxlength="64" placeholder="rosy-site-sta" autocomplete="off">
+              <button type="button" id="network-apply" class="primary-button" disabled>프로파일 적용</button>
+            </div>
+          </form>
         </article>
 
         <article class="host-card" id="release-card" data-available="unknown"
@@ -296,6 +303,168 @@
         </button>
       </div>
       <p id="action-message" class="action-message" role="status" aria-live="assertive">제어 명령 대기 중</p>
+    </section>
+
+    <section id="field-settings-panel" class="panel field-settings-panel" aria-labelledby="field-settings-heading">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">FIELD SETTINGS</p>
+          <h2 id="field-settings-heading">현장 설정</h2>
+        </div>
+        <span class="machine-tag">이 로봇만 · 플릿 없음</span>
+      </div>
+      <div class="settings-grid">
+        <article class="settings-card" aria-labelledby="identity-heading">
+          <header>
+            <h3 id="identity-heading">로봇 신원</h3>
+            <span class="mode-chip" data-mode="LOCAL">LOCAL YAML</span>
+          </header>
+          <p class="host-note">관리자만 바꿀 수 있습니다. ROS namespace와 frame_prefix는 재시작 후에 따라갑니다.</p>
+          <form id="identity-form">
+            <label for="robot-id-input">로봇 ID</label>
+            <input id="robot-id-input" name="robot_id" maxlength="64" placeholder="rosy_01" autocomplete="off">
+            <label for="robot-name-input">이름</label>
+            <input id="robot-name-input" name="robot_name" maxlength="64" placeholder="Rosy 01" autocomplete="off">
+            <button type="button" id="identity-save" class="primary-button" disabled>신원 적용</button>
+          </form>
+          <p id="identity-message" class="host-note" role="status"></p>
+        </article>
+
+        <article class="settings-card" aria-labelledby="token-heading">
+          <header>
+            <h3 id="token-heading">API 토큰</h3>
+            <span class="mode-chip" data-mode="ADMIN">ADMIN</span>
+          </header>
+          <p class="host-note">전문은 저장 후 다시 보여주지 않습니다. 사용 중인 토큰과 마지막 관리자 토큰은 삭제할 수 없습니다.</p>
+          <ul id="token-list" class="waypoint-list">
+            <li class="empty-state">관리자로 연결하면 토큰 목록을 표시합니다.</li>
+          </ul>
+          <form id="token-form">
+            <label for="token-new">새 토큰</label>
+            <input id="token-new" name="token" type="password" minlength="8" maxlength="128" autocomplete="off">
+            <label for="token-role">역할</label>
+            <select id="token-role" name="role">
+              <option value="viewer">viewer</option>
+              <option value="operator">operator</option>
+              <option value="administrator">administrator</option>
+            </select>
+            <button type="button" id="token-add" class="primary-button" disabled>토큰 추가</button>
+          </form>
+          <p id="token-message" class="host-note" role="status"></p>
+        </article>
+
+        <article class="settings-card" aria-labelledby="waypoint-heading">
+          <header>
+            <h3 id="waypoint-heading">웨이포인트</h3>
+            <span class="mode-chip" data-mode="LOCAL">LOCAL JSON</span>
+          </header>
+          <p class="host-note">현재 자세를 이름과 함께 저장합니다. __home__ 은 복귀 지점입니다. 값은 ~/.rosy/waypoints.json 에 남습니다.</p>
+          <form id="waypoint-form">
+            <label for="waypoint-name">이름</label>
+            <div class="settings-row">
+              <input id="waypoint-name" name="name" maxlength="64" required placeholder="zone_a 또는 __home__" autocomplete="off">
+              <button type="button" id="waypoint-save" class="primary-button">현재 위치 저장</button>
+            </div>
+          </form>
+          <ul id="waypoint-list" class="waypoint-list">
+            <li class="empty-state">연결 후 웨이포인트를 표시합니다.</li>
+          </ul>
+          <p id="waypoint-message" class="host-note" role="status"></p>
+        </article>
+
+        <article class="settings-card" aria-labelledby="limits-heading">
+          <header>
+            <h3 id="limits-heading">안전 정책</h3>
+            <span class="mode-chip" data-mode="LOCAL">LOCAL YAML</span>
+          </header>
+          <p class="host-note">관리자만 바꿀 수 있습니다. ~/.rosy/rosy.yaml 에 남습니다. 속도는 프로필 상한을 넘기지 않으며, 배터리 임계는 deep &lt; critical &lt; warning 이어야 합니다.</p>
+          <dl class="host-facts">
+            <div><dt>프로필 최대 직선</dt><dd id="limit-max-linear">—</dd></div>
+            <div><dt>프로필 최대 회전</dt><dd id="limit-max-angular">—</dd></div>
+          </dl>
+          <form id="limits-form">
+            <label for="limit-manual-linear">수동 직선 m/s</label>
+            <input id="limit-manual-linear" name="manual_linear" type="number" min="0" step="0.01" inputmode="decimal">
+            <label for="limit-manual-angular">수동 회전 rad/s</label>
+            <input id="limit-manual-angular" name="manual_angular" type="number" min="0" step="0.01" inputmode="decimal">
+            <label for="fleet-loss-policy">플릿 단절 정책</label>
+            <select id="fleet-loss-policy" name="fleet_loss_policy">
+              <option value="STOP">STOP</option>
+              <option value="HOLD">HOLD</option>
+              <option value="RETURN_HOME">RETURN_HOME</option>
+              <option value="CONTINUE">CONTINUE</option>
+            </select>
+            <label for="battery-warning">배터리 경고 %</label>
+            <input id="battery-warning" name="battery_warning_percent" type="number" min="1" max="100" step="1" inputmode="decimal">
+            <label for="battery-critical">배터리 위험 %</label>
+            <input id="battery-critical" name="battery_critical_percent" type="number" min="1" max="100" step="1" inputmode="decimal">
+            <label for="battery-deep">배터리 방전 %</label>
+            <input id="battery-deep" name="battery_deep_percent" type="number" min="1" max="100" step="1" inputmode="decimal">
+            <label for="battery-critical-policy">위험 시 동작</label>
+            <select id="battery-critical-policy" name="battery_critical_policy">
+              <option value="RETURN_HOME">RETURN_HOME</option>
+              <option value="STOP">STOP</option>
+            </select>
+            <button type="button" id="limits-save" class="primary-button" disabled>정책 적용</button>
+          </form>
+          <p id="limits-message" class="host-note" role="status"></p>
+        </article>
+
+        <article class="settings-card" aria-labelledby="slam-heading">
+          <header>
+            <h3 id="slam-heading">맵핑 세션</h3>
+            <span id="slam-capability" class="mode-chip" data-mode="UNKNOWN">—</span>
+          </header>
+          <p class="host-note">SLAM 세션은 이 로봇에서만 동작합니다. 저장하면 현재 map_id가 바뀝니다.</p>
+          <div class="host-actions">
+            <button type="button" id="slam-start">맵핑 시작</button>
+            <button type="button" id="slam-stop">맵핑 중지</button>
+          </div>
+          <form id="slam-save-form">
+            <label for="slam-map-name">저장 이름</label>
+            <div class="settings-row">
+              <input id="slam-map-name" name="name" maxlength="64" value="rosy_map" autocomplete="off">
+              <button type="button" id="slam-save" class="primary-button">맵 저장</button>
+            </div>
+          </form>
+          <p id="slam-message" class="host-note" role="status"></p>
+        </article>
+
+        <article class="settings-card" aria-labelledby="dock-heading">
+          <header>
+            <h3 id="dock-heading">도크</h3>
+            <span id="dock-capability" class="mode-chip" data-mode="UNKNOWN">—</span>
+          </header>
+          <p class="host-note" id="dock-status-note">등록과 teach는 저장소에 남습니다. 실제 도킹 명령은 capability가 켜진 로봇에서만 나갑니다.</p>
+          <form id="dock-form">
+            <label for="dock-id">도크 ID</label>
+            <input id="dock-id" name="id" maxlength="64" required placeholder="dock_1" autocomplete="off">
+            <label for="dock-type">기종</label>
+            <input id="dock-type" name="type" maxlength="64" value="rosy_v1" autocomplete="off">
+            <button type="button" id="dock-register" class="primary-button" disabled>도크 등록</button>
+          </form>
+          <ul id="dock-list" class="waypoint-list">
+            <li class="empty-state">연결 후 도크를 표시합니다.</li>
+          </ul>
+          <div class="host-actions">
+            <button type="button" id="dock-undock">언도크</button>
+            <button type="button" id="dock-cancel">도킹 취소</button>
+          </div>
+          <p id="dock-message" class="host-note" role="status"></p>
+        </article>
+
+        <article class="settings-card" aria-labelledby="fleet-settings-heading">
+          <header>
+            <h3 id="fleet-settings-heading">군집 / 플릿</h3>
+            <span class="mode-chip" data-mode="HOLD">FLEET_HOLD</span>
+          </header>
+          <p class="host-note" id="fleet-settings-note">
+            이 저장소에는 플릿 서버가 없습니다. 로봇 outbound WebSocket은 열리지 않으며
+            추종·대형 명령도 연결되어 있지 않습니다. 여러 대를 한 화면에서 묶거나 대형을
+            바꾸는 설정은 여기서 할 수 없습니다.
+          </p>
+        </article>
+      </div>
     </section>
 
     <section class="panel capability-panel" aria-labelledby="capability-heading">
