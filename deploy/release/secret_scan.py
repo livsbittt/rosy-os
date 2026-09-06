@@ -14,13 +14,6 @@ The scanner is deliberately conservative about placeholders: a config
 template that says ``password: <your-wifi-password>`` is the correct thing
 for a repository to contain, and flagging it would train people to ignore
 the scanner.
-
-Known gap, recorded so it is not rediscovered as a surprise: ``_ASSIGNMENT``
-needs six characters of value, so ``api_token = wrap(`` — a call whose name is
-five characters or fewer — never reaches any matcher at all. It is the
-shortest way past this gate. Closing it means lowering that floor, which
-cascades into every matcher and every fixture, so it wants its own change
-rather than a line in someone else's.
 """
 
 from __future__ import annotations
@@ -61,6 +54,15 @@ _PLACEHOLDER = re.compile(
 
 # Assignment of a literal value to a secret-ish name. Group "value" is the
 # literal; quotes are stripped by the caller.
+#
+# The six-character floor is about literals: shorter than that and a bare value
+# is a keyword, a number or a type name rather than a secret. It is not about
+# calls, and applying it to them left a hole — `api_token = wrap(` never
+# reached any matcher because `wrap(` is five characters, which made a short
+# function name the shortest way past this gate. The "call" branch recognises
+# a call or subscript head at any length and hands it to the same rules that
+# already judge the long ones: excused when it closes on this line holding no
+# literal, reported otherwise.
 _ASSIGNMENT = re.compile(
     r"""
     (?P<name>
@@ -74,6 +76,7 @@ _ASSIGNMENT = re.compile(
         " (?P<quoted>[^"\n]{6,}) "     # "correct horse battery staple"
       | ' (?P<squoted>[^'\n]{6,}) '
       | (?P<value>[^"'\s#,;]{6,})     # bare, no spaces
+      | (?P<call>[A-Za-z_][A-Za-z0-9_.]*[\(\[])   # wrap( , data[
     )
     """,
     re.IGNORECASE | re.VERBOSE,
@@ -277,7 +280,8 @@ def scan_text(path: str, text: str) -> list[Finding]:
 
         matched_assignment = False
         for match in _ASSIGNMENT.finditer(line):
-            value = match.group("quoted") or match.group("squoted") or match.group("value")
+            value = (match.group("quoted") or match.group("squoted")
+                     or match.group("value") or match.group("call"))
             if (
                 _is_placeholder(value)
                 or _TYPE_EXPRESSION.match(value)

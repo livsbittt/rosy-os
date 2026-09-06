@@ -167,6 +167,11 @@ class SwarmManager:
             # 받아들인 뒤 다음 틱에 조용히 푸는 것은 거절보다 나쁘다 —
             # 운영자는 200 을 보고, 로봇은 NAVIGATION 에 남는다.
             raise SwarmError("DOCKING_ACTIVE", "a docking run owns navigation")
+        if getattr(self.nav, "mapping_active", False):
+            # 같은 이유. 맵핑 중에는 목표 투입이 MAPPING_ACTIVE 로 거절되는데,
+            # 그 예외는 참조 소켓이 삼킨다 — 무장돼 보이면서 아무것도 못 하는
+            # 대형이 남는다.
+            raise SwarmError("MAPPING_ACTIVE", "a mapping session owns navigation")
         if not math.isfinite(params.distance) or params.distance <= 0:
             raise SwarmError("VALIDATION_ERROR", "distance must be a positive number")
         if not math.isfinite(params.lateral):
@@ -278,6 +283,11 @@ class SwarmManager:
                 announce = self._map_mismatch != reference.map_id
                 self._map_mismatch = reference.map_id
                 self._pending = None
+                # 프레임이 도착했으니 스트림은 살아 있다. 단절 HOLD 를 그대로
+                # 두면 `holding: true` 와 갓 갱신된 `stream_age_s` 가 나란히
+                # 보이고, 운영자는 무엇이 멈춘 것인지 알 수 없다. 이유는
+                # 이제 map_mismatch 다.
+                self._holding = False
             else:
                 resumed = self._holding or self._map_mismatch is not None
                 self._holding = False

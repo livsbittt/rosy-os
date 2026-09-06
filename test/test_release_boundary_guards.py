@@ -464,3 +464,56 @@ def test_a_call_left_open_at_the_end_of_the_line_is_not_excused(line):
     """
     assert scan_text("sample.py", line), line
 
+
+# --- a short function name is not a way past the gate ------------------------
+
+
+@pytest.mark.parametrize("call", ["f", "wrap", "get", "b64", "load"])
+def test_a_short_call_name_left_open_is_still_reported(call):
+    """`_ASSIGNMENT`'s six-character floor is about literals, not calls.
+
+    Applying it to call heads made a short function name the shortest way past
+    this gate — under six characters the assignment reached no matcher at all.
+    The sample is assembled rather than written, for the same reason the other
+    open-call ones are: as a literal it is the shape under test.
+    """
+    assert scan_text("x.py", _open_call("", "api_token", call))
+
+
+@pytest.mark.parametrize("name", ["password", "secret", "api_key"])
+def test_a_secret_handed_to_a_short_call_is_reported(name):
+    """The hole was not only the open call — a closed one hid a literal too."""
+    line = _open_call("", name, "f") + '"hunter2swordfish")'
+
+    assert scan_text("x.py", line), line
+
+
+def test_a_short_subscript_holding_a_secret_is_reported():
+    line = _open_call("", "secret", "data").replace("(", "[") + '"hunter2swordfish"]'
+
+    assert scan_text("x.py", line), line
+
+
+@pytest.mark.parametrize("line_parts", [
+    ("token", "f", ")"),
+    ("secret", "data", '"key"]'),
+])
+def test_a_short_call_that_closes_with_no_secret_is_still_excused(line_parts):
+    """The new branch must not turn every short call into a report."""
+    name, call, tail = line_parts
+    opener = _open_call("", name, call)
+    if tail.endswith("]"):
+        opener = opener.replace("(", "[")
+
+    assert not scan_text("x.py", opener + tail)
+
+
+@pytest.mark.parametrize("line", [
+    "bearer: Optional[str]",
+    "password: Dict[str, str] = {}",
+    "api_token: Sequence[bytes]",
+])
+def test_a_type_annotation_is_still_not_a_credential(line):
+    """The call branch also matches `Optional[`; the type check runs first."""
+    assert not scan_text("x.py", line), line
+

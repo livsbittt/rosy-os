@@ -168,9 +168,18 @@ class NavigationManager:
     def start_mapping(self, source: str = "api") -> None:
         if self._safety.estop:
             raise NavigationError("EMERGENCY_ACTIVE", "e-stop is active")
-        if self._nav_state not in _IDLE_STATES:
-            raise NavigationError("NAVIGATION_ACTIVE",
-                                  f"navigation in progress ({self._nav_state.value})")
+        with self._lock:
+            if self._moving_session is not None:
+                # `moving_goal` refuses during a mapping session; this is the
+                # other direction. `_nav_state` alone does not see a follow in
+                # HOLD — no goal is out, but the formation still owns the goal
+                # and resumes the moment its stream returns.
+                raise NavigationError(
+                    "NAVIGATION_ACTIVE",
+                    "a swarm follow session owns the goal — cancel it first")
+            if self._nav_state not in _IDLE_STATES:
+                raise NavigationError("NAVIGATION_ACTIVE",
+                                      f"navigation in progress ({self._nav_state.value})")
         self.mapping_active = True
         self._events.publish("slam.started", source="navigation_manager", data={"by": source})
 
