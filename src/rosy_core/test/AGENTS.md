@@ -33,6 +33,8 @@ pytest for rosy_core policy, API, dashboard, and protocol. Most tests import Pyt
 | `test_diagnostics_api.py` | DIAG-001 rollup, unknown component, agreement with `/metrics` |
 | `conftest.py` | `core_client` fixture: the one place a test stands a robot up |
 | `test_goal_tracker.py` | Nav2 goal generations: stale results, the cancel-before-accept window |
+| `test_event_catalogue.py` | §8 catalogue vs the events the package can emit, both directions |
+| `test_teleop_watchdog_event.py` | SAF-002 expiry announces once per lapse |
 | `test_swarm_integration.py` | Real `NavigationManager` + replayed bridge callbacks — the seam a `FakeNav` hides |
 
 ## Subdirectories
@@ -49,6 +51,7 @@ None (ignore `__pycache__/`).
 - A `FakeNav`-style double proves the caller, not the seam. Swarm's two worst defects (a HOLD whose cancel never reached Nav2, NAV-006 silently disabled) both lived between the real managers — keep `test_swarm_integration.py` covering that path.
 - Asserting that a source file contains a string proves only the wiring. Where a value matters, put the computation in a ROS-free module (`bridge/translate.py`, `navigation/initial_pose.py`) and assert the value.
 - When adding an API field, assert it here **and** in `protocol/schemas.py`.
+- A new event needs a row in §8 of the API reference before `test_event_catalogue.py` passes. That is deliberate: an undocumented event sits outside the deprecation policy, so it can vanish without anyone having broken a promise.
 
 ### Testing Requirements
 

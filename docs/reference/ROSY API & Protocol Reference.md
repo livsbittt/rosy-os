@@ -403,12 +403,13 @@ close code: `4401` 은 토큰이 없거나 틀린 것(`/ws/state` 와 동일), `
 | `nav.failed` | error | 로봇 | `{error_code}` |
 | `nav.canceled` | info | 로봇 | `{source}` |
 | `nav.stuck` | error | 로봇 | `{timeout_ms}` |
-| `nav.blocked` | warning | 로봇 | `{}` |
+| `nav.blocked` | warning | 로봇 | **미구현** — CORE 는 Nav2 액션 피드백을 구독하지 않아 막힘을 알 방법이 없다. 진척이 없는 주행은 NAV-006 이 `nav.stuck` 으로 끝낸다 |
 | `safety.estop` | critical | 로봇 | `{source}` |
 | `safety.estop_released` | warning | 로봇 | `{by}` |
 | `safety.watchdog` | warning | 로봇 | `{timeout_ms}` |
 | `battery.low` | warning | 로봇 | `{percent}` |
 | `battery.critical` | critical | 로봇 | `{percent, policy}` |
+| `battery.shutdown_request_failed` | error | 로봇 | `{path, error, armed}` — D-27 셧다운 센티넬을 쓰지 못했다. 딥배터리 보호가 무장되지 않았다는 뜻이므로 조용히 넘어가면 안 된다 |
 | `command.rejected` | warning | 로봇 | `{source, reason}` |
 | `waypoint.created/updated/deleted` | info | 로봇 | `{name}` |
 | `slam.started` / `slam.stopped` | info | 로봇 | `{by, reset?}` (NAV-005 세션) |
@@ -417,6 +418,17 @@ close code: `4401` 은 토큰이 없거나 틀린 것(`/ws/state` 와 동일), `
 | `presence.detected` / `presence.cleared` | info | 로봇 | `{state, range}` (PWR-002) |
 | `power.lidar_changed` | info | 로봇 | `{spinning, reason, spinup_s}` (PWR-005 STANDBY LiDAR 정지) |
 | `map.saved` | info | 로봇 | `{map_id}` |
+| `localization.initialpose` | info | 로봇 | `{x, y, yaw, by}` — 운영자가 AMCL 자세를 놓았다 |
+| `docking.started` | info | 로봇 | `{dock_id}` (DNC-003) |
+| `docking.docked` | info | 로봇 | `{dock_id}` |
+| `docking.charging` / `docking.charge_lost` | info | 로봇 | `{dock_id}` — 독립된 두 소스로 확인한 충전 상태 (D-28) |
+| `docking.undock_started` | info | 로봇 | `{dock_id}` |
+| `docking.undocked` | info | 로봇 | `{}` |
+| `docking.canceled` | info | 로봇 | `{dock_id}` |
+| `docking.retry` | warning | 로봇 | `{reason, attempt}` — 접근 재시도 |
+| `docking.reseat` | warning | 로봇 | `{reason, attempt}` — 접점 재착좌 |
+| `docking.failed` | error | 로봇 | `{reason, dock_id}` — 종착이며 스스로 재시도하지 않는다 (D-28) |
+| `docking.return_started` | warning | 로봇 | `{dock_id, reason}` — SAF-005 저배터리 복귀 |
 | `mission.assigned` | info | Fleet | `{mission_id, robot_id}` |
 | `mission.started` | info | Fleet | `{mission_id}` |
 | `mission.step_completed` | info | Fleet | `{mission_id, step_index}` |
@@ -557,6 +569,7 @@ Fleet(rosy_fleet)이 제공하는 엔드포인트. Base: `http://<fleet-host>:80
 
 | 버전 | 일자 | 내용 |
 |---|---|---|
+| v1.8 | 2026-09-06 | 이벤트 카탈로그를 실제 발행 목록과 일치시킴: `docking.*` 11 종과 `localization.initialpose` 문서화, `nav.blocked` 는 미구현 표시. `safety.watchdog` 은 v1.0 부터 약속만 있었고 이제 실제로 발행된다(SAF-002) |
 | v1.7 | 2026-09-06 | Additive: §7.8 pose payload 에 `map_id` — 다른 맵의 참조 pose 는 목표가 되지 않고 `swarm.hold(map_mismatch)` 를 낸다(MAP-002 를 추종으로 확장). `swarm/state` 에 `max_speed`·`map_mismatch`, `safety/state` 에 `limits.session_linear` 추가. `max_speed` 는 이제 검증만이 아니라 실제 상한으로 적용된다 |
 | v1.6 | 2026-09-06 | Additive: DIAG-001 `diagnostics` 조회 구현. 군집 추종 구현 — `swarm/follow·cancel·state` 가 실제로 서빙되고, `/ws/swarm/pose`(SWM-003)·`/ws/swarm/reference`(SWM-007) 소켓 신설(§7.8, D-31). `swarm/state` 에 `holding`·`target_robot_id`·`source`·`stream_age_s` 추가 |
 | v1.5 | 2026-09-06 | Additive: 현장 설정 — `PUT system/info`, `system/tokens/*`, `system/runtime`, `host/*` 릴레이 카탈로그(§5.7) 신설. `safety/limits` 에 `fleet_loss_policy`·배터리 임계값 추가(SAF-004/005). 미구현 상태였던 `diagnostics/*`·`ros/*`·`swarm/*` 행에 표시. 토큰은 해시 저장이며 목록은 불투명 `id` 로 식별한다(D-30) |

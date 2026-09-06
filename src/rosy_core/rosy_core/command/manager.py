@@ -34,6 +34,9 @@ class CommandManager:
         self._events = events
         self.watchdog = TeleopWatchdog(timeout_ms=500)
         self._manual_twist: Optional[Twist] = None
+        #: 만료를 알린 적이 있는가. select_output 은 50 Hz 로 불리므로
+        #: 상태가 아니라 전이에서만 말해야 한다.
+        self._watchdog_announced = False
         self._nav_twist: Optional[Twist] = None
         self._nav_updated_at: Optional[float] = None
         self._nav_timeout_s = 0.5
@@ -56,6 +59,8 @@ class CommandManager:
         linear, angular = self._safety.clip(linear, angular, scope="manual")
         self._manual_twist = Twist(linear, angular)
         self.watchdog.refresh()
+        # 새 명령이 왔으니 다음 끊김은 다시 알릴 일이다.
+        self._watchdog_announced = False
         return True, ""
 
     @property
@@ -81,6 +86,25 @@ class CommandManager:
         self._manual_twist = None
         self.watchdog.refresh(0.0)
 
+    def _announce_watchdog(self) -> None:
+        """SAF-002 만료를 한 번 알린다.
+
+        계약은 v1.0 부터 `safety.watchdog` 를 약속했는데 코드가 낸 적이 없다.
+        만료되면 출력은 조용히 0 이 되고, 조종하던 사람도 Fleet 도 로봇이 왜
+        섰는지 알 길이 없다 — 링크가 끊겼는지, 명령이 거부됐는지, 사람이 손을
+        뗀 것인지 구분되지 않는다.
+
+        `select_output` 은 50 Hz 로 불리므로 상태가 아니라 전이에서만 말한다.
+        쥐고 있던 teleop 이 없었다면 끊긴 조종도 없으므로 아무 말도 하지 않는다.
+        """
+        if self._manual_twist is None or self._watchdog_announced:
+            return
+        self._watchdog_announced = True
+        if self._events is not None:
+            self._events.publish(
+                "safety.watchdog", severity="warning", source="command_manager",
+                data={"timeout_ms": self.watchdog.timeout_ms})
+
     def select_output(self, now: Optional[float] = None) -> Twist:
         current = now if now is not None else time.monotonic()
         if self._safety.estop or self._modes.is_emergency:
@@ -89,6 +113,7 @@ class CommandManager:
             if self._manual_twist is not None and not self.watchdog.expired(current):
                 l, a = self._safety.clip(self._manual_twist.linear, self._manual_twist.angular, "manual")
                 return Twist(l, a)
+            self._announce_watchdog()
             return ZERO
         nav_age = current - self._nav_updated_at if self._nav_updated_at is not None else None
         if (
