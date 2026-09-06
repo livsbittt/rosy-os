@@ -3,7 +3,7 @@
 - 유일한 cmd_vel 퍼블리셔 (D-2): 50 Hz select_output → publish
 - 구독: odom / battery/voltage / nav_cmd_vel(Nav2 출력 리매핑 입력)
        / us_sensor/range, batt_state (PWR-002 근접 웨이크·배터리 표시)
-       / map, plan, local/global costmap (MAP-003 스냅샷)
+       / map, plan, local/global costmap_raw (MAP-003 스냅샷)
 - 발행: power/mode, display/info (PWR-003) — LED는 set_led 서비스로 구동
 - LiDAR 모터: start_motor / stop_motor 서비스로 STANDBY 듀티 조정 (PWR-005)
 - Nav2 NavigateToPose 액션 클라이언트 (NavExecutor 구현)
@@ -31,7 +31,14 @@ from sensor_msgs.msg import BatteryState, Imu, LaserScan, Range
 from std_msgs.msg import Bool, Float32, String
 from std_srvs.srv import Empty
 
-from rosy_core.bridge import display, odometry, reconcile, save_map, translate
+from rosy_core.bridge import (
+    battery_policy,
+    display,
+    odometry,
+    reconcile,
+    save_map,
+    translate,
+)
 from rosy_core.bridge.goal_tracker import GoalTracker
 from rosy_core.maps import occupancy_map_id
 from rosy_core.navigation.initial_pose import amcl_pose_covariance
@@ -48,7 +55,7 @@ from rosy_core.diagnostics.collector import (
     topic_freshness_provider,
 )
 from rosy_core.navigation.manager import NavGoalSpec, NavigationError
-from rosy_core.power.battery import BatteryLevel, resolve_led
+from rosy_core.power.battery import resolve_led
 from rosy_core.protocol.schemas import HealthState
 
 # 늦게 뜬 노드도 현재 모드를 즉시 받도록 latch 한다 (PWR-003).
@@ -88,9 +95,11 @@ class RosBridge:
         node.create_subscription(BatteryState, "batt_state", self._on_batt_state, 10)
         node.create_subscription(OccupancyGrid, "map", self._on_map, _LATCHED)
         node.create_subscription(Path, "plan", self._on_plan, 10)
-        node.create_subscription(Costmap, "local_costmap/costmap", self._on_local_costmap, 10)
+        # Nav2 는 같은 격자를 두 토픽으로 낸다: `costmap` 은 nav_msgs/OccupancyGrid,
+        # `costmap_raw` 는 nav2_msgs/Costmap 이다. 예전에는 네 개를 다 구독했는데,
+        # 앞의 둘은 타입이 맞지 않아 영원히 매칭되지 않는 리더였다 — 데이터는 한 줄도
+        # 오지 않으면서 디스커버리 비용만 냈다. `_raw` 쪽만 남긴다.
         node.create_subscription(Costmap, "local_costmap/costmap_raw", self._on_local_costmap, 10)
-        node.create_subscription(Costmap, "global_costmap/costmap", self._on_global_costmap, 10)
         node.create_subscription(Costmap, "global_costmap/costmap_raw", self._on_global_costmap, 10)
 
         self.power_mode_pub = node.create_publisher(String, "power/mode", _LATCHED)
@@ -155,42 +164,8 @@ class RosBridge:
         self._apply_voltage(float(msg.data))
 
     def _apply_voltage(self, voltage: float) -> None:
-        """생 표본을 정책 계층에 넣고, 그것이 거른 값으로만 SAF-005를 태운다.
-
-        예전에는 표본 하나가 곧장 임계 판정을 거쳐 E-Stop 까지 갔다. 모터가
-        기동할 때의 전압 새그 한 발이 크리티컬 정책을 오발화시키던 경로다.
-        """
-        if not math.isfinite(voltage):
-            return
-
-        battery = self._svc.battery
-        battery.on_voltage(voltage)
-
-        percent = battery.percent
-        if percent is None:
-            return
-
-        self._svc.state.set_battery(percent, voltage)
-        self._svc.state.set_battery_status(battery.status())
-        self._svc.power.on_battery_alert(battery.level.value)
-
-        # DEEP 은 유예 전에 먼저 움직임을 멈춘다. 모터가 최대 소모원이고, 부하가
-        # 빠져야 전압이 휴지 곡선 쪽으로 회복해 셧다운 판단의 근거가 나아진다.
-        if battery.level is BatteryLevel.DEEP:
-            self._svc.safety.trigger_estop("battery_deep")
-
-        # 20% 경고에서 도크 복귀를 시도한다 (DNC-006). 도크가 없거나
-        # 미지원이면 아무 일도 하지 않고 SAF-005 폴백이 그대로 남는다.
-        self._svc.docking.on_battery_level(battery.level)
-
-        action = self._svc.safety.on_battery_percent(percent)
-        if action == "RETURN_HOME":
-            try:
-                self._svc.nav.home(source="battery_policy")
-            except Exception:
-                self._svc.safety.trigger_estop("battery_policy")
-        elif action in ("STOP",):
-            self._svc.safety.trigger_estop("battery_policy")
+        """생 표본을 정책 계층에 넣고, 그것이 거른 값으로만 SAF-005를 태운다."""
+        battery_policy.apply_voltage(self._svc, voltage)
 
     def _on_nav_cmd_vel(self, msg: Twist) -> None:
         self._svc.command.set_nav_twist(CoreTwist(linear=msg.linear.x, angular=msg.angular.z))
@@ -534,7 +509,7 @@ class RosBridge:
         (일반 실패가 아니라 `CAPABILITY_NOT_SUPPORTED`).
 
         실물은 slam_toolbox `Reset` 서비스이며 `mapping/` 트리거에 걸려 있다
-        — 이식원은 `rosy_navigation/scripts/nav2_web_server.py`.
+        — 이식원은 구 Flask `nav2_web_server.py` 였다 (D-3 이후 사문화되어 삭제됨).
         """
         raise NavigationError(
             "CAPABILITY_NOT_SUPPORTED",
