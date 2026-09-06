@@ -102,7 +102,7 @@ A dependency reached through `hasattr`/`getattr` instead of a declared member, *
 
 *What it does not catch, stated so the guarantee is not oversold:* a reach whose receiver is itself a call or a subscript (`getattr(obj["k"], ...)`, `getattr(self.dep(), ...)`), and anything reaching an attribute without `getattr`/`hasattr` at all. It gates the syntax C6 names, not every possible way to dodge a contract.
 
-*Check (pasted output):*
+*Check (pasted output, at `5a5b7c3`):*
 
 ```
 $ grep -rnE "hasattr\(|getattr\(self\.|getattr\(svc\." src/rosy_core/rosy_core/ --include=*.py
@@ -113,20 +113,32 @@ docking/manager.py:199:        if getattr(self._safety, "estop", False):
 docking/manager.py:261:        if self._manual_active or getattr(self._safety, "estop", False):
 docking/manager.py:284:        if getattr(self._safety, "estop", False) and self._state in (
 docking/manager.py:403:        voltage = getattr(self._battery, "voltage", None) if self._battery else None
-navigation/manager.py:193:        if self.executor is not None and hasattr(self.executor, "reset_mapping"):
 power/manager.py:199:        return float(getattr(self._cfg, _RATE_ATTR[mode]))
 system/host_agent_client.py:157:        if not hasattr(socket, "AF_UNIX"):  # pragma: no cover - Windows dev host
 ```
 
-Ten reaches, three verdicts:
+**The list lives in the test, not here.** `ALLOWED` in `test_module_criteria.py` is the
+authoritative set and the only copy a change has to keep true; this paste is dated evidence
+and these paragraphs are the reasoning. The two drifted apart within a day the first time
+they were both treated as authoritative — the test lost the `navigation/manager.py` entry
+when Step 2 removed that reach, and this section did not notice, because the test compares
+the code against its own allowlist and has no opinion about prose.
+
+Nine reaches, three verdicts:
 
 | Reach | Verdict |
 |---|---|
 | `api/v1/safety.py` ×2 — `getattr(getattr(svc.battery, "_cfg", None), "deep_percent", 5.0)` | **Seam lie.** Reaches a *private* field across a package boundary because `BatteryMonitor` (`power/`) exposes no public accessor to `safety/`. Fix: add `BatteryMonitor.deep_percent`. Whether SAF or PWR should own battery thresholds at all is a separate, open question. |
-| `navigation/manager.py` — `hasattr(self.executor, "reset_mapping")` | **Seam lie, and a live defect.** The contract does not declare the member, and `RosBridge` does not implement it — so `POST /api/v1/slam/reset` returns `{"reset": true}` for a no-op. See the verdicts below. |
 | `docking/manager.py` ×5 | **Accepted.** None-tolerance for optional injections whose attribute is part of the injected type's public surface. |
 | `power/manager.py` | **Accepted.** Mode → attribute dispatch over the module's own config object. |
 | `system/host_agent_client.py` | **Platform guard, not a seam.** `AF_UNIX` is absent on the Windows dev host. |
+
+**Resolved — the criterion earned its keep on first application.** `navigation/manager.py`
+reached the executor through `hasattr(self.executor, "reset_mapping")`, a member no contract
+declared and `RosBridge` never implemented, so `POST /api/v1/slam/reset` answered
+`{"reset": true}` for a no-op. Fixed in D-32: the contract declares the member, the bridge
+implements it and fails with `CAPABILITY_NOT_SUPPORTED`, and the probe is gone. A criterion
+that finds a live defect the first time it is run is not an abstraction.
 
 Line numbers above drift; the test keys on `(file, kind, receiver, attribute)` for exactly that reason.
 
