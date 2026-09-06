@@ -119,6 +119,38 @@ _CODE_REFERENCE = re.compile(
     r")$"
 )
 
+
+# The head of a call or subscript expression, not a literal: prefs.getString(,
+# created.json()[. The bare-value branch of _ASSIGNMENT stops at the first
+# quote, so a value ending in an opener means code started, never a secret.
+#
+# Excusing the shape alone would hide password = wrap("hunter2swordfish"), so
+# _call_holds_no_literal checks what the call was handed. Widening an exclusion
+# is how a matcher goes quiet; this one stays narrow by asking that question.
+_CODE_EXPRESSION = re.compile(
+    r"^[A-Za-z_][A-Za-z0-9_]*"
+    r"(?:\.[A-Za-z_][A-Za-z0-9_]*)*"
+    r"(?:\(\))*"
+    r"[\(\[]$"
+)
+
+#: A quoted argument this long is a secret, not a lookup key. Six would catch
+#: "secret" in prefs.getString("secret", ""), which is the name of a slot.
+_ARGUMENT_LITERAL = re.compile(r"""["']([^"'\n]{8,})["']""")
+
+
+def _call_holds_no_literal(line: str, start: int) -> bool:
+    """True when the call opening at ``start`` was handed no long literal.
+
+    This is what keeps the call-head exclusion from silencing the matcher:
+    password = decrypt_value("hunter2swordfish") still reports.
+    """
+    return not any(
+        not _is_placeholder(m.group(1))
+        for m in _ARGUMENT_LITERAL.finditer(line[start:])
+    )
+
+
 # This module's own matchers would flag their own source. Nothing else is
 # exempt by name: excluding a file makes it the one safe place to hide a
 # secret, and a test file is exactly where one gets pasted "temporarily".
@@ -210,6 +242,8 @@ def scan_text(path: str, text: str) -> list[Finding]:
                 _is_placeholder(value)
                 or _TYPE_EXPRESSION.match(value)
                 or _CODE_REFERENCE.match(value)
+                or (_CODE_EXPRESSION.match(value)
+                    and _call_holds_no_literal(line, match.end()))
             ):
                 continue
             # A reference to another variable or a path is not a literal secret.

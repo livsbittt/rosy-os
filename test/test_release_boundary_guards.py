@@ -377,3 +377,44 @@ def test_scanner_ignores_placeholders_and_public_data():
     assert not findings, "scanner flagged placeholders:\n" + "\n".join(
         str(f) for f in findings
     )
+
+
+# --- a call is not a literal, but a literal inside one still is -------------
+
+
+@pytest.mark.parametrize("line", [
+    'const String secret = prefs.getString("secret", "");',
+    'secret = created.json()["token"]',
+    'api_token = response.headers.get("x-token")',
+    'password = load()',
+    'psk = self.setup_psk',
+])
+def test_reading_a_value_out_of_code_is_not_a_secret(line):
+    """The bare-value branch stops at the first quote, so a captured value that
+    ends in ( or [ is the head of an expression — never a literal.
+
+    Firmware that reads its own key out of NVS was reported for years of this
+    scanner's life, which trains everyone to ignore the report.
+    """
+    assert not scan_text("sample.ino", line), line
+
+
+@pytest.mark.parametrize("line", [
+    'password = decrypt_value("hunter2swordfish")',
+    'secret = config.get("key", "site-passphrase-not-to-be-kept")',
+    'api_key = os.environ.get("K", "sk_live_9182aeb27c4d")',
+])
+def test_a_secret_handed_to_a_call_is_still_a_secret(line):
+    """The exclusion is about the shape of the value, not the shape of the line.
+
+    Excusing every call would let a literal hide one bracket deep, which is
+    exactly how a matcher goes quiet without anyone noticing.
+    """
+    assert scan_text("sample.py", line), line
+
+
+def test_a_lookup_key_is_not_mistaken_for_the_secret_it_looks_up():
+    """A slot name is short; a passphrase is not. Eight characters is the line."""
+    assert not scan_text("x.py", 'secret = prefs.getString("secret")')
+    assert scan_text("x.py", 'secret = prefs.getString("hunter2swordfish")')
+
