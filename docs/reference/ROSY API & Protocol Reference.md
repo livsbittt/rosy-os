@@ -175,7 +175,7 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 | POST | `/api/v1/slam/start` | Operator | NAV-005 |
 | POST | `/api/v1/slam/stop` | Operator | NAV-005 |
 | POST | `/api/v1/slam/save` | Operator | NAV-005 (응답에 `map_id`) |
-| POST | `/api/v1/slam/reset` | Operator | NAV-005. 런타임에 slam_toolbox 리셋이 없으면 `501 CAPABILITY_NOT_SUPPORTED`, 맵핑 세션이 없으면 `400 VALIDATION_ERROR` (D-32) |
+| POST | `/api/v1/slam/reset` | Operator | NAV-005. **미구현** — 어느 런타임에도 slam_toolbox 리셋이 없어 항상 `501 CAPABILITY_NOT_SUPPORTED`. 맵핑 세션이 없으면 `400 VALIDATION_ERROR` (D-32) |
 
 ## 5.4 Map·Waypoint
 
