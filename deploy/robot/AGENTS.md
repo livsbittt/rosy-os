@@ -41,7 +41,10 @@ On-device runtime: multi-stage Dockerfile (`core` / `io` targets), Compose `rosy
 - Host proc/sys bind-mounts are read-only for dashboard telemetry (`ROSY_HOST_ROOT=/host`).
 - Low-battery shutdown: CORE writes `battery-shutdown-request.json`; the host unit executes halt (sentinel age 900 s, grace cap 600 s). CORE must not call shutdown itself (D-27).
 - `rosy-runtime.service` **Requires** `rosy-release-recover.service` — `Wants=` would make recovery advisory.
-- `ROS_DOMAIN_ID` default 42; CycloneDDS URI `file:///etc/rosy/cyclonedds.xml`.
+- `ROS_DOMAIN_ID` has **no default** — it is derived from `ROSY_ROBOT_NUMBER`
+  (`40 + N`, namespace `rosy_%02d`) at install time and `compose.yaml` uses the
+  `${VAR:?}` form so an unset identity stops the runtime (D-33). A default here is
+  what shipped every unit as 42/`rosy_01`. CycloneDDS URI `file:///etc/rosy/cyclonedds.xml`.
 
 ### Testing Requirements
 

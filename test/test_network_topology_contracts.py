@@ -64,15 +64,40 @@ def test_contract_documents_exist():
 # --- ADR governance -------------------------------------------------------
 
 
-#: D-19's original reasoning, which the ADR log's rule says must not be
-#: rewritten when a decision is replaced. Asserted verbatim so that editing
-#: the superseded record in place fails rather than passing quietly.
-D19_ORIGINAL_DECISION = (
-    "**Decision:** 해당 토폴로지를 표준 배포 시나리오로 수용한다(NET-001~004)."
-)
-D19_ORIGINAL_CONTEXT = (
-    '현장 네트워크 구성이 "로봇이 상위 WiFi에 연결된 채 AP처럼 동작해 무선을 릴레이"하는'
-)
+#: Every superseded decision, and what must survive verbatim in it.
+#:
+#: This was hardcoded to D-19 alone, which meant the governance rule it claims to
+#: enforce protected exactly one decision. Superseding D-6 with D-33 would have gone
+#: unguarded — a plan review caught that the mitigation named here did not mitigate.
+#: Table-driven now, so adding a supersession means adding a row, not a test.
+SUPERSESSIONS = {
+    "D-19": {
+        "heading": "## D-19 접속 토폴로지: 로봇 WiFi 릴레이(AP+STA) 지원",
+        "superseded_by": "D-26",
+        "decision": (
+            "**Decision:** 해당 토폴로지를 표준 배포 시나리오로 수용한다(NET-001~004)."
+        ),
+        "context": (
+            '현장 네트워크 구성이 "로봇이 상위 WiFi에 연결된 채 AP처럼 동작해 무선을 릴레이"하는'
+        ),
+        "index_row": (
+            "| D-19 | 접속 토폴로지: 로봇 WiFi 릴레이(AP+STA) 지원 | Superseded by D-26 |"
+        ),
+    },
+    "D-6": {
+        "heading": "## D-6 로봇 간 DDS 차단",
+        "superseded_by": "D-33",
+        "decision": (
+            "**Decision:** 로봇별 고유 `ROS_DOMAIN_ID` + CycloneDDS localhost-only "
+            "프로파일로 로봇 간 DDS를 차단한다. 로봇 간 데이터는 Fleet 경유만."
+        ),
+        "context": (
+            "**Context:** 동일 WiFi에서 다수 로봇의 DDS 디스커버리 트래픽은 "
+            "불안정의 주 원인이 된다(SRS §33)."
+        ),
+        "index_row": "| D-6 | 로봇 간 DDS 차단 (도메인 격리) | Superseded by D-33 |",
+    },
+}
 
 
 def test_the_adr_log_still_requires_superseding_rather_than_editing(adr):
@@ -81,16 +106,39 @@ def test_the_adr_log_still_requires_superseding_rather_than_editing(adr):
     assert "`Superseded`" in adr
 
 
-def test_d19_is_superseded_not_edited_in_place(adr):
-    """The ADR log's own rule: supersede, never rewrite a decision."""
-    section = _section(adr, "## D-19 접속 토폴로지: 로봇 WiFi 릴레이(AP+STA) 지원")
-    assert "**Status:** Superseded by D-26" in section
-    assert D19_ORIGINAL_DECISION in section, (
-        "D-19's original Decision must survive verbatim; the ADR log forbids "
-        "rewriting a superseded record"
+@pytest.mark.parametrize("decision_id", sorted(SUPERSESSIONS))
+def test_superseded_decisions_are_not_edited_in_place(adr, decision_id):
+    """The ADR log's own rule: supersede, never rewrite a decision.
+
+    Asserted verbatim so that editing a superseded record fails rather than
+    passing quietly — including its index row, which is a second place the
+    status can silently drift.
+    """
+    entry = SUPERSESSIONS[decision_id]
+    section = _section(adr, entry["heading"])
+
+    assert f"**Status:** Superseded by {entry['superseded_by']}" in section, (
+        f"{decision_id} must carry its supersession in the Status line"
     )
-    assert D19_ORIGINAL_CONTEXT in section, "D-19's original Context must survive verbatim"
-    assert "| D-19 | 접속 토폴로지: 로봇 WiFi 릴레이(AP+STA) 지원 | Superseded by D-26 |" in adr
+    assert entry["decision"] in section, (
+        f"{decision_id}'s original Decision must survive verbatim; the ADR log "
+        f"forbids rewriting a superseded record"
+    )
+    assert entry["context"] in section, (
+        f"{decision_id}'s original Context must survive verbatim"
+    )
+    assert entry["index_row"] in adr, (
+        f"{decision_id}'s index row must record the supersession too"
+    )
+
+
+@pytest.mark.parametrize("decision_id", sorted(SUPERSESSIONS))
+def test_every_superseding_decision_exists_and_is_complete(adr, decision_id):
+    """A supersession that points at a decision nobody wrote is not a supersession."""
+    successor = SUPERSESSIONS[decision_id]["superseded_by"]
+    section = _section(adr, f"## {successor} ")
+    for heading in ("**Context:**", "**Decision:**", "**Consequences:**"):
+        assert heading in section, f"{successor} is missing {heading}"
 
 
 def test_d26_exists_and_replaces_d19(adr):

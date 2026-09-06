@@ -462,7 +462,7 @@ rosy-vision:
   healthcheck:
     test:
       - CMD-SHELL
-      - "ros2 node list 2>/dev/null | grep -Fq '/${ROSY_NAMESPACE:-rosy_01}/rosy_vision'"
+      - "ros2 node list 2>/dev/null | grep -Fq '/${ROSY_NAMESPACE}/rosy_vision'"
     interval: 10s
     timeout: 5s
     retries: 3

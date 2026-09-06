@@ -15,7 +15,7 @@
 | D-3 | Flask 완전 대체 — FastAPI 전면 이관 | Accepted |
 | D-4 | Namespace + frame_prefix 조합 | Accepted |
 | D-5 | Fleet↔로봇: 로봇 outbound WS + Fleet REST 명령 | Accepted |
-| D-6 | 로봇 간 DDS 차단 (도메인 격리) | Accepted |
+| D-6 | 로봇 간 DDS 차단 (도메인 격리) | Superseded by D-33 |
 | D-7 | React+TS+Vite, 빌드 산출물 정적 서빙 | Accepted |
 | D-8 | 프로세스 내 이벤트 버스 | Accepted |
 | D-9 | Waypoint 로컬 저장소 (JSON) | Accepted |
@@ -41,6 +41,8 @@
 | D-30 | 현장 설정은 로컬 오버레이에만 쓰고, 토큰은 해시로만 남긴다 | Accepted |
 | D-31 | 군집 참조 스트림은 로봇의 소켓이다 — Fleet 은 선택적 중계자 | Accepted |
 | D-32 | 광고한 능력을 못 지키면 200 이 아니라 코드로 실패한다 | Accepted |
+| D-33 | 로봇 신원은 하나의 로봇 번호에서 나온다 | Accepted (D-6 대체) |
+| D-34 | 발행 주기는 그것을 읽는 쪽에 맞춘다 | Accepted |
 
 ---
 
@@ -106,7 +108,7 @@
 
 ## D-6 로봇 간 DDS 차단
 
-**Status:** Accepted (2026-08)
+**Status:** Superseded by D-33 (2026-09-06)
 
 **Context:** 동일 WiFi에서 다수 로봇의 DDS 디스커버리 트래픽은 불안정의 주 원인이 된다(SRS §33).
 
@@ -759,3 +761,76 @@ Protocol 은 구조적이고 `RosBridge` 는 베이스 클래스를 선언하지
 (`docs/plans/2026-09-06-module-split-criteria.md`). 그때 리셋이 어떤 이벤트를
 발행할지도 함께 정해야 한다 — 지금은 두 경로가 모두 먼저 raise 하므로 기존
 `slam.started {"reset": true}` 발행은 도달 불가 코드로 남아 있다.
+
+---
+
+## D-33 로봇 신원은 하나의 로봇 번호에서 나온다
+
+**Status:** Accepted (2026-09-06) — D-6 대체
+
+**Context:** D-6 은 "로봇별 고유 `ROS_DOMAIN_ID`" 를 결정했지만, 구현은 그 결정을
+지키지 않았다. `deploy/robot/.env.example` 이 `ROS_DOMAIN_ID=42` 와
+`ROSY_NAMESPACE=rosy_01` 을 **값으로** 들고 있었고, `install-pi.sh` 는 그 템플릿을
+그대로 복사한다. 그래서 릴리스에서 설치된 모든 기기가 같은 도메인 **그리고** 같은
+네임스페이스로 출고됐다 — 도메인만 겹친 것이 아니라 토픽 이름까지 전부 겹쳤다.
+개발용 `rosy_env.sh` 는 `40 + N` 이라는 또 다른 규칙을 쓰고 있어서, 스크립트로 띄운
+2호기가 기본 배포된 모든 기기와 정확히 충돌했다.
+
+이 결함은 설치 스크립트만 고쳐서는 사라지지 않는다. 값을 채워 넣는 헬퍼
+(`set_env_default`) 는 키가 **없을 때만** 쓰므로, 템플릿이 값을 들고 있는 한 영영
+발화하지 못한다. 계획 검토 중 이 함정을 두 번 밟았다: 두 번 다 호출은 추가됐고
+테스트는 초록이었으며 기기는 여전히 충돌했다.
+
+**Decision:** 로봇 신원은 **로봇 번호 하나**에서 유도한다 — `ROS_DOMAIN_ID = 40 + N`,
+`ROSY_NAMESPACE = rosy_%02d`. 그리고 세 계층 모두에서 **기본값을 없앤다**:
+
+- `.env.example` 은 두 키를 **배정하지 않는다** (규칙만 주석으로 남긴다).
+- `install-pi.sh` 는 `ROSY_ROBOT_NUMBER` 를 **요구**하고, `0 <= 40+N <= 101` 을
+  검증하며, 이미 다른 번호로 자리잡은 기기를 만나면 **두 값을 모두 이름 대어 실패**한다.
+- `compose.yaml` 은 여섯 군데 전부 `${VAR:?...}` 를 쓴다 — `:8` 만 고치면 반쪽이다.
+  `:51` 이 실제로 노드가 기동에 쓰는 `__ns:=` 인자다.
+
+검증은 "호출이 있는가" 가 아니라 **"신규 설치가 실제로 다른 값을 낳는가"** 로 한다
+(`test/test_dds_identity_contracts.py`).
+
+**Consequences:** 신원 미설정은 조용한 충돌이 아니라 기동 실패가 된다 — 의도한 바다.
+이미 배포된 기기는 자동으로 재번호되지 않으며, 다음 프로비저닝 때 불일치 검사가
+잡는다. 재번호 절차는 `docs/deployment/raspberry-pi-runtime.md` 에 있다.
+D-6 의 localhost-only 프로파일 결정은 **그대로 유효하다** — 이 ADR 은 신원 유도만
+대체한다.
+
+---
+
+## D-34 발행 주기는 그것을 읽는 쪽에 맞춘다
+
+**Status:** Accepted (2026-09-06)
+
+**Context:** global costmap 은 `publish_frequency: 1.0` 으로 전체 격자를 초당 한 번씩
+내보내고 있었다. 그런데 그 격자를 읽는 유일한 소비자는 대시보드이고,
+`src/rosy_core/rosy_core/web/app.js:647` 의 `refreshSlowData` 는 **5000 ms 간격**이다.
+게다가 스트림이 아니라 캐시에 대한 REST pull 이라, 브라우저가 하나도 열려 있지
+않아도 초당 한 장씩 계속 나갔다. 즉 소비자보다 다섯 배 빨랐다.
+
+`publish_voxel_map: True` 는 더 단순한 경우다 — 저장소 전체에서 구독자가 하나도
+없다. RViz 디버그 출력인데 `update_frequency: 5.0` 에 물려 있어서, 아무도 보지 않는
+격자를 초당 다섯 번 내보내고 있었다.
+
+이 값들에는 어떤 테스트도 걸려 있지 않았다. `publish_frequency` 를 grep 하면 params
+파일 자신 말고는 나오지 않는다.
+
+**Decision:** **발행 주기는 측정이 아니라 소비자에게서 읽는다.** 두 costmap 의
+`publish_frequency` 를 `0.2` 로, `publish_voxel_map` 을 `False` 로 둔다. 숫자의 출처는
+`app.js:647` 의 폴링 간격이며, 그 간격이 바뀌면 이 값도 함께 바뀐다.
+`test/test_nav2_bandwidth_contracts.py` 가 둘의 관계를 고정한다.
+
+플래너 품질은 `update_frequency` 가 정하므로 이 변경은 항법 거동과 무관하다.
+
+**Consequences:** 최악의 경우 맵 패널이 약 10초까지 낡을 수 있다. **이것이 너무
+낡다고 판단되면 주기를 다시 올리는 것이 아니라 수요 기반 충전으로 간다** — 캐시를
+채우는 주체를 타이머에서 요청으로 바꾸는 쪽이다. 그것이 **잠정적인 장기 방향**이며,
+`maps.py` / `api/v1/map.py` 의 모듈 소유권 판정
+(`docs/plans/2026-09-06-module-split-criteria.md`)에 걸려 미뤄져 있다.
+
+이 ADR 은 주기적 push 를 결정된 구조로 승인하지 않는다. 지금의 주기는 현재 소비자에
+맞춘 값일 뿐이고, 소비자가 사라지면 그 값도 0 이 되는 것이 옳다.
+RViz 사용자는 `publish_voxel_map` 을 로컬에서만 되살린다 — 배포본에는 켜서 보내지 않는다.

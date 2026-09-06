@@ -5,14 +5,14 @@
 
 ## Purpose
 
-Nav2 and SLAM Toolbox launch/config/maps for real robot and Gazebo. ament_cmake. `scripts/nav2_web_server.py` is leftover Flask; web launches start `rosy_core`.
+Nav2 and SLAM Toolbox launch/config/maps for real robot and Gazebo. ament_cmake. The leftover Flask UI (`scripts/`) was deleted — it had been superseded by `rosy_core` FastAPI since D-3 and was never launched or installed.
 
 ## Key Files
 
 | File | Description |
 |------|-------------|
 | `package.xml` | Depends on navigation2, nav2_bringup |
-| `CMakeLists.txt` | Installs the Python policy package, launch, params, maps, rviz. Does not install leftover Flask scripts. |
+| `CMakeLists.txt` | Installs the Python policy package, launch, params, maps, rviz. |
 
 ## Subdirectories
 
@@ -23,13 +23,12 @@ Nav2 and SLAM Toolbox launch/config/maps for real robot and Gazebo. ament_cmake.
 | `params/` | `nav2_params.yaml`, `mapper_params.yaml` (see `params/AGENTS.md`) |
 | `map/` | Occupancy maps (`my_map`, `pinklab`) (see `map/AGENTS.md`) |
 | `rviz/` | map_building / nav2_view configs (see `rviz/AGENTS.md`) |
-| `scripts/` | Legacy Flask nav UI (see `scripts/AGENTS.md`) |
 
 ## For AI Agents
 
 ### Working In This Directory
 
-- Do not extend Flask. D-3: feature parity via `/api/v1/*`.
+- D-3: the web UI is `rosy_core` FastAPI at `/api/v1/*`. The Flask original is gone.
 - Nav2 velocity_smoother output must be remappable to `nav_cmd_vel` so CommandManager owns `cmd_vel`.
 - Launch files compose. TF/param policy lives in `rosy_navigation.*`, not under `launch/`.
 - `gz_bringup_launch.xml` includes `bringup_launch.xml`; do not fork the robot Nav2 XML.

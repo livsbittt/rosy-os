@@ -24,7 +24,7 @@ None.
 
 - Phases: P0 rename/multi-robot → P1 rosy_core → P2 rosy_web → P3 two-robot → P4 rosy_fleet → P5 formation → P6 expand.
 - Task IDs look like `P1-9`. Prefer updating the matrix when you finish work.
-- Flask `src/rosy_navigation/scripts/nav2_web_server.py` is legacy; do not add features there.
+- The legacy Flask UI (`src/rosy_navigation/scripts/`) was deleted; `rosy_core` FastAPI `/api/v1/*` is the only web surface (D-3).
 
 ### Testing Requirements
 

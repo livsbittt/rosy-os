@@ -74,8 +74,11 @@ Edit the installer-managed environment as root:
 sudoedit /opt/rosy/deploy/robot/.env
 ```
 
-Set the robot identity, per-robot `ROS_DOMAIN_ID`, actual UART paths, and image
-pins in `.env`. The installer manages service UID/GID, `ROSY_DATA_PATH`,
+Set the actual UART paths and image pins in `.env`. **Do not set the identity
+by hand on a fresh unit** — run the installer with `ROSY_ROBOT_NUMBER=<n>` and it
+derives `ROS_DOMAIN_ID = 40 + n` and `ROSY_NAMESPACE = rosy_%02d` for you (D-33).
+The installer refuses to run without that variable, and refuses to silently
+change a unit that is already commissioned as a different number. The installer manages service UID/GID, `ROSY_DATA_PATH`,
 `dialout` GID, file ownership, and the safe `ROSY_RUNTIME_MODE=core` default.
 Do not use `privileged: true`. `rosy-motor` receives only the motor UART;
 `rosy-io` receives the motor and LiDAR UARTs.
@@ -97,8 +100,40 @@ participants discover each other. A DDNS name must never be used as a substitute
 for a per-robot DDS domain assignment.
 
 Keep a small deployment registry with one unique `ROS_DOMAIN_ID` and
-`ROSY_NAMESPACE` per robot. Linux deployments use domain IDs `0` through `101`;
-Rosy rejects values outside that commissioning range. The bundled CycloneDDS
+`ROSY_NAMESPACE` per robot. Both come from one robot number: `ROS_DOMAIN_ID =
+40 + N` and `ROSY_NAMESPACE = rosy_%02d`. Linux deployments use domain IDs `0`
+through `101`; Rosy rejects values outside that commissioning range, which caps
+the robot number at **61**.
+
+#### Commissioning a new unit
+
+```bash
+sudo ROSY_ROBOT_NUMBER=3 /opt/rosy/deploy/robot/install-pi.sh
+```
+
+The installer writes `ROS_DOMAIN_ID=43` and `ROSY_NAMESPACE=rosy_03` into `.env`
+only if they are not already set. Omitting `ROSY_ROBOT_NUMBER` is a hard failure,
+not a default — a default is what once shipped every unit as 42/`rosy_01`.
+
+#### Renumbering a unit that is already commissioned
+
+Re-running the installer with a different number **fails on purpose**, naming both
+the existing and the derived value, so a live robot is never renumbered mid-mission.
+To renumber deliberately:
+
+1. Stop the runtime: `sudo /opt/rosy/deploy/robot/runtime-mode.sh down`
+2. Edit both keys together — they must stay consistent:
+   ```bash
+   sudo sed -i 's/^ROS_DOMAIN_ID=.*/ROS_DOMAIN_ID=43/' /opt/rosy/deploy/robot/.env
+   sudo sed -i 's/^ROSY_NAMESPACE=.*/ROSY_NAMESPACE=rosy_03/' /opt/rosy/deploy/robot/.env
+   ```
+3. Start it again: `sudo /opt/rosy/deploy/robot/runtime-mode.sh up`
+4. Confirm the graph moved: `ros2 node list` from another unit must no longer see it.
+5. Update the deployment registry.
+
+A unit upgraded from a pre-D-33 release keeps whatever `.env` it already had — it
+neither breaks nor self-corrects. `ros2 node list` showing two robots on the same
+namespace is the symptom; this procedure is the fix. The bundled CycloneDDS
 profile binds discovery to `lo`, so the core and I/O containers on one Pi can
 communicate while Wi-Fi peers cannot join the DDS graph. Browser and fleet
 clients use FastAPI instead.

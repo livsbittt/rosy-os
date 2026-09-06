@@ -312,7 +312,7 @@ rosy_02/odom
 
 ## 6.2 DDS 격리
 
-동일 네트워크 내 로봇 간 ROS DDS 트래픽이 상호 간섭을 일으키지 않아야 한다. 로봇별 고유 `ROS_DOMAIN_ID`와 localhost-only DDS 프로파일을 적용한다(ADR-D-6). 로봇 간 통신은 DDS를 사용하지 않고 Fleet을 경유한다.
+동일 네트워크 내 로봇 간 ROS DDS 트래픽이 상호 간섭을 일으키지 않아야 한다. 로봇별 고유 `ROS_DOMAIN_ID`와 localhost-only DDS 프로파일을 적용한다(ADR-D-6, 신원 유도는 D-33이 대체). 도메인과 namespace는 모두 로봇 번호 하나에서 유도하며(`40 + N` / `rosy_%02d`), 템플릿·설치 스크립트·compose 어디에도 기본값을 두지 않는다. 로봇 간 통신은 DDS를 사용하지 않고 Fleet을 경유한다.
 
 ---
 

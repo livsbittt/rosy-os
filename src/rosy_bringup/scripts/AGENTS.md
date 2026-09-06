@@ -25,7 +25,7 @@ None.
 source $(ros2 pkg prefix rosy_bringup)/share/rosy_bringup/scripts/rosy_env.sh 1
 ```
 
-Do not replace this with `source env.sh` on a real robot (comment in root `env.sh`). Sets `ROS_DOMAIN_ID=40+N` and localhost CycloneDDS — **do not source this for `gz_multi`**.
+Do not replace this with `source env.sh` on a real robot (comment in root `env.sh`). Sets `ROS_DOMAIN_ID=40+N`, `ROSY_NAMESPACE=rosy_%02d` (D-33 — 도메인만 나누면 토픽 이름이 겹친다) and localhost CycloneDDS — **do not source this for `gz_multi`**.
 
 ### Testing Requirements
 

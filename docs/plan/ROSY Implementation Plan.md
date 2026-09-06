@@ -48,7 +48,7 @@
 | A-3 | `bringup_robot.launch`(XML) | namespace 인자 없음 | **Python launch로 전환 + namespace/frame_prefix 플러밍** (검증 완료) |
 | A-4 | LiDAR 런치 include | `frame_id: rplidar_link` 고정 | prefix 적용 |
 | A-5 | `gz_bringup_launch.xml` | namespace + `/tf→tf` 리매핑 이미 구현 | **참조 패턴으로 활용** |
-| A-6 | 전체 | DDS 도메인 분리 정책 없음 | 로봇별 `ROS_DOMAIN_ID` + localhost-only 프로파일 (D-6) |
+| A-6 | 전체 | DDS 도메인 분리 정책 없음 | 로봇별 `ROS_DOMAIN_ID` + localhost-only 프로파일 (D-6, 신원 유도는 D-33) |
 
 ## 2.3 기존 Flask 웹서버 (`nav2_web_server.py`, 560줄)
 
@@ -278,6 +278,7 @@ ROS `/diagnostics` + 자체 수집(CPU/MEM/Disk/온도/네트워크) → 컴포�
 | P0-3 | `bringup.py` 프레임 파라미터화 (A-2) | `ns=rosy_01`에서 `/rosy_01/odom`, `rosy_01/odom` TF 정상 | M |
 | P0-4 | `bringup_robot.launch.xml` namespace 플러밍 (A-3) + LiDAR frame prefix (A-4) | 실물 1대 namespace 동작 | M |
 | P0-5 | DDS 격리: `ROS_DOMAIN_ID` 할당 스크립트 + CycloneDDS localhost 프로파일 (A-6, D-6) | 2대 동일 LAN 상호 간섭 없음 | S |
+| P0-5b | 배포 절반 마감: 신원을 로봇 번호에서 유도하고 세 계층 모두에서 기본값 제거 (D-33) | 같은 릴리스에서 설치한 2대가 서로 다른 도메인·namespace 로 뜬다 | S |
 | P0-6 | `rosy_gz_sim` 멀티 인스턴스 런치 (`gz_multi.launch.py`, 인자: 로봇 수/namespace) | 시뮬 2대 독립 주행 | M |
 | P0-7 | Flask→FastAPI 동등성 체크리스트 (기존 7 엔드포인트 × API Ref §5 매핑표, path/costmap 포함, 수용 기준 포함) | 체크리스트 문서 | S |
 
