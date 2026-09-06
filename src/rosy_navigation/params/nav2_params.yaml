@@ -178,7 +178,11 @@ local_costmap:
   local_costmap:
     ros__parameters:
       update_frequency: 5.0
-      publish_frequency: 2.0
+      # 이 값은 소비자에게 맞춘다. 대시보드는 5초에 한 번만 긁고
+      # (src/rosy_core/rosy_core/web/app.js:647 refreshSlowData),
+      # 게다가 local 스코프는 요청조차 하지 않는다 (map.js 는 scope=global 만).
+      # 플래너 품질은 update_frequency 가 정하므로 여기는 무관하다.
+      publish_frequency: 0.2
       global_frame: odom
       robot_base_frame: base_footprint
       rolling_window: true
@@ -195,7 +199,10 @@ local_costmap:
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: True
-        publish_voxel_map: True
+        # 이 토픽을 구독하는 것이 저장소 어디에도 없다 — RViz 디버그 출력이다.
+        # publish_frequency 가 아니라 update_frequency(5.0)에 물려 있어서
+        # 아무도 안 보는 격자를 초당 다섯 번 내보내고 있었다.
+        publish_voxel_map: False
         origin_z: 0.0
         z_resolution: 0.05
         z_voxels: 16
@@ -222,7 +229,11 @@ global_costmap:
     ros__parameters:
       footprint_padding: 0.03
       update_frequency: 1.0
-      publish_frequency: 1.0
+      # 대시보드의 5초 폴링에 맞춘 값이다
+      # (src/rosy_core/rosy_core/web/app.js:647). 1.0 Hz 는 소비자보다
+      # 다섯 배 빨랐고, 브라우저가 없어도 그대로 나갔다.
+      # 더 신선한 맵이 필요하면 주기를 올리지 말고 수요 기반 충전으로 간다.
+      publish_frequency: 0.2
       global_frame: map
       robot_base_frame: base_footprint
       #robot_radius: 0.22
