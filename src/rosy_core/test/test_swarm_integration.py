@@ -832,3 +832,60 @@ def test_a_matching_frame_after_that_clears_both():
     body = swarm.state_payload()
     assert body["holding"] is False and body["map_mismatch"] is None
 
+
+def test_mapping_starting_between_the_check_and_the_arming_is_refused():
+    """게이트를 양쪽에 두는 것만으로는 부족하다.
+
+    확인과 무장 사이에 상대가 시작되면 둘 다 주행의 임자가 된다. 결정은
+    세션을 여는 항법 락 안에서 난다.
+    """
+    swarm, nav, _executor, _clock, _events, _safety, _docking = build()
+    original = swarm.check_follow
+
+    def trip(body):
+        original(body)
+        nav.start_mapping()   # 운영자의 POST /slam/start 가 이 틈에 도착한다
+
+    swarm.check_follow = trip
+
+    with pytest.raises(SwarmError) as raised:
+        swarm.follow(params())
+
+    assert raised.value.code == "MAPPING_ACTIVE"
+    assert swarm.active is False
+    assert nav._moving_session is None, "no session may survive the refusal"
+
+
+def test_a_refused_arming_does_not_leave_the_speed_cap_on():
+    swarm, nav, _executor, _clock, _events, safety, _docking = build()
+    original = swarm.check_follow
+
+    def trip(body):
+        original(body)
+        nav.start_mapping()
+
+    swarm.check_follow = trip
+
+    with pytest.raises(SwarmError):
+        swarm.follow(params(max_speed=0.05))
+
+    assert safety.session_linear is None
+
+
+def test_a_standing_map_mismatch_does_not_relabel_itself_as_a_lost_stream():
+    """서 있는 이유는 불일치다. 타임아웃이 지난다고 원인이 바뀌지 않는다."""
+    swarm, _nav, executor, clock, events, _safety, _docking = build()
+    swarm._state.set_map_id("site_a")
+    swarm.follow(params(stream_timeout_ms=1000))
+    swarm.on_reference_pose(ReferencePose("rosy_02", 1.0, 0.0, 0.0, map_id="site_a"))
+    executor.settle()
+    clock.advance(0.6)
+    swarm.on_reference_pose(ReferencePose("rosy_02", 4.0, 0.0, 0.0, map_id="site_b"))
+
+    for _ in range(4):
+        clock.advance(1.0)
+        swarm.tick()
+
+    reasons = [d.get("reason") for t, d in events.published if t == "swarm.hold"]
+    assert reasons == ["map_mismatch"], reasons
+

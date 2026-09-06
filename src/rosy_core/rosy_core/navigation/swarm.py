@@ -17,7 +17,7 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
-from rosy_core.navigation.manager import NavGoalSpec
+from rosy_core.navigation.manager import NavGoalSpec, NavigationError
 from rosy_core.protocol.schemas import (
     SwarmFollowParams,
     SwarmReferenceSource,
@@ -197,12 +197,23 @@ class SwarmManager:
                 blocked = ("EMERGENCY_ACTIVE", "e-stop is active")
             elif self._docking_active():
                 blocked = ("DOCKING_ACTIVE", "a docking run owns navigation")
+            elif self.nav.mapping_active:
+                blocked = ("MAPPING_ACTIVE", "a mapping session owns navigation")
             if blocked is None:
                 # 세션은 여기서 연다. 락 밖에서 열면 그 사이에 도착한 cancel 이
                 # 임자 없는 세션을 남긴다. `open_moving_session` 은 항법 락 안의
                 # 카운터 증가일 뿐 executor 를 건드리지 않으므로, 이 한 줄은
                 # 목표·취소를 락 밖으로 뺀 이유(R1)와 충돌하지 않는다.
-                self._session = self.nav.open_moving_session()
+                try:
+                    # 항법 락 안에서 맵핑과의 배타를 확정한다. 위의 재확인은
+                    # 운영자에게 이유를 먼저 알려주는 것이고, 진짜 결정은 여기다.
+                    self._session = self.nav.open_moving_session()
+                except NavigationError as exc:
+                    blocked = (exc.code, str(exc))
+                    self._session = None
+            if blocked is None:
+                # 세션을 여는 것과 무장은 한 구간이다. 여기서 락을 놓으면 그
+                # 사이의 cancel 이 임자 없는 세션을 남긴다.
                 self._params = params.model_copy()
                 # 검증만 하고 흘려보내면 계약이 거짓이 된다. 실제로 바퀴에
                 # 닿는 값을 줄인다 (D-2 의 단일 통로를 그대로 쓴다).
@@ -355,7 +366,10 @@ class SwarmManager:
                 if age_ms >= timeout_ms and not self._holding:
                     self._holding = True
                     self._pending = None
-                    hold = True
+                    # 맵 불일치로 이미 서 있는 대형이면 다시 알리지 않는다.
+                    # 서 있는 이유는 그쪽이고, 목표도 이미 거둬져 있다 —
+                    # 알리면 감사 로그가 멈춘 원인을 되풀이해 잘못 말한다.
+                    hold = self._map_mismatch is None
                 elif not self._holding and self._pending is not None and (
                     self._last_goal_at is None
                     or current - self._last_goal_at >= _MIN_GOAL_INTERVAL_S

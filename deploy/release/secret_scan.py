@@ -63,6 +63,12 @@ _PLACEHOLDER = re.compile(
 # a call or subscript head at any length and hands it to the same rules that
 # already judge the long ones: excused when it closes on this line holding no
 # literal, reported otherwise.
+#
+# The false positive to expect is i18n: `api_key = _("settings.api_key_label")`
+# is a one-character call around a key longer than the argument floor, and the
+# key usually contains the variable's name without equalling it. Recognise the
+# shape rather than loosening the argument rule for it — the rule is what keeps
+# a secret handed to a call visible.
 _ASSIGNMENT = re.compile(
     r"""
     (?P<name>
