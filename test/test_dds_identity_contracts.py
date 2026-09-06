@@ -232,6 +232,35 @@ def test_reprovisioning_the_same_number_is_a_no_op():
 
 
 @pytest.mark.skipif(BASH is None, reason="bash is unavailable on this host")
+@pytest.mark.parametrize("number", ["08", "09", "010", "007", "00"])
+def test_a_leading_zero_is_refused_rather_than_read_as_octal(number):
+    """앞자리 0 은 추측하지 않고 거절한다.
+
+    bash 산술은 `010` 을 팔진수로 읽어 도메인 48 과 `rosy_08` 을 배정했다. 둘이
+    사이좋게 틀리기 때문에 어떤 검사도 걸리지 않고, 그대로 8호기와 충돌한다.
+    `08`/`09` 는 그나마 눈에 띄었다 — bash 내부 오류로 죽었으니까. 조용히 틀린
+    쪽이 더 나쁘다. `010` 이 10 인지 8 인지는 우리가 정할 문제가 아니다.
+    """
+    completed, env = _drive_installer(number)
+    assert completed.returncode != 0, f"{number} was accepted"
+    assert "leading zero" in completed.stderr
+    assert "ROS_DOMAIN_ID" not in env
+
+
+@pytest.mark.skipif(BASH is None, reason="bash is unavailable on this host")
+@pytest.mark.parametrize(
+    "number,domain,namespace",
+    [("0", "40", "rosy_00"), ("8", "48", "rosy_08"), ("10", "50", "rosy_10")],
+)
+def test_plain_decimal_numbers_still_derive_correctly(number, domain, namespace):
+    """거절 규칙이 정상 입력까지 막지 않는지 — 특히 10 은 8 이 아니다."""
+    completed, env = _drive_installer(number)
+    assert completed.returncode == 0, completed.stderr
+    assert f"ROS_DOMAIN_ID={domain}" in env
+    assert f"ROSY_NAMESPACE={namespace}" in env
+
+
+@pytest.mark.skipif(BASH is None, reason="bash is unavailable on this host")
 def test_a_half_matching_env_is_left_completely_untouched():
     """도메인은 맞는데 네임스페이스가 어긋난 `.env` 는 아무것도 쓰지 않고 거절한다.
 

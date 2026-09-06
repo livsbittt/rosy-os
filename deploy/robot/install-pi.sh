@@ -239,8 +239,12 @@ require_robot_identity() {
     declare -A derived
     number="${ROSY_ROBOT_NUMBER:-}"
     [[ -n "$number" ]] || fail "set ROSY_ROBOT_NUMBER=<n> — 로봇 번호가 없으면 신원을 만들 수 없다 (ADR D-33)"
-    [[ "$number" =~ ^[0-9]+$ ]] || fail "ROSY_ROBOT_NUMBER must be a non-negative integer, got '$number'"
-    domain=$((40 + number))
+    # 앞자리 0 을 허용하면 안 된다. bash 산술이 010 을 팔진수로 읽어 도메인 48 /
+    # rosy_08 을 조용히 배정한다 — 도메인과 네임스페이스가 사이좋게 틀리므로
+    # 아무것도 눈치채지 못하고 8호기와 충돌한다. 08 과 09 는 아예 bash 내부
+    # 오류로 죽는다. 010 이 10 인지 8 인지는 우리가 정할 일이 아니라 거절할 일이다.
+    [[ "$number" =~ ^(0|[1-9][0-9]*)$ ]] || fail "ROSY_ROBOT_NUMBER must be a decimal integer with no leading zero, got '$number'"
+    domain=$((40 + 10#$number))
     # rosy_core 의 parse_domain_id (rosy_core/system/ros_graph.py) 가 주는 것과 같은 경계.
     (( domain >= 0 && domain <= 101 )) || fail "ROS_DOMAIN_ID must be in the Linux-safe range 0 to 101; ROSY_ROBOT_NUMBER=$number gives $domain"
     namespace="$(printf 'rosy_%02d' "$number")"

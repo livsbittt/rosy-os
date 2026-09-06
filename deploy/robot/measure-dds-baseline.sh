@@ -52,12 +52,21 @@ DOMAIN="${DOMAIN%$'\r'}"
 [[ -n "$NS" ]] || fail "ROSY_NAMESPACE is unset in $ENV_FILE (ADR D-33)"
 [[ -n "$DOMAIN" ]] || fail "ROS_DOMAIN_ID is unset in $ENV_FILE (ADR D-33)"
 
+# 절대 이름으로 만드는 것은 비어 있는지 확인한 *뒤*다. 앞에서 하면
+# 미설정 네임스페이스가 "/" 가 되어 위 게이트를 그냥 통과한다.
+NS="/${NS#/}"
+
 # 기본 배포는 core 전용이라 Nav2 가 아예 없고 코스트맵 토픽도 존재하지 않는다.
 # 여기서 막지 않으면 "모든 토픽 0 KB/s" 라는 그럴듯한 거짓 보고서가 나온다.
 [[ "$MODE" == "hardware" ]] || fail "ROSY_RUNTIME_MODE=$MODE — Phase 0 은 hardware 모드에서만 의미가 있다 (core/motor 에는 Nav2 도 코스트맵도 없다)"
 
 DC=(docker compose --env-file "$ENV_FILE" --profile hardware)
-EX=("${DC[@]}" exec -T rosy-io)
+# PYTHONUNBUFFERED 가 없으면 이 스크립트는 조용히 아무것도 재지 못한다.
+# `exec -T` 는 TTY 를 주지 않으므로 stdout 이 파이프가 되고, Python 은 블록
+# 버퍼링(4KB)으로 넘어간다. 30초짜리 bw 출력은 2KB 남짓이라 한 번도 flush 되지
+# 않고, timeout 의 시그널이 그대로 프로세스를 죽여 출력이 0 바이트가 된다.
+# 그러면 모든 칸이 UNMATCHED 로 찍히고 리포트는 쓸모가 없다.
+EX=("${DC[@]}" exec -T -e PYTHONUNBUFFERED=1 rosy-io)
 
 "${DC[@]}" ps -q rosy-io >/dev/null 2>&1 || fail "rosy-io is not running; start it with runtime-mode.sh up"
 
@@ -90,6 +99,10 @@ TOPICS=(
   "/tf_static"
 )
 
+# 조용한 십수 분은 멈춘 것처럼 보인다. 실제로 그만큼 걸리므로 미리 말해 둔다.
+note "measuring ${#TOPICS[@]} topics x 2 windows x ${BW_WINDOW}s"
+note "expect roughly $(( ${#TOPICS[@]} * BW_WINDOW * 2 / 60 )) min — ROSY_BW_WINDOW 로 줄일 수 있으나 0.2 Hz 토픽은 30s 미만이면 표본이 거의 없다"
+
 #: 이 토픽들은 latched 라 첫 샘플 뒤 0 으로 읽힌다 — 0 을 트래픽 없음으로 읽지 않기 위해.
 LATCHED_RE='/(map|tf_static)$'
 
@@ -116,9 +129,9 @@ measure_topic() {
     return
   fi
 
-  bw="$("${EX[@]}" timeout "$BW_WINDOW" ros2 topic bw "$topic" 2>/dev/null \
+  bw="$("${EX[@]}" timeout -s INT "$BW_WINDOW" ros2 topic bw "$topic" 2>/dev/null \
         | tail -n 3 | grep -Eo '[0-9.]+ [KMG]?B/s' | tail -n 1 || true)"
-  hz="$("${EX[@]}" timeout "$BW_WINDOW" ros2 topic hz "$topic" 2>/dev/null \
+  hz="$("${EX[@]}" timeout -s INT "$BW_WINDOW" ros2 topic hz "$topic" 2>/dev/null \
         | grep -Eo 'average rate: [0-9.]+' | tail -n 1 | sed 's/average rate: //' || true)"
 
   if [[ -z "$bw" ]]; then
@@ -166,7 +179,7 @@ mkdir -p "$(dirname "$OUT")"
   echo '### 맵 크기'
   echo
   echo '```'
-  "${EX[@]}" sh -c 'cat ${ROSY_MAP%.yaml}.yaml 2>/dev/null' 2>/dev/null || echo '(map yaml unreadable)'
+  "${EX[@]}" sh -c 'cat "$ROSY_MAP"' 2>/dev/null || echo '(map yaml unreadable)'
   echo '```'
   echo
   echo '## 토픽'
@@ -177,7 +190,12 @@ mkdir -p "$(dirname "$OUT")"
   echo
   echo '| 토픽 | 타입 | Hz | 대역폭 | 사전 구독자 | 해석 |'
   echo '|---|---|---|---|---|---|'
-  for t in "${TOPICS[@]}"; do measure_topic "$t"; done
+  i=0
+  for t in "${TOPICS[@]}"; do
+    i=$((i + 1))
+    note "[$i/${#TOPICS[@]}] $t"
+    measure_topic "$t"
+  done
   echo
   echo '## CPU'
   echo
