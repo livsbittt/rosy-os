@@ -14,6 +14,13 @@ The scanner is deliberately conservative about placeholders: a config
 template that says ``password: <your-wifi-password>`` is the correct thing
 for a repository to contain, and flagging it would train people to ignore
 the scanner.
+
+Known gap, recorded so it is not rediscovered as a surprise: ``_ASSIGNMENT``
+needs six characters of value, so ``api_token = wrap(`` — a call whose name is
+five characters or fewer — never reaches any matcher at all. It is the
+shortest way past this gate. Closing it means lowering that floor, which
+cascades into every matcher and every fixture, so it wants its own change
+rather than a line in someone else's.
 """
 
 from __future__ import annotations
@@ -144,6 +151,19 @@ _CODE_EXPRESSION = re.compile(
 _ARGUMENT_LITERAL = re.compile(r"""["']([^"'\n]{8,})["']""")
 
 
+def _closes_on_this_line(rest: str) -> bool:
+    """True when the bracket the call opened with is closed in ``rest``."""
+    depth = 1
+    for char in rest:
+        if char in "([":
+            depth += 1
+        elif char in ")]":
+            depth -= 1
+            if depth == 0:
+                return True
+    return False
+
+
 def _call_holds_no_literal(line: str, start: int, name: str) -> bool:
     """True when the call opening at ``start`` was handed no secret.
 
@@ -155,9 +175,14 @@ def _call_holds_no_literal(line: str, start: int, name: str) -> bool:
     And the call must **close on this line**: when it does not, its arguments
     are somewhere we cannot see, and excusing what we have not read is how a
     formatter wrapping one line silently disarms this matcher.
+
+    Closure is counted, not looked for. A bracket anywhere in the remainder is
+    not the call closing — `_decode(  # base64 (D-30)` supplies one from a
+    comment, and parenthesised ADR references are this repository's house
+    style, so presence would hand the hole straight back.
     """
     rest = line[start:]
-    if ")" not in rest and "]" not in rest:
+    if not _closes_on_this_line(rest):
         return False
     lowered = name.lower()
     return not any(

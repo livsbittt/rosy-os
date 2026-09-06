@@ -413,6 +413,19 @@ def test_a_secret_handed_to_a_call_is_still_a_secret(line):
     assert scan_text("sample.py", line), line
 
 
+def test_a_nested_call_is_reported_rather_than_reasoned_about():
+    """A call inside a call does not match the call-head shape.
+
+    The bare value runs to the first quote, so it reads as two openers rather
+    than an identifier chain. Reporting is the right way to be wrong about a
+    shape this scanner cannot cheaply parse — and the sample is assembled for
+    the same reason the open-call ones are.
+    """
+    sample = _open_call("", "secret", "wrapper") + _open_call("", "", "inner").strip()
+
+    assert scan_text("x.py", sample), sample
+
+
 def test_a_lookup_key_is_not_mistaken_for_the_secret_it_looks_up():
     """A slot name is short, and often repeats the name being assigned."""
     assert not scan_text("x.py", 'secret = prefs.getString("secret")')
@@ -434,6 +447,12 @@ def _open_call(indent: str, name: str, call: str) -> str:
     _open_call("", "ROSY_FLEET_API_TOKEN", "_decode"),
     _open_call("    ", "api_password", "base64.b64decode"),
     _open_call("        ", "access_token", "build_token"),
+    # A bracket in a trailing comment is not the call closing. Parenthesised
+    # ADR references are this repository's house comment style, so looking for
+    # a bracket rather than counting one would hand the hole straight back.
+    _open_call("", "ROSY_FLEET_API_TOKEN", "_decode") + "  # base64 (D-30)",
+    _open_call("", "api_password", "b64decode") + "  # noqa: E501 (long)",
+    _open_call("", "access_token", "build_token") + "  # cfg[map]",
 ])
 def test_a_call_left_open_at_the_end_of_the_line_is_not_excused(line):
     """The arguments are on the next line, where a line-oriented scanner cannot
