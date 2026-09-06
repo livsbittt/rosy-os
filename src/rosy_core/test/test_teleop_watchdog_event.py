@@ -2,11 +2,13 @@
 
 만료되면 출력이 조용히 0 이 된다. 조종하던 사람에게는 로봇이 그냥 멈춘 것이고,
 링크가 끊겼는지 명령이 거부됐는지 자기가 손을 뗀 것인지 구분되지 않는다.
+
+테스트는 브리지의 한 주기를 그대로 흉내낸다 — `select_output` 으로 값을 얻어
+바퀴로 내보낸 **뒤** `announce_pending` 을 부른다. 순서가 이 기능의 절반이다.
 """
 
 from __future__ import annotations
 
-import pytest
 from rosy_core.command.arbitration import Mode, ModeMachine, SourceRegistry
 from rosy_core.command.manager import CommandManager, Twist
 from rosy_core.safety.manager import BatteryPolicy, SafetyManager, SpeedLimits
@@ -28,7 +30,19 @@ def build(mode=Mode.MANUAL):
     modes = ModeMachine()
     modes.transition(mode)
     safety = SafetyManager(SpeedLimits(), BatteryPolicy(), events=events)
-    return CommandManager(SourceRegistry(), modes, safety, events=events), events, safety
+    command = CommandManager(SourceRegistry(), modes, safety, events=events)
+    # services.py 와 같은 배선.
+    safety.estop_listeners.append(command.clear_manual_session)
+    return command, events, safety
+
+
+def cycle(command, now, log=None):
+    """브리지의 `_publish_cmd_vel` 한 번: 값을 얻어 내보낸 뒤 알린다."""
+    out = command.select_output(now=now)
+    if log is not None:
+        log.append("wheels")
+    command.announce_pending()
+    return out
 
 
 def drive(command, at):
@@ -40,7 +54,7 @@ def test_an_expiry_says_so_with_the_timeout():
     command, events, _safety = build()
     drive(command, 100.0)
 
-    command.select_output(now=100.0 + command.watchdog.timeout_ms / 1000.0 + 0.01)
+    cycle(command, 100.0 + command.watchdog.timeout_ms / 1000.0 + 0.01)
 
     watchdog = [d for t, _s, d in events.published if t == "safety.watchdog"]
     assert watchdog == [{"timeout_ms": command.watchdog.timeout_ms}]
@@ -50,19 +64,38 @@ def test_it_is_a_warning_because_the_robot_stopped_on_its_own():
     command, events, _safety = build()
     drive(command, 100.0)
 
-    command.select_output(now=101.0)
+    cycle(command, 101.0)
 
     severity = next(s for t, s, _d in events.published if t == "safety.watchdog")
     assert "warning" in severity.lower()
 
 
+def test_the_stop_reaches_the_wheels_before_the_announcement():
+    """이벤트 발행은 구독자를 동기로 부르고, 운용 구성에서 그중 하나가 30 일치
+    감사 로그를 통째로 다시 쓴다. 알림이 앞에 오면 정지가 그만큼 늦게 나간다."""
+    command, _events, _safety = build()
+    drive(command, 100.0)
+    order: list[str] = []
+
+    class Ordered(FakeEvents):
+        def publish(self, type_, severity="info", source="", data=None):
+            order.append(f"event:{type_}")
+            super().publish(type_, severity, source, data)
+
+    command._events = Ordered()
+
+    cycle(command, 101.0, log=order)
+
+    assert order == ["wheels", "event:safety.watchdog"], order
+
+
 def test_it_is_announced_once_not_once_per_cycle():
-    """select_output 은 50 Hz 로 불린다. 상태가 아니라 전이에서 말해야 한다."""
+    """cmd_vel 은 50 Hz 다. 상태가 아니라 전이에서 말해야 한다."""
     command, events, _safety = build()
     drive(command, 100.0)
 
     for step in range(50):
-        command.select_output(now=101.0 + step * 0.02)
+        cycle(command, 101.0 + step * 0.02)
 
     assert events.types().count("safety.watchdog") == 1
 
@@ -70,10 +103,10 @@ def test_it_is_announced_once_not_once_per_cycle():
 def test_a_new_command_re_arms_it():
     command, events, _safety = build()
     drive(command, 100.0)
-    command.select_output(now=101.0)
+    cycle(command, 101.0)
 
     drive(command, 102.0)
-    command.select_output(now=103.0)
+    cycle(command, 103.0)
 
     assert events.types().count("safety.watchdog") == 2
 
@@ -83,7 +116,7 @@ def test_an_expiry_with_nothing_in_hand_announces_nothing():
     command, events, _safety = build()
 
     for step in range(10):
-        command.select_output(now=1000.0 + step)
+        cycle(command, 1000.0 + step)
 
     assert "safety.watchdog" not in events.types()
 
@@ -92,9 +125,9 @@ def test_the_announcement_does_not_change_what_reaches_the_wheels():
     command, _events, _safety = build()
     drive(command, 100.0)
 
-    assert command.select_output(now=100.1) == Twist(0.1, 0.0)
-    assert command.select_output(now=101.0) == Twist(0.0, 0.0)
-    assert command.select_output(now=102.0) == Twist(0.0, 0.0)
+    assert cycle(command, 100.1) == Twist(0.1, 0.0)
+    assert cycle(command, 101.0) == Twist(0.0, 0.0)
+    assert cycle(command, 102.0) == Twist(0.0, 0.0)
 
 
 def test_an_estop_stops_the_robot_without_blaming_the_watchdog():
@@ -103,19 +136,55 @@ def test_an_estop_stops_the_robot_without_blaming_the_watchdog():
     drive(command, 100.0)
     safety.trigger_estop("operator")
 
-    command.select_output(now=101.0)
+    cycle(command, 101.0)
 
     assert "safety.watchdog" not in events.types()
     assert "safety.estop" in events.types()
+
+
+def test_releasing_an_estop_does_not_invent_a_lapsed_link():
+    """해제 뒤 첫 틱이 만료를 발견하면, 멀쩡했던 링크를 끊겼다고 적는다."""
+    command, events, safety = build()
+    drive(command, 100.0)
+    safety.trigger_estop("operator")
+    cycle(command, 101.0)
+
+    safety.release("admin")
+    for step in range(5):
+        cycle(command, 102.0 + step)
+
+    assert "safety.watchdog" not in events.types()
+    assert "safety.estop_released" in events.types()
 
 
 def test_a_navigation_run_is_not_a_lapsed_teleop():
     command, events, _safety = build(mode=Mode.NAVIGATION)
     command.set_nav_twist(Twist(0.1, 0.0), now=100.0)
 
-    command.select_output(now=200.0)
+    cycle(command, 200.0)
 
     assert "safety.watchdog" not in events.types()
+
+
+def test_a_late_write_cannot_swallow_a_fresh_session():
+    """불리언 래치는 경합에서 사라진다.
+
+    타이머가 만료를 기록하고 멈춘 사이 새 명령이 들어오면, 뒤늦게 도착한
+    알림이 그 새 세션을 "이미 알림"으로 덮어써 그 세션의 끊김은 영영
+    조용해진다. 세션 번호를 비교하면 옛 값을 실은 쓰기는 무해하다.
+    """
+    command, events, _safety = build()
+    drive(command, 100.0)
+    command.select_output(now=101.0)      # 만료를 기록만 한다
+
+    drive(command, 102.0)                 # 그 사이 새 세션이 시작되고
+    command.announce_pending()            # 뒤늦은 알림이 도착한다
+
+    cycle(command, 103.0)
+
+    assert events.types().count("safety.watchdog") >= 1, (
+        "the new session's own lapse must still be announced"
+    )
 
 
 def test_the_expiry_reaches_the_audit_log(tmp_path):
@@ -134,7 +203,7 @@ def test_the_expiry_reaches_the_audit_log(tmp_path):
     command.teleop(0.1, 0.0)
     command.watchdog.refresh(100.0)
 
-    command.select_output(now=101.0)
+    cycle(command, 101.0)
 
     recorded = (tmp_path / "audit.jsonl").read_text(encoding="utf-8")
     assert "safety.watchdog" in recorded

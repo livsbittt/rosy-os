@@ -34,9 +34,16 @@ class CommandManager:
         self._events = events
         self.watchdog = TeleopWatchdog(timeout_ms=500)
         self._manual_twist: Optional[Twist] = None
-        #: 만료를 알린 적이 있는가. select_output 은 50 Hz 로 불리므로
-        #: 상태가 아니라 전이에서만 말해야 한다.
-        self._watchdog_announced = False
+        #: teleop 세션 번호. 만료 알림은 세션당 한 번이다.
+        #:
+        #: 불리언이면 경합에서 사라진다: 타이머가 "아직 안 알림"을 읽고 멈춘
+        #: 사이 새 명령이 들어와 초기화하면, 타이머가 깨어나 그 새 세션을
+        #: "이미 알림"으로 덮어써 그 세션의 끊김은 영영 조용해진다. 번호를
+        #: 비교하면 뒤늦은 쓰기가 옛 값을 실어 무해하다.
+        self._session = 0
+        self._announced_session = -1
+        #: 알릴 것이 밀려 있는가. 알림은 정지가 바퀴에 닿은 뒤에 낸다.
+        self._pending_watchdog: Optional[int] = None
         self._nav_twist: Optional[Twist] = None
         self._nav_updated_at: Optional[float] = None
         self._nav_timeout_s = 0.5
@@ -60,7 +67,7 @@ class CommandManager:
         self._manual_twist = Twist(linear, angular)
         self.watchdog.refresh()
         # 새 명령이 왔으니 다음 끊김은 다시 알릴 일이다.
-        self._watchdog_announced = False
+        self._session += 1
         return True, ""
 
     @property
@@ -86,24 +93,44 @@ class CommandManager:
         self._manual_twist = None
         self.watchdog.refresh(0.0)
 
-    def _announce_watchdog(self) -> None:
-        """SAF-002 만료를 한 번 알린다.
+    def _note_watchdog_lapse(self) -> None:
+        """SAF-002 만료를 기록해 둔다. 내보내는 것은 `announce_pending` 이다.
 
-        계약은 v1.0 부터 `safety.watchdog` 를 약속했는데 코드가 낸 적이 없다.
-        만료되면 출력은 조용히 0 이 되고, 조종하던 사람도 Fleet 도 로봇이 왜
-        섰는지 알 길이 없다 — 링크가 끊겼는지, 명령이 거부됐는지, 사람이 손을
-        뗀 것인지 구분되지 않는다.
+        `select_output` 은 조회다 — 50 Hz cmd_vel 경로의 첫 줄이고, 그 반환값이
+        바퀴로 나간다. 여기서 바로 발행하면 정지를 **알리는 일이 정지를 내보내는
+        일보다 먼저** 온다: EventBus 는 구독자를 동기로 부르고, 운용 구성에서
+        그중 하나가 30 일치 감사 로그를 통째로 다시 쓰는 파일 싱크다. 그동안
+        드라이버는 끊기기 직전의 0 아닌 명령을 그대로 쥐고 있다.
 
-        `select_output` 은 50 Hz 로 불리므로 상태가 아니라 전이에서만 말한다.
-        쥐고 있던 teleop 이 없었다면 끊긴 조종도 없으므로 아무 말도 하지 않는다.
+        그래서 여기서는 기록만 하고, 정지가 나간 뒤 호출자가 알린다.
         """
-        if self._manual_twist is None or self._watchdog_announced:
+        if self._manual_twist is None or self._announced_session == self._session:
             return
-        self._watchdog_announced = True
+        self._pending_watchdog = self._session
+
+    def announce_pending(self) -> None:
+        """밀린 알림을 낸다. 브리지가 cmd_vel 을 내보낸 **뒤** 부른다."""
+        session = self._pending_watchdog
+        if session is None:
+            return
+        self._pending_watchdog = None
+        if session == self._announced_session:
+            return
+        self._announced_session = session
         if self._events is not None:
             self._events.publish(
                 "safety.watchdog", severity="warning", source="command_manager",
                 data={"timeout_ms": self.watchdog.timeout_ms})
+
+    def clear_manual_session(self) -> None:
+        """조종을 쥐고 있던 상태를 버린다 (E-Stop 등 이미 알려진 정지 사유).
+
+        `_manual_twist` 가 남아 있으면 E-Stop 해제 뒤 첫 틱이 만료를 발견하고
+        `safety.watchdog` 를 낸다 — 링크는 멀쩡했는데 끊겼다고 적는 셈이다.
+        """
+        self._manual_twist = None
+        self._pending_watchdog = None
+        self._announced_session = self._session
 
     def select_output(self, now: Optional[float] = None) -> Twist:
         current = now if now is not None else time.monotonic()
@@ -113,7 +140,7 @@ class CommandManager:
             if self._manual_twist is not None and not self.watchdog.expired(current):
                 l, a = self._safety.clip(self._manual_twist.linear, self._manual_twist.angular, "manual")
                 return Twist(l, a)
-            self._announce_watchdog()
+            self._note_watchdog_lapse()
             return ZERO
         nav_age = current - self._nav_updated_at if self._nav_updated_at is not None else None
         if (

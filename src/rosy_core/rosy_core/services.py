@@ -206,6 +206,10 @@ class CoreServices:
         )
         nav.session_closed_listener = swarm.on_navigation_session_closed
         safety.estop_listeners.append(swarm.on_estop)
+        # E-Stop 은 이미 알려진 정지 사유다. 쥐고 있던 teleop 을 남겨두면
+        # 해제 뒤 첫 틱이 만료를 발견해 safety.watchdog 를 내고, 감사 로그가
+        # 멀쩡했던 링크를 끊겼다고 적는다.
+        safety.estop_listeners.append(command.clear_manual_session)
         runtime_probe = HostRuntimeProbe(
             host_root=os.environ.get("ROSY_HOST_ROOT", "/"),
             data_path=waypoints_path.parent,

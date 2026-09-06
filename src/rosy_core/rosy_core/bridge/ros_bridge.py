@@ -208,6 +208,10 @@ class RosBridge:
         msg.linear.x = out.linear
         msg.angular.z = out.angular
         self.cmd_vel_pub.publish(msg)
+        # 정지가 나간 뒤에 알린다. 이벤트 발행은 구독자를 동기로 부르고 그중
+        # 하나가 감사 로그를 다시 쓰므로, 앞에 두면 SAF-002 의 정지가 그만큼
+        # 늦게 바퀴에 닿는다.
+        self._svc.command.announce_pending()
 
     def _tick_state(self) -> None:
         try:
