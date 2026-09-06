@@ -29,12 +29,15 @@ None.
 - LED and LiDAR start/stop are services, not CORE GPIO.
 - Do not put policy here. Policy lives in command/safety/power; bridge only adapts.
 - More than one Nav2 goal can be in flight (SWM-001 moving goal). Route every acceptance, result and cancel through `GoalTracker`: a preempted goal's late abort must not be read as the current goal's failure, and a cancel must reach every live handle.
+- `_setup_diagnostics` registers exactly `{rosy_core, cpu, memory, disk, odom_topic}`. That set is the baseline any
+  refactor of this file must reproduce — compare `GET /api/v1/diagnostics` key-for-key, not for non-emptiness. A dropped
+  provider shows up as a missing key, never as an error.
 - Message → dict conversion belongs in `translate.py`, not in a callback. A callback should read one line: translate, then hand the result to a service. Anything computed inline in `ros_bridge.py` cannot be tested on the host, and the source-grep tests that stand in for it pass on wrong values.
 
 ### Testing Requirements
 
 Host pytest does not import `ros_bridge.py` (optional ROS): CI boot smoke + SaveMap guard cover it.
-`translate.py` is host-testable and has real value assertions in `test/test_bridge_translate.py` — duck-typed `SimpleNamespace` messages, no rclpy.
+`translate.py` and `goal_tracker.py` are host-testable and have real value assertions in `test/test_bridge_translate.py` and `test/test_goal_tracker.py` — duck-typed `SimpleNamespace` messages, no rclpy.
 
 ### Common Patterns
 

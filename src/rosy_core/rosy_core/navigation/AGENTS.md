@@ -26,6 +26,10 @@ None.
 
 - `save_map` returns `map_id` (filename + checksum, D-13). Bridge computes the hash.
 - Stuck timeout is SAF/NAV-006 — honor `stuck_timeout_s` from config.
+- **Recorded exception (C7):** `NavigationManager` also carries NAV-005 mapping-session state (`mapping_active`,
+  `start/stop/save/reset_mapping`) although this package claims NAV-001~004/006. Accepted — there is no `mapping`
+  service for it to move to. It unblocks on the `mapping/` re-entry trigger in
+  `docs/plans/2026-09-06-module-split-criteria.md`. Do not deepen it: new mapping state waits for that package.
 
 ### Testing Requirements
 

@@ -19,7 +19,7 @@ Importable middleware. `main.py` starts rclpy; `node.py` builds `CoreServices`, 
 | `identity.py` | IDN-001 robot id/name/IP/version |
 | `profile.py` | HWA-001 `RobotProfile` loader |
 | `capability.py` | CAP-001 dotted lookup + `CapabilityError` |
-| `maps.py` | MAP-003 last OccupancyGrid / Path / Costmap snapshots (ROS-free) |
+| `maps.py` | MAP-003/004 **grid frames for the render path** — last OccupancyGrid / Path / Costmap snapshot (ROS-free). Not map artifacts: authoring and persistence are not its concern |
 
 ## Subdirectories
 
@@ -44,6 +44,18 @@ Importable middleware. `main.py` starts rclpy; `node.py` builds `CoreServices`, 
 ## For AI Agents
 
 ### Working In This Directory
+
+#### Split criteria — before making a module a package, or splitting a file
+
+Full reasoning: `docs/plans/2026-09-06-module-split-criteria.md`. Operative rules:
+
+- **Size is never a reason.** `waypoints/` is 85 lines and is a package; `docking/manager.py` is 511 and is one file.
+- **Promote a module only if all three hold:** it owns a requirement family no package claims, it needs a second file with a
+  different role *today* (or one is scheduled under a requirement ID), and ≥2 packages import it. One file, one role → stays.
+- **Split a file only on a defect.** C1: it cannot be imported by host pytest and hides a decision → extract a ROS-free sibling
+  (`bridge/translate.py`, `bridge/goal_tracker.py`). C6: a dependency reached via `hasattr`/`getattr` → declare the member;
+  `test/test_module_criteria.py` fails on any new reach. C7: one service field spanning two requirement families.
+- **Record the "leave it alone" verdicts too.** They are what stops the next round of churn.
 
 - `SOFTWARE_VERSION` lives in `identity.py` and must match `package.xml`. `node.py` imports it.
 - Waypoints default path: `~/.rosy/waypoints.json` (on Pi, `HOME=/var/lib/rosy`).

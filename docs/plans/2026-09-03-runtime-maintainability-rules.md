@@ -2,6 +2,8 @@
 
 **Goal:** Keep Pinky runtime slices (core / motor / hardware) and Nav2 wiring in named modules so a later change does not copy YAML, fork launch XML, or hide policy next to ROS launch files.
 
+**Sibling:** Python subpackage cuts inside `rosy_core` are governed by [2026-09-06-module-split-criteria.md](2026-09-06-module-split-criteria.md). This document's unit is a launch file, a ROS package or an overlay YAML; that one's is a Python subpackage. They do not overlap.
+
 ## What was not modular
 
 - `hardware.launch.py` mixed motor arg forwarding, Nav2 include, and D-4 YAML rewrite; the rewrite lived in `launch/` behind a `sys.path` insert.
@@ -32,4 +34,4 @@ CORE still has no `/dev`. IMU/ADC/LED/lamp/emotion stay out of the io image. `BU
 
 ## Non-goals
 
-Do not rewrite `navigation_launch.xml` composition vs isolated trees into one generator. Do not add a new ROS package. Do not invent a kernel or fleet server.
+Do not rewrite `navigation_launch.xml` composition vs isolated trees into one generator. Do not add a new ROS package *(ROS packages — not Python subpackages inside `rosy_core`, which are governed by the sibling document above)*. Do not invent a kernel or fleet server.

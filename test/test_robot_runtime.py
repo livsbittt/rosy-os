@@ -2,7 +2,14 @@
 
 import yaml
 
-from robot_contracts import DEPLOY, ROOT, board_caps, board_profile, compose
+from robot_contracts import (
+    DEPLOY,
+    ROOT,
+    board_caps,
+    board_profile,
+    compose,
+    runtime_launch_closure,
+)
 
 
 def test_runtime_separates_core_from_hardware_devices():
@@ -337,3 +344,64 @@ def test_installer_enables_the_lowbatt_units_alongside_the_runtime():
     assert "rosy-lowbatt-shutdown.sh" in installer
     # 기존 런타임 유닛 처리는 그대로여야 한다.
     assert "systemctl enable --now rosy-runtime.service" in installer
+
+
+def test_slam_capability_requires_a_launch_that_actually_starts_slam_toolbox():
+    """Maintainability rule 5, enforced instead of remembered.
+
+    An overlay may advertise `slam` only if the runtime it describes can do it.
+    This is also condition 1 of the `mapping/` package re-entry trigger in
+    `docs/plans/2026-09-06-module-split-criteria.md`: today every overlay is
+    `slam: false` and nothing deployed starts slam_toolbox, so a `mapping/`
+    package would have no runtime to be verified against. The day someone flips
+    an overlay to true, this fails and points them at that decision instead of
+    letting the advertisement drift ahead of the launch tree.
+
+    Passes vacuously today. That is the intended state, not a gap.
+    """
+    for mode in ("core", "motor", "hardware"):
+        if not board_caps(mode).get("slam", False):
+            continue
+        closure = runtime_launch_closure(mode)
+        starts_slam = sorted(
+            name for name, path in closure.items()
+            if "slam_toolbox" in path.read_text(encoding="utf-8")
+        )
+        assert starts_slam, (
+            f"capabilities.{mode}.yaml advertises slam: true, but no launch "
+            f"reachable from compose starts slam_toolbox (reachable: "
+            f"{sorted(closure)}). Either wire the launch or set slam: false.\n"
+            "This also fires condition 1 of the mapping/ package re-entry "
+            "trigger — see docs/plans/2026-09-06-module-split-criteria.md "
+            "before adding a mapping/ package."
+        )
+
+
+def test_launch_closure_walks_the_deployed_launch_tree():
+    """Keep the slam gate's own machinery exercised while the gate is quiet.
+
+    The gate above only calls `runtime_launch_closure` when an overlay sets
+    `slam: true`, and all three are false — correctly, and hopefully for a long
+    time. That leaves the walker itself unrun: a typo in the reference regex or
+    the resolver would stay green until the day someone flips an overlay, which
+    is the worst moment to discover the gate never worked.
+
+    Pinned here: the two launch-file naming conventions this tree actually uses
+    (`hardware.launch.py` and `bringup_launch.xml` — a `*.launch.*` pattern
+    alone silently halves the closure), transitive descent, and the per-profile
+    scoping the gate depends on.
+    """
+    hardware = runtime_launch_closure("hardware")
+
+    # Roots come from compose; the rest are only reachable transitively.
+    assert "hardware.launch.py" in hardware
+    assert "bringup_launch.xml" in hardware, "underscore-style includes must be followed"
+    assert {"localization_launch.xml", "navigation_launch.xml"} <= set(hardware), (
+        "bringup_launch.xml's own includes are two levels down from compose"
+    )
+    assert all(path.is_file() for path in hardware.values())
+
+    # Profiles scope the roots: rosy-io is [hardware], rosy-motor is [motor],
+    # and rosy-core launches nothing at all.
+    assert runtime_launch_closure("core") == {}
+    assert set(runtime_launch_closure("motor")) < set(hardware)

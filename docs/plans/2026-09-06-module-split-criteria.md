@@ -1,0 +1,249 @@
+# Module split criteria — when a `rosy_core` module becomes a package
+
+**Scope:** Python subpackages inside `src/rosy_core/rosy_core/`. Nothing here is about ROS packages.
+**Sibling:** [2026-09-03-runtime-maintainability-rules.md](2026-09-03-runtime-maintainability-rules.md) owns launch files, ROS packages and deploy overlays. Its non-goal *"Do not add a new ROS package"* means exactly that — ROS packages, not Python subpackages. These two documents do not overlap.
+**Operative copy:** a short checklist in [`src/rosy_core/rosy_core/AGENTS.md`](../../src/rosy_core/rosy_core/AGENTS.md). That file is loaded on every edit in the tree; this one is the reasoning behind it. If they disagree, this file is wrong and should be fixed.
+
+## Why this exists
+
+Every split in this package has been argued from scratch. That produces two failures in opposite directions: real defects survive because nobody wants to relitigate, and cosmetic reorganisations happen because "it's big" sounds like a reason. This file names what actually counts, so the argument happens once.
+
+**The findings that matter most are the "leave it alone" rows.** They are what stops the next round of churn.
+
+## How to apply
+
+Run A → B → C in order and record the verdict — including "nothing fired". A criterion that no longer matches the tree is a bug in the criterion, not in the tree; re-derive before citing.
+
+---
+
+## Rule A — what a subpackage is here
+
+*Descriptive, not a gate. It tells you what you are joining, not whether you may.*
+
+Two kinds of directory live under `rosy_core/`:
+
+- **Service packages** own one requirement family and are reachable through at least one `CoreServices` field: `command/`, `docking/`, `events/`, `navigation/`, `power/`, `safety/`, `state/`, `system/`, `waypoints/`.
+- **Structural packages** are layers or adapters with no service field, and are **exempt from A3 by name**: `api/`, `bridge/`, `protocol/`, `web/`, `fleet_agent/`, `diagnostics/`.
+
+| | Check | Escape hatch |
+|---|---|---|
+| A1 | Owns one requirement family, named in its own `AGENTS.md` Purpose | none |
+| A2 | Has an `AGENTS.md` | none — 17 exist under `rosy_core/` |
+| A3 | Maps to ≥1 `CoreServices` field, **or** is a named structural package | the list above |
+| A4 | Behaviour is covered by some host test | if no test bears the package's name, the package's own `AGENTS.md` **Testing Requirements** must name the file that covers it — that is what makes A4 falsifiable rather than a shrug |
+
+**Size is not in this table and must not be added.** See X1.
+
+### Verification — all fifteen subpackages
+
+*Hand-built. Re-derive before citing.*
+
+| Package | A3 — `CoreServices` field | A4 — name-matching test |
+|---|---|---|
+| `api/` | — (structural) | `test_api.py` |
+| `bridge/` | — (structural) | `test_bridge_translate.py`, `test_goal_tracker.py` |
+| `command/` | `command` (+`registry`, `modes`) | **none** → `test_core_logic.py` |
+| `diagnostics/` | — (structural) | `test_diagnostics_api.py` |
+| `docking/` | `docking` | `test_docking.py` |
+| `events/` | `events`, `audit` | `test_audit.py` |
+| `fleet_agent/` | — (structural) | `test_fleet_agent.py` |
+| `navigation/` | `nav`, `swarm` *(field name ≠ directory name)* | `test_swarm.py`, `test_initial_pose.py`, `test_swarm_integration.py` |
+| `power/` | `power`, `battery` | `test_power.py`, `test_battery.py` |
+| `protocol/` | — (structural) | `test_protocol_schemas.py` |
+| `safety/` | `safety` | **none** → `test_core_logic.py` |
+| `state/` | `state` | **none** → `test_core_logic.py` |
+| `system/` | `runtime_probe` *(field name ≠ directory name)* | `test_host_runtime.py`, `test_ros_graph_monitor.py` |
+| `waypoints/` | `waypoints` | **none** → `test_core_logic.py` |
+| `web/` | — (structural) | `test_dashboard.py` |
+
+A4 has no name-matching test for four packages — `command/`, `safety/`, `state/`, `waypoints/`. Each is covered by `test_core_logic.py`; the escape hatch requires that to be written in the package's `AGENTS.md`, not inferred here.
+
+## Rule B — promoting a top-level module to a subpackage
+
+Fires only when **all three** hold.
+
+- **B1 — unowned family.** It implements a requirement family that no existing package's `AGENTS.md` claims. *Check:* grep the ID prefix across `rosy_core/**/AGENTS.md`.
+- **B2 — two roles today.** It already needs ≥2 files with genuinely different roles, **or** work that adds the second file is scheduled and carries a requirement ID or checklist item. Name the second file and the ID that forces it. If you cannot, B2 is false.
+- **B3 — cross-package consumers.** ≥2 distinct packages import it.
+
+**One file with one role stays a module**, however many things import it.
+
+---
+
+## Published criteria
+
+These generalise. Use them.
+
+### C1 — a host-untestable decision
+
+The file cannot be imported by host pytest **and** contains a decision — a branch, a conversion, a threshold, a status-code interpretation, an ordering — whose wrongness the CI boot smoke would not catch.
+
+*Check (pasted output, run from `src/rosy_core/`):*
+
+```
+$ python -c "import rosy_core.bridge.ros_bridge"
+ModuleNotFoundError: No module named 'rclpy'
+```
+
+`bridge/AGENTS.md` records the same fact from the other side: *"Host pytest does not import `ros_bridge.py`"*. Anything decided inside that file is decided where no host test can see it.
+
+**Remedy:** extract the decision to a ROS-free sibling. This is not theory — the package has done it twice on its own, before this document existed:
+
+- `bridge/translate.py` — message → dict conversion, asserted on real values in `test_bridge_translate.py`.
+- `bridge/goal_tracker.py` — Nav2 goal generations, six real-value tests in `test_goal_tracker.py`, and `_goal_handle` deleted from `ros_bridge.py` rather than left beside it.
+
+A criterion the codebase reinvents unprompted is describing something real. **C1 is the strongest criterion here.**
+
+### C6 — a seam lie
+
+A dependency reached through `hasattr`/`getattr` instead of a declared member, **or** a Protocol member that is not that Protocol's concern.
+
+**C6 is a test, not a rule you have to remember:** [`src/rosy_core/test/test_module_criteria.py`](../../src/rosy_core/test/test_module_criteria.py) asserts **set equality** between the reaches in the package and the triage below. Add a reach — including a line-wrapped one, which a per-line scan would miss at `--max-line-length=120` — and it fails, naming the new one. That keeps this table true instead of true-on-the-day-it-was-written.
+
+*What it does not catch, stated so the guarantee is not oversold:* a reach whose receiver is itself a call or a subscript (`getattr(obj["k"], ...)`, `getattr(self.dep(), ...)`), and anything reaching an attribute without `getattr`/`hasattr` at all. It gates the syntax C6 names, not every possible way to dodge a contract.
+
+*Check (pasted output):*
+
+```
+$ grep -rnE "hasattr\(|getattr\(self\.|getattr\(svc\." src/rosy_core/rosy_core/ --include=*.py
+api/v1/safety.py:45:    deep = getattr(getattr(svc.battery, "_cfg", None), "deep_percent", 5.0)
+api/v1/safety.py:141:        "battery_deep_percent", getattr(getattr(svc.battery, "_cfg", None), "deep_percent", 5.0))
+docking/manager.py:170:        if getattr(self._safety, "estop", False):
+docking/manager.py:199:        if getattr(self._safety, "estop", False):
+docking/manager.py:261:        if self._manual_active or getattr(self._safety, "estop", False):
+docking/manager.py:284:        if getattr(self._safety, "estop", False) and self._state in (
+docking/manager.py:403:        voltage = getattr(self._battery, "voltage", None) if self._battery else None
+navigation/manager.py:193:        if self.executor is not None and hasattr(self.executor, "reset_mapping"):
+power/manager.py:199:        return float(getattr(self._cfg, _RATE_ATTR[mode]))
+system/host_agent_client.py:157:        if not hasattr(socket, "AF_UNIX"):  # pragma: no cover - Windows dev host
+```
+
+Ten reaches, three verdicts:
+
+| Reach | Verdict |
+|---|---|
+| `api/v1/safety.py` ×2 — `getattr(getattr(svc.battery, "_cfg", None), "deep_percent", 5.0)` | **Seam lie.** Reaches a *private* field across a package boundary because `BatteryMonitor` (`power/`) exposes no public accessor to `safety/`. Fix: add `BatteryMonitor.deep_percent`. Whether SAF or PWR should own battery thresholds at all is a separate, open question. |
+| `navigation/manager.py` — `hasattr(self.executor, "reset_mapping")` | **Seam lie, and a live defect.** The contract does not declare the member, and `RosBridge` does not implement it — so `POST /api/v1/slam/reset` returns `{"reset": true}` for a no-op. See the verdicts below. |
+| `docking/manager.py` ×5 | **Accepted.** None-tolerance for optional injections whose attribute is part of the injected type's public surface. |
+| `power/manager.py` | **Accepted.** Mode → attribute dispatch over the module's own config object. |
+| `system/host_agent_client.py` | **Platform guard, not a seam.** `AF_UNIX` is absent on the Windows dev host. |
+
+Line numbers above drift; the test keys on `(file, kind, receiver, attribute)` for exactly that reason.
+
+### C7 — a service field whose methods span two requirement families
+
+C5 (below) is defined over the *current* service graph, so it is a fixed point: it can see misplacement in the API layer and is structurally blind to misplacement in the service layer. C7 is the criterion C5 cannot express.
+
+***C7 is review-only, and stays that way.*** The obvious mechanisation — grepping for requirement-ID banners — is a source-grep over comment text and would fire on every legitimate cross-family reference. Saying so plainly is better than implying a mechanism that does not exist. Its one live instance is recorded in `navigation/AGENTS.md` and its closure is bound to the `mapping/` trigger, which *is* machine-checked.
+
+**Live instance:** `NavigationManager` carries NAV-005 mapping-session state (`mapping_active`, `start/stop/save/reset_mapping`) under a literal `# --- NAV-005 Mapping 세션` banner, inside a class whose module docstring and `AGENTS.md` both claim NAV-001~004/006. The code labels its own seam. Accepted for now — there is no `mapping` service for that state to move to.
+
+---
+
+## Worked verdicts
+
+*Derived from one or two cases. These are records of a judgement, not general tests — re-derive before citing one as a rule.*
+
+### C2 — unrelated lifecycles in one object
+
+One class registers periodic callbacks for ≥3 domains that can fail independently. `grep -c create_timer` is the **finder, not the test**: it counts timers rather than failure modes (`_state_timer` and `_diag_timer` both feed the same snapshot), and it is per-file where the criterion is per-class. Applies to one class in the tree.
+
+### C3 — two Protocols, one implementation
+
+`RosBridge` satisfies `NavExecutor` (`navigation/manager.py`) and `DockingExecutor` (`docking/manager.py`). Both are `typing.Protocol`, and `RosBridge` declares **no base class** — conformance is duck-typed on both sides and marked only by comment banners. That does not weaken C3, it sharpens it: nothing in the type system records that one class answers to two contracts, which is why adding a member to either Protocol binds nothing at runtime.
+
+### C4 — an aggregator carrying content
+
+`api/v1/routes.py` states the rule in its own docstring: *"새 엔드포인트는 해당 도메인 모듈에 넣고, 새 도메인이면 모듈을 만들어 여기에 등록한다."* It obeys it today — zero `svc.` references. Recorded as the repo's rule, not as a finding.
+
+### C5 — an API module with two service owners
+
+**Rule (authoritative).** For each module under `api/v1/`, list the `svc.<field>` names its endpoints **mutate**, or that a **router in the file is named after**. **Reads do not count.** Drop the ambient set `{state, events, capability, modes, config}`. If ≥2 remain and they are backed by different subpackages or top-level modules, the module has two owners.
+
+*The ambient set is ambient because those fields are cross-cutting infrastructure every domain touches — **not** because they are read-only. They are mutated all over: `svc.state` at `control.py:44` and `safety.py:25`, `svc.modes` at `control.py:41`, and `svc.config` is written and persisted to disk at `safety.py:150,154` and `system.py:89,92`.*
+
+A grep is a candidate generator only. Applying it and stopping there is what produced the wrong answer the first time this table was written.
+
+**Two owners is a finding, not automatically a split.** Record the verdict either way.
+
+*Hand-built, derived under the rule above. Thirteen modules, excluding `__init__.py` — eleven before the `navigation.py` split below, plus the two it produced.*
+
+| Module | Owners after the rule | Backed by | Verdict |
+|---|---|---|---|
+| `common.py` | — | — | **N/A** — shared auth dependencies, no endpoints |
+| `routes.py` | — | — | **N/A** — aggregator (C4) |
+| `host.py` | — | — | clean — owner set empty |
+| `docking.py` | `docking` | `docking/` | clean |
+| `map.py` | `maps` | `maps.py` | clean — a read-only module; ownership comes from `map_router`'s **name** |
+| `waypoints.py` | `waypoints` | `waypoints/` | clean |
+| `robot.py` | `power` | `power/` | clean — **three routers, one owner.** Router count is not the test |
+| `swarm.py` | `swarm` | `navigation/` | clean |
+| `observability.py` | — | — | clean. `svc.audit.history()` and `svc.started_at` are **reads**; `events_router`'s name matches the ambient `events` field, which the rule drops. Even counting the read, `audit` and `events` are both `events/` — one package |
+| `system.py` | `identity` | `identity.py` | **clean.** `svc.identity.robot_id`/`robot_name` are mutated at `:61`/`:66`; `svc.runtime_probe.snapshot()` at `:152` is a **read**, and no router is named `runtime_probe`. One owner |
+| `control.py` | `command`, `nav` | `command/`, `navigation/` | **fires** → verdict below |
+| `safety.py` | `safety`, `battery` | `safety/`, `power/` | **fires** → verdict below |
+| `navigation.py` | `nav` | `navigation/` | clean **now**. It fired with `{nav, maps, waypoints}` before the split below |
+
+**Three of eleven fired** when this table was first derived. `navigation.py` has since been split, so two of thirteen fire today — both recorded accepts. An earlier draft of this table said four, by reading `system.py` off the raw grep instead of the rule — `runtime_probe` is a read. The rule caught its own author.
+
+---
+
+## Anti-criteria — these do not justify a split
+
+Each cites an in-tree counter-example, because an anti-criterion without one is just an opinion.
+
+- **X1 — line count.** `rosy_core/waypoints/manager.py` is 85 lines and is a package; `rosy_core/docking/manager.py` is 511 lines and is correctly one file.
+- **X2 — symmetry.** `rosy_core/maps.py` is the last feature that is a top-level module rather than a package. That is an observation, not a defect; it stays a module because B2 is false.
+- **X3 — speculative work.** `deploy/robot/config/capabilities.{core,motor,hardware}.yaml` all say `slam: false` and nothing deployed starts slam_toolbox, so a `mapping/` package would have no runtime to be verified against. Pre-building a home for unscheduled work is how empty packages happen.
+- **X4 — test file size.** `src/rosy_core/test/test_docking.py` is 1157 lines. That is coverage, not debt. Never split production code to shorten a test file.
+- **X5 — a long but fully host-testable file with one owner.** `rosy_core/docking/manager.py` again: 511 lines, one owner (`svc.docking`), covered by `test_docking.py`. There is nothing to gain — the seam a split would introduce is not load-bearing.
+- **X6 — shrinking a diff during someone else's in-flight work.** `rosy_core/bridge/ros_bridge.py` was observed clean, dirty, and clean again over three days of swarm work. Refactoring a contended file is how conflicts eat commits. Wait for the branch.
+
+---
+
+## Verdicts
+
+### `bridge/ros_bridge.py` — split **within** `bridge/`
+
+C1, C2, C3 and C6 all fire. Not a new package: ROS-101 keeps all ROS I/O in `bridge/`, and D-1 keeps the process single. The split is into ROS-free siblings inside `bridge/`, following `translate.py` and `goal_tracker.py`.
+
+**The target is decisions covered by real-value host tests, not fewer lines.** A 559-line file of `translate → call service` one-liners would be correct. Note the corollary, learned from `goal_tracker.py`: extracting *stateful* logic can make the caller **longer**, because the sibling absorbs the algorithm and the call site grows the wiring. Net line count is not the measure.
+
+### mapping — **no `mapping/` package**
+
+B1 holds (no package claims MAP) and B3 holds — three importers across two packages plus a top-level module (`api/v1/map.py`, `bridge/ros_bridge.py`, `services.py`), but **B2 fails**: `maps.py` is one file with one role, and the second file exists only in unscheduled work. X3 applies independently — there is no runtime to verify against.
+
+`maps.py` does **not** belong with SLAM, and would not even if `mapping/` existed. They share a word, not a concern:
+
+| | `maps.py` | mapping / SLAM |
+|---|---|---|
+| Direction | read path — ROS subs → dashboard | write path — operator action → disk |
+| Lifetime | ephemeral, last-value in memory | persistent artifact, survives reboot |
+| Cadence | 5–10 Hz, continuous | discrete, operator-initiated |
+| Failure cost | a stale tile in the UI | a lost survey run |
+| Test shape | pure value assertions | service-call sequencing, needs slam_toolbox |
+| ROS coupling | none, by construction | needs the optional dependency |
+
+**The name is the real problem** — `maps.py` reads as though it owns maps. Renaming it was considered and rejected: it buys clarity at the cost of history churn, and the same clarity is free in the module docstring and the `AGENTS.md` row.
+
+#### `mapping/` re-entry trigger
+
+All three, or no package:
+
+1. A launch reachable from one of the three deploy overlay **modes** starts slam_toolbox, and that overlay sets `slam: true`. **Machine-checked** by `test_slam_capability_requires_a_launch_that_actually_starts_slam_toolbox` in [`test/test_robot_runtime.py`](../../test/test_robot_runtime.py) — it fails the moment an overlay advertises slam the launch tree cannot deliver, and names this trigger. *(The standalone `rosy_navigation` map-building launches do start slam_toolbox, but no overlay mode includes them — which is why the condition reads "reachable from a mode".)*
+2. MAP-003 upload or Flask parity item N-1 is scheduled — i.e. a second file with a distinct role can be named.
+3. B3 still holds.
+
+When it fires, `slam_router` moves out of `api/v1/navigation.py` in the same change, and C5 will say so on its own.
+
+### `api/v1/navigation.py` — split three ways · **done**
+
+C5 fired with `{nav, maps, waypoints}`. Resolved: `map_router` → `api/v1/map.py`, `waypoints_router` → `api/v1/waypoints.py`, leaving `navigation.py` with `{nav}`.
+
+`slam_router` **stays** in `navigation.py` — not because `nav` is the right owner, but because **there is no `mapping` service for it to belong to**. That distinction matters: the underlying misplacement is the C7 instance above, and it is recorded rather than blessed. `navigation_path()`'s `svc.maps.get_path()` is a read and does not make `navigation.py` a two-owner module.
+
+### Newly exposed, and accepted
+
+- **`api/v1/control.py` → `{command, nav}`.** `svc.nav.cancel()` inside a mode transition is coordination, not ownership: leaving a navigation mode must stop navigation. Splitting would put half a state transition in each of two files. **No action.**
+- **`api/v1/safety.py` → `{safety, battery}`.** `svc.battery.apply_thresholds()` is a `power/` object mutated from a `safety/` endpoint — one settings write that must land atomically across both. **No split**; fix the *access shape* only (the C6 `_cfg` reaches → a public `BatteryMonitor.deep_percent`). Whether SAF or PWR owns battery thresholds is genuinely open and larger than this document.
+- **`NavigationManager` — the C7 instance.** NAV-005 mapping-session state on a NAV-001~004/006 manager. Accepted; unblocks on the `mapping/` trigger. Recorded in `navigation/AGENTS.md`.
