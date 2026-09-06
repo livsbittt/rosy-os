@@ -15,7 +15,7 @@
 | E-3 | `POST /api/initialpose` — AMCL 초기 자세 | `POST /api/v1/localization/initialpose` | 동일 payload로 AMCL 초기화 후 pose 수렴 | API |
 | E-4 | `GET /api/nav/status` — 주행 상태 | `GET /api/v1/navigation/state` (+ `/ws/state` 실시간) | NAV-004 7상태로 매핑(구: 진행중/대기 등 이분법 → 신: 세분화). 구분할 수 없는 상태 없음 | API |
 | E-5 | `POST /api/nav/stop` — 취소 | `POST /api/v1/navigation/cancel` | 주행 중 취소 → 로봇 정지 + 상태 `CANCELED` + `nav.canceled` 이벤트(EVT) | API |
-| E-6 | `POST /api/slam/reset` | `POST /api/v1/slam/reset` (+ 세션 API `slam/start`·`stop`, NAV-005) | 매핑 세션 리셋 후 신규 스캔 정상 누적 | API |
+| E-6 | `POST /api/slam/reset` | `POST /api/v1/slam/reset` (+ 세션 API `slam/start`·`stop`, NAV-005) | 매핑 세션 리셋 후 신규 스캔 정상 누적 | **hollow** — 라우트는 있으나 리셋은 없다. `RosBridge` 에 `reset_mapping` 구현이 없어 200 만 돌려주고 있었고, D-32 로 정직한 501/400 이 되었다. 실물 slam_toolbox `Reset` 이식은 `mapping/` 트리거 대기 |
 | E-7 | `POST /api/slam/save_map` | `POST /api/v1/slam/save` | 맵 파일 저장 + 응답 `map_id`(MAP-001, D-13). 저장 맵으로 Nav2 재시작 시 주행 가능 | API |
 
 ## 2. 비-엔드포인트 동등성
