@@ -70,3 +70,43 @@ def test_ros_bridge_implements_every_declared_contract_member(relative, protocol
         "contract. If the runtime genuinely cannot honour it, implement it and "
         "raise CAPABILITY_NOT_SUPPORTED, as reset_mapping does (D-32)."
     )
+
+
+#: The providers `RosBridge._setup_diagnostics` registers, recorded in
+#: `bridge/AGENTS.md` as the baseline any refactor of that file must reproduce.
+DIAGNOSTICS_PROVIDERS = {"rosy_core", "cpu", "memory", "disk", "odom_topic"}
+
+
+def _registered_diagnostics() -> set[str]:
+    """String literals passed to `self.diagnostics.register(...)` in the bridge.
+
+    Read statically for the same reason as everything else here: host pytest
+    cannot import `ros_bridge.py`, so `GET /api/v1/diagnostics` cannot be asked
+    on this machine. A dropped provider surfaces as a missing key rather than an
+    error, which is exactly the failure a Pi run would have to notice by eye.
+    """
+    tree = ast.parse((PACKAGE / "bridge/ros_bridge.py").read_text(encoding="utf-8"))
+    return {
+        node.args[0].value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "register"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and isinstance(node.args[0].value, str)
+    }
+
+
+def test_diagnostics_provider_set_matches_the_recorded_baseline():
+    registered = _registered_diagnostics()
+
+    assert registered == DIAGNOSTICS_PROVIDERS, (
+        "RosBridge._setup_diagnostics no longer registers the set recorded in "
+        "bridge/AGENTS.md.\n"
+        f"  dropped: {sorted(DIAGNOSTICS_PROVIDERS - registered)}\n"
+        f"  added:   {sorted(registered - DIAGNOSTICS_PROVIDERS)}\n"
+        "A dropped provider is invisible at runtime — /api/v1/diagnostics simply "
+        "stops carrying the key. Update AGENTS.md and this literal together, or "
+        "put the provider back."
+    )
