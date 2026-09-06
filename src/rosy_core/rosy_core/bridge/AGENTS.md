@@ -18,6 +18,7 @@ ROS-101: the only module allowed to import rclpy message types and talk to the R
 | `display.py` | ROS-free `display/info` decisions: address resolution and payload rounding (PWR-003) |
 | `reconcile.py` | ROS-free change-detection latch. LED latches on a skipped call, LiDAR does not |
 | `odometry.py` | ROS-free `travelled_m` — the only measure undocking has |
+| `save_map.py` | ROS-free SaveMap reply handling. `RESULT_SUCCESS = 0` — truthiness inverts it |
 
 ## Subdirectories
 
@@ -40,7 +41,7 @@ None.
 ### Testing Requirements
 
 Host pytest does not import `ros_bridge.py` (optional ROS): CI boot smoke + SaveMap guard cover it.
-The ROS-free siblings are host-testable and carry real value assertions — `translate.py` (`test_bridge_translate.py`), `goal_tracker.py` (`test_goal_tracker.py`), `display.py` (`test_bridge_display.py`), `reconcile.py` (`test_bridge_reconcile.py`), `odometry.py` (`test_bridge_odometry.py`). Duck-typed `SimpleNamespace` inputs, no rclpy. Extract a decision here rather than leaving it inline: this file is the one place host pytest cannot reach.
+The ROS-free siblings are host-testable and carry real value assertions — `translate.py` (`test_bridge_translate.py`), `goal_tracker.py` (`test_goal_tracker.py`), `display.py` (`test_bridge_display.py`), `reconcile.py` (`test_bridge_reconcile.py`), `odometry.py` (`test_bridge_odometry.py`), `save_map.py` (`test_bridge_save_map.py`). Duck-typed `SimpleNamespace` inputs, no rclpy. Extract a decision here rather than leaving it inline: this file is the one place host pytest cannot reach.
 
 ### Common Patterns
 

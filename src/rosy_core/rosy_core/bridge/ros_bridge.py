@@ -33,7 +33,7 @@ from sensor_msgs.msg import BatteryState, Imu, LaserScan, Range
 from std_msgs.msg import Bool, Float32, String
 from std_srvs.srv import Empty
 
-from rosy_core.bridge import display, odometry, reconcile, translate
+from rosy_core.bridge import display, odometry, reconcile, save_map, translate
 from rosy_core.bridge.goal_tracker import GoalTracker
 from rosy_core.maps import occupancy_map_id
 from rosy_core.navigation.initial_pose import amcl_pose_covariance
@@ -523,11 +523,7 @@ class RosBridge:
         response = future.result()
         if response is None:
             raise RuntimeError("save_map service failed")
-        # slam_toolbox 는 RESULT_SUCCESS=0, 실패가 1/255 다. 참/거짓으로 보면
-        # 성공을 실패로, 실패를 성공으로 뒤집게 된다.
-        code = response.result
-        if code != 0:
-            raise RuntimeError(f"save_map service failed (result={code})")
+        save_map.check_result(response.result)
 
         digest_source = name
         for candidate in (Path(f"{name}.pgm"), Path(name)):
