@@ -42,6 +42,11 @@ None.
 ### Testing Requirements
 
 Host pytest does not import `ros_bridge.py` (optional ROS): CI boot smoke + SaveMap guard cover it.
+One exception, deliberately narrow — `test/test_bridge_timers.py` stubs `rclpy` in `sys.modules` to build
+the bridge against a recording node and assert **what it registers**: six timers at fixed periods, eleven
+subscriptions, five publishers, three service clients. Structural only. It exists so the 3b adapter reshape
+is gradable without a robot. Do not add semantic tests there and do not move the stub into `conftest.py` —
+a stub asserts stub semantics, and its blast radius is meant to stay one file.
 The ROS-free siblings are host-testable and carry real value assertions — `translate.py` (`test_bridge_translate.py`), `goal_tracker.py` (`test_goal_tracker.py`), `display.py` (`test_bridge_display.py`), `reconcile.py` (`test_bridge_reconcile.py`), `odometry.py` (`test_bridge_odometry.py`), `save_map.py` (`test_bridge_save_map.py`), `battery_policy.py` (`test_bridge_battery_policy.py`). Duck-typed `SimpleNamespace` inputs, no rclpy. Extract a decision here rather than leaving it inline: this file is the one place host pytest cannot reach.
 
 ### Common Patterns
