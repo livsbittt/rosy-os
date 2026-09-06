@@ -110,7 +110,8 @@ def build(capability=CAPABLE):
     state = StateManager(robot_id="rosy_01")
     nav = FakeNav()
     safety = SafetyManager(SpeedLimits(), BatteryPolicy(), events)
-    manager = SwarmManager(events, state, nav, safety, capability, clock=clock)
+    manager = SwarmManager(events, state, nav, safety, capability, clock=clock,
+                           map_id_provider=lambda: state.map_id)
     return manager, clock, events, state, nav, safety
 
 

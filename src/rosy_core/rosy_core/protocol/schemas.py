@@ -249,6 +249,8 @@ class PoseSample(BaseModel):
     robot_id: str
     pose: Pose
     seq: int
+    #: v1.7 additive. 어느 맵의 좌표인지 — 없으면 확인하지 않는다(구 릴레이 호환).
+    map_id: Optional[str] = None
 
 
 class StateSnapshot(BaseModel):

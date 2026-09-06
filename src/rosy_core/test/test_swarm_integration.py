@@ -122,7 +122,8 @@ def build():
     swarm = SwarmManager(events, state, nav, safety,
                          Capability({"swarm": {"follow": True, "lead": True}}),
                          clock=clock,
-                         docking_active_provider=lambda: docking["active"])
+                         docking_active_provider=lambda: docking["active"],
+                         map_id_provider=lambda: state.map_id)
     # services.py 와 같은 배선. 세션을 닫는 모든 길이 추종자에게 닿는다.
     nav.session_closed_listener = swarm.on_navigation_session_closed
     safety.estop_listeners.append(swarm.on_estop)
@@ -607,3 +608,98 @@ def test_the_cap_comes_off_when_the_formation_ends_for_any_reason():
 
         assert swarm.active is False, closer
         assert safety.session_linear is None, closer
+
+
+# --- MAP-002 를 추종에도 (D-31 의 남은 구멍) -------------------------------------
+
+
+def follow_on_map(map_id="site_a"):
+    swarm, nav, executor, clock, events, safety, docking = build()
+    swarm._state.set_map_id(map_id)
+    swarm.follow(params())
+    return swarm, nav, executor, clock, events
+
+
+def test_a_reference_from_another_map_is_not_turned_into_a_goal():
+    """웨이포인트에는 MAP_MISMATCH 가드가 있는데 추종에는 없었다.
+
+    다른 맵의 좌표를 그대로 목표로 삼으면 그럴듯해 보이는 엉뚱한 지점으로 간다.
+    """
+    swarm, _nav, executor, _clock, events = follow_on_map("site_a")
+
+    issued = swarm.on_reference_pose(
+        ReferencePose("rosy_02", 4.0, 0.0, 0.0, map_id="site_b"))
+
+    assert issued is False
+    assert executor.goals == []
+    holds = [d for t, d in events.published if t == "swarm.hold"]
+    assert holds and holds[-1]["reason"] == "map_mismatch"
+    assert holds[-1]["reference_map_id"] == "site_b" and holds[-1]["map_id"] == "site_a"
+
+
+def test_a_map_mismatch_is_announced_once_not_every_frame():
+    swarm, _nav, _executor, clock, events = follow_on_map("site_a")
+
+    for _ in range(5):
+        swarm.on_reference_pose(ReferencePose("rosy_02", 4.0, 0.0, 0.0, map_id="site_b"))
+        clock.advance(0.1)
+
+    assert [t for t, _ in events.published].count("swarm.hold") == 1
+    assert swarm.state_payload()["map_mismatch"] == "site_b"
+
+
+def test_a_map_mismatch_withdraws_the_goal_but_keeps_the_formation():
+    swarm, nav, executor, clock, _events = follow_on_map("site_a")
+    swarm.on_reference_pose(ReferencePose("rosy_02", 1.0, 0.0, 0.0, map_id="site_a"))
+    executor.settle()
+    clock.advance(0.5)
+
+    swarm.on_reference_pose(ReferencePose("rosy_02", 4.0, 0.0, 0.0, map_id="site_b"))
+
+    assert executor.cancelled_handles >= 1
+    assert swarm.active is True
+    assert nav._moving_session is not None, "the session survives so the stream can resume"
+
+
+def test_a_leader_returning_to_our_map_resumes_the_formation():
+    swarm, _nav, executor, clock, _events = follow_on_map("site_a")
+    swarm.on_reference_pose(ReferencePose("rosy_02", 4.0, 0.0, 0.0, map_id="site_b"))
+    assert swarm.state_payload()["map_mismatch"] == "site_b"
+
+    clock.advance(0.6)
+    issued = swarm.on_reference_pose(
+        ReferencePose("rosy_02", 2.0, 0.0, 0.0, map_id="site_a"))
+
+    assert issued is True
+    assert swarm.state_payload()["map_mismatch"] is None
+    assert executor.goals[-1].x == pytest.approx(1.5)
+
+
+def test_a_reference_without_a_map_id_is_still_followed():
+    """이 필드는 additive 다. 그것을 모르는 Fleet 릴레이가 계속 동작해야 한다."""
+    swarm, _nav, executor, _clock, _events = follow_on_map("site_a")
+
+    assert swarm.on_reference_pose(ReferencePose("rosy_02", 1.0, 0.0, 0.0)) is True
+    assert executor.goals
+
+
+def test_a_robot_with_no_map_of_its_own_does_not_refuse_the_leader():
+    """비교할 것이 없으면 확인할 수 없다. 확인 실패로 읽어 멈추면 안 된다."""
+    swarm, _nav, _executor, _clock, _events, _safety, _docking = build()
+    swarm.follow(params())
+
+    assert swarm.on_reference_pose(
+        ReferencePose("rosy_02", 1.0, 0.0, 0.0, map_id="site_b")) is True
+
+
+def test_a_map_mismatch_does_not_read_as_a_lost_stream():
+    """표본은 도착하고 있다. SWM-004 타임아웃을 걸면 원인을 잘못 말한다."""
+    swarm, _nav, _executor, clock, events = follow_on_map("site_a")
+    swarm.on_reference_pose(ReferencePose("rosy_02", 4.0, 0.0, 0.0, map_id="site_b"))
+
+    clock.advance(0.5)
+    swarm.tick()
+
+    assert swarm.holding is False
+    reasons = [d.get("reason") for t, d in events.published if t == "swarm.hold"]
+    assert reasons == ["map_mismatch"]

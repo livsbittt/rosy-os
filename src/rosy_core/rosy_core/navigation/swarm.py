@@ -46,6 +46,8 @@ class ReferencePose:
     y: float
     yaw: float
     seq: int = 0
+    #: 이 좌표가 어느 맵의 것인지. `None` 이면 확인할 수 없다.
+    map_id: Optional[str] = None
 
 
 def follow_goal(reference: ReferencePose, distance: float, lateral: float) -> NavGoalSpec:
@@ -67,7 +69,8 @@ class SwarmManager:
     """SWM-002 follow 프리미티브와 SWM-004 단절 정책."""
 
     def __init__(self, events, state_manager, nav, safety, capability,
-                 clock=time.monotonic, docking_active_provider=None) -> None:
+                 clock=time.monotonic, docking_active_provider=None,
+                 map_id_provider=None) -> None:
         self._events = events
         self._state = state_manager
         self.nav = nav
@@ -78,6 +81,10 @@ class SwarmManager:
         # 액션을 쓰므로, 추종이 계속 목표를 갈아끼우면 도크로 가던 주행을
         # 선점해버린다 — SAF-005 저배터리 복귀가 조용히 실패하는 경로다.
         self._docking_active = docking_active_provider or (lambda: False)
+        # 참조 pose 가 우리 맵의 좌표인지 볼 수 있어야 한다. 웨이포인트에는
+        # MAP-002 가드가 있는데(resolve_goal 의 MAP_MISMATCH) 추종에는 없었고,
+        # 다른 맵의 리더를 따라가면 그럴듯해 보이는 엉뚱한 좌표로 간다.
+        self._map_id = map_id_provider or (lambda: None)
         self._lock = threading.RLock()
 
         self._params: Optional[SwarmFollowParams] = None
@@ -89,6 +96,9 @@ class SwarmManager:
         self._last_goal_at: Optional[float] = None
         self._pending: Optional[ReferencePose] = None
         self._holding = False
+        #: 맞지 않는 맵 id. 스트림 단절과 원인은 다르지만 처신은 같다 —
+        #: 목표를 거두고 세션은 살려 둔다.
+        self._map_mismatch: Optional[str] = None
 
     # --- 조회 -----------------------------------------------------------------
 
@@ -124,6 +134,7 @@ class SwarmManager:
                 "target_robot_id": self._params.target_robot_id if self._params else None,
                 "source": self._params.source.value if self._params else None,
                 "max_speed": self._params.max_speed if self._params else None,
+                "map_mismatch": self._map_mismatch,
                 "stream_age_s": (
                     None if self._last_sample_at is None
                     else round(self._clock() - self._last_sample_at, 3)
@@ -195,6 +206,7 @@ class SwarmManager:
                 self._last_goal_at = None
                 self._pending = None
                 self._holding = False
+                self._map_mismatch = None
                 status = self.status()
         if blocked is not None:
             raise SwarmError(*blocked)
@@ -220,6 +232,7 @@ class SwarmManager:
             self._last_goal_at = None
             self._pending = None
             self._holding = False
+            self._map_mismatch = None
             self._session = None
             self._safety.set_session_speed(None)
 
@@ -246,17 +259,42 @@ class SwarmManager:
             if params is None or reference.robot_id != params.target_robot_id:
                 return False
             now = self._clock()
+            # 표본은 도착했다 — 스트림은 살아 있다. 맵이 맞지 않는 것은
+            # 단절이 아니므로 SWM-004 타임아웃을 걸어서는 안 된다.
             self._last_sample_at = now
-            resumed = self._holding
-            self._holding = False
-            if self._last_goal_at is not None and now - self._last_goal_at < _MIN_GOAL_INTERVAL_S:
-                # SWM-002: <=2 Hz. 버리지 않고 들고 있다가 tick 에서 낸다.
-                self._pending = reference
-                return False
-            self._last_goal_at = now
-            self._pending = None
-            spec = follow_goal(reference, params.distance, params.lateral)
-            session = self._session
+
+            ours = self._map_id()
+            if reference.map_id and ours and reference.map_id != ours:
+                announce = self._map_mismatch != reference.map_id
+                self._map_mismatch = reference.map_id
+                self._pending = None
+                if not announce:
+                    # 이미 알렸다. 매 프레임 같은 말을 감사 로그에 쌓지 않는다.
+                    return False
+            else:
+                resumed = self._holding or self._map_mismatch is not None
+                self._holding = False
+                self._map_mismatch = None
+                if (self._last_goal_at is not None
+                        and now - self._last_goal_at < _MIN_GOAL_INTERVAL_S):
+                    # SWM-002: <=2 Hz. 버리지 않고 들고 있다가 tick 에서 낸다.
+                    self._pending = reference
+                    return False
+                self._last_goal_at = now
+                self._pending = None
+                spec = follow_goal(reference, params.distance, params.lateral)
+                session = self._session
+
+        if self._map_mismatch is not None:
+            # 목표를 거둔다. 대형은 살려 둔다 — 리더가 우리 맵으로 돌아오면
+            # 새 follow 명령 없이 이어간다.
+            self.nav.cancel(source="swarm", close_session=False)
+            self._state.set_swarm(self.status())
+            self._events.publish(
+                "swarm.hold", severity="warning", source="swarm_manager",
+                data={"reason": "map_mismatch", "formation": self._formation_label(params),
+                      "reference_map_id": reference.map_id, "map_id": ours})
+            return False
 
         if resumed:
             self._state.set_swarm(self.status())

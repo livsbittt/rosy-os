@@ -109,9 +109,9 @@ async def _authorize(websocket: WebSocket, min_role: str = "viewer",
     return svc
 
 
-def _pose_envelope(robot_id: str, pose, seq: int) -> dict:
+def _pose_envelope(robot_id: str, pose, seq: int, map_id=None) -> dict:
     """API Ref §7.8 그대로. 리더와 팔로워가 같은 모양을 쓴다."""
-    sample = PoseSample(robot_id=robot_id,
+    sample = PoseSample(robot_id=robot_id, map_id=map_id,
                         pose=Pose(x=pose.x, y=pose.y, yaw=pose.yaw), seq=seq)
     return Envelope(type=EnvelopeType.POSE, payload=sample.model_dump()).model_dump()
 
@@ -136,7 +136,8 @@ async def ws_swarm_pose(websocket: WebSocket):
             snapshot = svc.state.snapshot()
             seq += 1
             await websocket.send_json(
-                _pose_envelope(svc.identity.robot_id, snapshot.pose, seq))
+                _pose_envelope(svc.identity.robot_id, snapshot.pose, seq,
+                               map_id=snapshot.map_id))
             next_at += period
             delay = next_at - loop.time()
             if delay <= 0:
@@ -167,6 +168,7 @@ def _reference_from(frame: dict):
             robot_id=robot_id,
             x=float(pose["x"]), y=float(pose["y"]), yaw=float(pose["yaw"]),
             seq=int(payload.get("seq", 0)),
+            map_id=payload.get("map_id") or None,
         )
     except (KeyError, TypeError, ValueError):
         return None
