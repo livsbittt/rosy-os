@@ -167,7 +167,7 @@ class SwarmManager:
             # 받아들인 뒤 다음 틱에 조용히 푸는 것은 거절보다 나쁘다 —
             # 운영자는 200 을 보고, 로봇은 NAVIGATION 에 남는다.
             raise SwarmError("DOCKING_ACTIVE", "a docking run owns navigation")
-        if getattr(self.nav, "mapping_active", False):
+        if self.nav.mapping_active:
             # 같은 이유. 맵핑 중에는 목표 투입이 MAPPING_ACTIVE 로 거절되는데,
             # 그 예외는 참조 소켓이 삼킨다 — 무장돼 보이면서 아무것도 못 하는
             # 대형이 남는다.
