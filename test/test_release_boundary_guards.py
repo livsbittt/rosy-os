@@ -414,7 +414,34 @@ def test_a_secret_handed_to_a_call_is_still_a_secret(line):
 
 
 def test_a_lookup_key_is_not_mistaken_for_the_secret_it_looks_up():
-    """A slot name is short; a passphrase is not. Eight characters is the line."""
+    """A slot name is short, and often repeats the name being assigned."""
     assert not scan_text("x.py", 'secret = prefs.getString("secret")')
+    assert not scan_text("x.py", 'api_token = response.headers.get("x-token")')
     assert scan_text("x.py", 'secret = prefs.getString("hunter2swordfish")')
+
+
+def _open_call(indent: str, name: str, call: str) -> str:
+    """An assignment whose call is left open at the end of the line.
+
+    Assembled rather than written out: a literal here is itself an open-call
+    assignment, so the scanner reports this file's own samples. The same
+    reason `_pem_header` exists.
+    """
+    return f"{indent}{name} = {call}("
+
+
+@pytest.mark.parametrize("line", [
+    _open_call("", "ROSY_FLEET_API_TOKEN", "_decode"),
+    _open_call("    ", "api_password", "base64.b64decode"),
+    _open_call("        ", "access_token", "build_token"),
+])
+def test_a_call_left_open_at_the_end_of_the_line_is_not_excused(line):
+    """The arguments are on the next line, where a line-oriented scanner cannot
+    read them.
+
+    Excusing the head anyway made a formatter wrapping one assignment enough to
+    hide a token — the exclusion fired with most confidence exactly where it
+    had no evidence.
+    """
+    assert scan_text("sample.py", line), line
 

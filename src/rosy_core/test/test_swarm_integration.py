@@ -596,6 +596,30 @@ def test_an_estop_still_wins_over_the_clipped_twist():
 
     assert command.select_output().linear == pytest.approx(0.0)
     assert swarm.active is False, "the estop listener also ends the formation"
+    assert safety.session_linear is None, "and the cap comes off with it"
+
+
+def test_a_manual_takeover_during_a_hold_gives_the_operator_their_speed_back():
+    """전역 캡을 옹호하는 근거가 서는 자리.
+
+    HOLD 중에는 아무도 목표를 내지 않는데 캡은 걸려 있다. 그 상태가 갇힘이
+    아닌 이유는 오직 하나 — 운영자가 수동으로 넘어가는 그 동작이 대형을
+    끝내고 캡을 함께 푼다는 것. 그 경로가 끊기면 조용히 느린 로봇이 남는다.
+    """
+    swarm, nav, executor, clock, _events, safety, _docking = build()
+    swarm.follow(params(max_speed=0.05, stream_timeout_ms=1000))
+    stream(swarm, executor, clock, 1.0)
+    clock.advance(1.0)
+    swarm.tick()
+    assert swarm.holding is True and safety.session_linear == pytest.approx(0.05)
+
+    # control.py 가 MANUAL 전환에서 보내는 것과 같은 취소.
+    nav.cancel(source="mode:operator")
+
+    assert swarm.active is False
+    assert safety.session_linear is None
+    assert safety.clip(0.20, 0.0, "manual")[0] == pytest.approx(
+        safety.limits.manual_linear)
 
 
 def test_the_cap_comes_off_when_the_formation_ends_for_any_reason():

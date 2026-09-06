@@ -263,14 +263,21 @@ class SwarmManager:
             # 단절이 아니므로 SWM-004 타임아웃을 걸어서는 안 된다.
             self._last_sample_at = now
 
+            # 락을 나가면 이 값들은 더 이상 우리 것이 아니다. 다른 스레드가
+            # e-stop·docking·재무장으로 어느 것이든 바꿀 수 있으므로, 이 표본에
+            # 대한 판단은 전부 여기서 지역 변수에 담아 나간다.
             ours = self._map_id()
-            if reference.map_id and ours and reference.map_id != ours:
+            session = self._session
+            formation = self._formation_label(params)
+            mismatched = bool(reference.map_id and ours and reference.map_id != ours)
+            announce = False
+            resumed = False
+            spec = None
+
+            if mismatched:
                 announce = self._map_mismatch != reference.map_id
                 self._map_mismatch = reference.map_id
                 self._pending = None
-                if not announce:
-                    # 이미 알렸다. 매 프레임 같은 말을 감사 로그에 쌓지 않는다.
-                    return False
             else:
                 resumed = self._holding or self._map_mismatch is not None
                 self._holding = False
@@ -283,16 +290,19 @@ class SwarmManager:
                 self._last_goal_at = now
                 self._pending = None
                 spec = follow_goal(reference, params.distance, params.lateral)
-                session = self._session
 
-        if self._map_mismatch is not None:
+        if mismatched:
+            if not announce:
+                # 이미 알렸다. 매 프레임 같은 말을 감사 로그에 쌓지 않는다.
+                return False
             # 목표를 거둔다. 대형은 살려 둔다 — 리더가 우리 맵으로 돌아오면
-            # 새 follow 명령 없이 이어간다.
-            self.nav.cancel(source="swarm", close_session=False)
+            # 새 follow 명령 없이 이어간다. 토큰을 붙여, 그 사이에 운영자가
+            # 다시 건 대형의 목표를 대신 거두지 않게 한다.
+            self.nav.cancel(source="swarm", close_session=False, session=session)
             self._state.set_swarm(self.status())
             self._events.publish(
                 "swarm.hold", severity="warning", source="swarm_manager",
-                data={"reason": "map_mismatch", "formation": self._formation_label(params),
+                data={"reason": "map_mismatch", "formation": formation,
                       "reference_map_id": reference.map_id, "map_id": ours})
             return False
 
@@ -348,7 +358,7 @@ class SwarmManager:
         if hold:
             # 자리를 지킨다: 목표만 거두고 follow 는 살려 둔다. 스트림이 돌아오면
             # 새 follow 명령 없이 이어서 따라간다 — 그래서 세션은 닫지 않는다.
-            self.nav.cancel(source="swarm", close_session=False)
+            self.nav.cancel(source="swarm", close_session=False, session=session)
             self._state.set_swarm(self.status())
             self._events.publish("swarm.hold", severity="warning", source="swarm_manager",
                                  data={"reason": "reference stream lost",

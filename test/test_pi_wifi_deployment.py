@@ -157,13 +157,27 @@ def test_a_catalog_mode_resolves_to_itself(mode):
     assert result.stdout.strip() == mode
 
 
-@bash_only
-def test_a_board_alias_resolves_to_its_catalog_mode():
-    """Aliases exist so a board can be named without duplicating its overlay."""
-    result = _resolve("pi5-lite")
+def _catalog_aliases() -> dict:
+    board = yaml.safe_load(_text(DEPLOY / "config" / "board.yaml"))
+    return board.get("aliases") or {}
 
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "hardware"
+
+@bash_only
+def test_every_alias_in_the_catalog_resolves_to_its_mode():
+    """Reading the catalog rather than naming one alias.
+
+    The resolver holds a second definition of a valid alias name (the
+    identifier regex that keeps punctuation out of the sed lookup). Nothing
+    keeps the two in step, so the test iterates what the catalog actually
+    declares — adding an alias the regex rejects must fail here.
+    """
+    aliases = _catalog_aliases()
+    assert aliases, "the catalog declares no aliases; this test proves nothing"
+
+    for alias, mode in aliases.items():
+        result = _resolve(str(alias))
+        assert result.returncode == 0, f"{alias}: {result.stderr}"
+        assert result.stdout.strip() == str(mode)
 
 
 @bash_only

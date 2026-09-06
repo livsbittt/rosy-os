@@ -134,20 +134,35 @@ _CODE_EXPRESSION = re.compile(
     r"[\(\[]$"
 )
 
-#: A quoted argument this long is a secret, not a lookup key. Six would catch
-#: "secret" in prefs.getString("secret", ""), which is the name of a slot.
+#: A quoted argument long enough to be a secret rather than a slot name.
+#:
+#: Deliberately higher than _ASSIGNMENT's six. In argument position the short
+#: literals are overwhelmingly keys — "secret", "x-token", "psk" — and a
+#: release gate that reports response.headers.get("x-token") teaches everyone
+#: to skim past it, which costs more than the six- and seven-character secrets
+#: it would catch one bracket deep. Directly assigned, those are still caught.
 _ARGUMENT_LITERAL = re.compile(r"""["']([^"'\n]{8,})["']""")
 
 
-def _call_holds_no_literal(line: str, start: int) -> bool:
-    """True when the call opening at ``start`` was handed no long literal.
+def _call_holds_no_literal(line: str, start: int, name: str) -> bool:
+    """True when the call opening at ``start`` was handed no secret.
 
     This is what keeps the call-head exclusion from silencing the matcher:
-    password = decrypt_value("hunter2swordfish") still reports.
+    `password = decrypt_value("hunter2swordfish")` still reports.
+
+    Two things are not secrets here. A literal that repeats the name being
+    assigned is a slot to read from, not a value — `prefs.getString("secret")`.
+    And the call must **close on this line**: when it does not, its arguments
+    are somewhere we cannot see, and excusing what we have not read is how a
+    formatter wrapping one line silently disarms this matcher.
     """
+    rest = line[start:]
+    if ")" not in rest and "]" not in rest:
+        return False
+    lowered = name.lower()
     return not any(
-        not _is_placeholder(m.group(1))
-        for m in _ARGUMENT_LITERAL.finditer(line[start:])
+        not _is_placeholder(m.group(1)) and m.group(1).lower() != lowered
+        for m in _ARGUMENT_LITERAL.finditer(rest)
     )
 
 
@@ -243,7 +258,7 @@ def scan_text(path: str, text: str) -> list[Finding]:
                 or _TYPE_EXPRESSION.match(value)
                 or _CODE_REFERENCE.match(value)
                 or (_CODE_EXPRESSION.match(value)
-                    and _call_holds_no_literal(line, match.end()))
+                    and _call_holds_no_literal(line, match.end(), match.group("name")))
             ):
                 continue
             # A reference to another variable or a path is not a literal secret.
