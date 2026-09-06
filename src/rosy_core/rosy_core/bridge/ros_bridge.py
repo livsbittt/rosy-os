@@ -33,7 +33,7 @@ from sensor_msgs.msg import BatteryState, Imu, LaserScan, Range
 from std_msgs.msg import Bool, Float32, String
 from std_srvs.srv import Empty
 
-from rosy_core.bridge import display, translate
+from rosy_core.bridge import display, reconcile, translate
 from rosy_core.bridge.goal_tracker import GoalTracker
 from rosy_core.maps import occupancy_map_id
 from rosy_core.navigation.initial_pose import amcl_pose_covariance
@@ -323,10 +323,10 @@ class RosBridge:
             gauge_percent=self._svc.state.snapshot().battery.percent,
             now=now,
         )
-        if command == self._applied_led:
-            return
-        self._call_led(command.command, command.r, command.g, command.b)
-        self._applied_led = command
+        _acted, self._applied_led = reconcile.reconcile(
+            command, self._applied_led,
+            lambda: self._call_led(command.command, command.r, command.g, command.b),
+            latch_on_skip=True)      # 장식이다 — 서비스가 없으면 다시 칠하지 않는다
 
     def _reconcile_lidar(self, spinning: bool) -> None:
         """PowerManager가 선언한 회전 의도에 LiDAR 모터를 맞춘다 (PWR-005).
@@ -335,25 +335,29 @@ class RosBridge:
         아직 준비되지 않았으면 latch 없이 다음 틱(5 Hz)에 재시도한다. 그래야
         드라이버가 늦게 떠도 정지 상태로 방치되지 않는다.
         """
-        if spinning == self._applied_lidar_spinning:
-            return
-        client = self._lidar_start_client if spinning else self._lidar_stop_client
-        if not client.service_is_ready():
-            return
-        client.call_async(Empty.Request())
-        self._applied_lidar_spinning = spinning
-        self._node.get_logger().info(
-            "lidar motor %s requested by power policy" % ("start" if spinning else "stop"))
+        def send() -> bool:
+            client = self._lidar_start_client if spinning else self._lidar_stop_client
+            if not client.service_is_ready():
+                return False
+            client.call_async(Empty.Request())
+            self._node.get_logger().info(
+                "lidar motor %s requested by power policy" % ("start" if spinning else "stop"))
+            return True
 
-    def _call_led(self, command: str, r: int, g: int, b: int) -> None:
+        # 내비게이션 입력이다 — 서비스가 늦게 뜨면 다음 틱에 다시 시도한다.
+        _acted, self._applied_lidar_spinning = reconcile.reconcile(
+            spinning, self._applied_lidar_spinning, send, latch_on_skip=False)
+
+    def _call_led(self, command: str, r: int, g: int, b: int) -> bool:
         """LED는 부가 표시다 — 서비스가 없으면 조용히 건너뛴다."""
         if not self._led_client.service_is_ready():
-            return
+            return False
         request = SetLed.Request()
         request.command = command
         request.pixels = []
         request.r, request.g, request.b = r, g, b
         self._led_client.call_async(request)
+        return True
 
     def _setup_diagnostics(self) -> None:
         self.diagnostics = DiagnosticsCollector()

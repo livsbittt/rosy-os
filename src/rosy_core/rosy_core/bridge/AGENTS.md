@@ -16,6 +16,7 @@ ROS-101: the only module allowed to import rclpy message types and talk to the R
 | `translate.py` | ROS-free message → domain dict conversion. Imports no ROS type, so host pytest runs it |
 | `goal_tracker.py` | ROS-free Nav2 goal generations: which result is current, what to cancel |
 | `display.py` | ROS-free `display/info` decisions: address resolution and payload rounding (PWR-003) |
+| `reconcile.py` | ROS-free change-detection latch. LED latches on a skipped call, LiDAR does not |
 
 ## Subdirectories
 
@@ -38,7 +39,7 @@ None.
 ### Testing Requirements
 
 Host pytest does not import `ros_bridge.py` (optional ROS): CI boot smoke + SaveMap guard cover it.
-The ROS-free siblings are host-testable and carry real value assertions — `translate.py` (`test_bridge_translate.py`), `goal_tracker.py` (`test_goal_tracker.py`), `display.py` (`test_bridge_display.py`). Duck-typed `SimpleNamespace` inputs, no rclpy. Extract a decision here rather than leaving it inline: this file is the one place host pytest cannot reach.
+The ROS-free siblings are host-testable and carry real value assertions — `translate.py` (`test_bridge_translate.py`), `goal_tracker.py` (`test_goal_tracker.py`), `display.py` (`test_bridge_display.py`), `reconcile.py` (`test_bridge_reconcile.py`). Duck-typed `SimpleNamespace` inputs, no rclpy. Extract a decision here rather than leaving it inline: this file is the one place host pytest cannot reach.
 
 ### Common Patterns
 
