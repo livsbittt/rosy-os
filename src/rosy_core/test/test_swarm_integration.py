@@ -727,3 +727,165 @@ def test_a_map_mismatch_does_not_read_as_a_lost_stream():
     assert swarm.holding is False
     reasons = [d.get("reason") for t, d in events.published if t == "swarm.hold"]
     assert reasons == ["map_mismatch"]
+
+
+# --- SLAM 과 추종은 같은 주행을 두고 다툰다 ---------------------------------------
+
+
+def test_mapping_cannot_start_under_a_formation():
+    """`moving_goal` 은 맵핑 중을 막는다. 이쪽이 반대 방향이다."""
+    swarm, nav, executor, clock, _events, _safety, _docking = build()
+    swarm.follow(params())
+    stream(swarm, executor, clock, 1.0)
+
+    with pytest.raises(NavigationError) as raised:
+        nav.start_mapping()
+
+    assert raised.value.code == "NAVIGATION_ACTIVE"
+    assert "swarm follow session" in str(raised.value)
+
+
+def test_a_hold_does_not_open_the_door_to_mapping():
+    """HOLD 중에는 나가 있는 목표가 없다. `_nav_state` 만 보면 열려 보인다 —
+    그러나 대형은 여전히 목표의 임자이고, 스트림이 돌아오면 이어간다."""
+    swarm, nav, executor, clock, _events, _safety, _docking = build()
+    swarm.follow(params(stream_timeout_ms=1000))
+    stream(swarm, executor, clock, 1.0)
+    clock.advance(1.0)
+    swarm.tick()
+    assert swarm.holding is True
+
+    with pytest.raises(NavigationError) as raised:
+        nav.start_mapping()
+    assert raised.value.code == "NAVIGATION_ACTIVE"
+
+
+def test_mapping_starts_normally_once_the_formation_is_cancelled():
+    swarm, nav, executor, clock, _events, _safety, _docking = build()
+    swarm.follow(params())
+    stream(swarm, executor, clock, 1.0)
+    swarm.cancel()
+
+    nav.start_mapping()
+
+    assert nav.mapping_active is True
+
+
+def test_a_follow_is_refused_at_the_door_during_a_mapping_session():
+    """두 게이트가 양방향을 닫는다.
+
+    받아들이면 목표 투입이 MAPPING_ACTIVE 로 거절되는데 그 예외는 참조
+    소켓이 삼킨다 — 운영자는 200 을 보고, 대형은 무장된 채 아무것도 못 한다.
+    """
+    swarm, nav, _executor, _clock, _events, _safety, _docking = build()
+    nav.start_mapping()
+
+    with pytest.raises(SwarmError) as raised:
+        swarm.follow(params())
+
+    assert raised.value.code == "MAPPING_ACTIVE"
+    assert swarm.active is False
+
+
+def test_a_mismatch_arriving_during_a_stream_loss_hold_corrects_the_reason():
+    """`holding: true` 와 갓 갱신된 `stream_age_s` 가 나란히 보이면 안 된다.
+
+    프레임이 도착했다는 것은 스트림이 살아 있다는 뜻이다. 멈춘 이유는 이제
+    단절이 아니라 맵 불일치이고, 상태는 그렇게 말해야 한다.
+    """
+    swarm, _nav, executor, clock, events, _safety, _docking = build()
+    swarm._state.set_map_id("site_a")
+    swarm.follow(params(stream_timeout_ms=1000))
+    swarm.on_reference_pose(ReferencePose("rosy_02", 1.0, 0.0, 0.0, map_id="site_a"))
+    executor.settle()
+    clock.advance(1.0)
+    swarm.tick()
+    assert swarm.state_payload()["holding"] is True
+
+    clock.advance(0.1)
+    swarm.on_reference_pose(ReferencePose("rosy_02", 4.0, 0.0, 0.0, map_id="site_b"))
+
+    body = swarm.state_payload()
+    assert body["holding"] is False
+    assert body["map_mismatch"] == "site_b"
+    assert body["stream_age_s"] == pytest.approx(0.0)
+    assert [d.get("reason") for t, d in events.published if t == "swarm.hold"] == [
+        "reference stream lost", "map_mismatch"]
+
+
+def test_a_matching_frame_after_that_clears_both():
+    swarm, _nav, executor, clock, _events, _safety, _docking = build()
+    swarm._state.set_map_id("site_a")
+    swarm.follow(params(stream_timeout_ms=1000))
+    swarm.on_reference_pose(ReferencePose("rosy_02", 1.0, 0.0, 0.0, map_id="site_a"))
+    executor.settle()
+    clock.advance(1.0)
+    swarm.tick()
+    clock.advance(0.1)
+    swarm.on_reference_pose(ReferencePose("rosy_02", 4.0, 0.0, 0.0, map_id="site_b"))
+
+    clock.advance(0.6)
+    issued = swarm.on_reference_pose(
+        ReferencePose("rosy_02", 2.0, 0.0, 0.0, map_id="site_a"))
+
+    assert issued is True
+    body = swarm.state_payload()
+    assert body["holding"] is False and body["map_mismatch"] is None
+
+
+def test_mapping_starting_between_the_check_and_the_arming_is_refused():
+    """게이트를 양쪽에 두는 것만으로는 부족하다.
+
+    확인과 무장 사이에 상대가 시작되면 둘 다 주행의 임자가 된다. 결정은
+    세션을 여는 항법 락 안에서 난다.
+    """
+    swarm, nav, _executor, _clock, _events, _safety, _docking = build()
+    original = swarm.check_follow
+
+    def trip(body):
+        original(body)
+        nav.start_mapping()   # 운영자의 POST /slam/start 가 이 틈에 도착한다
+
+    swarm.check_follow = trip
+
+    with pytest.raises(SwarmError) as raised:
+        swarm.follow(params())
+
+    assert raised.value.code == "MAPPING_ACTIVE"
+    assert swarm.active is False
+    assert nav._moving_session is None, "no session may survive the refusal"
+
+
+def test_a_refused_arming_does_not_leave_the_speed_cap_on():
+    swarm, nav, _executor, _clock, _events, safety, _docking = build()
+    original = swarm.check_follow
+
+    def trip(body):
+        original(body)
+        nav.start_mapping()
+
+    swarm.check_follow = trip
+
+    with pytest.raises(SwarmError):
+        swarm.follow(params(max_speed=0.05))
+
+    assert safety.session_linear is None
+
+
+def test_a_standing_map_mismatch_does_not_relabel_itself_as_a_lost_stream():
+    """서 있는 이유는 불일치다. 타임아웃이 지난다고 원인이 바뀌지 않는다."""
+    swarm, _nav, executor, clock, events, _safety, _docking = build()
+    swarm._state.set_map_id("site_a")
+    swarm.follow(params(stream_timeout_ms=1000))
+    swarm.on_reference_pose(ReferencePose("rosy_02", 1.0, 0.0, 0.0, map_id="site_a"))
+    executor.settle()
+    clock.advance(0.6)
+    swarm.on_reference_pose(ReferencePose("rosy_02", 4.0, 0.0, 0.0, map_id="site_b"))
+
+    for _ in range(4):
+        clock.advance(1.0)
+        swarm.tick()
+
+    reasons = [d.get("reason") for t, d in events.published if t == "swarm.hold"]
+    assert reasons == ["map_mismatch"], reasons
+

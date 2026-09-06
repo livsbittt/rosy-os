@@ -32,6 +32,9 @@ class RecordingNav:
         self.cancels = []
         self._session = None
         self._counter = 0
+        # NavigationManager 가 선언하는 것과 같은 이름. double 이
+        # 계약의 일부만 들고 있으면 그 부분은 더 이상 테스트되지 않는다.
+        self.mapping_active = False
 
     def open_moving_session(self):
         self._counter += 1

@@ -172,7 +172,7 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 | GET | `/api/v1/navigation/state` | Viewer | NAV-004 |
 | GET | `/api/v1/navigation/path` | Viewer | MAP-003 |
 | POST | `/api/v1/localization/initialpose` | Operator | AMCL 초기화 |
-| POST | `/api/v1/slam/start` | Operator | NAV-005 |
+| POST | `/api/v1/slam/start` | Operator | NAV-005 — 추종 세션이 주행을 쥐고 있으면 409 `NAVIGATION_ACTIVE` |
 | POST | `/api/v1/slam/stop` | Operator | NAV-005 |
 | POST | `/api/v1/slam/save` | Operator | NAV-005 (응답에 `map_id`) |
 | POST | `/api/v1/slam/reset` | Operator | NAV-005 |
@@ -194,7 +194,7 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 |---|---|---|---|
 | POST | `/api/v1/teleop` | Operator | §11 |
 | POST | `/api/v1/mode` | Operator | `{mode: MANUAL\|NAVIGATION\|IDLE}` |
-| POST | `/api/v1/swarm/follow` | Operator | SWM-002 `{target_robot_id, distance, lateral, max_speed, stream_timeout_ms, source}`. `source: fleet(기본)\|peer(예약, D-21 — 요청하면 501)`. `max_speed` 는 SAF-004 상한을 넘으면 400 이고, 추종 구간 동안 실제 상한으로 적용된다 — Nav2 가 무엇을 내보내든 `cmd_vel` 은 이 값으로 클리핑된다(D-31). 적용 중인 값은 `GET /safety/state` 의 `limits.session_linear` 에 보인다. 미지원 로봇은 501 `CAPABILITY_NOT_SUPPORTED` (SWM-005/CAP-003), 도킹/언도킹 중에는 409 `DOCKING_ACTIVE`, E-Stop 중에는 409 `EMERGENCY_ACTIVE`. 추종 중 `POST /navigation/cancel` 이나 MANUAL 전환은 대형을 끝내고 `swarm.aborted` 를 낸다 |
+| POST | `/api/v1/swarm/follow` | Operator | SWM-002 `{target_robot_id, distance, lateral, max_speed, stream_timeout_ms, source}`. `source: fleet(기본)\|peer(예약, D-21 — 요청하면 501)`. `max_speed` 는 SAF-004 상한을 넘으면 400 이고, 추종 구간 동안 실제 상한으로 적용된다 — Nav2 가 무엇을 내보내든 `cmd_vel` 은 이 값으로 클리핑된다(D-31). 적용 중인 값은 `GET /safety/state` 의 `limits.session_linear` 에 보인다. 미지원 로봇은 501 `CAPABILITY_NOT_SUPPORTED` (SWM-005/CAP-003), 도킹/언도킹 중에는 409 `DOCKING_ACTIVE`, 맵핑 세션 중에는 409 `MAPPING_ACTIVE`, E-Stop 중에는 409 `EMERGENCY_ACTIVE`. 추종 중 `POST /navigation/cancel` 이나 MANUAL 전환은 대형을 끝내고 `swarm.aborted` 를 낸다 |
 | POST | `/api/v1/swarm/cancel` | Operator | SWM-002 |
 | GET | `/api/v1/swarm/state` | Viewer | SWM-006 — `{role, formation, active, holding, target_robot_id, source, max_speed, map_mismatch, stream_age_s}`. `map_mismatch` 는 거부 중인 리더의 `map_id` 다. 상태 스냅샷의 `swarm` 필드는 그중 `role`·`formation`·`active` 다 |
 | POST | `/api/v1/safety/stop` | Viewer↑ | SAF-001 (누구나) |

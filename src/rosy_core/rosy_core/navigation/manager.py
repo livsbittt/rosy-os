@@ -117,8 +117,16 @@ class NavigationManager:
                              data={"goal": {"x": spec.x, "y": spec.y, "yaw": spec.yaw}, "by": source})
 
     def open_moving_session(self) -> int:
-        """추종 세션을 연다. 이후 이 토큰을 단 목표만 받아들인다."""
+        """추종 세션을 연다. 이후 이 토큰을 단 목표만 받아들인다.
+
+        맵핑 세션과는 여기서 갈린다. 양쪽이 각자 상대를 미리 확인하는 것만으로는
+        부족하다 — 확인과 무장 사이에 상대가 시작되면 둘 다 주행의 임자가 된다.
+        같은 락 안에서 정해야 그 창이 없다.
+        """
         with self._lock:
+            if self.mapping_active:
+                raise NavigationError("MAPPING_ACTIVE",
+                                      "a mapping session owns navigation")
             self._session_counter += 1
             self._moving_session = self._session_counter
             return self._moving_session
@@ -168,10 +176,21 @@ class NavigationManager:
     def start_mapping(self, source: str = "api") -> None:
         if self._safety.estop:
             raise NavigationError("EMERGENCY_ACTIVE", "e-stop is active")
-        if self._nav_state not in _IDLE_STATES:
-            raise NavigationError("NAVIGATION_ACTIVE",
-                                  f"navigation in progress ({self._nav_state.value})")
-        self.mapping_active = True
+        with self._lock:
+            if self._moving_session is not None:
+                # `moving_goal` refuses during a mapping session; this is the
+                # other direction. `_nav_state` alone does not see a follow in
+                # HOLD — no goal is out, but the formation still owns the goal
+                # and resumes the moment its stream returns.
+                raise NavigationError(
+                    "NAVIGATION_ACTIVE",
+                    "a swarm follow session owns the goal — cancel it first")
+            if self._nav_state not in _IDLE_STATES:
+                raise NavigationError("NAVIGATION_ACTIVE",
+                                      f"navigation in progress ({self._nav_state.value})")
+            # 확인과 같은 락 안에서 쓴다. 밖에 두면 그 사이에 열린 추종 세션과
+            # 맵핑이 함께 주행의 임자가 된다.
+            self.mapping_active = True
         self._events.publish("slam.started", source="navigation_manager", data={"by": source})
 
     def stop_mapping(self, source: str = "api") -> None:
