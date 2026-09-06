@@ -86,7 +86,8 @@ def test_state_is_readable_before_any_follow(client):
     body = tc.get("/api/v1/swarm/state", headers=VIEWER).json()
 
     assert body == {"role": "none", "formation": None, "active": False, "holding": False,
-                    "target_robot_id": None, "source": None, "stream_age_s": None}
+                    "target_robot_id": None, "source": None, "max_speed": None,
+                    "stream_age_s": None}
 
 
 def test_follow_and_cancel_need_an_operator_and_state_needs_a_viewer(client):
@@ -236,3 +237,21 @@ def test_taking_manual_control_ends_the_formation(client):
     aborted = [e for e in events if e["type"] == "swarm.aborted"]
     # 감사 로그를 읽는 사람이 "주행 취소"와 "누가 수동으로 잡았다"를 구분할 수 있어야 한다.
     assert aborted and aborted[-1]["data"]["reason"] == "manual"
+
+
+def test_the_session_speed_cap_goes_on_with_the_follow_and_comes_off_with_it(client):
+    """SWM-002 의 max_speed 는 검증만 하는 값이 아니라 실제로 걸리는 상한이다."""
+    tc, svc = client
+    profile_ceiling = svc.safety.limits.max_linear
+
+    tc.post("/api/v1/swarm/follow", json={**FOLLOW, "max_speed": 0.05}, headers=OPERATOR)
+
+    assert svc.safety.clip(0.20, 0.0, "nav")[0] == pytest.approx(0.05)
+    state = tc.get("/api/v1/safety/state", headers=VIEWER).json()
+    assert state["limits"]["session_linear"] == pytest.approx(0.05)
+    assert tc.get("/api/v1/swarm/state", headers=VIEWER).json()["max_speed"] == pytest.approx(0.05)
+
+    tc.post("/api/v1/swarm/cancel", headers=OPERATOR)
+
+    assert svc.safety.clip(0.20, 0.0, "nav")[0] == pytest.approx(profile_ceiling)
+    assert tc.get("/api/v1/safety/state", headers=VIEWER).json()["limits"]["session_linear"] is None

@@ -525,3 +525,85 @@ def test_an_estop_landing_during_arming_does_not_leave_a_follow_armed():
 
     assert raised.value.code == "EMERGENCY_ACTIVE"
     assert swarm.active is False
+
+
+# --- SWM-002 max_speed: 검증이 아니라 실제 제한 -----------------------------------
+
+
+def command_manager(safety, events):
+    from rosy_core.command.arbitration import Mode, ModeMachine, SourceRegistry
+    from rosy_core.command.manager import CommandManager
+
+    modes = ModeMachine()
+    modes.transition(Mode.NAVIGATION)
+    return CommandManager(SourceRegistry(), modes, safety, events=events), modes
+
+
+def test_the_follow_cap_reaches_the_wheels_not_just_the_validator():
+    """D-2 의 단일 통로를 그대로 쓴다 — Nav2 파라미터 없이도 실제로 느려진다."""
+    from rosy_core.command.manager import Twist
+
+    swarm, _nav, _executor, _clock, events, safety, _docking = build()
+    command, _modes = command_manager(safety, events)
+    swarm.follow(params(max_speed=0.05))
+
+    command.set_nav_twist(Twist(0.20, 0.0))
+
+    assert command.select_output().linear == pytest.approx(0.05)
+
+
+def test_cancelling_the_follow_gives_the_profile_limit_back():
+    from rosy_core.command.manager import Twist
+
+    swarm, _nav, _executor, _clock, events, safety, _docking = build()
+    command, _modes = command_manager(safety, events)
+    ceiling = safety.limits.max_linear
+    swarm.follow(params(max_speed=0.05))
+
+    swarm.cancel()
+    command.set_nav_twist(Twist(0.20, 0.0))
+
+    assert command.select_output().linear == pytest.approx(ceiling)
+
+
+def test_the_session_cap_can_only_lower_the_limit():
+    """활동이 프로필 상한을 넘겨 달릴 수는 없다 (SAF-004)."""
+    swarm, _nav, _executor, _clock, _events, safety, _docking = build()
+    ceiling = safety.limits.max_linear
+    safety.set_session_speed(ceiling * 5)
+
+    assert safety.clip(ceiling * 5, 0.0, "nav")[0] == pytest.approx(ceiling)
+
+
+def test_the_cap_applies_to_manual_teleop_too_while_a_formation_runs():
+    """상한은 활동 구간의 것이다. 추종 중 수동으로 밀어도 그 위로는 못 간다."""
+    swarm, _nav, _executor, _clock, _events, safety, _docking = build()
+    swarm.follow(params(max_speed=0.05))
+
+    assert safety.clip(0.20, 0.0, "manual")[0] == pytest.approx(0.05)
+
+
+def test_an_estop_still_wins_over_the_clipped_twist():
+    from rosy_core.command.manager import Twist
+
+    swarm, _nav, _executor, _clock, events, safety, _docking = build()
+    command, _modes = command_manager(safety, events)
+    swarm.follow(params(max_speed=0.05))
+    command.set_nav_twist(Twist(0.20, 0.0))
+
+    safety.trigger_estop("operator")
+
+    assert command.select_output().linear == pytest.approx(0.0)
+    assert swarm.active is False, "the estop listener also ends the formation"
+
+
+def test_the_cap_comes_off_when_the_formation_ends_for_any_reason():
+    swarm, nav, _executor, clock, _events, safety, _docking = build()
+    for closer in ("api:operator", "stuck_detector"):
+        swarm.follow(params(max_speed=0.05))
+        assert safety.session_linear == pytest.approx(0.05), closer
+
+        nav.cancel(source=closer)
+
+        assert swarm.active is False, closer
+        assert safety.session_linear is None, closer

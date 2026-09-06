@@ -123,6 +123,7 @@ class SwarmManager:
                 "holding": self._holding,
                 "target_robot_id": self._params.target_robot_id if self._params else None,
                 "source": self._params.source.value if self._params else None,
+                "max_speed": self._params.max_speed if self._params else None,
                 "stream_age_s": (
                     None if self._last_sample_at is None
                     else round(self._clock() - self._last_sample_at, 3)
@@ -187,6 +188,9 @@ class SwarmManager:
                 # 목표·취소를 락 밖으로 뺀 이유(R1)와 충돌하지 않는다.
                 self._session = self.nav.open_moving_session()
                 self._params = params.model_copy()
+                # 검증만 하고 흘려보내면 계약이 거짓이 된다. 실제로 바퀴에
+                # 닿는 값을 줄인다 (D-2 의 단일 통로를 그대로 쓴다).
+                self._safety.set_session_speed(params.max_speed)
                 self._last_sample_at = None
                 self._last_goal_at = None
                 self._pending = None
@@ -217,6 +221,7 @@ class SwarmManager:
             self._pending = None
             self._holding = False
             self._session = None
+            self._safety.set_session_speed(None)
 
         if not was_active:
             return SwarmStatus()
