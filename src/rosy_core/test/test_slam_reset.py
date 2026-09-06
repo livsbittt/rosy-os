@@ -119,3 +119,23 @@ def test_moving_goal_still_refuses_while_a_mapping_session_is_open(core_client):
         svc.nav.moving_goal(NavGoalSpec(x=1.0, y=0.0, yaw=0.0), source="swarm")
 
     assert raised.value.code == "MAPPING_ACTIVE"
+
+
+def test_reset_without_an_open_session_is_400_not_a_quiet_200(core_client, events):
+    """The second of the two lies.
+
+    Resetting outside a mapping session used to return early and still answer
+    200. `save_map` already had the honest answer for the same condition, so
+    this reuses its error rather than inventing a second vocabulary for one
+    situation.
+    """
+    client, svc = core_client()
+    svc.nav.executor = RefusingExecutor()
+    seen = events(svc)
+
+    assert svc.nav.mapping_active is False
+    response = client.post("/api/v1/slam/reset", headers=OPERATOR)
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert seen == []

@@ -193,7 +193,7 @@ class NavigationManager:
         # 뒤집으면 실행기가 없는 경우가 400 으로 나가 CAP-003 을 어긴다.
         executor = self._require_executor()
         if not self.mapping_active:
-            return
+            raise NavigationError("VALIDATION_ERROR", "no active mapping session")
         executor.reset_mapping()
         self._events.publish("slam.started", source="navigation_manager",
                              data={"by": source, "reset": True})
