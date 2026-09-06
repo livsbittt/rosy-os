@@ -48,6 +48,8 @@ def _safety_payload(svc: CoreServices) -> dict:
         "source": svc.safety.estop_source,
         "fleet_loss_policy": svc.safety.fleet_loss_policy,
         "limits": {
+            # 활동 상한이 걸려 있으면 지금 실제로 적용되는 값이 이것이다.
+            "session_linear": svc.safety.session_linear,
             "max_linear": svc.safety.limits.max_linear,
             "max_angular": svc.safety.limits.max_angular,
             "manual_linear": svc.safety.limits.manual_linear,

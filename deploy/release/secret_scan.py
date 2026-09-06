@@ -14,6 +14,13 @@ The scanner is deliberately conservative about placeholders: a config
 template that says ``password: <your-wifi-password>`` is the correct thing
 for a repository to contain, and flagging it would train people to ignore
 the scanner.
+
+Known gap, recorded so it is not rediscovered as a surprise: ``_ASSIGNMENT``
+needs six characters of value, so ``api_token = wrap(`` — a call whose name is
+five characters or fewer — never reaches any matcher at all. It is the
+shortest way past this gate. Closing it means lowering that floor, which
+cascades into every matcher and every fixture, so it wants its own change
+rather than a line in someone else's.
 """
 
 from __future__ import annotations
@@ -119,6 +126,71 @@ _CODE_REFERENCE = re.compile(
     r")$"
 )
 
+
+# The head of a call or subscript expression, not a literal: prefs.getString(,
+# created.json()[. The bare-value branch of _ASSIGNMENT stops at the first
+# quote, so a value ending in an opener means code started, never a secret.
+#
+# Excusing the shape alone would hide password = wrap("hunter2swordfish"), so
+# _call_holds_no_literal checks what the call was handed. Widening an exclusion
+# is how a matcher goes quiet; this one stays narrow by asking that question.
+_CODE_EXPRESSION = re.compile(
+    r"^[A-Za-z_][A-Za-z0-9_]*"
+    r"(?:\.[A-Za-z_][A-Za-z0-9_]*)*"
+    r"(?:\(\))*"
+    r"[\(\[]$"
+)
+
+#: A quoted argument long enough to be a secret rather than a slot name.
+#:
+#: Deliberately higher than _ASSIGNMENT's six. In argument position the short
+#: literals are overwhelmingly keys — "secret", "x-token", "psk" — and a
+#: release gate that reports response.headers.get("x-token") teaches everyone
+#: to skim past it, which costs more than the six- and seven-character secrets
+#: it would catch one bracket deep. Directly assigned, those are still caught.
+_ARGUMENT_LITERAL = re.compile(r"""["']([^"'\n]{8,})["']""")
+
+
+def _closes_on_this_line(rest: str) -> bool:
+    """True when the bracket the call opened with is closed in ``rest``."""
+    depth = 1
+    for char in rest:
+        if char in "([":
+            depth += 1
+        elif char in ")]":
+            depth -= 1
+            if depth == 0:
+                return True
+    return False
+
+
+def _call_holds_no_literal(line: str, start: int, name: str) -> bool:
+    """True when the call opening at ``start`` was handed no secret.
+
+    This is what keeps the call-head exclusion from silencing the matcher:
+    `password = decrypt_value("hunter2swordfish")` still reports.
+
+    Two things are not secrets here. A literal that repeats the name being
+    assigned is a slot to read from, not a value — `prefs.getString("secret")`.
+    And the call must **close on this line**: when it does not, its arguments
+    are somewhere we cannot see, and excusing what we have not read is how a
+    formatter wrapping one line silently disarms this matcher.
+
+    Closure is counted, not looked for. A bracket anywhere in the remainder is
+    not the call closing — `_decode(  # base64 (D-30)` supplies one from a
+    comment, and parenthesised ADR references are this repository's house
+    style, so presence would hand the hole straight back.
+    """
+    rest = line[start:]
+    if not _closes_on_this_line(rest):
+        return False
+    lowered = name.lower()
+    return not any(
+        not _is_placeholder(m.group(1)) and m.group(1).lower() != lowered
+        for m in _ARGUMENT_LITERAL.finditer(rest)
+    )
+
+
 # This module's own matchers would flag their own source. Nothing else is
 # exempt by name: excluding a file makes it the one safe place to hide a
 # secret, and a test file is exactly where one gets pasted "temporarily".
@@ -210,6 +282,8 @@ def scan_text(path: str, text: str) -> list[Finding]:
                 _is_placeholder(value)
                 or _TYPE_EXPRESSION.match(value)
                 or _CODE_REFERENCE.match(value)
+                or (_CODE_EXPRESSION.match(value)
+                    and _call_holds_no_literal(line, match.end(), match.group("name")))
             ):
                 continue
             # A reference to another variable or a path is not a literal secret.

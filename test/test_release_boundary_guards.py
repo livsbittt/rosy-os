@@ -377,3 +377,90 @@ def test_scanner_ignores_placeholders_and_public_data():
     assert not findings, "scanner flagged placeholders:\n" + "\n".join(
         str(f) for f in findings
     )
+
+
+# --- a call is not a literal, but a literal inside one still is -------------
+
+
+@pytest.mark.parametrize("line", [
+    'const String secret = prefs.getString("secret", "");',
+    'secret = created.json()["token"]',
+    'api_token = response.headers.get("x-token")',
+    'password = load()',
+    'psk = self.setup_psk',
+])
+def test_reading_a_value_out_of_code_is_not_a_secret(line):
+    """The bare-value branch stops at the first quote, so a captured value that
+    ends in ( or [ is the head of an expression — never a literal.
+
+    Firmware that reads its own key out of NVS was reported for years of this
+    scanner's life, which trains everyone to ignore the report.
+    """
+    assert not scan_text("sample.ino", line), line
+
+
+@pytest.mark.parametrize("line", [
+    'password = decrypt_value("hunter2swordfish")',
+    'secret = config.get("key", "site-passphrase-not-to-be-kept")',
+    'api_key = os.environ.get("K", "sk_live_9182aeb27c4d")',
+])
+def test_a_secret_handed_to_a_call_is_still_a_secret(line):
+    """The exclusion is about the shape of the value, not the shape of the line.
+
+    Excusing every call would let a literal hide one bracket deep, which is
+    exactly how a matcher goes quiet without anyone noticing.
+    """
+    assert scan_text("sample.py", line), line
+
+
+def test_a_nested_call_is_reported_rather_than_reasoned_about():
+    """A call inside a call does not match the call-head shape.
+
+    The bare value runs to the first quote, so it reads as two openers rather
+    than an identifier chain. Reporting is the right way to be wrong about a
+    shape this scanner cannot cheaply parse — and the sample is assembled for
+    the same reason the open-call ones are.
+    """
+    sample = _open_call("", "secret", "wrapper") + _open_call("", "", "inner").strip()
+
+    assert scan_text("x.py", sample), sample
+
+
+def test_a_lookup_key_is_not_mistaken_for_the_secret_it_looks_up():
+    """A slot name is short, and often repeats the name being assigned."""
+    assert not scan_text("x.py", 'secret = prefs.getString("secret")')
+    assert not scan_text("x.py", 'api_token = response.headers.get("x-token")')
+    assert scan_text("x.py", 'secret = prefs.getString("hunter2swordfish")')
+
+
+def _open_call(indent: str, name: str, call: str) -> str:
+    """An assignment whose call is left open at the end of the line.
+
+    Assembled rather than written out: a literal here is itself an open-call
+    assignment, so the scanner reports this file's own samples. The same
+    reason `_pem_header` exists.
+    """
+    return f"{indent}{name} = {call}("
+
+
+@pytest.mark.parametrize("line", [
+    _open_call("", "ROSY_FLEET_API_TOKEN", "_decode"),
+    _open_call("    ", "api_password", "base64.b64decode"),
+    _open_call("        ", "access_token", "build_token"),
+    # A bracket in a trailing comment is not the call closing. Parenthesised
+    # ADR references are this repository's house comment style, so looking for
+    # a bracket rather than counting one would hand the hole straight back.
+    _open_call("", "ROSY_FLEET_API_TOKEN", "_decode") + "  # base64 (D-30)",
+    _open_call("", "api_password", "b64decode") + "  # noqa: E501 (long)",
+    _open_call("", "access_token", "build_token") + "  # cfg[map]",
+])
+def test_a_call_left_open_at_the_end_of_the_line_is_not_excused(line):
+    """The arguments are on the next line, where a line-oriented scanner cannot
+    read them.
+
+    Excusing the head anyway made a formatter wrapping one assignment enough to
+    hide a token — the exclusion fired with most confidence exactly where it
+    had no evidence.
+    """
+    assert scan_text("sample.py", line), line
+

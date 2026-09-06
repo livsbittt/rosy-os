@@ -61,13 +61,16 @@ def follow(tc, target="rosy_02"):
     assert response.status_code == 200
 
 
-def pose_frame(robot_id="rosy_02", x=1.0, y=2.0, yaw=0.0, seq=1):
+def pose_frame(robot_id="rosy_02", x=1.0, y=2.0, yaw=0.0, seq=1, map_id=None):
+    payload = {"robot_id": robot_id, "pose": {"x": x, "y": y, "yaw": yaw}, "seq": seq}
+    if map_id is not None:
+        payload["map_id"] = map_id
     return {
         "protocol_version": "1.0",
         "msg_id": "test",
         "type": "pose",
         "ts": "2026-09-06T00:00:00Z",
-        "payload": {"robot_id": robot_id, "pose": {"x": x, "y": y, "yaw": yaw}, "seq": seq},
+        "payload": payload,
     }
 
 
@@ -236,3 +239,37 @@ def test_the_leader_socket_is_closed_when_lead_is_not_declared(core_client):
             socket.receive_json()
 
     assert raised.value.code == 4403
+
+
+def test_the_leader_says_which_map_its_coordinates_are_in(client):
+    """좌표만 보내면 받는 쪽은 그것이 자기 맵의 좌표인지 알 수 없다 (MAP-002)."""
+    tc, svc = client
+    svc.state.set_map_id("site_a")
+
+    with tc.websocket_connect(f"/ws/swarm/pose?token={VIEWER_TOKEN}") as socket:
+        frame = socket.receive_json()
+
+    assert frame["payload"]["map_id"] == "site_a"
+
+
+def test_a_leader_with_no_map_sends_the_field_as_null(client):
+    tc, _svc = client
+
+    with tc.websocket_connect(f"/ws/swarm/pose?token={VIEWER_TOKEN}") as socket:
+        frame = socket.receive_json()
+
+    assert frame["payload"]["map_id"] is None
+
+
+def test_the_reference_socket_carries_the_map_id_through(client):
+    tc, svc = client
+    svc.swarm.nav = RecordingNav()
+    svc.state.set_map_id("site_a")
+    follow(tc)
+
+    with tc.websocket_connect(f"/ws/swarm/reference?token={OPERATOR_TOKEN}") as socket:
+        socket.send_text(json.dumps(pose_frame(x=4.0, map_id="site_b")))
+        socket.send_text(json.dumps({"type": "ping"}))
+
+    assert svc.swarm.nav.goals == [], "a pose from another map must not become a goal"
+    assert svc.swarm.state_payload()["map_mismatch"] == "site_b"

@@ -1,7 +1,9 @@
 """Static safety contracts for headless Raspberry Pi Wi-Fi deployment."""
 
+import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
 
 
@@ -14,6 +16,15 @@ WINDOWS_DEPLOY = DEPLOY / "deploy-from-windows.ps1"
 WINDOWS_VERIFY = DEPLOY / "verify-from-windows.ps1"
 UART_CONFIG = DEPLOY / "configure-uart-pi5.sh"
 MOTOR_VERIFY = DEPLOY / "verify-motors.sh"
+RESOLVE_MODE = DEPLOY / "config" / "resolve-mode.sh"
+
+bash_only = pytest.mark.skipif(
+    subprocess.run(["bash", "-c", "true"], capture_output=True,
+                   check=False).returncode != 0,
+    reason="bash is required to exercise the runtime-mode resolver",
+)
+
+
 
 
 def _text(path: Path) -> str:
@@ -101,7 +112,7 @@ def test_installer_uses_private_temporary_docker_key_file():
     assert "/tmp/rosy-docker.asc" not in script
 
 
-def test_runtime_defaults_to_core_only_and_rejects_unknown_modes():
+def test_runtime_defaults_to_core_and_the_unit_drives_the_wrapper():
     environment = _text(DEPLOY / ".env.example")
     wrapper = _text(RUNTIME_MODE)
     unit = _text(DEPLOY / "rosy-runtime.service")
@@ -109,13 +120,94 @@ def test_runtime_defaults_to_core_only_and_rejects_unknown_modes():
     assert "ROSY_RUNTIME_MODE=core" in environment
     assert '${ROSY_RUNTIME_MODE:-core}' in wrapper
     assert "s/^ROSY_RUNTIME_MODE=//p" in wrapper
-    assert '"core"|"motor"|"hardware")' in wrapper
     assert '--profile motor up -d --remove-orphans rosy-core rosy-motor' in wrapper
-    assert "unknown ROSY_RUNTIME_MODE" in wrapper
     assert "runtime-mode.sh up" in unit
     assert "runtime-mode.sh down" in unit
     assert "network-online.target" in unit
     assert "docker.service" in unit
+
+
+def _resolve(mode: str) -> subprocess.CompletedProcess:
+    """Run the real resolver against the real board catalog.
+
+    Mode validation used to sit inline in runtime-mode.sh and this test read it
+    out of that file. It moved to config/resolve-mode.sh, and the grep kept
+    passing until it did not — a test that greps for a case statement is
+    asserting where the code lives, not what it does.
+    """
+    # Run from the config directory with relative names: a Windows drive path
+    # is not something Git Bash can `source`, and this is also how the wrapper
+    # uses it — beside its own board.yaml.
+    return subprocess.run(
+        ["bash", "-c",
+         f'source ./resolve-mode.sh; resolve_runtime_mode "{mode}" ./board.yaml'],
+        cwd=str(RESOLVE_MODE.parent), capture_output=True, text=True,
+        # text=True decodes with the locale codec, which is cp949 here and
+        # chokes on a non-ASCII byte in a subprocess's own error output.
+        encoding="utf-8", errors="replace", check=False,
+    )
+
+
+@bash_only
+@pytest.mark.parametrize("mode", ["core", "motor", "hardware"])
+def test_a_catalog_mode_resolves_to_itself(mode):
+    result = _resolve(mode)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == mode
+
+
+def _catalog_aliases() -> dict:
+    board = yaml.safe_load(_text(DEPLOY / "config" / "board.yaml"))
+    return board.get("aliases") or {}
+
+
+@bash_only
+def test_every_alias_in_the_catalog_resolves_to_its_mode():
+    """Reading the catalog rather than naming one alias.
+
+    The resolver holds a second definition of a valid alias name (the
+    identifier regex that keeps punctuation out of the sed lookup). Nothing
+    keeps the two in step, so the test iterates what the catalog actually
+    declares — adding an alias the regex rejects must fail here.
+    """
+    aliases = _catalog_aliases()
+    assert aliases, "the catalog declares no aliases; this test proves nothing"
+
+    for alias, mode in aliases.items():
+        result = _resolve(str(alias))
+        assert result.returncode == 0, f"{alias}: {result.stderr}"
+        assert result.stdout.strip() == str(mode)
+
+
+@bash_only
+@pytest.mark.parametrize("mode", ["hardwear", "HARDWARE", "core motor", "../hardware", ""])
+def test_an_unknown_mode_is_refused_rather_than_guessed(mode):
+    """Guessing here would boot a slice the operator did not ask for."""
+    result = _resolve(mode)
+
+    assert result.returncode != 0, f"{mode!r} resolved to {result.stdout.strip()!r}"
+    assert result.stdout.strip() == ""
+    assert result.stderr.strip(), "a refusal the operator cannot read is not a refusal"
+
+
+@bash_only
+@pytest.mark.parametrize("mode", ["../hardware", "core;rm", "hard ware"])
+def test_a_malformed_mode_is_answered_by_the_resolver_not_by_sed(mode):
+    """The value reaches a sed expression. An operator must read why it was
+    refused, not sed's opinion of the punctuation."""
+    result = _resolve(mode)
+
+    assert "ROSY_RUNTIME_MODE" in result.stderr
+    assert "sed:" not in result.stderr
+
+
+@bash_only
+def test_an_unknown_mode_names_what_it_would_have_accepted():
+    result = _resolve("hardwear")
+
+    assert "core" in result.stderr and "motor" in result.stderr
+    assert "board.yaml" in result.stderr
 
 
 def test_network_verifier_separates_wifi_lan_internet_and_dashboard():
