@@ -15,7 +15,6 @@ from __future__ import annotations
 import json
 import math
 import hashlib
-import socket
 import threading
 import time
 from pathlib import Path
@@ -34,7 +33,7 @@ from sensor_msgs.msg import BatteryState, Imu, LaserScan, Range
 from std_msgs.msg import Bool, Float32, String
 from std_srvs.srv import Empty
 
-from rosy_core.bridge import translate
+from rosy_core.bridge import display, translate
 from rosy_core.bridge.goal_tracker import GoalTracker
 from rosy_core.maps import occupancy_map_id
 from rosy_core.navigation.initial_pose import amcl_pose_covariance
@@ -297,38 +296,19 @@ class RosBridge:
         self._reconcile_led(status.info_visible, now)
 
     def _publish_display_info(self, status) -> None:
-        snapshot = self._svc.state.snapshot()
-        payload = {
-            "battery_percent": round(snapshot.battery.percent, 1),
-            "battery_voltage": (round(snapshot.battery.voltage, 2)
-                                if snapshot.battery.voltage is not None else None),
-            "robot_id": snapshot.robot_id,
-            "mode": snapshot.mode.value,
-            "navigation": snapshot.navigation.value,
-            "health": self.diagnostics.summary_health().value,
-            "estop": snapshot.safety.estop,
-            "address": self._api_endpoint(),
-            "reason": status.last_wake_reason,
-            "presence": status.presence.value,
-            "hold_s": round(self._svc.power.info_hold_s, 1),
-        }
+        payload = display.info_payload(
+            self._svc.state.snapshot(), status,
+            health=self.diagnostics.summary_health().value,
+            address=self._api_endpoint(),
+            hold_s=self._svc.power.info_hold_s,
+        )
         self.display_info_pub.publish(String(data=json.dumps(payload)))
 
     def _api_endpoint(self) -> str:
-        """정보 화면에 띄울 접속 주소. 실패해도 화면을 막지 않는다."""
-        if self._api_address is not None:
-            return self._api_address
-        port = self._svc.config.get("network", {}).get("api_port", 8080)
-        host = socket.gethostname()
-        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            probe.connect(("8.8.8.8", 80))       # 패킷은 나가지 않는다 — 경로 조회용
-            host = probe.getsockname()[0]
-        except OSError:
-            pass
-        finally:
-            probe.close()
-        self._api_address = f"http://{host}:{port}"
+        """정보 화면에 띄울 접속 주소. 한 번 풀고 캐시한다."""
+        if self._api_address is None:
+            port = self._svc.config.get("network", {}).get("api_port", 8080)
+            self._api_address = display.resolve_api_address(port)
         return self._api_address
 
     def _reconcile_led(self, info_visible: bool, now: float) -> None:
