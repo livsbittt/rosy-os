@@ -14,10 +14,8 @@ from __future__ import annotations
 
 import json
 import math
-import hashlib
 import threading
 import time
-from pathlib import Path
 from typing import Optional
 
 import rclpy
@@ -525,15 +523,7 @@ class RosBridge:
             raise RuntimeError("save_map service failed")
         save_map.check_result(response.result)
 
-        digest_source = name
-        for candidate in (Path(f"{name}.pgm"), Path(name)):
-            if candidate.exists():
-                digest_source = hashlib.sha1(candidate.read_bytes()).hexdigest()
-                break
-        else:
-            digest_source = hashlib.sha1(
-                f"{name}:{time.time()}".encode()).hexdigest()
-        return f"{name}:{digest_source[:8]}"
+        return save_map.map_id(name, save_map.saved_bytes(name), time.time())
 
     def reset_mapping(self) -> None:
         """NAV-005 세션 초기화 — 아직 실기가 없다.

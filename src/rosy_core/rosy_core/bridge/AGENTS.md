@@ -18,7 +18,7 @@ ROS-101: the only module allowed to import rclpy message types and talk to the R
 | `display.py` | ROS-free `display/info` decisions: address resolution and payload rounding (PWR-003) |
 | `reconcile.py` | ROS-free change-detection latch. LED latches on a skipped call, LiDAR does not |
 | `odometry.py` | ROS-free `travelled_m` — the only measure undocking has |
-| `save_map.py` | ROS-free SaveMap reply handling. `RESULT_SUCCESS = 0` — truthiness inverts it |
+| `save_map.py` | ROS-free SaveMap reply handling: `RESULT_SUCCESS = 0` (truthiness inverts it) and the D-13 map id |
 
 ## Subdirectories
 

@@ -38,3 +38,69 @@ def test_a_truthiness_test_would_invert_this():
 def test_any_unknown_code_is_a_failure_not_a_success(code):
     with pytest.raises(SaveMapFailed):
         check_result(code)
+
+
+# --- D-13 map id ------------------------------------------------------------
+
+from rosy_core.bridge.save_map import map_id, saved_bytes  # noqa: E402
+
+
+def test_map_id_is_the_name_plus_a_short_content_checksum():
+    result = map_id("survey", b"grid-bytes", now=1000.0)
+
+    assert result.startswith("survey:")
+    assert len(result.split(":", 1)[1]) == 8
+
+
+def test_the_same_content_always_gives_the_same_id():
+    """MAP-002 compares ids — a re-save of an unchanged map must still match."""
+    assert map_id("survey", b"same", 1.0) == map_id("survey", b"same", 999.0)
+
+
+def test_different_content_gives_a_different_id():
+    """The whole point: a changed map must not answer to the old id."""
+    assert map_id("survey", b"before", 1.0) != map_id("survey", b"after", 1.0)
+
+
+def test_the_name_is_part_of_the_id_not_just_the_hash():
+    assert map_id("bay_a", b"same", 1.0) != map_id("bay_b", b"same", 1.0)
+
+
+def test_a_missing_file_falls_back_to_a_distinct_id_not_a_stable_one():
+    """Deliberate: two different maps sharing an id would let MAP-002 wave
+    through a goal from the wrong survey. A changing id only costs a re-teach."""
+    first = map_id("survey", None, now=1000.0)
+    second = map_id("survey", None, now=1000.5)
+
+    assert first != second
+    assert first.startswith("survey:")
+
+
+def test_empty_content_is_content_not_absence():
+    """An empty file is a real (bad) map; it must not take the timestamp path."""
+    assert map_id("survey", b"", 1.0) == map_id("survey", b"", 2.0)
+
+
+def test_saved_bytes_prefers_the_pgm_slam_toolbox_writes(tmp_path):
+    (tmp_path / "m.pgm").write_bytes(b"pgm-content")
+    (tmp_path / "m").write_bytes(b"bare-content")
+
+    assert saved_bytes(str(tmp_path / "m")) == b"pgm-content"
+
+
+def test_saved_bytes_falls_back_to_the_bare_name(tmp_path):
+    (tmp_path / "m").write_bytes(b"bare-content")
+
+    assert saved_bytes(str(tmp_path / "m")) == b"bare-content"
+
+
+def test_saved_bytes_returns_none_rather_than_raising(tmp_path):
+    """The save already succeeded — not finding the file afterwards must not
+    turn a good save into an error."""
+    assert saved_bytes(str(tmp_path / "absent")) is None
+
+
+def test_saved_bytes_ignores_a_directory_with_the_right_name(tmp_path):
+    (tmp_path / "m").mkdir()
+
+    assert saved_bytes(str(tmp_path / "m")) is None
