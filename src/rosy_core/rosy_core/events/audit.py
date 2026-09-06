@@ -52,19 +52,43 @@ class FileAuditLog:
         #: None = 아직 한 번도 정리하지 않았다. 첫 기록은 정리한다 — 지난
         #: 실행이 남긴 오래된 줄이 그대로 있을 수 있다.
         self._last_prune: Optional[float] = None
+        #: 기록이 실패한 횟수와 마지막 사유. 버스는 구독자 예외를 삼키므로,
+        #: 여기에 남기지 않으면 디스크가 찬 로봇은 감사 기록을 남기지 않으면서
+        #: 아무 말도 하지 않는다 — LOG-001 이 조용히 꺼진 상태다.
+        self._write_failures = 0
+        self._last_error: Optional[str] = None
         self._lock = threading.Lock()
 
     @property
     def path(self) -> Path:
         return self._path
 
+    def health(self) -> dict:
+        """기록이 실제로 남고 있는가. 운영자가 감사 로그를 물을 때 함께 답한다."""
+        with self._lock:
+            return {
+                "writable": self._write_failures == 0,
+                "write_failures": self._write_failures,
+                "last_error": self._last_error,
+            }
+
     def record(self, event: EventMessage) -> None:
         with self._lock:
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            with self._path.open("a", encoding="utf-8") as handle:
-                handle.write(event.model_dump_json() + "\n")
-            if self._prune_due_locked():
-                self._prune_locked()
+            try:
+                self._path.parent.mkdir(parents=True, exist_ok=True)
+                with self._path.open("a", encoding="utf-8") as handle:
+                    handle.write(event.model_dump_json() + "\n")
+                if self._prune_due_locked():
+                    self._prune_locked()
+            except OSError as error:
+                # EventBus 는 구독자 예외를 삼킨다. 그대로 두면 감사 기록이
+                # 멈춘 사실이 어디에도 남지 않는다 — 디스크가 찬 로봇은 아무
+                # 말 없이 LOG-001 을 지키지 않게 된다. 세어 두고, 물으면 답한다.
+                self._write_failures += 1
+                self._last_error = f"{type(error).__name__}: {error}"
+                raise
+            self._last_error = None
+            self._write_failures = 0
 
     def _prune_due_locked(self) -> bool:
         if self._last_prune is None:

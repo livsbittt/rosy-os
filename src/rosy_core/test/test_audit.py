@@ -172,3 +172,64 @@ def test_a_failed_prune_leaves_the_log_intact(tmp_path, monkeypatch):
     assert path.read_text(encoding="utf-8") == before
     assert not list(tmp_path.glob("*.tmp")), "the temporary file must not be left behind"
 
+
+# --- LOG-001 이 꺼졌다는 사실은 어딘가에 남아야 한다 ---------------------------
+
+
+def test_a_write_failure_is_counted_rather_than_lost(tmp_path, monkeypatch):
+    """EventBus 는 구독자 예외를 삼킨다.
+
+    그래서 디스크가 찬 로봇은 감사 기록을 남기지 않으면서 아무 말도 하지
+    않는다 — 나중에 사고를 조사할 때 비어 있는 로그와 구분되지 않는다.
+    """
+    log = FileAuditLog(tmp_path / "audit.jsonl")
+    assert log.health() == {"writable": True, "write_failures": 0, "last_error": None}
+
+    def refuse(*args, **kwargs):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(Path, "open", refuse)
+    for _ in range(3):
+        with pytest.raises(OSError):
+            log.record(_event(1, "2026-09-03T12:00:00+00:00"))
+
+    health = log.health()
+    assert health["writable"] is False
+    assert health["write_failures"] == 3
+    assert "No space left" in health["last_error"]
+
+
+def test_the_bus_still_swallows_the_failure_so_publishing_keeps_working(tmp_path, monkeypatch):
+    """감사 기록이 안 된다고 안전 이벤트 발행이 멈추면 안 된다."""
+    bus = EventBus("rosy_01")
+    log = FileAuditLog(tmp_path / "audit.jsonl")
+    bus.subscribe(log.record)
+
+    def refuse(*args, **kwargs):
+        raise OSError("nope")
+
+    monkeypatch.setattr(Path, "open", refuse)
+    bus.publish("safety.estop", source="api")
+
+    assert log.health()["write_failures"] == 1
+    assert bus.last_seq == 1
+
+
+def test_a_recovered_write_clears_the_alarm(tmp_path, monkeypatch):
+    """디스크가 비면 다시 정상이다. 한 번 실패한 채로 굳어 있으면 안 된다."""
+    log = FileAuditLog(tmp_path / "audit.jsonl")
+    real_open = Path.open
+
+    def refuse(*args, **kwargs):
+        raise OSError("nope")
+
+    monkeypatch.setattr(Path, "open", refuse)
+    with pytest.raises(OSError):
+        log.record(_event(1, "2026-09-03T12:00:00+00:00"))
+    assert log.health()["writable"] is False
+
+    monkeypatch.setattr(Path, "open", real_open)
+    log.record(_event(2, "2026-09-03T12:00:00+00:00"))
+
+    assert log.health() == {"writable": True, "write_failures": 0, "last_error": None}
+

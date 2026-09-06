@@ -30,7 +30,9 @@ def list_audit_logs(
     svc: CoreServices = Depends(get_services),
 ):
     events = svc.audit.history(since_seq=since_seq, limit=min(limit, 2000))
-    return {"events": [e.model_dump() for e in events]}
+    # 기록이 멈춰 있으면 목록이 짧은 것과 구분되지 않는다. 감사 로그를 묻는
+    # 자리가 "이 로그를 믿어도 되는가"를 함께 답할 유일한 자리다.
+    return {"events": [e.model_dump() for e in events], "log": svc.audit.health()}
 
 diagnostics_router = APIRouter(prefix="/api/v1/diagnostics", tags=["diagnostics"])
 
@@ -85,6 +87,12 @@ def metrics(svc: CoreServices = Depends(get_services)):
         f"rosy_battery_percent {snap.battery.percent if snap.battery.percent is not None else -1}",
         "# HELP rosy_diagnostics_health component health (0=OK,1=UNKNOWN,2=WARNING,3=ERROR)",
         "# TYPE rosy_diagnostics_health gauge",
+    ]
+    audit = svc.audit.health()
+    lines[-2:-2] = [
+        "# HELP rosy_audit_write_failures consecutive audit log write failures (LOG-001)",
+        "# TYPE rosy_audit_write_failures gauge",
+        f"rosy_audit_write_failures {audit['write_failures']}",
     ]
     for component, health in snap.diagnostics_summary.items():
         lines.append(f'rosy_diagnostics_health{{component="{component}"}} {_HEALTH_VALUE[health.value]}')
