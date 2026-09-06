@@ -12,12 +12,8 @@ from rosy_core.api.v1.common import admin, enter_navigation_mode, operator, view
 from rosy_core.api.v1.control import control_router
 from rosy_core.api.v1.docking import docking_router
 from rosy_core.api.v1.host import host_router
-from rosy_core.api.v1.navigation import (
-    map_router,
-    navigation_router,
-    slam_router,
-    waypoints_router,
-)
+from rosy_core.api.v1.map import map_router
+from rosy_core.api.v1.navigation import navigation_router, slam_router
 from rosy_core.api.v1.observability import (
     diagnostics_router,
     events_router,
@@ -28,6 +24,7 @@ from rosy_core.api.v1.robot import power_router, robot_router, sensors_router
 from rosy_core.api.v1.safety import safety_router
 from rosy_core.api.v1.swarm import swarm_router
 from rosy_core.api.v1.system import system_router
+from rosy_core.api.v1.waypoints import waypoints_router
 
 __all__ = [
     "admin",

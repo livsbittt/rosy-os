@@ -18,7 +18,9 @@ REST routers under `/api/v1/*` (API Ref §5). One module per domain; `routes.py`
 | `robot.py` | State/pose/battery/velocity, sensors, PWR-001 power modes |
 | `control.py` | `POST /mode`, `POST /teleop` |
 | `safety.py` | SAF-001 stop/release, SAF-004 limits, SAF-005 battery policy |
-| `navigation.py` | NAV-001~005 goals and SLAM, MAP-003 snapshots, WPT-002 waypoints |
+| `navigation.py` | NAV-001~004/006 goals, NAV-005 SLAM session, `/localization/initialpose` |
+| `map.py` | MAP-003 occupancy and costmap snapshots (`svc.maps`) |
+| `waypoints.py` | WPT-002 waypoint CRUD (`svc.waypoints`) |
 | `docking.py` | DNC-003/005 dock registry, teach, dock/undock |
 | `swarm.py` | SWM-002 follow/cancel/state. 501 when the capability does not declare `swarm.follow` |
 | `observability.py` | EVT-003 events, LOG-001 audit, DIAG-001 diagnostics, OBS-101 `/metrics` |
@@ -38,6 +40,11 @@ None.
 - Host card endpoints proxy Host Agent; never fabricate telemetry (`host_agent_client`).
 - Docking and battery routes were extended on `feat/battery-integrity-low-battery-alert`.
 - A new endpoint goes in its domain module, never in `routes.py`. A new domain gets a module and one line in the aggregator.
+- **One module, one owning service (C5).** List the `svc.<field>` names a module's endpoints *mutate*, or that a router is
+  *named after* — reads do not count — minus the ambient `{state, events, capability, modes, config}`. Two owners backed by
+  different packages is a finding: split, or record why not. `control.py`, `safety.py` are recorded accepts; see
+  `docs/plans/2026-09-06-module-split-criteria.md`. Router count is not the test — `robot.py` has three routers and one owner.
+- `slam_router` lives in `navigation.py` because there is no `mapping` service to own it, not because `nav` is its owner.
 - Tests that patch a route helper must name the domain module (`rosy_core.api.v1.host._agent`); patching the aggregator re-export has no effect.
 
 ### Testing Requirements

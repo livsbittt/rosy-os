@@ -1,16 +1,14 @@
-"""rosy_core.api.v1.navigation — NAV-001~005 주행·SLAM, MAP-003 스냅샷, WPT-002 웨이포인트."""
+"""rosy_core.api.v1.navigation — NAV-001~005 주행·SLAM·로컬라이제이션(초기 위치추정)."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from rosy_core.api.v1.common import enter_navigation_mode, operator, viewer
 from rosy_core.api.deps import AuthContext, get_services
 from rosy_core.api.errors import ApiError
-from rosy_core.maps import valid_costmap_scope
 from rosy_core.services import CoreServices
-from rosy_core.waypoints.manager import Waypoint
 
 
 navigation_router = APIRouter(prefix="/api/v1", tags=["navigation"])
@@ -63,28 +61,6 @@ def navigation_path(_: AuthContext = Depends(viewer), svc: CoreServices = Depend
     return {"poses": svc.maps.get_path()}
 
 
-map_router = APIRouter(prefix="/api/v1/map", tags=["map"])
-
-
-@map_router.get("")
-def current_map(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
-    grid = svc.maps.get_map()
-    if grid is None:
-        raise ApiError("NOT_FOUND", 404, "no occupancy map received yet")
-    return {"map_id": svc.state.map_id, **grid}
-
-
-@map_router.get("/costmap")
-def costmap(scope: str | None = Query(default=None),
-            _: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
-    if scope is None or not valid_costmap_scope(scope):
-        raise ApiError("VALIDATION_ERROR", 400, "scope must be global or local")
-    grid = svc.maps.get_costmap(scope)
-    if grid is None:
-        raise ApiError("NOT_FOUND", 404, f"no {scope} costmap received yet")
-    return {"scope": scope, **grid}
-
-
 class InitialPoseRequest(BaseModel):
     x: float
     y: float
@@ -105,31 +81,6 @@ def initialpose(body: InitialPoseRequest, auth: AuthContext = Depends(operator),
     )
     return {"accepted": True}
 
-
-waypoints_router = APIRouter(prefix="/api/v1/waypoints", tags=["waypoints"])
-
-
-@waypoints_router.get("")
-def list_waypoints(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
-    return {"waypoints": [w.model_dump() for w in svc.waypoints.list()]}
-
-
-@waypoints_router.post("", status_code=201)
-def create_waypoint(body: Waypoint, auth: AuthContext = Depends(operator),
-                    svc: CoreServices = Depends(get_services)):
-    return svc.waypoints.create(body).model_dump()
-
-
-@waypoints_router.put("/{name}")
-def update_waypoint(name: str, body: dict, auth: AuthContext = Depends(operator),
-                    svc: CoreServices = Depends(get_services)):
-    return svc.waypoints.update(name, body).model_dump()
-
-
-@waypoints_router.delete("/{name}", status_code=204)
-def delete_waypoint(name: str, auth: AuthContext = Depends(operator),
-                    svc: CoreServices = Depends(get_services)):
-    svc.waypoints.delete(name)
 
 slam_router = APIRouter(prefix="/api/v1/slam", tags=["slam"])
 

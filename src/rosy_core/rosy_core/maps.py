@@ -1,4 +1,6 @@
-"""Last OccupancyGrid / Path / Costmap snapshots for MAP-003. ROS-free."""
+"""Grid frames for the render path (MAP-003/004): last OccupancyGrid / Path /
+Costmap snapshots. Map authoring and persistence are not this module's
+concern. ROS-free."""
 
 from __future__ import annotations
 
