@@ -33,7 +33,7 @@ from sensor_msgs.msg import BatteryState, Imu, LaserScan, Range
 from std_msgs.msg import Bool, Float32, String
 from std_srvs.srv import Empty
 
-from rosy_core.bridge import display, reconcile, translate
+from rosy_core.bridge import display, odometry, reconcile, translate
 from rosy_core.bridge.goal_tracker import GoalTracker
 from rosy_core.maps import occupancy_map_id
 from rosy_core.navigation.initial_pose import amcl_pose_covariance
@@ -417,10 +417,7 @@ class RosBridge:
 
     def travelled_m(self) -> float:
         """마크 이후 이동 거리. 언도킹은 센서를 보지 않고 이 값만 쓴다."""
-        if self._dock_odom_mark is None or self._last_odom_xy is None:
-            return 0.0
-        return math.hypot(self._last_odom_xy[0] - self._dock_odom_mark[0],
-                          self._last_odom_xy[1] - self._dock_odom_mark[1])
+        return odometry.travelled_m(self._dock_odom_mark, self._last_odom_xy)
 
     def _tick_swarm(self) -> None:
         """SWM-004 는 마감시각으로 판정한다 — 스트림이 끊기면 아무 프레임도
