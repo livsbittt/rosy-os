@@ -50,7 +50,7 @@ from rosy_core.diagnostics.collector import (
     disk_provider,
     topic_freshness_provider,
 )
-from rosy_core.navigation.manager import NavGoalSpec
+from rosy_core.navigation.manager import NavGoalSpec, NavigationError
 from rosy_core.power.battery import BatteryLevel, resolve_led
 from rosy_core.protocol.schemas import HealthState
 
@@ -557,3 +557,18 @@ class RosBridge:
             digest_source = hashlib.sha1(
                 f"{name}:{time.time()}".encode()).hexdigest()
         return f"{name}:{digest_source[:8]}"
+
+    def reset_mapping(self) -> None:
+        """NAV-005 세션 초기화 — 아직 실기가 없다.
+
+        `hasattr` 뒤에 숨어 있던 자리다. 없는 메서드를 조용히 건너뛰면
+        `POST /api/v1/slam/reset` 이 아무 일도 하지 않고 200 을 돌려준다.
+        선언해 두고 명확한 코드로 실패하는 편이 CAP-003 이 요구하는 것이다
+        (일반 실패가 아니라 `CAPABILITY_NOT_SUPPORTED`).
+
+        실물은 slam_toolbox `Reset` 서비스이며 `mapping/` 트리거에 걸려 있다
+        — 이식원은 `rosy_navigation/scripts/nav2_web_server.py`.
+        """
+        raise NavigationError(
+            "CAPABILITY_NOT_SUPPORTED",
+            "slam_toolbox reset is not implemented in this runtime")

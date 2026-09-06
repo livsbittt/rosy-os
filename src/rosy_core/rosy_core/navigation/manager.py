@@ -27,6 +27,7 @@ class NavExecutor(Protocol):
     def cancel_goal(self) -> None: ...
     def send_initial_pose(self, x: float, y: float, yaw: float) -> None: ...
     def save_map(self, name: str) -> str: ...   # map_id 반환 (D-13, 브리지가 체크섬/대체 해시 산출)
+    def reset_mapping(self) -> None: ...        # NAV-005 세션 초기화
 
 
 class NavigationError(Exception):
@@ -188,10 +189,12 @@ class NavigationManager:
         return map_id
 
     def reset_mapping(self, source: str = "api") -> None:
+        # save_map 과 같은 순서다: 능력 답변이 세션 답변보다 먼저 온다.
+        # 뒤집으면 실행기가 없는 경우가 400 으로 나가 CAP-003 을 어긴다.
+        executor = self._require_executor()
         if not self.mapping_active:
             return
-        if self.executor is not None and hasattr(self.executor, "reset_mapping"):
-            self.executor.reset_mapping()
+        executor.reset_mapping()
         self._events.publish("slam.started", source="navigation_manager",
                              data={"by": source, "reset": True})
 

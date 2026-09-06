@@ -39,14 +39,10 @@ REACH = re.compile(
 #: Adding a reach fails this test. That is the point: the next one gets a
 #: verdict before it lands, not after someone notices it in review.
 ALLOWED = Counter({
-    # Seam lies — real findings, each with an owner in the criteria doc.
+    # Seam lie — a real finding, with an owner in the criteria doc.
     # Reaches a *private* field across a package boundary because
     # BatteryMonitor (power/) exposes no public accessor to safety/.
     ("api/v1/safety.py", "getattr", "svc.battery", '"_cfg"'): 2,
-    # The executor contract does not declare reset_mapping, so the call is
-    # probed instead of typed — and RosBridge does not implement it at all.
-    # Plan Step 2 removes this one.
-    ("navigation/manager.py", "hasattr", "self.executor", '"reset_mapping"'): 1,
 
     # Accepted — None-tolerance for optional injections whose attribute is part
     # of the injected type's public surface.
