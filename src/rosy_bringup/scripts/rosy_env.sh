@@ -20,6 +20,9 @@ fi
 
 DOMAIN_BASE=40
 export ROS_DOMAIN_ID=$((DOMAIN_BASE + ROBOT_NUM))
+# 도메인만 나눠서는 부족하다 — 네임스페이스가 같으면 토픽 이름이 그대로 겹친다.
+# 두 값 모두 같은 로봇 번호 하나에서 나온다 (ADR D-33).
+export ROSY_NAMESPACE="$(printf 'rosy_%02d' "$ROBOT_NUM")"
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 PROFILE="$(ros2 pkg prefix rosy_bringup)/share/rosy_bringup/config/cyclonedds_localhost.xml"
@@ -29,4 +32,4 @@ else
     echo "warning: cyclonedds_localhost.xml not found ($PROFILE) — 프로파일 미적용" >&2
 fi
 
-echo "ROSY env: ROS_DOMAIN_ID=$ROS_DOMAIN_ID RMW=$RMW_IMPLEMENTATION"
+echo "ROSY env: ROS_DOMAIN_ID=$ROS_DOMAIN_ID ROSY_NAMESPACE=$ROSY_NAMESPACE RMW=$RMW_IMPLEMENTATION"

@@ -224,6 +224,44 @@ set_env_default() {
     fi
 }
 
+get_env_value() {
+    local file="$1" key="$2" value
+    value="$(sed -n "s/^${key}=//p" "$file" | tail -n 1)"
+    printf '%s' "${value%$'\r'}"
+}
+
+# 신원은 로봇 번호 하나에서 나온다 (ADR D-33). 예전에는 .env.example 이 42/rosy_01 을
+# 값으로 들고 있어서 set_env_default 가 영영 발화하지 못했고, 모든 기기가 같은
+# 도메인/네임스페이스로 출고됐다. 그래서 여기서 요구하고, 범위를 막고, 불일치를
+# 소리내어 깬다.
+require_robot_identity() {
+    local env_file="$1" number domain namespace existing key
+    declare -A derived
+    number="${ROSY_ROBOT_NUMBER:-}"
+    [[ -n "$number" ]] || fail "set ROSY_ROBOT_NUMBER=<n> — 로봇 번호가 없으면 신원을 만들 수 없다 (ADR D-33)"
+    [[ "$number" =~ ^[0-9]+$ ]] || fail "ROSY_ROBOT_NUMBER must be a non-negative integer, got '$number'"
+    domain=$((40 + number))
+    # rosy_core 의 parse_domain_id (rosy_core/system/ros_graph.py) 가 주는 것과 같은 경계.
+    (( domain >= 0 && domain <= 101 )) || fail "ROS_DOMAIN_ID must be in the Linux-safe range 0 to 101; ROSY_ROBOT_NUMBER=$number gives $domain"
+    namespace="$(printf 'rosy_%02d' "$number")"
+
+    # 이미 자리잡은 기기를 조용히 다른 번호로 바꾸지 않는다 — set_env_default 는 값이
+    # 있으면 아무 말 없이 지나가므로, 불일치는 여기서 직접 잡아야 한다.
+    derived[ROS_DOMAIN_ID]="$domain"
+    derived[ROSY_NAMESPACE]="$namespace"
+    # 검사를 먼저 다 하고 나서 쓴다. 한 키를 쓰고 다음 키에서 실패하면 도메인과
+    # 네임스페이스가 어긋난 채로 남는데, 신원이 절반만 이주한 기기가 바로 이
+    # 작업이 없애려는 상태다.
+    for key in ROS_DOMAIN_ID ROSY_NAMESPACE; do
+        existing="$(get_env_value "$env_file" "$key")"
+        if [[ -n "$existing" && "$existing" != "${derived[$key]}" ]]; then
+            fail "$env_file already has $key=$existing but ROSY_ROBOT_NUMBER=$number derives ${derived[$key]}. 이 기기는 이미 다른 번호로 자리잡았다 — 재번호 절차는 docs/deployment/raspberry-pi-runtime.md 를 따르라."
+        fi
+    done
+    set_env_default "$env_file" ROS_DOMAIN_ID "$domain"
+    set_env_default "$env_file" ROSY_NAMESPACE "$namespace"
+}
+
 write_runtime_environment() {
     local env_file run_group dialout_gid
     env_file="$INSTALL_ROOT/deploy/robot/.env"
@@ -235,6 +273,7 @@ write_runtime_environment() {
             "$INSTALL_ROOT/deploy/robot/.env.example" "$env_file"
     fi
     [[ ! -L "$env_file" && -f "$env_file" ]] || fail "$env_file must be a regular non-symlink file"
+    require_robot_identity "$env_file"
     set_env_value "$env_file" ROSY_UID "$(id -u "$RUN_USER")"
     set_env_value "$env_file" ROSY_GID "$(id -g "$RUN_USER")"
     set_env_value "$env_file" ROSY_DIALOUT_GID "$dialout_gid"

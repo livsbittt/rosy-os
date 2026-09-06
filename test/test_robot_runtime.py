@@ -40,16 +40,26 @@ def test_runtime_uses_local_ros_network_and_bounded_logs():
             "max-size": "10m",
             "max-file": "3",
         }
-        assert service["environment"]["ROS_DOMAIN_ID"] == "${ROS_DOMAIN_ID:-42}"
+        # 기본값이 있으면 모든 기기가 같은 도메인으로 뜬다 — 없는 것이 계약이다 (ADR D-33).
+        domain = service["environment"]["ROS_DOMAIN_ID"]
+        assert domain.startswith("${ROS_DOMAIN_ID:?"), domain
+        assert ":-" not in domain, domain
 
 
 def test_runtime_uses_one_namespace_and_a_real_core_health_endpoint():
     services = compose()["services"]
-    namespace_arg = "__ns:=/${ROSY_NAMESPACE:-rosy_01}"
+    namespace_arg = "__ns:=/${ROSY_NAMESPACE}"
+    # 네임스페이스도 마찬가지다 — :51 이 실제로 기동에 쓰이는 인자이므로,
+    # :8 만 고치고 여기를 두면 반쪽 수정이 된다. 신원 키에 한해서만 본다.
+    compose_text = (DEPLOY / "compose.yaml").read_text(encoding="utf-8")
+    for key in ("ROS_DOMAIN_ID", "ROSY_NAMESPACE"):
+        assert f"${{{key}:-" not in compose_text, (
+            f"compose.yaml still defaults {key}"
+        )
 
     assert namespace_arg in services["rosy-core"]["command"]
-    assert "namespace:=${ROSY_NAMESPACE:-rosy_01}" in services["rosy-motor"]["command"]
-    assert "namespace:=${ROSY_NAMESPACE:-rosy_01}" in services["rosy-io"]["command"]
+    assert "namespace:=${ROSY_NAMESPACE}" in services["rosy-motor"]["command"]
+    assert "namespace:=${ROSY_NAMESPACE}" in services["rosy-io"]["command"]
     assert "/api/v1" in " ".join(services["rosy-core"]["healthcheck"]["test"])
 
 
@@ -131,7 +141,7 @@ def test_io_health_requires_the_motor_node_to_be_discoverable():
     io = compose()["services"]["rosy-io"]
 
     assert "healthcheck" in io
-    assert "/${ROSY_NAMESPACE:-rosy_01}/rosy_bringup" in " ".join(
+    assert "/${ROSY_NAMESPACE}/rosy_bringup" in " ".join(
         io["healthcheck"]["test"]
     )
 

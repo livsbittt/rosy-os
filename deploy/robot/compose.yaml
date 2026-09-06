@@ -1,11 +1,11 @@
 name: rosy-runtime
 
 x-ros-environment: &ros-environment
-  ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-42}"
+  ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:?ROS_DOMAIN_ID 미설정 — install-pi.sh 를 ROSY_ROBOT_NUMBER 와 함께 실행하라 (ADR D-33)}"
   RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
   CYCLONEDDS_URI: file:///etc/rosy/cyclonedds.xml
   ROS_LOG_DIR: /tmp/ros-logs
-  ROSY_NAMESPACE: "${ROSY_NAMESPACE:-rosy_01}"
+  ROSY_NAMESPACE: "${ROSY_NAMESPACE:?ROSY_NAMESPACE 미설정 — install-pi.sh 를 ROSY_ROBOT_NUMBER 와 함께 실행하라 (ADR D-33)}"
 
 x-runtime-defaults: &runtime-defaults
   network_mode: host
@@ -48,7 +48,7 @@ services:
       - rosy_core
       - --ros-args
       - -r
-      - "__ns:=/${ROSY_NAMESPACE:-rosy_01}"
+      - "__ns:=/${ROSY_NAMESPACE}"
     volumes:
       - "${ROSY_CONFIG_PATH:-/etc/rosy/rosy.yaml}:/etc/rosy/rosy.yaml:ro"
       - "./config/profile.${ROSY_RUNTIME_MODE:-core}.yaml:/etc/rosy/profile.yaml:ro"
@@ -96,7 +96,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "ros2 node list 2>/dev/null | grep -Fxq '/${ROSY_NAMESPACE:-rosy_01}/rosy_bringup'"
+        - "ros2 node list 2>/dev/null | grep -Fxq '/${ROSY_NAMESPACE}/rosy_bringup'"
       interval: 10s
       timeout: 5s
       retries: 3
@@ -106,7 +106,7 @@ services:
       - launch
       - rosy_bringup
       - bringup_robot.launch.py
-      - "namespace:=${ROSY_NAMESPACE:-rosy_01}"
+      - "namespace:=${ROSY_NAMESPACE}"
       - "cmd_vel_timeout_s:=${ROSY_CMD_VEL_TIMEOUT_S:-0.5}"
       - "motor_device:=/dev/rosy-motor"
       - "motor_baudrate:=${ROSY_MOTOR_BAUDRATE:-1000000}"
@@ -146,7 +146,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "nodes=$$(ros2 node list 2>/dev/null); echo \"$$nodes\" | grep -Fxq '/${ROSY_NAMESPACE:-rosy_01}/rosy_bringup' && echo \"$$nodes\" | grep -Fxq '/${ROSY_NAMESPACE:-rosy_01}/lifecycle_manager_navigation'"
+        - "nodes=$$(ros2 node list 2>/dev/null); echo \"$$nodes\" | grep -Fxq '/${ROSY_NAMESPACE}/rosy_bringup' && echo \"$$nodes\" | grep -Fxq '/${ROSY_NAMESPACE}/lifecycle_manager_navigation'"
       interval: 10s
       timeout: 10s
       retries: 3
@@ -156,7 +156,7 @@ services:
       - launch
       - rosy_navigation
       - hardware.launch.py
-      - "namespace:=${ROSY_NAMESPACE:-rosy_01}"
+      - "namespace:=${ROSY_NAMESPACE}"
       - "cmd_vel_timeout_s:=${ROSY_CMD_VEL_TIMEOUT_S:-0.5}"
       - "motor_device:=/dev/rosy-motor"
       - "motor_baudrate:=${ROSY_MOTOR_BAUDRATE:-1000000}"
