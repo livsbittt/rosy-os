@@ -195,6 +195,9 @@ class NavigationManager:
         if not self.mapping_active:
             raise NavigationError("VALIDATION_ERROR", "no active mapping session")
         executor.reset_mapping()
+        # 도달 불가 — 위 두 가드가 모두 먼저 raise 하고, 브리지의 reset_mapping
+        # 도 아직 항상 raise 한다. 실물 slam_toolbox Reset 이 붙을 때 리셋이
+        # 무엇을 발행할지 함께 정한다 (D-32, follow-up 1). 그때까지 지우지 않는다.
         self._events.publish("slam.started", source="navigation_manager",
                              data={"by": source, "reset": True})
 

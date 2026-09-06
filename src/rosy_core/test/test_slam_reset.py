@@ -46,6 +46,20 @@ class RefusingExecutor:
             "slam_toolbox reset is not implemented in this runtime")
 
 
+class RecordingExecutor(RefusingExecutor):
+    """`RefusingExecutor` that counts resets instead of refusing them.
+
+    For assertions about whether a path was *reached*, where refusing would be
+    indistinguishable from never arriving.
+    """
+
+    def __init__(self) -> None:
+        self.reset_calls = 0
+
+    def reset_mapping(self):
+        self.reset_calls += 1
+
+
 @pytest.fixture
 def events(request):
     """Collect published event types so a test can assert nothing was emitted."""
@@ -84,22 +98,24 @@ def test_reset_with_an_executor_that_cannot_reset_is_501_and_publishes_nothing(
     assert "slam.started" not in seen
 
 
-def test_capability_gate_still_precedes_the_executor(core_client, events):
+def test_capability_gate_refuses_before_the_manager_is_reached(core_client):
     """The pre-existing 501 and the new one have different causes.
 
-    An implementation that moved work above `capability.require("slam")` would
-    keep this endpoint returning 501 and look correct. What separates the two is
-    that the gated call must not reach the manager at all — so assert the
-    absence of side effects, not the status code.
+    Status code cannot tell them apart: with no executor the manager path also
+    answers 501 `CAPABILITY_NOT_SUPPORTED` and publishes nothing, so a test that
+    asserts only the code passes even when the gate has been moved below the
+    call. The discriminating fact is that the executor is never reached — so the
+    setup removes every *other* reason to refuse (an executor is present and a
+    session is open) and asserts the call count.
     """
     client, svc = core_client(capabilities={"slam": False})
-    seen = events(svc)
+    svc.nav.executor = executor = RecordingExecutor()
+    svc.nav.mapping_active = True
 
     response = client.post("/api/v1/slam/reset", headers=OPERATOR)
 
     assert response.status_code == 501
-    assert svc.nav.mapping_active is False
-    assert seen == []
+    assert executor.reset_calls == 0
 
 
 def test_moving_goal_still_refuses_while_a_mapping_session_is_open(core_client):
@@ -139,3 +155,22 @@ def test_reset_without_an_open_session_is_400_not_a_quiet_200(core_client, event
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
     assert seen == []
+
+
+def test_no_executor_and_no_session_answers_the_capability_first(core_client):
+    """CAP-003: the capability answer precedes the session answer.
+
+    Both guards fire here, and this is the only combination that separates the
+    two orders — every other test supplies an executor or opens a session, which
+    disarms one guard and lets either order pass. Reverse the two lines in
+    `NavigationManager.reset_mapping` and this 501 becomes a 400: "this runtime
+    cannot do that" reported as "your request was malformed".
+    """
+    client, svc = core_client()
+
+    assert svc.nav.executor is None
+    assert svc.nav.mapping_active is False
+    response = client.post("/api/v1/slam/reset", headers=OPERATOR)
+
+    assert response.status_code == 501
+    assert response.json()["error"]["code"] == "CAPABILITY_NOT_SUPPORTED"
