@@ -30,6 +30,21 @@ def test_fewer_than_three_posts_is_refused():
         DockProfile(post_lateral_m=(-0.075, 0.075))
 
 
+def test_posts_closer_together_than_two_radii_are_refused():
+    # A layout whose posts overlap, or nearly touch, can never resolve into
+    # three clusters no matter how good the scan is. Refusing arrangements
+    # that cannot work is this validator's whole job, and duplicate laterals
+    # are the degenerate case of the same mistake.
+    with pytest.raises(ValidationError):
+        DockProfile(post_lateral_m=(-0.075, -0.075, 0.075))
+    with pytest.raises(ValidationError):
+        DockProfile(post_lateral_m=(-0.075, -0.055, 0.075))
+    # 2 * radius exactly is still refused: touching posts are one obstacle.
+    with pytest.raises(ValidationError):
+        DockProfile(post_lateral_m=(-0.075, -0.045, 0.075))
+    DockProfile(post_lateral_m=(-0.075, -0.040, 0.075))
+
+
 def test_the_scanner_offset_defaults_to_where_the_c1_actually_sits():
     # rplidar_link is 17 mm behind base_link. A detector that forgets this
     # reports the dock 17 mm closer than it is, every time.

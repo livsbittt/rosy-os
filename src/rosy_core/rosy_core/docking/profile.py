@@ -17,7 +17,7 @@ import math
 from dataclasses import dataclass
 from typing import Optional, Sequence
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from rosy_core.docking.detector import DockObservation
 
@@ -53,6 +53,20 @@ class DockProfile(BaseModel):
                for a, b in zip(ascending, mirrored)):
             raise ValueError("post_lateral_m must not be mirror-symmetric")
         return value
+
+    @model_validator(mode="after")
+    def _layout_must_be_resolvable(self) -> "DockProfile":
+        """돌 수 없는 배치는 설정 시각에 거부한다 — 이 검증기의 일이다."""
+        ascending = sorted(self.post_lateral_m)
+        floor = 2.0 * self.post_radius_m
+        for previous, lateral in zip(ascending, ascending[1:]):
+            if lateral - previous <= floor:
+                # 반지름 두 개보다 가까우면 두 기둥이 서로 붙어 있어서 스캔에서
+                # 절대 따로 떨어지지 않는다. 같은 값이면 물리적으로 겹친다.
+                raise ValueError(
+                    "adjacent posts must be more than 2 * post_radius_m apart; "
+                    f"{previous} and {lateral} are not")
+        return self
 
 
 @dataclass(frozen=True)
