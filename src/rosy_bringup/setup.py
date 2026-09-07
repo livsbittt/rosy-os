@@ -27,6 +27,7 @@ setup(
             'bringup=rosy_bringup.bringup:main',
             'battery_publisher=rosy_bringup.battery_publisher:main',
             'dynamixel_probe=rosy_bringup.dynamixel_probe:main',
+            'dock_probe=rosy_bringup.dock_probe:main',
         ],
     },
 )
