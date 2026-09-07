@@ -203,10 +203,10 @@ class RosBridge:
         # 순서는 cmd_vel_cycle 이 정한다 (rclpy 없이 검사되는 자리).
         cmd_vel_cycle(self._svc.command, self._svc.power, self._send_twist)
 
-    def _send_twist(self, linear: float, angular: float) -> None:
+    def _send_twist(self, out: CoreTwist) -> None:
         msg = Twist()
-        msg.linear.x = linear
-        msg.angular.z = angular
+        msg.linear.x = out.linear
+        msg.angular.z = out.angular
         self.cmd_vel_pub.publish(msg)
 
     def _tick_state(self) -> None:

@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+from rosy_core.bridge.cmd_vel import cmd_vel_cycle
 from rosy_core.command.arbitration import Mode, ModeMachine, SourceRegistry
 from rosy_core.command.manager import CommandManager, Twist
 from rosy_core.safety.manager import BatteryPolicy, SafetyManager, SpeedLimits
@@ -36,13 +37,39 @@ def build(mode=Mode.MANUAL):
     return command, events, safety
 
 
+class _AtTime:
+    """`cmd_vel_cycle` 은 `select_output()` 을 인자 없이 부른다. 시각만 끼운다."""
+
+    def __init__(self, command, now):
+        self._command, self._now = command, now
+
+    def select_output(self):
+        return self._command.select_output(now=self._now)
+
+    def announce_pending(self):
+        self._command.announce_pending()
+
+
+class _NoPower:
+    def on_activity(self, source):
+        pass
+
+
 def cycle(command, now, log=None):
-    """브리지의 `_publish_cmd_vel` 한 번: 값을 얻어 내보낸 뒤 알린다."""
-    out = command.select_output(now=now)
-    if log is not None:
-        log.append("wheels")
-    command.announce_pending()
-    return out
+    """브리지의 `_publish_cmd_vel` 한 번.
+
+    순서를 여기서 다시 적지 않는다 — 그러면 이 파일과 `cmd_vel.py` 가 조용히
+    갈라지고, 순서를 한 군데로 모으려고 떼어낸 의미가 없어진다.
+    """
+    seen = []
+
+    def send(out):
+        if log is not None:
+            log.append("wheels")
+        seen.append(out)
+
+    cmd_vel_cycle(_AtTime(command, now), _NoPower(), send)
+    return seen[0]
 
 
 def drive(command, at):

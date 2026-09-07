@@ -69,18 +69,34 @@ def _names_in(node: ast.AST) -> Optional[list[str]]:
     return None
 
 
-def _severity_of(rest: list[ast.AST]) -> str:
-    """심각도. 못 찾으면 `EventBus.publish` 의 기본값인 info 다.
+def _severity_written_at(node: ast.AST) -> Optional[str]:
+    """이 노드가 심각도인가. `"warning"` 이거나 `Severity.WARNING` 이거나.
+
+    `Severity.` 를 확인하는 것이 중요하다. 열거형이면 무엇이든 받으면
+    `BatteryLevel.CRITICAL` 이 심각도로 읽히고, `if level not in
+    (BatteryLevel.WARNING, BatteryLevel.CRITICAL, BatteryLevel.DEEP)` 라는
+    평범한 멤버십 검사가 발행 튜플로 잡힌다.
+    """
+    if isinstance(node, ast.Constant) and node.value in _SEVERITIES:
+        return node.value
+    if (isinstance(node, ast.Attribute) and node.attr.lower() in _SEVERITIES
+            and getattr(node.value, "id", "") == "Severity"):
+        return node.attr.lower()
+    return None
+
+
+def _severity_of(node: Optional[ast.AST]) -> str:
+    """심각도 자리의 값. 비어 있으면 `EventBus.publish` 의 기본값인 info 다.
 
     `None` 을 돌려주면 그 발행 지점은 심각도 검사에서 통째로 빠진다 — 43 개 중
     15 개가 기본값에 기대고 있어서, 그렇게 두면 검사가 3 분의 1을 놓쳤다.
+
+    **자리를 정해 읽는다.** 인자를 훑어 심각도처럼 생긴 것을 집으면
+    `publish("x.y", source="error", …)` 의 `source` 가 심각도로 읽힌다.
     """
-    for arg in rest:
-        if isinstance(arg, ast.Constant) and arg.value in _SEVERITIES:
-            return arg.value
-        if isinstance(arg, ast.Attribute) and arg.attr.lower() in _SEVERITIES:
-            return arg.attr.lower()
-    return "info"
+    if node is None:
+        return "info"
+    return _severity_written_at(node) or "info"
 
 
 def _looks_like_an_emit_tuple(elts: list[ast.AST]) -> bool:
@@ -90,12 +106,8 @@ def _looks_like_an_emit_tuple(elts: list[ast.AST]) -> bool:
     같은 평범한 튜플이 이벤트로 잡힌다. 심각도나 payload 가 함께 있어야
     발행 자리다.
     """
-    return any(
-        isinstance(node, ast.Dict)
-        or (isinstance(node, ast.Constant) and node.value in _SEVERITIES)
-        or (isinstance(node, ast.Attribute) and node.attr.lower() in _SEVERITIES)
-        for node in elts[1:]
-    )
+    return any(isinstance(node, ast.Dict) or _severity_written_at(node) is not None
+               for node in elts[1:])
 
 
 #: ROS 퍼블리셔 변수의 이름 규약. 이 패키지는 예외 없이 이렇게 짓는다.
@@ -123,23 +135,48 @@ def _is_event_bus(func: ast.AST) -> bool:
     return not name.endswith(_ROS_PUBLISHER_SUFFIXES)
 
 
-def _relayed_names(tree: ast.AST) -> set[str]:
-    """이름이 이미 **다른 자리에서** 읽힌 중계 지점의 변수들.
+def _publishes(node: ast.AST) -> bool:
+    """이 함수 몸통에 발행 호출이 있는가."""
+    return any(
+        isinstance(inner, ast.Call)
+        and (getattr(inner.func, "attr", "") in {"publish", "_emit"}
+             or getattr(inner.func, "id", "") in {"publish", "_emit"})
+        for inner in ast.walk(node)
+    )
 
-    두 가지뿐이다. `for type_, severity, data in pending:` — 배터리·절전은
-    `(type, severity, data)` 튜플을 모았다가 한 자리에서 풀어 발행하고, 읽어야
-    할 것은 튜플 리터럴 쪽이며 그건 이미 잡힌다. 그리고 `def _emit(type_, …)` —
-    그 몸통은 중계일 뿐이고 이름은 `_emit(…)` 호출 자리에서 읽힌다.
 
-    이 둘만 봐준다. 아무 변수나 봐주면 `publish(EVT)` 가 다시 조용히 지나간다.
+def _relay_bindings(node: ast.AST,
+                    inherited: Optional[frozenset[str]]) -> Optional[frozenset[str]]:
+    """이 노드가 **자기 안쪽에** 새로 걸어 주는 중계 이름들.
+
+    `None` 은 "중계 함수 안이 아니다" 이고, frozenset 은 "중계 함수 안이며
+    이 이름들은 다른 자리에서 이미 읽혔다" 이다.
+
+    중계를 봐주는 근거는 "그 이름은 다른 자리에서 이미 읽혔다"이지 "그렇게
+    생긴 변수는 봐준다"가 아니다. 그래서 두 겹으로 좁힌다.
+
+    범위로: 걸어 주는 것은 그 이름을 묶은 구문의 **안쪽뿐**이다. 파일 전체에
+    뿌리면 `name`·`key`·`value`·`source`·`component` 처럼 흔한 식별자가 통째로
+    면제된다.
+
+    자리로: 중계 함수(`_emit…` 이면서 **실제로 발행하는** 것) 안에서만 건다.
+    그러지 않으면 `for component, health in …` 안에 발행을 한 줄 넣는 것으로
+    두 그물이 모두 뚫린다 — 리뷰가 실제 패키지에 넣어 641 개 테스트를 전부
+    초록으로 통과시킨 것이 그것이다. 중계 함수 안의 `for type_, severity, data
+    in pending:` 은 튜플을 푸는 자리이고, 읽어야 할 이름은 튜플 리터럴 쪽에
+    있으며 그건 이미 잡힌다.
+
+    `self` 는 뺀다. 중계가 아닌 함수는 새 스코프이므로 바깥에서 걸린 것도
+    함께 끊는다.
     """
-    names: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.For) and isinstance(node.target, ast.Tuple):
-            names.update(elt.id for elt in node.target.elts if isinstance(elt, ast.Name))
-        elif isinstance(node, ast.FunctionDef) and node.name.startswith("_emit"):
-            names.update(arg.arg for arg in node.args.args)
-    return names
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if node.name.startswith("_emit") and _publishes(node):
+            return frozenset(arg.arg for arg in node.args.args if arg.arg != "self")
+        return None
+    if (inherited is not None
+            and isinstance(node, ast.For) and isinstance(node.target, ast.Tuple)):
+        return inherited | {elt.id for elt in node.target.elts if isinstance(elt, ast.Name)}
+    return inherited
 
 
 #: 이벤트 이름과 모양이 같은 파일 이름들 (`app.js`, `docks.json`, `audit.jsonl`).
@@ -179,7 +216,10 @@ def emit_sites() -> tuple[list[Emit], list[str]]:
     sites: list[Emit] = []
     unresolved: list[str] = []
     for path in sorted(PACKAGE.rglob("*.py")):
-        found, blind = scan(path.read_text(encoding="utf-8"), path.name)
+        # 패키지에 `manager.py` 가 여섯 개다. 파일 이름만 적으면 실패 메시지가
+        # 읽는 사람을 엉뚜한 파일로 보낸다.
+        found, blind = scan(path.read_text(encoding="utf-8"),
+                            path.relative_to(PACKAGE).as_posix())
         sites.extend(found)
         unresolved.extend(blind)
     return sites, unresolved
@@ -194,11 +234,17 @@ def scan(source: str, origin: str = "<test>") -> tuple[list[Emit], list[str]]:
     """
     sites: list[Emit] = []
     unresolved: list[str] = []
-    tree = ast.parse(source)
-    relayed = _relayed_names(tree)
-    for node in ast.walk(tree):
+
+    def descend(node: ast.AST, inherited: Optional[frozenset[str]]) -> None:
+        relayed = _relay_bindings(node, inherited)
+        read(node, relayed)
+        for child in ast.iter_child_nodes(node):
+            descend(child, relayed)
+
+    def read(node: ast.AST, relayed: Optional[frozenset[str]]) -> None:
         first: ast.AST | None = None
-        rest: list[ast.AST] = []
+        severity_node: ast.AST | None = None
+        payloads: list[ast.AST] = []
         is_call = False
         if isinstance(node, ast.Call):
             func = node.func
@@ -207,31 +253,39 @@ def scan(source: str, origin: str = "<test>") -> tuple[list[Emit], list[str]]:
                 is_call = True
                 keywords = {k.arg: k.value for k in node.keywords}
                 first = node.args[0] if node.args else keywords.get("type_") or keywords.get("type")
-                rest = list(node.args[1:]) + [k.value for k in node.keywords]
+                severity_node = (node.args[1] if len(node.args) > 1
+                                 else keywords.get("severity"))
+                payloads = list(node.args[1:]) + [k.value for k in node.keywords]
         elif (isinstance(node, ast.Tuple) and 2 <= len(node.elts) <= 3
               and _looks_like_an_emit_tuple(node.elts)):
             # 절전·배터리는 `(type, severity, data)` 튜플을 모아 두었다가
             # 한 번에 낸다 — append 로도, 리스트 리터럴로도.
-            first, rest = node.elts[0], list(node.elts[1:])
+            first = node.elts[0]
+            severity_node = node.elts[1] if len(node.elts) > 1 else None
+            payloads = list(node.elts[1:])
 
         if first is None and not is_call:
-            continue
+            return
         where = f"{origin}:{getattr(node, 'lineno', 0)}"
         if first is None:
             unresolved.append(f"{where}: 이름 인자가 없다")
-            continue
+            return
         names = _names_in(first)
         if names is None:
-            if isinstance(first, ast.Name) and first.id in relayed:
-                continue  # 튜플에서 풀린 이름 — 튜플 리터럴 쪽에서 이미 읽었다
-            if is_call:
-                unresolved.append(f"{where}: 이름을 정적으로 읽을 수 없다")
-            continue
+            if relayed and isinstance(first, ast.Name) and first.id in relayed:
+                return  # 중계 — 이름은 튜플 리터럴·호출 자리에서 이미 읽었다
+            # 호출이든 튜플이든 마찬가지다. `_looks_like_an_emit_tuple` 을
+            # 통과한 튜플은 이미 자기가 발행 자리라고 말한 것이므로, 그
+            # 이름을 못 읽으면 그것도 눈을 감은 것이다. 이 모양은
+            # `power/battery.py`·`power/manager.py` 가 실제로 쓰는 것이라, 새
+            # 배터리·절전 이벤트가 가장 쉬운 길로 새는 자리였다.
+            unresolved.append(f"{where}: 이름을 정적으로 읽을 수 없다")
+            return
         if not names:
-            continue
+            return
 
-        severity = _severity_of(rest)
-        payload = next((a for a in rest if isinstance(a, ast.Dict)), None)
+        severity = _severity_of(severity_node)
+        payload = next((a for a in payloads if isinstance(a, ast.Dict)), None)
         keys: frozenset[str] | None = None
         if payload is not None:
             literal = [k.value for k in payload.keys
@@ -239,6 +293,8 @@ def scan(source: str, origin: str = "<test>") -> tuple[list[Emit], list[str]]:
             if len(literal) == len(payload.keys):
                 keys = frozenset(literal)
         sites.extend(Emit(name, severity, keys, where) for name in names)
+
+    descend(ast.parse(source), None)
     return sites, unresolved
 
 
@@ -257,6 +313,11 @@ class Row:
         self.severity = severity.strip()
         self.sender = sender.strip()
         self.payload = payload
+
+    @property
+    def severities(self) -> set[str]:
+        """한 칸에 여러 값이 적힌 행이 있다 (`info/error/info`)."""
+        return {part.strip() for part in re.split(r"[/,]", self.severity) if part.strip()}
 
     @property
     def keys(self) -> set[str]:
@@ -359,7 +420,9 @@ def test_the_documented_severity_is_the_one_the_code_uses():
         row = documented.get(site.name)
         if row is None:
             continue
-        if site.severity not in row.severity:
+        # 부분 문자열이 아니라 값이다. `in` 으로 두면 한 칸에 여러 값이 적히는
+        # 순간(Fleet 행들이 이미 그렇다) 검사가 합집합이 되어 아무 값이나 받는다.
+        if site.severity not in row.severities:
             wrong.append(f"{site.name} ({site.where}): 코드 {site.severity}, 문서 {row.severity}")
 
     assert not wrong, "\n".join(wrong)
@@ -453,7 +516,8 @@ def test_the_extractor_reads_the_shapes_this_package_actually_uses():
     sites = emitted()
     names = {site.name for site in sites}
 
-    assert len(names) >= 30, f"only found {len(names)}"
+    # 실제 43 개다. `>= 30` 으로 두면 13 개가 조용히 사라져도 통과한다.
+    assert len(names) >= 40, f"only found {len(names)}"
     # 직접 호출, 튜플 수집, 조건식 이름 — 세 가지 모양이 모두 잡혀야 한다.
     assert "nav.started" in names            # publish("...", data={...})
     assert "power.mode_changed" in names     # pending.append((...))
@@ -534,14 +598,60 @@ def test_a_publisher_that_breaks_the_naming_convention_fails_loudly():
     assert blind
 
 
-def test_the_relay_allowance_does_not_cover_an_ordinary_variable():
-    """중계는 이름이 다른 자리에서 읽히기 때문에 봐주는 것이다.
+@pytest.mark.parametrize("label,source", [
+    # 중계는 이름이 **다른 자리에서 읽히기 때문에** 봐주는 것이다. 그 근거가
+    # 없는 이름은 모양이 닮았다고 봐주지 않는다.
+    ("평범한 지역 변수",
+     "def send(self, kind):\n"
+     "    self._events.publish(kind, data={})\n"),
+    # 리뷰가 실제 패키지의 observability.py 에 한 줄 넣어 641 개 테스트를 전부
+    # 초록으로 통과시킨 모양이다. for 튜플 언팩이라는 것만으로 봐주면
+    # `component`·`name`·`key`·`value`·`source` 가 통째로 면제된다.
+    ("중계 함수 밖의 for 튜플 언팩",
+     "def metrics(svc):\n"
+     "    for component, health in items:\n"
+     "        svc.events.publish(component, severity='error', data={'health': 1})\n"),
+    ("모듈 수준의 for 튜플 언팩",
+     "for component, health in items:\n"
+     "    svc.events.publish(component, data={})\n"),
+    # `_emit` 파라미터는 그 함수 **안에서만** 중계다.
+    ("_emit 파라미터를 다른 함수에서 쓴 것",
+     "def _emit(self, type_, severity, data):\n"
+     "    self._events.publish(type_, severity=severity, data=data)\n"
+     "def elsewhere(self):\n"
+     "    self._events.publish(type_, data={})\n"),
+    # 이름만 `_emit…` 인 헬퍼는 중계가 아니다.
+    ("발행하지 않는 _emit… 헬퍼",
+     "def _emit_label(self, type_):\n"
+     "    return type_.upper()\n"
+     "def send(self, type_):\n"
+     "    self._events.publish(type_, data={})\n"),
+])
+def test_the_relay_allowance_does_not_cover_a_name_read_nowhere_else(label, source):
+    _names, blind = _names_and_blind(source)
 
-    튜플 언팩도 `_emit` 파라미터도 아닌 변수는 그 근거가 없다.
+    assert blind, f"{label} 이(가) 조용히 지나갔다"
+
+
+def test_an_enum_membership_test_is_not_an_emit_tuple():
+    """`BatteryLevel.CRITICAL` 은 심각도가 아니다.
+
+    열거형이면 무엇이든 심각도로 읽으면 `if level not in (BatteryLevel.WARNING,
+    BatteryLevel.CRITICAL, BatteryLevel.DEEP)` 이 발행 자리로 잡혀, 가드가
+    멀쩡한 코드를 두고 거짓으로 빨개진다.
     """
+    names, blind = _names_and_blind(
+        "if level not in (BatteryLevel.WARNING, BatteryLevel.CRITICAL, "
+        "BatteryLevel.DEEP):\n    pass\n")
+
+    assert not names and not blind
+
+
+def test_a_tuple_whose_name_cannot_be_read_is_reported_too():
+    """호출만 보고하고 튜플은 넘기면, 절전·배터리가 실제로 쓰는 모양이 통째로
+    감시 밖이다 — 새 이벤트가 가장 쉬운 길로 새는 자리였다."""
     _names, blind = _names_and_blind(
-        "def send(self, kind):\n"
-        "    self._events.publish(kind, data={})\n")
+        "pending.append((kind, 'critical', {'percent': pct}))\n")
 
     assert blind
 
@@ -575,3 +685,17 @@ def test_a_plain_tuple_is_not_read_as_an_emit():
         '    pass\n')
 
     assert not names and not blind
+
+
+def test_a_non_severity_argument_is_not_read_as_the_severity():
+    """자리를 정해 읽지 않으면 `source="error"` 가 심각도가 된다."""
+    sites, _blind = scan('self._events.publish("nav.started", source="error", data={})')
+
+    assert [site.severity for site in sites] == ["info"]
+
+
+def test_the_documented_severity_is_matched_by_value_not_by_substring():
+    row = Row("info", "로봇", "{}")
+
+    assert row.severities == {"info"}
+    assert Row("info/error/info", "Fleet", "{}").severities == {"info", "error"}

@@ -15,7 +15,7 @@ SAF-002 정지가 늦어지지 않게 하는 규칙 두 가지:
 
 from __future__ import annotations
 
-from typing import Callable, Protocol
+from typing import Any, Callable, Protocol
 
 
 class _Command(Protocol):
@@ -24,14 +24,21 @@ class _Command(Protocol):
 
 
 class _Power(Protocol):
-    def on_activity(self, reason: str) -> None: ...
+    # 인자 이름까지 `PowerManager.on_activity` 와 같게 적는다 — 구조적
+    # 타입은 이름으로 맞추므로, 다르게 적으면 mypy 가 들어오는 날 오류다.
+    def on_activity(self, source: str) -> None: ...
 
 
 def cmd_vel_cycle(command: _Command, power: _Power,
-                  send: Callable[[float, float], None]) -> None:
-    """값을 고르고, 바퀴로 내보내고, 그 뒤에 알린다."""
+                  send: Callable[[Any], None]) -> None:
+    """값을 고르고, 바퀴로 내보내고, 그 뒤에 알린다.
+
+    `send` 에는 고른 값을 **통째로** 넘긴다. `(linear, angular)` 두 개를
+    자리로 넘기면 받는 쪽에서 둘을 바꿔 적어도 타입은 맞고, 그것은
+    전진 명령을 제자리 회전으로 바꾼다.
+    """
     out = command.select_output()
-    send(out.linear, out.angular)
+    send(out)
     if out.linear != 0.0 or out.angular != 0.0:
         power.on_activity("cmd_vel")
     command.announce_pending()

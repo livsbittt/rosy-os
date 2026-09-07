@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 from rosy_core.bridge.cmd_vel import cmd_vel_cycle
@@ -44,9 +45,9 @@ class Recorder:
         self.log.append(f"activity:{reason}")
 
     # 바퀴
-    def send(self, linear: float, angular: float) -> None:
+    def send(self, out: Out) -> None:
         self.log.append("wheels")
-        self.sent.append((linear, angular))
+        self.sent.append((out.linear, out.angular))
 
 
 def run(linear=0.2, angular=0.0) -> Recorder:
@@ -99,3 +100,34 @@ def test_a_zero_output_is_not_activity():
 
 def test_a_turn_in_place_is_activity():
     assert "activity:cmd_vel" in run(0.0, 0.4).log
+
+
+# --- 배선 자체 ----------------------------------------------------------------
+
+
+def _bridge_source() -> str:
+    return (Path(__file__).resolve().parents[1] / "rosy_core" / "bridge"
+            / "ros_bridge.py").read_text(encoding="utf-8")
+
+
+def test_the_bridge_actually_calls_the_cycle():
+    """위의 아홉 개는 순서를 지키지만, 브리지가 그 함수를 부르는지는 모른다.
+
+    rclpy 가 없는 호스트에서 `RosBridge` 는 import 조차 되지 않으므로, 이
+    저장소가 이미 쓰는 방식(`test_initial_pose.py`)대로 소스에서 확인한다.
+    이 한 줄이 사라지면 로봇은 `cmd_vel` 을 아예 내보내지 않는다 — 떼어내기
+    전보다 더 큰 것이 조용히 지워질 수 있는 자리가 됐다.
+    """
+    text = _bridge_source()
+
+    assert "from rosy_core.bridge.cmd_vel import cmd_vel_cycle" in text
+    assert "cmd_vel_cycle(self._svc.command, self._svc.power, self._send_twist)" in text
+
+
+def test_the_bridge_still_owns_the_only_cmd_vel_publisher():
+    """D-2: 바퀴로 나가는 자리는 하나다. 순서를 떼어내면서 두 번째 자리가
+    생기면, 그 자리는 이 파일의 검사를 통째로 우회한다."""
+    text = _bridge_source()
+
+    assert text.count("self.cmd_vel_pub.publish(") == 1
+    assert "def _send_twist(self, out: CoreTwist)" in text
