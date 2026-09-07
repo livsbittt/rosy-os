@@ -79,7 +79,15 @@ IFS=',' read -r -a motor_ids <<<"$motor_ids_text"
 
 cd "$RUNTIME_DIR"
 compose=(docker compose --env-file "$ENV_FILE")
-if [[ -n "$("${compose[@]}" --profile motor --profile hardware ps -q rosy-motor rosy-io)" ]]; then
+# 게이트는 닫히는 쪽으로 실패해야 한다. 예전에는 compose 의 출력이 비었는지만
+# 봤는데, compose 가 아예 실패해도 출력은 비므로 게이트가 통과해 버렸다 — 모터
+# 런타임이 살아 있어도 프로브가 그대로 진행된다는 뜻이다. 신원 미설정은 그 실패의
+# 한 가지 이유일 뿐이고 (ADR D-33), docker 부재나 잘못된 compose 파일도 같다.
+# 그래서 종료 상태를 먼저 본다.
+if ! running="$("${compose[@]}" --profile motor --profile hardware ps -q rosy-motor rosy-io)"; then
+    fail "cannot tell whether the motor runtime is active — docker compose failed; fix that before probing the UART"
+fi
+if [[ -n "$running" ]]; then
     fail "motor runtime is active; switch to core mode before the read-only probe"
 fi
 

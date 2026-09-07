@@ -1,7 +1,10 @@
 """Static safety contracts for headless Raspberry Pi Wi-Fi deployment."""
 
+import shutil
+import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
 
 
@@ -193,6 +196,63 @@ def test_motor_preflight_checks_uart_and_runs_torque_free_dynamixel_probe():
     assert "read1ByteTxRx" in probe
     assert "write1ByteTxRx" not in probe
     assert "write4ByteTxRx" not in probe
+
+
+def test_the_motor_runtime_gate_fails_closed_when_compose_cannot_answer(tmp_path):
+    """이 게이트는 살아 있는 모터 런타임 위로 UART 프로브가 겹치는 것을 막는다.
+
+    예전 형태는 compose 의 *출력이 비었는지*만 봤다. 그런데 compose 가 아예
+    실패해도 출력은 비므로, 게이트가 조용히 통과하고 프로브가 그대로 진행됐다.
+    docker 부재, 잘못된 compose 파일, 그리고 (ADR D-33 이후로는) 신원 미설정이
+    모두 그 경로를 탄다.
+
+    소스 텍스트가 아니라 실제 bash 로 확인한다 — 이 결함의 본질이 "코드는
+    그럴듯한데 동작이 다르다" 였기 때문이다.
+    """
+    script = _text(MOTOR_VERIFY)
+    assert 'if ! running="$(' in script, (
+        "the gate must branch on compose's exit status, not only on empty output"
+    )
+
+    if shutil.which("bash") is None:
+        pytest.skip("bash is required to exercise the gate")
+
+    stub = tmp_path / "bin"
+    stub.mkdir()
+    docker = stub / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\necho 'compose exploded' >&2\nexit 1\n", encoding="utf-8"
+    )
+    docker.chmod(0o755)
+
+    gate = script[script.index('if ! running="$('):script.index('pass "UART4 overlay')]
+    harness = tmp_path / "gate.sh"
+    harness.write_text(
+        "set -Eeuo pipefail\n"
+        # 여기 bash 는 Windows 드라이브 경로를 풀지 못한다 — 스텁도 cwd 기준
+        # 상대이름으로 올려야 한다 (test_image_pipeline.py 가 같은 교훈을 적어 뒀다).
+        'export PATH="./bin:$PATH"\n'
+        'fail() { echo "FAIL MOTOR_PREFLIGHT $*" >&2; exit 1; }\n'
+        "compose=(docker compose --env-file /dev/null)\n"
+        + gate
+        + "\necho REACHED_THE_PROBE\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+
+    # 여기 bash 는 Windows 드라이브 경로도 그 MSYS 형태도 풀지 못한다 —
+    # test_image_pipeline.py 가 같은 이유로 상대이름 + 명시적 cwd 를 쓴다.
+    result = subprocess.run(
+        ["bash", "gate.sh"],
+        cwd=str(tmp_path),
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+
+    assert result.returncode != 0, result.stdout
+    assert "REACHED_THE_PROBE" not in result.stdout, (
+        "the probe ran even though compose could not report the runtime state"
+    )
+    assert "docker compose failed" in result.stderr
 
 
 def test_windows_peer_verifier_checks_api_and_dashboard_over_wlan():
