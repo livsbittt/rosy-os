@@ -166,3 +166,76 @@ def test_a_layout_that_does_not_match_is_refused_by_the_residual_gate():
     got = fit(ranges, angle_min, step, seen, SensorOffset(), now=1.0)
     assert got.found is False
     assert "residual" in (got.reason or "")
+
+
+def _lateral_rms(sigma, trials=200, step=STEP_SIM, seed=11):
+    profile = DockProfile()
+    sensor = SensorOffset()
+    rng = random.Random(seed)
+    errors, misses = [], 0
+    for trial in range(trials):
+        x = rng.uniform(0.25, 0.70)
+        y = rng.uniform(-0.06, 0.06)
+        yaw = math.radians(rng.uniform(-15.0, 15.0))
+        ranges, angle_min, increment = _scan_of_posts(
+            profile, x, y, yaw, step=step, sigma=sigma, seed=trial)
+        got = fit(ranges, angle_min, increment, profile, sensor, now=float(trial))
+        if not got.found:
+            misses += 1
+            continue
+        errors.append(got.observation.y - y)
+    rms = math.sqrt(sum(e * e for e in errors) / len(errors)) if errors else math.inf
+    return rms, misses, trials
+
+
+def test_the_lateral_budget_holds_at_the_noise_the_simulator_declares():
+    # Gazebo declares sigma = 20 mm, which is worse than the real C1. The gate
+    # is 10 mm, so passing here means passing without knowing the C1 number.
+    # Measured: 0.87 mm RMS, 0 misses out of 200.
+    rms, misses, trials = _lateral_rms(0.020)
+    assert misses == 0, f"{misses}/{trials} scans produced no fit"
+    assert rms <= 0.010, f"lateral RMS {rms * 1000:.2f} mm over the 10 mm gate"
+
+
+def test_lateral_accuracy_barely_moves_when_range_noise_drops_sixfold():
+    # This is the whole reason posts beat the V. If a change makes lateral
+    # accuracy track sigma, the shape decision no longer holds and this fails.
+    # Measured ratio 1.46; the bound is 2.0 so the test is not a coin flip.
+    coarse, _, _ = _lateral_rms(0.020)
+    fine, _, _ = _lateral_rms(0.0035)
+    assert coarse / fine < 2.0, (
+        f"lateral RMS moved {coarse / fine:.2f}x with sigma; "
+        "the estimator has started depending on range noise")
+
+
+def test_the_residual_gate_separates_a_noisy_right_dock_from_a_wrong_layout():
+    """The gate only means something if it sits between the two populations.
+
+    Measured: noisy-correct worst 13.0 mm over 400 trials, wrong-layout
+    21.8 mm with no noise at all, gate 18 mm. Squeeze either side and the
+    gate stops being able to do both jobs — which is exactly what happened
+    with the first estimator that took the minimum range.
+    """
+    profile = DockProfile()
+    sensor = SensorOffset()
+    rng = random.Random(5)
+    worst = 0.0
+    for trial in range(400):
+        x = rng.uniform(0.25, 0.70)
+        y = rng.uniform(-0.06, 0.06)
+        yaw = math.radians(rng.uniform(-15.0, 15.0))
+        ranges, angle_min, increment = _scan_of_posts(
+            profile, x, y, yaw, step=STEP_SIM, sigma=0.020, seed=1000 + trial)
+        got = fit(ranges, angle_min, increment, profile, sensor, now=0.0)
+        assert got.found, f"the gate rejected a real dock: {got.reason}"
+        worst = max(worst, got.residual_m)
+
+    ranges, angle_min, increment = _scan_of_posts(
+        DockProfile(post_lateral_m=(-0.100, 0.010, 0.090)),
+        0.500, 0.0, 0.0, step=STEP_C1)
+    wrong = fit(ranges, angle_min, increment, profile, sensor, now=0.0)
+    assert wrong.found is False
+    assert worst < profile.max_residual_m < wrong.residual_m, (
+        f"gate {profile.max_residual_m * 1000:.0f} mm no longer sits between "
+        f"noisy-correct {worst * 1000:.1f} mm and wrong-layout "
+        f"{wrong.residual_m * 1000:.1f} mm")
