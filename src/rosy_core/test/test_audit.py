@@ -783,7 +783,7 @@ def test_a_failed_write_does_not_leave_the_tail_looking_terminated(tmp_path, mon
 
     log.record(_event(3, now.isoformat(), "safety.estop"))
 
-    assert 3 in [event.seq for event in log.history()], (
+    assert [event.seq for event in log.history()] == [1, 3], (
         "the estop was appended onto the half-written line and pruned away")
 
 
@@ -842,3 +842,93 @@ def test_the_reader_and_the_pruner_agree_on_what_a_line_is(tmp_path):
 
     assert [item.seq for item in log.history()] == [1]
     assert log.history()[0].data == {"note": "door\u2028open"}
+
+
+def test_the_writer_asks_for_no_newline_translation(tmp_path, monkeypatch):
+    """`newline=""` 없이 열면 Windows 는 CRLF 로 쓴다.
+
+    그 결함은 **Linux CI 에서 관측되지 않는다** — 거기서는 `newline=None` 도
+    번역을 하지 않으므로 바이트가 같다. 그래서 결과가 아니라 요청을 검사한다:
+    이 줄이 지워지면 어느 플랫폼에서든 여기가 빨개진다.
+    """
+    seen: list[object] = []
+    real_open = Path.open
+
+    def note(self, mode="r", *args, **kwargs):
+        if "a" in mode:
+            seen.append(kwargs.get("newline", "<missing>"))
+        return real_open(self, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", note)
+    FileAuditLog(tmp_path / "audit.jsonl").record(_event(1, "2026-09-03T12:00:00+00:00"))
+
+    assert seen == [""], "the append handle must disable newline translation"
+
+
+def test_a_log_written_by_an_older_crlf_build_upgrades_without_loss(tmp_path):
+    """이미 디스크에 있는 파일은 CRLF 로 쓰여 있을 수 있다.
+
+    읽기는 그대로 되어야 하고, 첫 정리가 LF 로 정규화하되 기록은 하나도
+    잃지 않아야 한다. 이 커밋은 writer 를 고치고 writer 를 검사했다 —
+    이미 있던 파일은 아무도 검사하지 않았다.
+    """
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    stale = _event(1, (now - timedelta(days=31)).isoformat()).model_dump_json()
+    fresh = _event(2, now.isoformat()).model_dump_json()
+    path.write_bytes(stale.encode("utf-8") + b"\r\n" + fresh.encode("utf-8") + b"\r\n")
+
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+    assert [event.seq for event in log.history()] == [2], "the reader must cope with CRLF"
+
+    log.record(_event(3, now.isoformat()))
+
+    assert [event.seq for event in log.history()] == [2, 3]
+    raw = path.read_bytes()
+    assert b"\r" not in raw, "the kept line was not normalised to LF"
+    assert raw.startswith(fresh.encode("utf-8") + b"\n"), "and otherwise byte-identical"
+    assert len(raw.split(b"\n")) == 3, "two lines and the trailing terminator"
+
+
+def test_a_line_is_split_on_the_newline_and_nothing_else():
+    """`bytes.splitlines()` 는 수직탭·폼피드·파일구분자에서도 자른다.
+
+    이 파일의 줄 구분자는 개행 하나다(JSON Lines). 갈라지면 한 줄이었던
+    기록이 두 줄로 보여 둘 다 깨진 JSON 이 된다 — 그리고 이제 조회와 정리가
+    **둘 다** 이 함수에 기대므로, 그 결함은 양쪽에 동시에 생긴다.
+    """
+    from rosy_core.events.audit import _raw_lines
+
+    assert _raw_lines(b'{"a":"x\ry"}') == [b'{"a":"x\ry"}']
+    assert _raw_lines(b"one\ntwo\n") == [b"one", b"two"]
+    assert _raw_lines(b"") == []
+    assert _raw_lines(b"no terminator") == [b"no terminator"]
+
+
+@pytest.mark.parametrize("suffix,label", [
+    (b"", "plain"),
+    (b"\r", "CRLF 로 쓰인 옛 파일"),
+    ("\u2028".encode("utf-8"), "U+2028 이 뒤에 붙은 줄"),
+    ("\u00a0".encode("utf-8"), "NBSP 가 뒤에 붙은 줄"),
+])
+def test_what_a_read_returns_is_what_the_prune_keeps(tmp_path, suffix, label):
+    """조회와 정리는 한 줄을 **같게** 판정해야 한다.
+
+    나뉘는 규칙만 맞추는 것으로는 부족하다. 자르는 규칙도 같아야 한다 —
+    `str.strip()` 의 공백에는 U+2028·NBSP 가 들어 있고 `bytes.strip()` 에는
+    없다. 어긋나면 조회가 운영자에게 돌려준 기록을 다음 정리가 지운다.
+    되돌릴 수 없는 삭제이고, 이 커밋이 없애려던 바로 그 종류다.
+    """
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    odd = _event(7, now.isoformat()).model_dump_json().encode("utf-8") + suffix
+    stale = _event(1, (now - timedelta(days=31)).isoformat()).model_dump_json()
+    path.write_bytes(odd + b"\n" + stale.encode("utf-8") + b"\n")
+
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+    before = {event.seq for event in log.history()}
+
+    log.record(_event(9, now.isoformat()))          # 첫 기록이 정리한다
+
+    after = {event.seq for event in log.history()}
+    assert before - {1} <= after, f"{label}: a record the read returned was pruned away"

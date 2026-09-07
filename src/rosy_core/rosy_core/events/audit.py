@@ -50,9 +50,13 @@ PRUNE_INTERVAL_S = 3600.0
 def _raw_lines(blob: bytes) -> list[bytes]:
     """줄을 **바이트 그대로** 자른다.
 
-    `bytes.splitlines()` 를 쓰지 않는다 — 그것은 수직탭·폼피드·파일구분자 같은
-    바이트에서도 자르고, 그러면 한 줄이었던 기록이 두 줄로 보여 둘 다
-    깨진 JSON 이 된다. 이 파일의 줄 구분자는 개행 하나다(JSON Lines).
+    `bytes.splitlines()` 를 쓰지 않는다 — 그것은 홀로 있는 캐리지리턴에서도
+    자른다. 그러면 한 줄이었던 기록이 두 줄로 보여 둘 다 깨진 JSON 이 되고,
+    조회에서 사라진 뒤 다음 정리에 지워진다. 이 파일의 줄 구분자는 개행
+    하나다(JSON Lines).
+
+    (`str.splitlines()` 는 여기에 U+2028·U+2029·U+0085 까지 더한다. 그래서
+    `_parse` 도 str 이 아니라 이 함수로 나눈다.)
     """
     lines = blob.split(b"\n")
     if lines and lines[-1] == b"":
@@ -166,7 +170,12 @@ class FileAuditLog:
                 self._last_write_error = f"{type(error).__name__}: {error}"
                 # 실패한 쓰기는 꼬리에 대해 아무것도 말해 주지 않는다. 부분
                 # 기록일 수도, 아무것도 안 나갔을 수도 있다. 다음 기록이 다시
-                # 확인하게 둔다 — 실패한 뒤 한 번의 stat 이지 매 주기가 아니다.
+                # 확인하게 둔다.
+                #
+                # 실패가 이어지는 동안은 **기록마다** 다시 확인한다. ENOSPC 는
+                # open 을 통과하고 close 에서 나므로 캐시가 매번 여기로 온다.
+                # 한 줄 크기의 메타데이터 읽기이고, 그 사이 감사 기록은 이미
+                # 멈춰 있다 — 성공하는 경로에는 아무 비용도 없다.
                 self._tail_is_terminated = None
                 raise
             self._write_failures = 0
@@ -226,13 +235,14 @@ class FileAuditLog:
                     with self._path.open("rb") as handle:
                         handle.seek(-1, os.SEEK_END)
                         self._tail_is_terminated = handle.read(1) == b"\n"
-            except FileNotFoundError:
-                self._tail_is_terminated = True          # 붙일 꼬리가 없다
             except OSError:
                 # 마지막 바이트를 **읽지 못했다** — 열린 핸들, ACL, 공유 위반.
                 # 두 답의 비용이 다르다: 틀린 True 는 다음 이벤트를 망가진 줄에
                 # 삼키게 하고(되돌릴 수 없다), 틀린 False 는 빈 줄 하나를 남기며
                 # 그것은 다음 정리가 지운다. 싼 쪽으로 틀린다.
+                #
+                # 파일이 없는 경우는 여기 오지 않는다 — 이 함수는 `open("a")`
+                # 안에서 불리고, 그것이 이미 파일을 만들어 두었다.
                 self._tail_is_terminated = False
         return self._tail_is_terminated
 
@@ -314,7 +324,10 @@ class FileAuditLog:
         """
         events: list[EventMessage] = []
         for raw_line in _raw_lines(raw):
-            line = FileAuditLog._decode(raw_line).strip()
+            # 바이트를 먼저 자른다. `str.strip()` 의 공백에는 U+2028·U+00A0 이
+            # 들어 있어 `_compact` 의 `bytes.strip()` 과 결과가 달라진다 —
+            # 조회는 돌려주고 정리는 지우는 줄이 생긴다.
+            line = FileAuditLog._decode(raw_line.strip())
             if not line:
                 continue
             try:
