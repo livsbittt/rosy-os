@@ -103,6 +103,9 @@ class FileAuditLog:
         #: 이어 붙일 수 없어 정리를 거른 횟수. 실패가 아니라 "전제가 깨졌다"이고,
         #: 계속 오르면 이 파일을 우리 말고 누가 건드리고 있다는 뜻이다.
         self._prune_skipped = 0
+        #: 거른 이유는 실패 사유 칸에 적지 않는다. 그러면 prune_failures 를
+        #: 보고 온 운영자가 다른 채널의 이야기를 읽게 된다.
+        self._last_skip_reason: Optional[str] = None
         #: 정리는 한 번에 하나만. `_last_prune` 이 사실상 그 역할을 해 왔지만,
         #: 그것은 `prune_interval_s` 가 0 보다 크다는 데 기대는 창발적 성질이라
         #: 생성자 인자 하나로 깨진다. 불변식은 창발이 아니라 명시로 둔다.
@@ -128,6 +131,7 @@ class FileAuditLog:
                 "write_failures_total": self._write_failures_total,
                 "prune_failures": self._prune_failures,
                 "prune_skipped": self._prune_skipped,
+                "last_skip_reason": self._last_skip_reason,
                 "last_write_error": self._last_write_error,
                 "last_prune_error": self._last_prune_error,
             }
@@ -136,7 +140,11 @@ class FileAuditLog:
         with self._lock:
             try:
                 self._path.parent.mkdir(parents=True, exist_ok=True)
-                with self._path.open("a", encoding="utf-8") as handle:
+                # newline='' 이 없으면 Windows 는 CRLF 로 쓴다. 이 파일은 다른
+                # 모든 자리에서 LF 로 나뉜 JSON Lines 로 다뤄지고, 정리는
+                # 캐리지리턴을 떼고 LF 로 다시 이어 붙인다 — 그러면 깨진 줄뿐
+                # 아니라 **모든** 줄이 쓴 것과 다르게 저장된다.
+                with self._path.open("a", encoding="utf-8", newline="") as handle:
                     if not self._terminated_locked():
                         # 지난 실행의 잘린 마지막 줄에 그냥 이어 쓰면, 이
                         # 이벤트가 그 줄의 일부가 되어 다음 정리에 함께
@@ -144,7 +152,11 @@ class FileAuditLog:
                         # `safety.estop` 일 수 있다.
                         handle.write("\n")
                     handle.write(event.model_dump_json() + "\n")
-                    self._tail_is_terminated = True
+                # 닫힌 **뒤에** 세운다. with 를 나가며 flush 하고 실제 쓰기 오류는
+                # 거의 다 거기서 난다 — 한 줄은 버퍼보다 훨씬 작다. 안에서 세우면
+                # 실패한 쓰기가 "개행으로 끝났다"를 남기고, 그 캐시가 바로 이
+                # 커밋이 고친 구멍을 다시 연다.
+                self._tail_is_terminated = True
             except OSError as error:
                 # EventBus 는 구독자 예외를 삼킨다. 그대로 두면 감사 기록이
                 # 멈춘 사실이 어디에도 남지 않는다 — 디스크가 찬 로봇은 아무
@@ -152,6 +164,10 @@ class FileAuditLog:
                 self._write_failures += 1
                 self._write_failures_total += 1
                 self._last_write_error = f"{type(error).__name__}: {error}"
+                # 실패한 쓰기는 꼬리에 대해 아무것도 말해 주지 않는다. 부분
+                # 기록일 수도, 아무것도 안 나갔을 수도 있다. 다음 기록이 다시
+                # 확인하게 둔다 — 실패한 뒤 한 번의 stat 이지 매 주기가 아니다.
+                self._tail_is_terminated = None
                 raise
             self._write_failures = 0
 
@@ -210,10 +226,14 @@ class FileAuditLog:
                     with self._path.open("rb") as handle:
                         handle.seek(-1, os.SEEK_END)
                         self._tail_is_terminated = handle.read(1) == b"\n"
+            except FileNotFoundError:
+                self._tail_is_terminated = True          # 붙일 꼬리가 없다
             except OSError:
-                # 파일이 없으면 붙일 것도 없다. 진짜 쓰기 오류는 바로 다음
-                # 줄의 덧붙이기가 같은 이유로 다시 만나 제대로 센다.
-                self._tail_is_terminated = True
+                # 마지막 바이트를 **읽지 못했다** — 열린 핸들, ACL, 공유 위반.
+                # 두 답의 비용이 다르다: 틀린 True 는 다음 이벤트를 망가진 줄에
+                # 삼키게 하고(되돌릴 수 없다), 틀린 False 는 빈 줄 하나를 남기며
+                # 그것은 다음 정리가 지운다. 싼 쪽으로 틀린다.
+                self._tail_is_terminated = False
         return self._tail_is_terminated
 
     def _prune_due_locked(self) -> bool:
@@ -245,7 +265,7 @@ class FileAuditLog:
         with self._lock:
             raw = self._read_bytes_locked()
             cutoff = self._now() - timedelta(days=self._retention_days)
-        events = [event for event in self._parse(self._decode(raw))
+        events = [event for event in self._parse(raw)
                   if self._is_fresh(event.ts, cutoff)]
         if since_seq is not None:
             events = [item for item in events if item.seq > since_seq]
@@ -284,10 +304,17 @@ class FileAuditLog:
         return raw.decode("utf-8", errors="replace")
 
     @staticmethod
-    def _parse(text: str) -> list[EventMessage]:
+    def _parse(raw: bytes) -> list[EventMessage]:
+        """`_raw_lines` 와 같은 규칙으로 나눈다.
+
+        `str.splitlines()` 는 U+2028·U+2029·U+0085 에서도 자르는데 정리는
+        개행에서만 자른다. 어긋나 있으면 payload 에 그 글자가 든 기록이
+        디스크에는 남고 조회에는 영영 안 보인다 — 감사 로그가 자기가 가진
+        것을 부인하는 상태다.
+        """
         events: list[EventMessage] = []
-        for line in text.splitlines():
-            line = line.strip()
+        for raw_line in _raw_lines(raw):
+            line = FileAuditLog._decode(raw_line).strip()
             if not line:
                 continue
             try:
@@ -349,7 +376,7 @@ class FileAuditLog:
                 # 넘기면 파일을 계속 자르는 외부 도구 하나가 정리를 영원한
                 # 무동작으로 만들면서 건강 상태는 깨끗하다고 답한다.
                 self._prune_skipped += 1
-                self._last_prune_error = "skipped: the file is no longer the one we read"
+                self._last_skip_reason = "the file is no longer the one we read"
                 return
             # 감사 로그를 자르는 도중에 죽으면 기록이 사라진다. 설정 오버레이와
             # 같은 규칙으로 임시 파일에 쓰고 바꿔 끼운다.

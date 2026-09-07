@@ -260,8 +260,8 @@ def test_a_write_failure_is_counted_rather_than_lost(tmp_path, monkeypatch):
     log = FileAuditLog(tmp_path / "audit.jsonl")
     assert log.health() == {"writable": True, "write_failures": 0,
                             "write_failures_total": 0, "prune_failures": 0,
-                            "prune_skipped": 0, "last_write_error": None,
-                            "last_prune_error": None}
+                            "prune_skipped": 0, "last_skip_reason": None,
+                            "last_write_error": None, "last_prune_error": None}
 
     def refuse(*args, **kwargs):
         raise OSError(28, "No space left on device")
@@ -626,7 +626,8 @@ def test_a_file_swapped_for_a_longer_one_is_not_spliced(tmp_path):
     health = log.health()
     assert health["prune_skipped"] == 1
     assert health["prune_failures"] == 0, "전제가 깨진 것이지 실패한 것이 아니다"
-    assert "no longer" in health["last_prune_error"]
+    assert "no longer" in health["last_skip_reason"]
+    assert health["last_prune_error"] is None, "거른 것을 실패 사유 칸에 적지 않는다"
 
 
 # --- 회귀 방지: 검사가 없어 조용히 바뀔 수 있던 계약들 -------------------------
@@ -740,3 +741,104 @@ def test_only_one_record_is_ever_inside_the_compaction_window(tmp_path):
     assert high_water, "no compaction ran; the test proves nothing"
     assert max(high_water) == 1, "two records compacted at once"
     assert sorted(event.seq for event in log.history()) == [20, 21, 22, 23]
+
+
+def test_a_failed_write_does_not_leave_the_tail_looking_terminated(tmp_path, monkeypatch):
+    """캐시는 *쓰려고 한 것* 이 아니라 *쓰인 것* 을 말해야 한다.
+
+    성공한 기록이 캐시를 참으로 만든 뒤 다음 기록이 절반만 나가고 실패하면,
+    꼬리는 개행 없이 끝나 있는데 캐시는 여전히 참이다. 그 다음 이벤트는 그
+    잘린 줄에 이어 붙어 함께 버려진다 — 디스크가 잠깐 찼다 풀린 로봇에서
+    그것이 하필 `safety.estop` 일 수 있다.
+    """
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+    log.record(_event(1, now.isoformat()))          # 캐시가 참이 된다
+
+    real_open = Path.open
+
+    class HalfWrites:
+        """절반만 쓰고 닫으며 실패한다 (ENOSPC 의 모양)."""
+
+        def __init__(self, handle):
+            self._handle = handle
+
+        def write(self, text):
+            self._handle.write(text[: len(text) // 2])
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc):
+            self._handle.close()
+            raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(Path, "open", lambda self, *a, **k: HalfWrites(real_open(self, *a, **k)))
+    with pytest.raises(OSError):
+        log.record(_event(2, now.isoformat()))
+    monkeypatch.setattr(Path, "open", real_open)
+
+    assert not path.read_bytes().endswith(b"\n"), "the fixture must leave a torn tail"
+
+    log.record(_event(3, now.isoformat(), "safety.estop"))
+
+    assert 3 in [event.seq for event in log.history()], (
+        "the estop was appended onto the half-written line and pruned away")
+
+
+def test_a_last_byte_we_could_not_read_is_treated_as_unterminated(tmp_path, monkeypatch):
+    """두 답의 비용이 다르다. 틀린 `True` 는 이벤트를 삼키고(되돌릴 수 없다),
+    틀린 `False` 는 빈 줄 하나를 남기며 그것은 다음 정리가 지운다."""
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    good = _event(1, now.isoformat()).model_dump_json()
+    path.write_bytes(good.encode("utf-8") + b"\n" + UNTERMINATED)
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+
+    real_open = Path.open
+
+    def deny_reads(self, mode="r", *args, **kwargs):
+        if "b" in mode and "r" in mode:
+            raise PermissionError("in use")
+        return real_open(self, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", deny_reads)
+    log.record(_event(2, now.isoformat(), "safety.estop"))
+    monkeypatch.setattr(Path, "open", real_open)
+
+    assert 2 in [event.seq for event in log.history()]
+
+
+def test_what_record_wrote_is_what_the_prune_keeps(tmp_path):
+    """바이트 그대로 남긴다는 약속은 이 모듈 자신의 writer 에 대해서도 참이어야
+    한다. `newline=""` 이 없으면 Windows 는 CRLF 로 쓰고, 정리는 그 `\r` 를
+    떼고 LF 로 다시 이어 붙인다 — 깨진 줄뿐 아니라 모든 줄이 달라진다.
+    """
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+    log.record(_event(1, now.isoformat()))
+    log.record(_event(2, (now - timedelta(days=31)).isoformat()))
+    written = path.read_bytes().split(b"\n")[0]
+
+    FileAuditLog(path, retention_days=30, now=lambda: now).record(_event(3, now.isoformat()))
+
+    assert written in path.read_bytes(), "the line the module itself wrote came back different"
+
+
+def test_the_reader_and_the_pruner_agree_on_what_a_line_is(tmp_path):
+    """`str.splitlines()` 는 U+2028 에서도 자르고 정리는 개행에서만 자른다.
+
+    어긋나 있으면 payload 에 그 글자가 든 기록이 디스크에는 남고 조회에는
+    영영 안 보인다 — 감사 로그가 자기가 가진 것을 부인하는 상태다.
+    """
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    event = _event(1, now.isoformat())
+    event.data = {"note": "door\u2028open"}
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+    log.record(event)
+
+    assert [item.seq for item in log.history()] == [1]
+    assert log.history()[0].data == {"note": "door\u2028open"}
