@@ -133,3 +133,66 @@ def test_the_usable_envelope_lower_bound_is_reported():
                              truth_y=0.0, truth_yaw=0.0))
     got = verdict(rows)
     assert got[0].metrics["envelope_low_m"] >= 0.30
+
+
+def _intensity_rows(target=200.0, baseline=40.0, count=12):
+    return [ProbeRow(lane="bench", candidate="intensity",
+                     truth_x=0.2 + index * 0.05, truth_y=0.0, truth_yaw=0.0,
+                     int_target=target, int_baseline=baseline)
+            for index in range(count)]
+
+
+def test_separated_intensity_passes():
+    got = verdict(_intensity_rows())
+    assert got[0].candidate == "intensity"
+    assert got[0].passed is True, got[0].reasons
+
+
+def test_a_constant_intensity_field_fails_the_candidate():
+    # The rviz snapshot in the tree shows min == max == 47, so this is the
+    # outcome the design expects if sllidar reports quality and not reflectance.
+    got = verdict(_intensity_rows(target=47.0, baseline=47.0))
+    assert got[0].passed is False
+    assert any("overlap" in reason for reason in got[0].reasons)
+
+
+def _ir_rows(band="indoor", monotonic=True, onset_x=0.12):
+    rows = []
+    # ambient floor, measured with no dock in front of the sensors
+    for index in range(4):
+        rows.append(ProbeRow(lane="bench", candidate="ir", dock_present=False,
+                             truth_x=math.nan, truth_y=math.nan,
+                             truth_yaw=math.nan, ambient=band,
+                             ir_l=100, ir_mid=100, ir_r=100))
+    for index in range(9):
+        lateral = -0.020 + index * 0.005
+        skew = int(lateral * 20000) if monotonic else 0
+        # The dock to the robot's left (+y) lights the left channel more, so
+        # (ir_l - ir_r) must RISE with truth_y. Getting this sign backwards is
+        # what a real wiring swap looks like, and the verdict has to catch it.
+        rows.append(ProbeRow(lane="bench", candidate="ir", truth_x=0.03,
+                             truth_y=lateral, truth_yaw=0.0, ambient=band,
+                             ir_l=600 + skew, ir_mid=800, ir_r=600 - skew))
+    rows.append(ProbeRow(lane="bench", candidate="ir", truth_x=onset_x,
+                         truth_y=0.0, truth_yaw=0.0, ambient=band,
+                         ir_l=140, ir_mid=180, ir_r=140))
+    return rows
+
+
+def test_a_monotonic_ir_skew_passes():
+    got = verdict(_ir_rows())
+    assert got[0].candidate == "ir"
+    assert got[0].passed is True, got[0].reasons
+    assert got[0].metrics["onset_m_indoor"] >= 0.12
+
+
+def test_a_flat_ir_skew_fails_because_it_cannot_tell_left_from_right():
+    got = verdict(_ir_rows(monotonic=False))
+    assert got[0].passed is False
+    assert any("monotonic" in reason for reason in got[0].reasons)
+
+
+def test_an_onset_inside_the_contact_tolerance_fails():
+    got = verdict(_ir_rows(onset_x=0.02))
+    assert got[0].passed is False
+    assert any("onset" in reason for reason in got[0].reasons)

@@ -227,3 +227,92 @@ def _verdict_geometry(rows: Sequence[ProbeRow]) -> ProbeVerdict:
 
     metrics["envelope_low_m"] = _envelope_low(present)
     return ProbeVerdict("geometry", not reasons, tuple(reasons), metrics)
+
+
+def _verdict_intensity(rows: Sequence[ProbeRow]) -> ProbeVerdict:
+    """역반사와 무광이 모든 거리에서 갈라지는가.
+
+    겹치면 탈락이다. 부분적으로만 갈라지는 intensity 로는 임계를 하나 고를 수
+    없고, 거리에 따라 임계를 바꾸는 것은 감지기가 아니라 추측이다.
+    """
+    usable = [row for row in rows
+              if row.int_target is not None and row.int_baseline is not None
+              and math.isfinite(row.truth_x)]
+    if not usable:
+        return ProbeVerdict("intensity", False,
+                            ("no rows carry both a target and a baseline",), {})
+
+    binned: dict[int, list[ProbeRow]] = {}
+    for row in usable:
+        binned.setdefault(round(row.truth_x / ENVELOPE_BIN_M), []).append(row)
+
+    reasons: list[str] = []
+    worst = math.inf
+    for key in sorted(binned):
+        items = binned[key]
+        margin = (min(row.int_target for row in items)
+                  - max(row.int_baseline for row in items))
+        worst = min(worst, margin)
+        if margin <= 0.0:
+            reasons.append(
+                f"retro and matte overlap at {key * ENVELOPE_BIN_M:.2f} m "
+                f"(margin {margin:.1f})")
+    return ProbeVerdict("intensity", not reasons, tuple(reasons),
+                        {"worst_margin": worst})
+
+
+def _verdict_ir(rows: Sequence[ProbeRow]) -> ProbeVerdict:
+    """`ir_l - ir_r` 이 접점 밴드에서 좌우를 가르는가, 그리고 언제부터 응답하는가.
+
+    주변광 구간마다 따로 본다. 판정을 가르는 것은 가장 밝은 구간이다 — 밝은
+    곳에서 무너지는 감지기는 창가에 놓인 도크에서 쓸 수 없다.
+    """
+    reasons: list[str] = []
+    metrics: dict[str, float] = {}
+    bands = sorted({row.ambient for row in rows if row.ambient})
+    if not bands:
+        return ProbeVerdict("ir", False, ("no ambient band recorded",), {})
+
+    for band in bands:
+        in_band = [row for row in rows if row.ambient == band]
+        floor = max((max(value for value in (row.ir_l, row.ir_mid, row.ir_r)
+                         if value is not None)
+                     for row in in_band
+                     if not row.dock_present
+                     and any(value is not None
+                             for value in (row.ir_l, row.ir_mid, row.ir_r))),
+                    default=None)
+        if floor is None:
+            reasons.append(f"{band}: no dock-absent rows to set the ambient floor")
+            continue
+
+        skewed = sorted(
+            (row for row in in_band
+             if row.dock_present and row.ir_l is not None and row.ir_r is not None
+             and math.isfinite(row.truth_y) and abs(row.truth_y) <= IR_BAND_M),
+            key=lambda row: row.truth_y)
+        if len(skewed) < 3:
+            reasons.append(f"{band}: fewer than three samples inside the band")
+        else:
+            pairs = list(zip(skewed, skewed[1:]))
+            ordered = sum(1 for a, b in pairs
+                          if (b.ir_l - b.ir_r) > (a.ir_l - a.ir_r))
+            share = ordered / len(pairs)
+            metrics[f"monotonic_{band}"] = share
+            if share < IR_MONOTONIC_MIN:
+                reasons.append(
+                    f"{band}: skew monotonic in only {share:.0%} of pairs, "
+                    f"under {IR_MONOTONIC_MIN:.0%}")
+
+        responded = [row.truth_x for row in in_band
+                     if row.dock_present and math.isfinite(row.truth_x)
+                     and max((value for value in (row.ir_l, row.ir_mid, row.ir_r)
+                              if value is not None), default=0) > floor]
+        onset = max(responded) if responded else 0.0
+        metrics[f"onset_m_{band}"] = onset
+        if onset < IR_ONSET_MIN_M:
+            reasons.append(
+                f"{band}: onset {onset * 1000:.0f} mm inside the "
+                f"{IR_ONSET_MIN_M * 1000:.0f} mm contact tolerance")
+
+    return ProbeVerdict("ir", not reasons, tuple(reasons), metrics)
