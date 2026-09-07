@@ -162,6 +162,49 @@ def test_windows_uploader_archives_only_git_head_and_keeps_ssh_host_checks():
     assert "verify-from-windows.ps1" in script
 
 
+def test_the_windows_deployer_passes_a_robot_number_to_the_installer():
+    """이 스크립트는 설치기를 원격에서 부른다. 번호를 넘기지 않으면 항상 실패한다.
+
+    D-33 이후 `install-pi.sh` 는 `ROSY_ROBOT_NUMBER` 없이는 거절한다. 그런데 이
+    스크립트는 `sudo bash ... install-pi.sh` 를 그대로 부르고 있었으므로, 문서에
+    적힌 Windows→Pi 배포 경로 전체가 깨져 있었다. README 퀵스타트와 같은 부류의
+    부수 피해다 — 코드는 맞는데 사람이 따라 할 순서가 끊겼다.
+
+    기본값을 두는 것으로 고치지 않는다. 기본값이 있으면 이 스크립트로 배포한 모든
+    기기가 같은 도메인으로 뜨고, 그것이 D-33 이 없앤 결함 그 자체다.
+    """
+    script = _text(WINDOWS_DEPLOY)
+
+    assert "ROSY_ROBOT_NUMBER=$RobotNumber bash deploy/robot/install-pi.sh" in script, (
+        "the installer must receive the robot number, or every deploy fails"
+    )
+    assert "sudo bash deploy/robot/install-pi.sh" not in script, (
+        "the bare invocation cannot provision an identity"
+    )
+    assert '[string]$RobotNumber = ""' in script, "RobotNumber must be a parameter"
+    assert "RobotNumber is required" in script, (
+        "an absent number must fail loudly rather than default to one robot"
+    )
+    # 앞자리 0 은 bash 산술이 팔진수로 읽는다 — 설치기와 같은 규칙을 여기서도 건다.
+    assert "no leading zero" in script
+    assert "-gt 101" in script, "the Linux-safe domain range must be checked here too"
+
+
+def test_the_wifi_image_doc_invokes_the_deployer_with_a_robot_number():
+    """문서에 적힌 명령이 실제로 도는지 — 이번에도 그게 깨진 부분이었다."""
+    doc = _text(ROOT / "docs" / "deployment" / "raspberry-pi-wifi-image.md")
+
+    block = None
+    for chunk in doc.split("```"):
+        if "deploy-from-windows.ps1" in chunk:
+            block = chunk
+            break
+    assert block is not None, "the documented invocation is missing"
+    assert "-RobotNumber" in block, (
+        "the documented command omits the robot number and would fail at install"
+    )
+
+
 def test_uart4_configuration_is_explicit_idempotent_and_does_not_move_motors():
     script = _text(UART_CONFIG)
 

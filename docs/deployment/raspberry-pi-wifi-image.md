@@ -101,6 +101,7 @@ PowerShell에서 실행한다.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File deploy/robot/deploy-from-windows.ps1 `
+  -RobotNumber 1 `
   -PiHost rosy-01.local `
   -PiUser rosy
 ```
@@ -113,6 +114,10 @@ powershell -ExecutionPolicy Bypass -File deploy/robot/deploy-from-windows.ps1 `
 4. Docker 공식 Debian 저장소를 사용해 Docker Engine과 Compose 플러그인을
    설치한다.
 5. `/opt/rosy`에 릴리스를 설치하고 장비 내부에서 API 토큰을 생성한다.
+   신원(`ROS_DOMAIN_ID` = 40 + N, `ROSY_NAMESPACE` = `rosy_%02d`)은 `-RobotNumber`
+   에서 유도한다. 기본값은 없다 — 있으면 이 스크립트로 배포한 모든 기기가 같은
+   도메인으로 뜬다 (ADR D-33). 이미 다른 번호로 자리잡은 기기에 다른 번호를
+   주면 설치기가 두 값을 모두 이름 대어 거절한다.
 6. 기본 `core` 모드로 `rosy-core`만 빌드·기동한다.
 7. Wi-Fi, LAN, DNS, 인터넷, 런타임, API, 대시보드를 검증한다.
 8. 배포 PC에서 Pi의 `wlan0` 주소로 API와 대시보드에 다시 요청해 다른
