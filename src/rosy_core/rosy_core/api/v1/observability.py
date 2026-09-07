@@ -90,9 +90,12 @@ def metrics(svc: CoreServices = Depends(get_services)):
     ]
     audit = svc.audit.health()
     lines[-2:-2] = [
-        "# HELP rosy_audit_write_failures consecutive audit log write failures (LOG-001)",
-        "# TYPE rosy_audit_write_failures gauge",
-        f"rosy_audit_write_failures {audit['write_failures']}",
+        # 이름이 `rosy_audit_write_failures` 였다면 아래 `_total` 카운터와 같은
+        # 계열(family)이 되어, OpenMetrics 로 읽는 쪽에서 gauge 와 counter 가
+        # 한 이름으로 충돌한다.
+        "# HELP rosy_audit_write_failures_consecutive consecutive audit log write failures (LOG-001)",
+        "# TYPE rosy_audit_write_failures_consecutive gauge",
+        f"rosy_audit_write_failures_consecutive {audit['write_failures']}",
         # 게이지만 있으면 스크레이프 사이에서 실패했다 복구한 로봇은 늘 0 이다.
         # 누적 카운터는 되돌아가지 않으므로 `increase()` 로 그것이 보인다.
         "# HELP rosy_audit_write_failures_total audit log write failures since boot (LOG-001)",

@@ -81,7 +81,12 @@ class FileAuditLog:
         self._prune_failures = 0
         #: 마지막 사유는 지우지 않는다. 성공 한 번에 지워 버리면 간헐적으로
         #: 실패하는 디스크는 운영자가 볼 때마다 늘 깨끗해 보인다.
-        self._last_error: Optional[str] = None
+        #:
+        #: 채널마다 따로 남긴다. 하나로 두면 정리 실패 한 번이 디스크가 찼다는
+        #: 사유를 덮어써, 운영자는 0 이 아닌 `write_failures_total` 과 전혀 다른
+        #: 이야기를 하는 `last_error` 를 함께 보게 된다.
+        self._last_write_error: Optional[str] = None
+        self._last_prune_error: Optional[str] = None
         self._lock = threading.Lock()
 
     @property
@@ -96,7 +101,8 @@ class FileAuditLog:
                 "write_failures": self._write_failures,
                 "write_failures_total": self._write_failures_total,
                 "prune_failures": self._prune_failures,
-                "last_error": self._last_error,
+                "last_write_error": self._last_write_error,
+                "last_prune_error": self._last_prune_error,
             }
 
     def record(self, event: EventMessage) -> None:
@@ -111,19 +117,32 @@ class FileAuditLog:
                 # 말 없이 LOG-001 을 지키지 않게 된다. 세어 두고, 물으면 답한다.
                 self._write_failures += 1
                 self._write_failures_total += 1
-                self._last_error = f"{type(error).__name__}: {error}"
+                self._last_write_error = f"{type(error).__name__}: {error}"
                 raise
             self._write_failures = 0
 
-            # 이벤트는 이미 파일에 있다. 여기서부터 실패해도 그것은 되돌아가지
-            # 않으므로, 정리 실패를 쓰기 실패로 세거나 밖으로 던지지 않는다 —
-            # 그렇게 하면 감사 기록은 멀쩡한데 로그가 꺼졌다고 답하게 된다.
+            snapshot: Optional[bytes] = None
             if self._prune_due_locked():
-                try:
-                    self._prune_locked()
-                except OSError as error:
-                    self._prune_failures += 1
-                    self._last_error = f"prune {type(error).__name__}: {error}"
+                # 시각을 먼저 태운다. 아래에서 실패해도 매 기록마다 다시
+                # 시도하지 않고 한 시간 뒤에 한 번 더 해 본다.
+                self._last_prune = self._monotonic()
+                snapshot = self._read_bytes_locked()
+
+        # 이벤트는 이미 파일에 있다. 여기서부터 실패해도 그것은 되돌아가지
+        # 않으므로, 정리 실패를 쓰기 실패로 세거나 밖으로 던지지 않는다 —
+        # 그렇게 하면 감사 기록은 멀쩡한데 로그가 꺼졌다고 답하게 된다.
+        #
+        # `OSError` 만 잡으면 부족하다. `_compact` 가 가장 먼저 하는 일은 I/O 가
+        # 아니라 **디코드** 이고, 그 실패는 `UnicodeDecodeError`(= `ValueError`)
+        # 다 — 그리고 fsync 하지 않는다는 이 파일의 결정이 바로 그 잘린 꼬리를
+        # 만든다. 그것이 여기를 빠져나가면 EventBus 가 삼켜 아무 데도 남지 않고,
+        # `/logs/audit` 은 그 뒤로 영원히 500 이 된다. 무엇을 던지든 센다.
+        if snapshot is not None:
+            try:
+                self._compact(snapshot)
+            except (OSError, ValueError) as error:
+                self._prune_failures += 1
+                self._last_prune_error = f"{type(error).__name__}: {error}"
 
     def _prune_due_locked(self) -> bool:
         if self._last_prune is None:
@@ -152,19 +171,32 @@ class FileAuditLog:
         그쪽이고, 그 사이 덧붙는 줄은 다음 조회에 보이면 된다.
         """
         with self._lock:
-            text = self._read_text_locked()
+            raw = self._read_bytes_locked()
             cutoff = self._now() - timedelta(days=self._retention_days)
-        events = [event for event in self._parse(text) if self._is_fresh(event.ts, cutoff)]
+        events = [event for event in self._parse(self._decode(raw))
+                  if self._is_fresh(event.ts, cutoff)]
         if since_seq is not None:
             events = [item for item in events if item.seq > since_seq]
         if limit < 1:
             return []
         return events[-limit:]
 
-    def _read_text_locked(self) -> str:
+    def _read_bytes_locked(self) -> bytes:
         if not self._path.is_file():
-            return ""
-        return self._path.read_text(encoding="utf-8")
+            return b""
+        return self._path.read_bytes()
+
+    @staticmethod
+    def _decode(raw: bytes) -> str:
+        """`errors="replace"` 로 읽는다.
+
+        정전이 잘라 놓은 UTF-8 꼬리(이 파일은 fsync 하지 않는다)에 `strict` 로
+        부딪히면 `UnicodeDecodeError` 다. 그것이 `history()` 에서 나면
+        `/logs/audit` 은 그 뒤로 영원히 500 이고, 감사 로그를 읽으러 온 사람은
+        30 일치를 통째로 못 보게 된다 — 바이트 몇 개 때문에. 깨진 줄은 깨진
+        JSON 이 되어 `_parse` 가 건너뛰고, 다음 정리가 그 줄을 덜어낸다.
+        """
+        return raw.decode("utf-8", errors="replace")
 
     @staticmethod
     def _parse(text: str) -> list[EventMessage]:
@@ -179,18 +211,30 @@ class FileAuditLog:
                 continue
         return events
 
-    def _prune_locked(self) -> None:
-        self._last_prune = self._monotonic()
-        if not self._path.is_file():
-            return
+    def _compact(self, snapshot: bytes) -> None:
+        """보존 기간이 지난 줄을 파일에서 실제로 덜어낸다.
+
+        **파싱은 락 밖에서 한다.** 10 만 줄이면 파싱만 350 ms 이고, 그것을 락을
+        쥔 채로 하면 그 한 시간에 처음 기록되는 이벤트가 값을 문다 — 한 시간
+        조용하던 로봇에서 그 이벤트는 하필 SAF-002 정지일 수 있다. 락은 (1) 위에서
+        스냅샷을 뜰 때와 (2) 아래에서 갈아 끼울 때만, 파싱 없이 잡는다.
+
+        스냅샷을 뜬 뒤에 덧붙은 줄은 잃지 않는다. 이 파일에 쓰는 것은 덧붙이기
+        뿐이므로(D-1: 프로세스도 하나) 그 사이 자란 부분은 스냅샷 길이 뒤에
+        그대로 있고, 그것을 잘라 새 내용 뒤에 붙인다.
+        """
         cutoff = self._now() - timedelta(days=self._retention_days)
-        kept: list[str] = []
+        kept: list[bytes] = []
         seen = 0
-        for line in self._path.read_text(encoding="utf-8").splitlines():
+        # 디코드도 파싱도 락 밖이다 (`_decode` 는 잘린 UTF-8 꼬리를 예외가
+        # 아니라 깨진 JSON 으로 만들고, 그 줄은 아래에서 버려진다).
+        for line in self._decode(snapshot).splitlines():
             stripped = line.strip()
+            # 빈 줄도 센다. 건너뛰면 `len(kept) == seen` 이 되어 아래 조기 반환에
+            # 걸리고, 빈 줄은 파일이 사는 내내 남는다.
+            seen += 1
             if not stripped:
                 continue
-            seen += 1
             try:
                 event = EventMessage.model_validate_json(stripped)
             except (ValueError, TypeError):
@@ -199,7 +243,7 @@ class FileAuditLog:
             if self._is_fresh(event.ts, cutoff):
                 # 원본 줄을 그대로 남긴다. 다시 직렬화하면 감사 기록이 스키마
                 # 왕복에 따라 조용히 달라질 수 있다.
-                kept.append(stripped)
+                kept.append(stripped.encode("utf-8"))
 
         if len(kept) == seen:
             # 버릴 것이 없으면 쓰지 않는다. 같은 내용으로 파일을 갈아 끼우는
@@ -207,20 +251,31 @@ class FileAuditLog:
             # 원본이 잠깐 사라지는 창이 생긴다.
             return
 
-        # 감사 로그를 자르는 도중에 죽으면 기록이 사라진다. 설정 오버레이와
-        # 같은 규칙으로 임시 파일에 쓰고 바꿔 끼운다.
-        tmp = self._path.with_name(self._path.name + ".tmp")
-        try:
-            tmp.write_text(("\n".join(kept) + "\n") if kept else "", encoding="utf-8")
-            # Windows 에서 이것은 대상에 열린 핸들이 하나라도 있으면
-            # `PermissionError` 다 (백신·인덱서·다른 프로세스의 조회). 여기서
-            # 자며 다시 시도하지 않는다 — 이 코드는 락을 쥔 채 50 Hz cmd_vel
-            # 스레드 위에서 돈다. 재시도는 한 시간 뒤 다음 정리 시각이 한다.
-            # 그 사이 원본은 그대로 남아 있으므로 잃는 것은 없다.
-            os.replace(tmp, self._path)
-        except OSError:
-            tmp.unlink(missing_ok=True)
-            raise
+        head = b"\n".join(kept) + b"\n" if kept else b""
+        with self._lock:
+            tail = self._tail_after_locked(len(snapshot))
+            # 감사 로그를 자르는 도중에 죽으면 기록이 사라진다. 설정 오버레이와
+            # 같은 규칙으로 임시 파일에 쓰고 바꿔 끼운다.
+            tmp = self._path.with_name(self._path.name + ".tmp")
+            try:
+                tmp.write_bytes(head + tail)
+                # Windows 에서 이것은 대상에 열린 핸들이 하나라도 있으면
+                # `PermissionError` 다 (백신·인덱서·다른 프로세스의 조회). 여기서
+                # 자며 다시 시도하지 않는다 — 락을 쥔 채 50 Hz cmd_vel 스레드
+                # 위이기 때문이다. 재시도는 한 시간 뒤 다음 정리 시각이 한다.
+                # 그 사이 원본은 그대로 남아 있으므로 잃는 것은 없다.
+                os.replace(tmp, self._path)
+            except OSError:
+                tmp.unlink(missing_ok=True)
+                raise
+
+    def _tail_after_locked(self, offset: int) -> bytes:
+        """스냅샷 이후에 덧붙은 바이트."""
+        if not self._path.is_file():
+            return b""
+        with self._path.open("rb") as handle:
+            handle.seek(offset)
+            return handle.read()
 
     def _is_fresh(self, ts: str, cutoff: datetime) -> bool:
         try:

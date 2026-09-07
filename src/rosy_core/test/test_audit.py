@@ -167,8 +167,6 @@ def test_a_failed_prune_leaves_the_log_intact(tmp_path, monkeypatch):
     path = tmp_path / "audit.jsonl"
     log = FileAuditLog(path, retention_days=30, now=lambda: now)
     log.record(_event(1, now.isoformat()))
-    before = path.read_text(encoding="utf-8")
-
     log.record(_event(2, (now - timedelta(days=31)).isoformat()))
     before = path.read_text(encoding="utf-8")
 
@@ -202,7 +200,8 @@ def test_a_failed_prune_is_not_reported_as_an_unwritable_log(tmp_path, monkeypat
     assert health["writable"] is True
     assert health["write_failures"] == 0 and health["write_failures_total"] == 0
     assert health["prune_failures"] == 1
-    assert "prune" in health["last_error"]
+    assert "OSError" in health["last_prune_error"]
+    assert health["last_write_error"] is None, "쓰기 채널은 깨끗하다"
     assert [event.seq for event in log.history()] == [2], "the new event is on disk"
 
 
@@ -219,12 +218,14 @@ def test_a_read_does_not_rewrite_the_file(tmp_path):
     log.record(_event(1, (now - timedelta(days=31)).isoformat()))
     log.record(_event(2, now.isoformat()))
     before = path.read_bytes()
-    mtime = path.stat().st_mtime_ns
+    inode = path.stat().st_ino
 
     assert [event.seq for event in log.history()] == [2], "the stale one is filtered out"
 
     assert path.read_bytes() == before
-    assert path.stat().st_mtime_ns == mtime
+    # `st_mtime_ns` 는 같은 내용으로 갈아 끼울 때 그대로일 때가 많다(이 파일
+    # 시스템에서 200 번 중 76 번). inode 는 `os.replace` 가 반드시 바꾼다.
+    assert path.stat().st_ino == inode
 
 
 def test_a_prune_with_nothing_to_drop_does_not_rewrite(tmp_path):
@@ -259,7 +260,7 @@ def test_a_write_failure_is_counted_rather_than_lost(tmp_path, monkeypatch):
     log = FileAuditLog(tmp_path / "audit.jsonl")
     assert log.health() == {"writable": True, "write_failures": 0,
                             "write_failures_total": 0, "prune_failures": 0,
-                            "last_error": None}
+                            "last_write_error": None, "last_prune_error": None}
 
     def refuse(*args, **kwargs):
         raise OSError(28, "No space left on device")
@@ -273,7 +274,7 @@ def test_a_write_failure_is_counted_rather_than_lost(tmp_path, monkeypatch):
     assert health["writable"] is False
     assert health["write_failures"] == 3
     assert health["write_failures_total"] == 3
-    assert "No space left" in health["last_error"]
+    assert "No space left" in health["last_write_error"]
 
 
 def test_the_bus_still_swallows_the_failure_so_publishing_keeps_working(tmp_path, monkeypatch):
@@ -314,5 +315,149 @@ def test_a_recovered_write_clears_the_alarm(tmp_path, monkeypatch):
     # 실패하는 디스크는 운영자가 볼 때마다 늘 깨끗하고, Prometheus 는 카운터가
     # 0 으로 돌아간 것을 재시작으로 읽어 그 실패를 통째로 잃는다.
     assert health["write_failures_total"] == 1
-    assert "nope" in health["last_error"]
+    assert "nope" in health["last_write_error"]
 
+
+
+# --- 잘린 꼬리: fsync 하지 않기로 한 것의 대가 --------------------------------
+
+#: 정전이 UTF-8 한 글자 가운데를 자른 줄. `data` 에는 웨이포인트·맵 이름이
+#: 실리므로 한글이 들어가고, 그 바이트열이 잘리면 strict 디코드는 예외다.
+TORN = b'{"seq":2,"data":{"name":"\xed\x95\n'
+
+
+def _with_a_torn_line(path: Path, now: datetime) -> str:
+    good = _event(1, now.isoformat()).model_dump_json()
+    path.write_bytes(good.encode("utf-8") + b"\n" + TORN)
+    return good
+
+
+def test_a_torn_tail_does_not_take_the_audit_log_down(tmp_path):
+    """이 상태가 조용하면 `/logs/audit` 은 그 뒤로 영원히 500 이다.
+
+    바이트 몇 개 때문에 30 일치를 통째로 못 읽게 되는 것이고, 그 사실은
+    EventBus 가 구독자 예외를 삼키므로 어디에도 남지 않는다. `record()` 안의
+    정리도 같은 디코드에서 죽어, 파일은 다시는 정리되지 않는다.
+    """
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    _with_a_torn_line(path, now)
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+
+    assert [event.seq for event in log.history()] == [1]
+
+    log.record(_event(3, now.isoformat()))         # 예외가 밖으로 나오지 않는다
+
+    assert [event.seq for event in log.history()] == [1, 3]
+    health = log.health()
+    assert health["writable"] is True
+    assert health["prune_failures"] == 0, "정리는 실패한 것이 아니라 그 줄을 버린 것이다"
+
+
+def test_a_torn_tail_is_compacted_away_rather_than_kept_forever(tmp_path):
+    """스스로 낫는 것이 요점이다. 세어만 두면 파일은 영원히 그 상태다."""
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    good = _with_a_torn_line(path, now)
+
+    FileAuditLog(path, retention_days=30, now=lambda: now).record(_event(3, now.isoformat()))
+
+    raw = path.read_bytes()
+    assert b"\xed\x95" not in raw
+    assert raw.decode("utf-8").splitlines()[0] == good
+
+
+def test_blank_lines_are_compacted_rather_than_kept_forever(tmp_path):
+    """빈 줄을 세지 않으면 `len(kept) == seen` 이 되어 조기 반환에 걸린다 —
+    파일이 사는 내내 남는다."""
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    good = _event(1, now.isoformat()).model_dump_json()
+    path.write_text("\n\n   \n" + good + "\n", encoding="utf-8")
+
+    FileAuditLog(path, retention_days=30, now=lambda: now).record(_event(2, now.isoformat()))
+
+    assert path.read_text(encoding="utf-8").splitlines()[0] == good
+    assert len(path.read_text(encoding="utf-8").splitlines()) == 2
+
+
+# --- 정리는 락을 쥔 채 디코드·파싱하지 않는다 ---------------------------------
+
+
+def _prune_with(log: FileAuditLog, path: Path, during) -> None:
+    """정리의 디코드 자리에 `during` 을 끼워 넣고 한 번 기록한다.
+
+    디코드와 파싱은 락 밖에서 도는 유일한 구간이다. 그 자리에서 무슨 일이
+    벌어질 수 있는지가 이 설계의 대가이므로, 거기에 직접 손을 넣어 본다.
+    """
+    real = FileAuditLog._decode
+    try:
+        FileAuditLog._decode = staticmethod(lambda raw: (during(), real(raw))[1])
+        log.record(_event(2, datetime(2026, 9, 3, tzinfo=timezone.utc).isoformat()))
+    finally:
+        FileAuditLog._decode = staticmethod(real)
+
+
+def test_an_event_written_during_a_prune_is_not_lost(tmp_path):
+    """스냅샷 길이 뒤를 잘라 새 내용에 붙이지 않으면 그 줄은 `os.replace` 에
+    지워진다 — 감사 로그가 조용히 이벤트를 잃는 것이다."""
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    stale = _event(1, (now - timedelta(days=31)).isoformat()).model_dump_json()
+    path.write_text(stale + "\n", encoding="utf-8")
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+
+    def another_thread_records():
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(_event(99, now.isoformat()).model_dump_json() + "\n")
+
+    _prune_with(log, path, another_thread_records)
+
+    assert sorted(event.seq for event in log.history()) == [2, 99]
+
+
+def test_the_prune_does_not_hold_the_lock_across_the_parse(tmp_path):
+    """10 만 줄이면 디코드·파싱만 350 ms 다. 락을 쥔 채로 하면 그 한 시간에
+    처음 기록되는 이벤트가 그것을 문다 — 하필 SAF-002 정지일 수 있다."""
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    path.write_text(_event(1, (now - timedelta(days=31)).isoformat()).model_dump_json() + "\n",
+                    encoding="utf-8")
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+    held: list[bool] = []
+
+    def note_whether_the_lock_is_held():
+        free = log._lock.acquire(blocking=False)
+        held.append(not free)
+        if free:
+            log._lock.release()
+
+    _prune_with(log, path, note_whether_the_lock_is_held)
+
+    assert held == [False], "the lock was held across the decode and parse"
+
+
+def test_whatever_the_prune_throws_is_counted_rather_than_swallowed(tmp_path):
+    """`except OSError` 로는 부족하다.
+
+    `_compact` 가 가장 먼저 하는 일은 I/O 가 아니라 디코드이고, 디코드 실패는
+    `ValueError` 다. 그것이 여기를 빠져나가면 EventBus 의 `except Exception:
+    pass` 가 삼켜 아무 데도 남지 않는다 — 정리는 영영 멈춘 채, 건강 상태는
+    깨끗하다고 답한다.
+    """
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    path.write_text(_event(1, (now - timedelta(days=31)).isoformat()).model_dump_json() + "\n",
+                    encoding="utf-8")
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+
+    def explode():
+        raise ValueError("not an OSError")
+
+    _prune_with(log, path, explode)                # 예외가 밖으로 나오지 않는다
+
+    health = log.health()
+    assert health["prune_failures"] == 1
+    assert "ValueError" in health["last_prune_error"]
+    assert health["writable"] is True and health["write_failures_total"] == 0
+    assert [event.seq for event in log.history()] == [2], "the append still happened"
