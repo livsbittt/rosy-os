@@ -94,6 +94,40 @@ def test_every_namespace_site_is_still_present():
     assert len(sites) >= 6, f"expected at least six sites, found {len(sites)}"
 
 
+# --- (b2) 문서가 주는 명령이 실제로 도는가 --------------------------------
+
+
+README = ROOT / "README.md"
+
+
+def test_the_readme_quickstart_sets_identity_before_invoking_compose():
+    """`.env.example` 에서 신원을 뺀 순간 README 의 첫 실행 예제가 깨졌다.
+
+    `cp .env.example .env` 다음 줄이 바로 `docker compose build` 였는데, 템플릿에
+    두 키가 없으므로 compose 는 `${VAR:?}` 로 즉시 실패한다. 게다가 그 실패
+    메시지는 install-pi.sh 를 가리키는데, 개발 벤치에서는 맞는 안내가 아니다.
+    새로 온 사람이 가장 먼저 읽는 문서였다.
+
+    실제 docker 로 확인한 사실을 여기 고정한다 — 두 줄이 있으면 `config` 가
+    exit 0, 없으면 exit 1.
+    """
+    block = None
+    for chunk in _text(README).split("```"):
+        if "runtime-mode.sh up" in chunk and "cp .env.example .env" in chunk:
+            block = chunk
+            break
+    assert block is not None, "README quickstart block not found"
+
+    copied = block.index("cp .env.example .env")
+    composed = block.index("docker compose")
+    for key in IDENTITY_KEYS:
+        assert key in block, f"README quickstart never sets {key}"
+        assert copied < block.index(key) < composed, (
+            f"{key} must be set after the template copy and before compose runs, "
+            f"or the documented sequence fails at the compose step"
+        )
+
+
 # --- (c) 설치 스크립트 ----------------------------------------------------
 
 

@@ -212,6 +212,29 @@ def test_an_image_that_boots_hardware_is_refused(image):
     assert "IMAGE_RUNTIME_MODE_NOT_CORE" in _codes(check_runtime_defaults(image))
 
 
+def test_an_image_must_not_bake_a_robot_identity(image):
+    """이미지가 신원을 실으면 그것으로 구운 모든 기기가 충돌한다 (ADR D-33).
+
+    D-33 이 고친 것은 템플릿이 값을 들고 있어 모든 기기가 42/rosy_01 로 나가던
+    문제였다. 프리빌트 이미지가 신원을 구우면 정확히 같은 일이 한 단계 위에서
+    벌어진다 — 그리고 이미 필드에 나간 뒤라 되돌리기가 훨씬 비싸다.
+    """
+    _write(
+        image / "opt/rosy/deploy/robot/.env",
+        "ROSY_RUNTIME_MODE=core\n"
+        "ROS_DOMAIN_ID=42\n"
+        "ROSY_NAMESPACE=rosy_01\n",
+    )
+    findings = check_runtime_defaults(image)
+    baked = [f for f in findings if f.code == "IMAGE_IDENTITY_BAKED"]
+    assert len(baked) == 2, [f.code for f in findings]
+
+
+def test_an_image_without_identity_is_accepted(image):
+    """신원은 첫 부팅 프로비저닝의 몫이므로, 이미지에 없는 것이 정상이다."""
+    assert "IMAGE_IDENTITY_BAKED" not in _codes(check_runtime_defaults(image))
+
+
 def test_a_missing_uart_overlay_is_refused(image):
     """Present but idle: the overlay ships, the motor service does not run."""
     _write(image / "boot/firmware/config.txt", "dtparam=audio=on\n")

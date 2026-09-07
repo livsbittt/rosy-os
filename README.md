@@ -52,6 +52,11 @@ Raspberry Pi OS Lite 64-bit에서는 ROS 2 Jazzy 실행환경을 단계별 서�
 ```bash
 cd deploy/robot
 cp .env.example .env
+# 신원은 로봇 번호 하나에서 나온다 (ADR D-33). 템플릿은 값을 담지 않으므로
+# 개발 벤치에서는 직접 넣는다. 실기기는 install-pi.sh 가 ROSY_ROBOT_NUMBER 에서
+# 유도하고, 번호가 없으면 설치를 거절한다.
+echo 'ROS_DOMAIN_ID=41'   >> .env   # 1호기: 40 + 1
+echo 'ROSY_NAMESPACE=rosy_01' >> .env
 docker compose --env-file .env build rosy-core
 ./runtime-mode.sh up
 ```

@@ -210,6 +210,21 @@ def check_runtime_defaults(root: Path) -> list[Finding]:
         )
     else:
         text = env.read_text(encoding="utf-8")
+        # 신원을 이미지에 구우면 그 이미지로 만든 모든 기기가 같은 도메인과 같은
+        # namespace 로 뜬다 — D-33 이 없앤 결함을 이미지 규모로 되살리는 것이다.
+        # 이미지 문서도 "같은 이미지를 여러 장비에 복제할 때 자격증명은 장비마다
+        # 다르게" 라고 이미 말하고 있다. 신원도 같은 부류이므로 첫 부팅
+        # 프로비저닝의 몫이고, 여기서는 구워져 있지 않은지만 본다.
+        for key in ("ROS_DOMAIN_ID", "ROSY_NAMESPACE"):
+            if any(line.strip().startswith(f"{key}=") for line in text.splitlines()):
+                findings.append(
+                    Finding(
+                        "IMAGE_IDENTITY_BAKED",
+                        "opt/rosy/deploy/robot/.env",
+                        f"{key} is baked into the image; every unit flashed from it "
+                        f"would share one identity (ADR D-33)",
+                    )
+                )
         if "ROSY_RUNTIME_MODE=core" not in text:
             findings.append(
                 Finding(
