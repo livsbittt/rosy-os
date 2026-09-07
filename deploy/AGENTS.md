@@ -33,7 +33,8 @@ None at this level — three sibling pipelines.
 ```bash
 python3 -m pytest test/ -v
 # notable modules: test_host_agent, test_release_*, test_image_*, test_robot_runtime,
-# test_pi_wifi_deployment, test_network_*, test_release_boundary_guards
+# test_pi_wifi_deployment, test_network_*, test_release_boundary_guards,
+# test_dds_identity_contracts (pins .env.example / install-pi.sh / compose.yaml identity)
 ```
 
 ### Common Patterns

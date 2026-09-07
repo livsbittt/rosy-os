@@ -277,7 +277,7 @@ ROS `/diagnostics` + 자체 수집(CPU/MEM/Disk/온도/네트워크) → 컴포�
 | P0-2 | `nav2_params.yaml` 절대경로 제거 (A-1) | namespace 런치에서 costmap 정상 | S |
 | P0-3 | `bringup.py` 프레임 파라미터화 (A-2) | `ns=rosy_01`에서 `/rosy_01/odom`, `rosy_01/odom` TF 정상 | M |
 | P0-4 | `bringup_robot.launch.xml` namespace 플러밍 (A-3) + LiDAR frame prefix (A-4) | 실물 1대 namespace 동작 | M |
-| P0-5 | DDS 격리: `ROS_DOMAIN_ID` 할당 스크립트 + CycloneDDS localhost 프로파일 (A-6, D-6) | 2대 동일 LAN 상호 간섭 없음 | S |
+| P0-5 | DDS 격리: `ROS_DOMAIN_ID` 할당 스크립트 + CycloneDDS localhost 프로파일 (A-6, D-6) | 2대 동일 LAN 상호 간섭 없음 — **이 수용 기준은 아무도 릴리스 2대를 한 LAN에 올리지 않는 한 통과한다.** 판별 형태는 P0-5b 를 쓴다 | S |
 | P0-5b | 배포 절반 마감: 신원을 로봇 번호에서 유도하고 세 계층 모두에서 기본값 제거 (D-33) | 같은 릴리스에서 설치한 2대가 서로 다른 도메인·namespace 로 뜬다 | S |
 | P0-6 | `rosy_gz_sim` 멀티 인스턴스 런치 (`gz_multi.launch.py`, 인자: 로봇 수/namespace) | 시뮬 2대 독립 주행 | M |
 | P0-7 | Flask→FastAPI 동등성 체크리스트 (기존 7 엔드포인트 × API Ref §5 매핑표, path/costmap 포함, 수용 기준 포함) | 체크리스트 문서 | S |

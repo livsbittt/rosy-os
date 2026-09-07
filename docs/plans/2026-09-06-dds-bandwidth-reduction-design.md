@@ -1,7 +1,10 @@
 # DDS 대역폭 감축 — Phase 0 사실 정리
 
 **상태:** 상류 소스로 닫을 수 있는 추론은 닫혔다. 계측 수치는 실물 Pi 대기.
-**관련:** ADR D-33(신원), D-34(발행 주기), `.omc/plans/2026-09-06-dds-domain-and-bandwidth.md`
+**관련:** ADR D-33(신원), D-34(발행 주기),
+`docs/solutions/workflow-issues/inability-to-check-recorded-as-clean-result.md`.
+계획 원본은 `.omc/` 아래에 있었고 그 디렉터리는 gitignore 대상이라 이 저장소에
+남지 않는다 — 인용하지 않는다.
 
 계획의 §1c는 Nav2 내부 동작에 관한 추론 몇 가지를 "리그에서 확인 필요"로 남겼다.
 그중 둘은 하드웨어 없이 상류 소스로 답할 수 있었고, 답하는 과정에서 계획에 없던

@@ -103,7 +103,9 @@ Keep a small deployment registry with one unique `ROS_DOMAIN_ID` and
 `ROSY_NAMESPACE` per robot. Both come from one robot number: `ROS_DOMAIN_ID =
 40 + N` and `ROSY_NAMESPACE = rosy_%02d`. Linux deployments use domain IDs `0`
 through `101`; Rosy rejects values outside that commissioning range, which caps
-the robot number at **61**.
+the robot number at **61**. The number must also be plain decimal with **no leading
+zero** — `03` is refused rather than read, because shell arithmetic treats a leading
+zero as octal and would derive domain 43 for `03` but domain 48 for `010` (D-33).
 
 #### Commissioning a new unit
 
@@ -272,7 +274,7 @@ Run tests with the wheels lifted before any floor test.
 |---|---|---|
 | Configuration | `docker compose --profile motor config` | core plus motor service; only `rosy-motor` has one device; neither is privileged |
 | WLAN peer | run `verify-from-windows.ps1` on another Wi-Fi client | Pi `wlan0` IPv4 serves `/api/v1` and `/dashboard` |
-| UART preflight | run `verify-motors.sh` while runtime is core-only | IDs 1 and 2 respond at 1 Mbps and report drive torque disabled |
+| UART preflight | run `verify-motors.sh` while runtime is core-only | IDs 1 and 2 respond at 1 Mbps and report drive torque disabled. A refusal naming `docker compose` is a configuration fault, not a hardware one — the script fails closed when it cannot tell whether the motor runtime is down |
 | Core health | query `/api/v1` and authenticated `/api/v1/robot/state` | healthy container; state stream at least 5 Hz |
 | Dashboard | open `/dashboard`, authenticate, then inspect `/api/v1/system/runtime` | UI loads without external assets; Pi OS/CPU/RAM/disk/temp values agree with host commands or are explicitly unavailable |
 | Motor command | send a bounded low-speed command | expected wheel direction and RPM |

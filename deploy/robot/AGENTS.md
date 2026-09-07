@@ -19,7 +19,8 @@ On-device runtime: multi-stage Dockerfile (`core` / `io` targets), Compose `rosy
 | `configure-uart-pi5.sh` | Pi 5 UART (`ttyAMA4` for Dynamixel) |
 | `deploy-from-windows.ps1` | Copy/deploy from a Windows host |
 | `verify-from-windows.ps1` | Remote verify |
-| `verify-pi.sh` / `verify-motors.sh` / `verify-power.sh` | On-device checks |
+| `verify-pi.sh` / `verify-motors.sh` / `verify-power.sh` | On-device checks. `verify-motors.sh` refuses to probe the UART whenever it cannot establish that the motor runtime is down — a compose failure counts, so missing docker or an unset identity now stops it rather than opening the gate |
+| `measure-dds-baseline.sh` | Phase 0 DDS baseline (D-34). Requires `hardware` mode; records each topic's pre-attach subscriber count because attaching `ros2 topic bw` creates the traffic it measures |
 | `rosy-runtime.service` | systemd unit for compose runtime |
 | `rosy-lowbatt-shutdown.service` / `.path` / `.sh` | D-27: host watches CORE sentinel file and halts |
 | `rosy-release-recover.service` / `release-recover.sh` | Failed-release recovery |

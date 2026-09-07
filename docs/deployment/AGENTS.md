@@ -33,7 +33,7 @@ None.
 
 ### Testing Requirements
 
-Contracts: `test/test_robot_runtime.py`, `test/test_pi_wifi_deployment.py`. Hardware steps are manual (`pi5-acceptance-checklist.md`).
+Contracts: `test/test_robot_runtime.py`, `test/test_pi_wifi_deployment.py`, `test/test_dds_identity_contracts.py` (the commissioning and renumber procedures in these runbooks). Hardware steps are manual (`pi5-acceptance-checklist.md`).
 
 ### Common Patterns
 

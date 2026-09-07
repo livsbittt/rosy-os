@@ -206,6 +206,8 @@ sudo /opt/rosy/deploy/robot/verify-pi.sh
 sudo /opt/rosy/deploy/robot/configure-uart-pi5.sh
 sudo reboot
 # 재접속 후 motor runtime이 꺼진 core 상태에서 무토크 ping/read:
+# docker compose 를 언급하며 거절하면 하드웨어가 아니라 설정 문제다 —
+# 이 스크립트는 모터 런타임이 꺼졌는지 확인할 수 없으면 닫히는 쪽으로 실패한다.
 sudo /opt/rosy/deploy/robot/verify-motors.sh
 
 sudoedit /opt/rosy/deploy/robot/.env
