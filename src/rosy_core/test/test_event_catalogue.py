@@ -27,7 +27,19 @@ ROOT = Path(__file__).resolve().parents[3]
 PACKAGE = Path(__file__).resolve().parents[1] / "rosy_core"
 REFERENCE = ROOT / "docs" / "reference" / "ROSY API & Protocol Reference.md"
 
-_EVENT_NAME = re.compile(r"[a-z_]+\.[a-z_]+")
+#: 이벤트 이름의 모양. **자리에 따라 두 가지를 쓴다.**
+#:
+#: 발행 자리(이름 인자)는 넓게 본다 — 거기 놓인 문자열은 이미 이벤트 이름이고,
+#: 넓혀도 거짓 양성이 없다. 좁게 두면 `imu.bno055_fault` 처럼 숫자가 들어가거나
+#: `docking.stage.begin` 처럼 세 마디인 이름이 **조용히** 빠진다. 그리고 문서
+#: 쪽 정규식도 같은 모양이었으므로, 그런 이름은 양쪽에서 동시에 안 보이고
+#: 가드는 "일치한다"고 답한다 — 이 파일이 없애려던 `battery.deep` 의 실패가
+#: 정규식으로 다시 쓰인 것이다.
+#:
+#: 두 번째 그물(소스의 모든 문자열)은 좁게 둔다. 넓히면 설정 키·경로가 쏟아져
+#: 들어와 예외 목록을 키우게 되고, 그 목록이 바로 위의 실패다.
+_EVENT_NAME = re.compile(r"[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+")
+_EVENT_SHAPED_LITERAL = re.compile(r"[a-z_]+\.[a-z_]+")
 _SEVERITIES = {"info", "warning", "error", "critical"}
 
 
@@ -59,7 +71,13 @@ def _names_in(node: ast.AST) -> Optional[list[str]]:
     """
     if isinstance(node, ast.Constant):
         if isinstance(node.value, str):
-            return [node.value] if _EVENT_NAME.fullmatch(node.value) else []
+            if _EVENT_NAME.fullmatch(node.value):
+                return [node.value]
+            # 점이 있는데 모양이 안 맞으면 "우리가 모르는 이름"이다 — 조용히
+            # 버리면 가드가 그만큼 눈을 감으므로 `None` 으로 알린다.
+            # 점이 아예 없으면 애초에 이름이 아니다(모드 문자열 등). 그것까지
+            # 알리면 `if state in ("warning", "critical")` 이 빨개진다.
+            return None if "." in node.value else []
         return []
     if isinstance(node, ast.IfExp):
         # self._emit("docking.charging" if confirmed else "docking.charge_lost", ...)
@@ -161,6 +179,17 @@ def _is_event_bus(func: ast.AST) -> bool:
     return not name.endswith(_ROS_PUBLISHER_SUFFIXES)
 
 
+def _is_ros_publish(call: ast.Call) -> bool:
+    """ROS 퍼블리셔 호출의 **모양**: 위치 인자 하나, 키워드 없음.
+
+    이름 규약만으로 빼면, 이벤트 버스를 담은 속성이 우연히 `_pub` 으로 끝날 때
+    그 자리가 통째로 사라진다. 모양까지 맞을 때만 뺀다 —
+    `self._events_pub.publish(name, data={...})` 는 규약에 걸려도 모양이
+    다르므로 발행 자리로 남는다.
+    """
+    return len(call.args) == 1 and not call.keywords
+
+
 def _publishes(node: ast.AST) -> bool:
     """이 함수 몸통에 발행 호출이 있는가.
 
@@ -201,7 +230,10 @@ def relay_fingerprints() -> dict[tuple[str, str], str]:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for qualname, node in _functions_in(tree):
             if node.name.startswith("_emit") and _publishes(node):
-                found[(origin, qualname)] = fingerprint(node)
+                key = (origin, qualname)
+                # 마지막이 이기게 두면 고정 목록이 거짓말을 한다.
+                found[key] = ("두 번 정의됨: " + qualname if key in found
+                              else fingerprint(node))
     return found
 
 
@@ -300,6 +332,14 @@ def scan(source: str, origin: str = "<test>") -> tuple[list[Emit], list[str]]:
     def descend(node: ast.AST, stack: list[str]) -> None:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             key = (origin, _qualified(stack, node.name))
+            if key in PINNED_RELAYS and PINNED_RELAYS[key] != fingerprint(node):
+                # 이 말을 안 하면 아래에서 "이름을 정적으로 읽을 수 없다"만
+                # 나온다 — 루프 변수 이름 하나 바꾼 사람은 없는 결함을 찾아
+                # 헤매다가 고정 목록을 지우는 쪽으로 간다.
+                unresolved.append(
+                    f"{origin}:{node.lineno}: 고정된 중계의 몸통이 바뀌었다 — "
+                    "발행되는 이름이 여전히 호출 자리나 튜플 리터럴에서 오는지 "
+                    "확인하고 PINNED_RELAYS 를 갱신할 것")
             if PINNED_RELAYS.get(key) == fingerprint(node):
                 # 고정된 중계다. 이 몸통이 발행하는 이름은 호출 자리와 튜플
                 # 리터럴 쪽에서 이미 읽혔으므로 여기서는 아무것도 보지 않는다.
@@ -320,14 +360,18 @@ def scan(source: str, origin: str = "<test>") -> tuple[list[Emit], list[str]]:
         if isinstance(node, ast.Call):
             func = node.func
             called = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
-            if called == "_emit" or (called == "publish" and _is_event_bus(func)):
+            bus = _is_event_bus(func) or not _is_ros_publish(node)
+            if called == "_emit" or (called == "publish" and bus):
                 is_call = True
                 keywords = {k.arg: k.value for k in node.keywords}
                 first = node.args[0] if node.args else keywords.get("type_") or keywords.get("type")
                 severity_node = (node.args[1] if len(node.args) > 1
                                  else keywords.get("severity"))
-                payloads = list(node.args[1:]) + [k.value for k in node.keywords]
-        elif (isinstance(node, (ast.Tuple, ast.List)) and 2 <= len(node.elts) <= 3
+                # `data=` 를 먼저 본다. 순서대로 첫 dict 를 집으면
+                # `publish(…, context={…}, data={…})` 가 엉뚱한 키를 읽는다.
+                payloads = ([keywords["data"]] if "data" in keywords else [])
+                payloads += list(node.args[1:]) + [k.value for k in node.keywords]
+        elif (isinstance(node, (ast.Tuple, ast.List)) and len(node.elts) >= 2
               and _looks_like_an_emit_tuple(node.elts, spellings)):
             # 절전·배터리는 `(type, severity, data)` 튜플을 모아 두었다가
             # 한 번에 낸다 — append 로도, 리스트 리터럴로도.
@@ -353,7 +397,7 @@ def scan(source: str, origin: str = "<test>") -> tuple[list[Emit], list[str]]:
             unresolved.append(f"{where}: 이름을 정적으로 읽을 수 없다")
             return
         if not names:
-            return
+            return          # 이름 자리가 아니었다 (숫자 등)
 
         severity = _severity_of(severity_node, spellings)
         if severity is None:
@@ -377,7 +421,7 @@ def emitted() -> list[Emit]:
 
 
 #: `type` 열 한 칸에 여러 이벤트가 들어가는 행이 있다.
-_ROW = re.compile(r"^\|\s*(?P<types>(?:`[a-z_]+\.[a-z_/]+`[^|`]*)+)\|"
+_ROW = re.compile(r"^\|\s*(?P<types>(?:`[a-z][a-z0-9_]*\.[a-z0-9_/.]+`[^|`]*)+)\|"
                   r"\s*(?P<severity>[^|]*)\|\s*(?P<sender>[^|]*)\|(?P<payload>.*)$",
                   re.MULTILINE)
 
@@ -418,7 +462,7 @@ def catalogue() -> dict[str, Row]:
     rows: dict[str, Row] = {}
     for match in _ROW.finditer(section):
         row = Row(match.group("severity"), match.group("sender"), match.group("payload"))
-        for quoted in re.findall(r"`([a-z_]+\.[a-z_/]+)`", match.group("types")):
+        for quoted in re.findall(r"`([a-z][a-z0-9_]*\.[a-z0-9_/.]+)`", match.group("types")):
             head, _, rest = quoted.partition(".")
             for leaf in rest.split("/"):
                 rows[f"{head}.{leaf}"] = row
@@ -574,7 +618,8 @@ def test_a_literal_that_looks_like_an_event_is_either_emitted_or_declared():
             if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
                 continue
             value = node.value
-            if not _EVENT_NAME.fullmatch(value) or value in names or value in not_events:
+            if (not _EVENT_SHAPED_LITERAL.fullmatch(value)
+                    or value in names or value in not_events):
                 continue
             if value in spoken_for or value.rpartition(".")[2] in _FILE_SUFFIXES:
                 continue
@@ -898,7 +943,6 @@ def test_a_pinned_relay_whose_body_changed_is_no_longer_exempt():
     그대로였다.
     """
     origin, qualname = next(iter(PINNED_RELAYS))
-    package, _, module = origin.rpartition("/")
     holder = qualname.rpartition(".")[0]
 
     _names, blind = _names_and_blind_at(
@@ -908,7 +952,12 @@ def test_a_pinned_relay_whose_body_changed_is_no_longer_exempt():
         "        self._events.publish(type_, severity=severity, data=data)\n",
         origin)
 
-    assert blind, "a pinned name with a different body must not be trusted"
+    # 두 가지가 모두 나와야 한다. 지문을 안 보고 이름만으로 건너뛰면 안내
+    # 메시지는 그대로 나오지만 **몸통은 여전히 건너뛰어져** 그 안의 동적
+    # 발행이 보고되지 않는다 — 안내만 보고 통과시키면 그것을 놓친다.
+    assert any("PINNED_RELAYS" in message for message in blind), blind
+    assert any("정적으로 읽을 수 없다" in message for message in blind), (
+        "the changed body was still skipped", blind)
 
 
 def test_a_collected_emit_written_as_a_list_is_read_too():
@@ -928,3 +977,91 @@ def test_a_two_element_emit_has_no_severity_slot_to_fail_on():
     assert [(site.name, site.severity) for site in sites] == [("nav.started", "info")]
     assert not blind
     assert sites[0].keys == frozenset({"goal"})
+
+
+@pytest.mark.parametrize("name", ["imu.bno055_fault", "docking.stage.begin", "nav.dwb_stuck"])
+def test_a_name_with_a_digit_or_a_third_segment_is_still_an_event(name):
+    """좁은 정규식은 **양쪽에서 동시에** 눈을 감는다.
+
+    발행 자리에서도 문서 표에서도 같은 모양을 요구했으므로, 숫자가 든 이름은
+    코드에서도 카탈로그에서도 안 보이고 가드는 "일치한다"고 답했다 — 이 파일이
+    없애려던 `battery.deep` 의 실패가 정규식으로 다시 쓰인 것이다. 이 저장소의
+    보드가 `rosy_imu_bno055` 라 이런 이름은 한 커밋 거리에 있다.
+    """
+    sites, blind = scan(f'self._events.publish("{name}", severity="error", data={{"c": 1}})\n')
+
+    assert [site.name for site in sites] == [name]
+    assert not blind
+
+
+def test_a_dotted_name_the_guard_cannot_recognise_is_reported():
+    """모르는 모양은 통과가 아니라 실패다."""
+    _names, blind = _names_and_blind(
+        'self._events.publish("Power.Brownout", severity="error", data={})\n')
+
+    assert blind
+
+
+def test_the_document_table_reads_the_same_name_shapes_the_code_does():
+    """두 정규식은 함께 넓어져야 한다.
+
+    코드 쪽만 넓히면 `imu.bno055_fault` 는 발행으로는 보이는데 표에서는 안
+    읽혀 "문서에 없다"고 빨개진다. 표 쪽만 넓히면 그 반대다. 좁은 채로 두면
+    **양쪽이 함께 눈을 감고** 가드는 일치한다고 답한다 — 그것이 가장 나쁘다.
+    """
+    row = ("| `imu.bno055_fault` | error | 로봇 | `{code}` |\n"
+           "| `docking.stage.begin` | info | 로봇 | `{}` |\n")
+    found = [name for match in _ROW.finditer(row)
+             for name in re.findall(r"`([a-z][a-z0-9_]*\.[a-z0-9_/.]+)`", match.group("types"))]
+
+    assert found == ["imu.bno055_fault", "docking.stage.begin"]
+
+
+def test_a_dotless_string_in_the_name_slot_is_not_reported():
+    """`if state in ("warning", "critical")` 은 발행 자리가 아니다."""
+    _names, blind = _names_and_blind('if state in ("warning", "critical"):\n    pass\n')
+
+    assert not blind
+
+
+def test_a_bus_whose_attribute_ends_in_pub_is_still_a_bus():
+    """이름 규약만으로 빼면, 버스를 담은 속성이 우연히 `_pub` 으로 끝날 때
+    그 발행 자리가 통째로 사라진다. 호출 모양까지 본다."""
+    names, blind = _names_and_blind(
+        'self._events_pub.publish("nav.started", data={"goal": 1})\n')
+
+    assert names == {"nav.started"} and not blind
+
+    # 진짜 ROS 퍼블리셔는 여전히 조용하다.
+    quiet_names, quiet_blind = _names_and_blind("self.cmd_vel_pub.publish(msg)\n")
+    assert not quiet_names and not quiet_blind
+
+
+def test_a_collection_of_four_is_not_a_way_out():
+    """`2 <= len <= 3` 으로 세면 원소 하나를 더 붙여 수집 경로를 빠져나간다."""
+    _names, blind = _names_and_blind(
+        "pending.append((kind, 'critical', {'percent': 3}, ts))\n")
+
+    assert blind
+
+
+def test_the_payload_is_the_data_keyword_not_the_first_dict_seen():
+    sites, _blind = scan(
+        'self._events.publish("nav.started", context={"zzz": 1}, data={"goal": 2})\n')
+
+    assert [site.keys for site in sites] == [frozenset({"goal"})]
+
+
+def test_a_changed_pinned_body_says_what_to_do_about_it():
+    """"이름을 정적으로 읽을 수 없다"만 나오면, 루프 변수 이름 하나 바꾼 사람은
+    없는 결함을 찾아 헤매다가 고정 목록을 지우는 쪽으로 간다."""
+    origin, qualname = next(iter(PINNED_RELAYS))
+    holder = qualname.rpartition(".")[0]
+
+    _names, blind = _names_and_blind_at(
+        f"class {holder}:\n"
+        "    def _emit(self, type_, severity, data):\n"
+        "        self._events.publish(type_, severity=severity, data=data)\n",
+        origin)
+
+    assert any("PINNED_RELAYS" in message for message in blind), blind
