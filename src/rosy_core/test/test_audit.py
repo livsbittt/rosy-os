@@ -862,7 +862,10 @@ def test_the_writer_asks_for_no_newline_translation(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "open", note)
     FileAuditLog(tmp_path / "audit.jsonl").record(_event(1, "2026-09-03T12:00:00+00:00"))
 
-    assert seen == [""], "the append handle must disable newline translation"
+    # `== [""]` 로 적으면 정당한 두 번째 append 열기(재시도 등)에도 깨지고,
+    # 그때 나오는 메시지는 엉뚱한 곳을 가리킨다.
+    assert seen and all(newline == "" for newline in seen), (
+        "the append handle must disable newline translation")
 
 
 def test_a_log_written_by_an_older_crlf_build_upgrades_without_loss(tmp_path):
@@ -905,19 +908,30 @@ def test_a_line_is_split_on_the_newline_and_nothing_else():
     assert _raw_lines(b"no terminator") == [b"no terminator"]
 
 
-@pytest.mark.parametrize("suffix,label", [
-    (b"", "plain"),
-    (b"\r", "CRLF 로 쓰인 옛 파일"),
-    ("\u2028".encode("utf-8"), "U+2028 이 뒤에 붙은 줄"),
-    ("\u00a0".encode("utf-8"), "NBSP 가 뒤에 붙은 줄"),
+@pytest.mark.parametrize("suffix,visible,label", [
+    (b"", True, "plain"),
+    (b"\r", True, "CRLF 로 쓰인 옛 파일"),
+    # 세로탭·폼피드는 `bytes.strip()` 이 떼어내고 JSON 공백에는 없다. 그래서
+    # 자르는 순서가 실제로 다른 답을 내는 유일한 바이트들이다 — 이것들이
+    # 없으면 아래 검사는 `strip` 을 통째로 지워도 통과한다.
+    (b"\x0b", True, "세로탭이 뒤에 붙은 줄"),
+    (b"\x0c", True, "폼피드가 뒤에 붙은 줄"),
+    # U+2028·NBSP 는 `str.strip()` 만 떼어낸다. 정리는 예전부터 이 줄을
+    # 버려 왔으므로 답은 "안 보인다"이고, 조회도 같은 답을 해야 한다.
+    ("\u2028".encode("utf-8"), False, "U+2028 이 뒤에 붙은 줄"),
+    ("\u00a0".encode("utf-8"), False, "NBSP 가 뒤에 붙은 줄"),
 ])
-def test_what_a_read_returns_is_what_the_prune_keeps(tmp_path, suffix, label):
+def test_what_a_read_returns_is_what_the_prune_keeps(tmp_path, suffix, visible, label):
     """조회와 정리는 한 줄을 **같게** 판정해야 한다.
 
     나뉘는 규칙만 맞추는 것으로는 부족하다. 자르는 규칙도 같아야 한다 —
     `str.strip()` 의 공백에는 U+2028·NBSP 가 들어 있고 `bytes.strip()` 에는
     없다. 어긋나면 조회가 운영자에게 돌려준 기록을 다음 정리가 지운다.
-    되돌릴 수 없는 삭제이고, 이 커밋이 없애려던 바로 그 종류다.
+    되돌릴 수 없는 삭제이고, 이 브랜치가 없애려던 바로 그 종류다.
+
+    각 줄이 보이는지 **여기서 못박는다**. "돌려준 것은 남는다"만 적으면
+    아무것도 안 돌려주는 경우에 공허하게 참이 되고, 실제로 그 두 줄이
+    그랬다 — 그래서 이 검사가 `strip` 을 지워도 통과했다.
     """
     now = datetime(2026, 9, 3, tzinfo=timezone.utc)
     path = tmp_path / "audit.jsonl"
@@ -927,6 +941,8 @@ def test_what_a_read_returns_is_what_the_prune_keeps(tmp_path, suffix, label):
 
     log = FileAuditLog(path, retention_days=30, now=lambda: now)
     before = {event.seq for event in log.history()}
+
+    assert (7 in before) is visible, f"{label}: the read disagrees with what we pinned"
 
     log.record(_event(9, now.isoformat()))          # 첫 기록이 정리한다
 

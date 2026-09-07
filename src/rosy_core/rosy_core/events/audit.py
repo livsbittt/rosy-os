@@ -55,8 +55,10 @@ def _raw_lines(blob: bytes) -> list[bytes]:
     조회에서 사라진 뒤 다음 정리에 지워진다. 이 파일의 줄 구분자는 개행
     하나다(JSON Lines).
 
-    (`str.splitlines()` 는 여기에 U+2028·U+2029·U+0085 까지 더한다. 그래서
-    `_parse` 도 str 이 아니라 이 함수로 나눈다.)
+    (`str.splitlines()` 는 여기에 세로탭·폼피드·파일/그룹/레코드 구분자와
+    U+2028·U+2029·U+0085 까지 더한다. 그래서 `_parse` 도 str 이 아니라 이
+    함수로 나눈다. 그 목록을 짧게 적어 두었더니 세로탭·폼피드가 빠졌고,
+    하필 그 둘이 `_parse` 의 자르는 순서를 검사할 수 있는 유일한 바이트였다.)
     """
     lines = blob.split(b"\n")
     if lines and lines[-1] == b"":
