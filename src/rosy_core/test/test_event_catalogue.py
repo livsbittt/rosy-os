@@ -98,18 +98,29 @@ def _looks_like_an_emit_tuple(elts: list[ast.AST]) -> bool:
     )
 
 
+#: ROS 퍼블리셔 변수의 이름 규약. 이 패키지는 예외 없이 이렇게 짓는다.
+_ROS_PUBLISHER_SUFFIXES = ("_pub", "_publisher")
+
+
 def _is_event_bus(func: ast.AST) -> bool:
     """`self._events.publish(...)` 인가 `self.cmd_vel_pub.publish(msg)` 인가.
 
     ROS 퍼블리셔도 `publish` 다. 이름 자리에 `Twist()` 가 앉아 있으니 "이름을
-    못 읽었다"로 잡혀 가드가 영원히 빨개진다. 받는 쪽이 이벤트 버스일 때만
-    발행 자리로 본다 — 버스를 다른 이름에 담으면 여기가 실패하고, 그때
-    이 집합을 넓히는 것이 옳다.
+    못 읽었다"로 잡혀 가드가 영원히 빨개진다.
+
+    **버스를 허용 목록으로 고르지 않는다.** `self._events`·`svc.events` 만
+    통과시키면 `events.publish(...)`(모듈 전역·지역 이름)나 `self.bus.publish(...)`
+    는 발행 자리로 세어지지도 않고 **조용히** 빠진다 — 가드가 눈을 감는 쪽으로
+    틀리는 것이다. 그래서 반대로 적는다: `publish` 는 전부 발행 자리이고,
+    ROS 퍼블리셔 이름 규약(`*_pub`)에 맞는 것만 뺀다. 규약을 벗어난 퍼블리셔가
+    생기면 가드가 빨개지고, 그것은 이름을 고치거나 여기를 고치라는 뜻이다 —
+    어느 쪽이든 사람이 보게 된다.
     """
     if not isinstance(func, ast.Attribute):
         return False
     owner = func.value
-    return isinstance(owner, ast.Attribute) and owner.attr in {"events", "_events"}
+    name = owner.attr if isinstance(owner, ast.Attribute) else getattr(owner, "id", "")
+    return not name.endswith(_ROS_PUBLISHER_SUFFIXES)
 
 
 def _relayed_names(tree: ast.AST) -> set[str]:
@@ -168,51 +179,66 @@ def emit_sites() -> tuple[list[Emit], list[str]]:
     sites: list[Emit] = []
     unresolved: list[str] = []
     for path in sorted(PACKAGE.rglob("*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        relayed = _relayed_names(tree)
-        for node in ast.walk(tree):
-            first: ast.AST | None = None
-            rest: list[ast.AST] = []
-            is_call = False
-            if isinstance(node, ast.Call):
-                func = node.func
-                called = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
-                if called == "_emit" or (called == "publish" and _is_event_bus(func)):
-                    is_call = True
-                    keywords = {k.arg: k.value for k in node.keywords}
-                    first = node.args[0] if node.args else keywords.get("type_") or keywords.get("type")
-                    rest = list(node.args[1:]) + [k.value for k in node.keywords]
-            elif (isinstance(node, ast.Tuple) and 2 <= len(node.elts) <= 3
-                  and _looks_like_an_emit_tuple(node.elts)):
-                # 절전·배터리는 `(type, severity, data)` 튜플을 모아 두었다가
-                # 한 번에 낸다 — append 로도, 리스트 리터럴로도.
-                first, rest = node.elts[0], list(node.elts[1:])
+        found, blind = scan(path.read_text(encoding="utf-8"), path.name)
+        sites.extend(found)
+        unresolved.extend(blind)
+    return sites, unresolved
 
-            if first is None and not is_call:
-                continue
-            where = f"{path.name}:{getattr(node, 'lineno', 0)}"
-            if first is None:
-                unresolved.append(f"{where}: 이름 인자가 없다")
-                continue
-            names = _names_in(first)
-            if names is None:
-                if isinstance(first, ast.Name) and first.id in relayed:
-                    continue  # 튜플에서 풀린 이름 — 튜플 리터럴 쪽에서 이미 읽었다
-                if is_call:
-                    unresolved.append(f"{where}: 이름을 정적으로 읽을 수 없다")
-                continue
-            if not names:
-                continue
 
-            severity = _severity_of(rest)
-            payload = next((a for a in rest if isinstance(a, ast.Dict)), None)
-            keys: frozenset[str] | None = None
-            if payload is not None:
-                literal = [k.value for k in payload.keys
-                           if isinstance(k, ast.Constant) and isinstance(k.value, str)]
-                if len(literal) == len(payload.keys):
-                    keys = frozenset(literal)
-            sites.extend(Emit(name, severity, keys, where) for name in names)
+def scan(source: str, origin: str = "<test>") -> tuple[list[Emit], list[str]]:
+    """소스 하나에서 발행 지점을 읽는다.
+
+    파일이 아니라 문자열을 받는 것이 요점이다 — 추출기가 무엇을 잡고 무엇을
+    놓치는지를 합성 소스로 직접 물을 수 있어야, "빠져나갈 수 없다"가 주장이
+    아니라 테스트가 된다.
+    """
+    sites: list[Emit] = []
+    unresolved: list[str] = []
+    tree = ast.parse(source)
+    relayed = _relayed_names(tree)
+    for node in ast.walk(tree):
+        first: ast.AST | None = None
+        rest: list[ast.AST] = []
+        is_call = False
+        if isinstance(node, ast.Call):
+            func = node.func
+            called = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+            if called == "_emit" or (called == "publish" and _is_event_bus(func)):
+                is_call = True
+                keywords = {k.arg: k.value for k in node.keywords}
+                first = node.args[0] if node.args else keywords.get("type_") or keywords.get("type")
+                rest = list(node.args[1:]) + [k.value for k in node.keywords]
+        elif (isinstance(node, ast.Tuple) and 2 <= len(node.elts) <= 3
+              and _looks_like_an_emit_tuple(node.elts)):
+            # 절전·배터리는 `(type, severity, data)` 튜플을 모아 두었다가
+            # 한 번에 낸다 — append 로도, 리스트 리터럴로도.
+            first, rest = node.elts[0], list(node.elts[1:])
+
+        if first is None and not is_call:
+            continue
+        where = f"{origin}:{getattr(node, 'lineno', 0)}"
+        if first is None:
+            unresolved.append(f"{where}: 이름 인자가 없다")
+            continue
+        names = _names_in(first)
+        if names is None:
+            if isinstance(first, ast.Name) and first.id in relayed:
+                continue  # 튜플에서 풀린 이름 — 튜플 리터럴 쪽에서 이미 읽었다
+            if is_call:
+                unresolved.append(f"{where}: 이름을 정적으로 읽을 수 없다")
+            continue
+        if not names:
+            continue
+
+        severity = _severity_of(rest)
+        payload = next((a for a in rest if isinstance(a, ast.Dict)), None)
+        keys: frozenset[str] | None = None
+        if payload is not None:
+            literal = [k.value for k in payload.keys
+                       if isinstance(k, ast.Constant) and isinstance(k.value, str)]
+            if len(literal) == len(payload.keys):
+                keys = frozenset(literal)
+        sites.extend(Emit(name, severity, keys, where) for name in names)
     return sites, unresolved
 
 
@@ -440,3 +466,112 @@ def test_the_events_this_change_was_about_are_covered(event):
     """회귀 방지: 이 셋이 각각 이 파일이 존재하는 이유다."""
     assert event in catalogue()
     assert event in {site.name for site in emitted()}
+
+
+# --- 추출기 자신에 대한 검사 ------------------------------------------------
+#
+# 위의 검사들은 전부 "추출기가 발행 지점을 다 찾는다"에 기대고 있다. 그
+# 전제가 틀리면 전부 공허해지고, 틀렸다는 사실은 조용하다. 그래서 합성
+# 소스로 직접 묻는다.
+
+
+def _names_and_blind(source: str) -> tuple[set[str], list[str]]:
+    sites, unresolved = scan(source)
+    return {site.name for site in sites}, unresolved
+
+
+@pytest.mark.parametrize("source,expected", [
+    ('self._events.publish("nav.started", data={"goal": 1})', "nav.started"),
+    ('svc.events.publish("nav.started", data={"goal": 1})', "nav.started"),
+    ('self.core.events.publish("nav.started", data={"goal": 1})', "nav.started"),
+    # 허용 목록이 아니라 제외 목록이므로, 버스를 어디에 담아도 잡힌다.
+    ('events.publish("nav.started", data={"goal": 1})', "nav.started"),
+    ('self.bus.publish("nav.started", data={"goal": 1})', "nav.started"),
+    ('self._emit("nav.started", "info", {"goal": 1})', "nav.started"),
+    # 이름을 키워드로 적어도 자리는 같다.
+    ('self._events.publish(type_="nav.started", data={"goal": 1})', "nav.started"),
+    # 튜플로 모아 두었다가 내는 것.
+    ('pending.append(("nav.started", "info", {"goal": 1}))', "nav.started"),
+])
+def test_the_shapes_that_publish_are_all_seen(source, expected):
+    names, blind = _names_and_blind(source)
+
+    assert expected in names, f"{source} 를 놓쳤다"
+    assert not blind
+
+
+@pytest.mark.parametrize("source", [
+    'self._events.publish(f"docking.{stage}", data={})',      # f-string
+    'self._events.publish(EVENT_NAME, data={})',              # 모듈 상수
+    'self._events.publish(name, data={})',                    # 지역 변수
+    'self._events.publish(NAMES[0], data={})',                # 첨자
+    'self._events.publish("nav." + suffix, data={})',         # 이어붙이기
+    'self._events.publish(data={})',                          # 이름 자리가 없다
+])
+def test_a_name_the_guard_cannot_read_is_reported_not_skipped(source):
+    """조용히 넘기면 가드는 통과시키는 법을 하나 더 배운 것뿐이다."""
+    names, blind = _names_and_blind(source)
+
+    assert not names
+    assert blind, f"{source} 가 조용히 지나갔다"
+
+
+def test_a_ros_publisher_is_not_mistaken_for_the_bus():
+    names, blind = _names_and_blind("self.cmd_vel_pub.publish(msg)")
+
+    assert not names and not blind
+
+
+def test_a_publisher_that_breaks_the_naming_convention_fails_loudly():
+    """모르는 모양은 통과가 아니라 실패다.
+
+    `_pub` 규약을 벗어난 ROS 퍼블리셔가 생기면 여기가 빨개진다 — 이름을
+    고치거나 규약을 고치라는 뜻이고, 어느 쪽이든 사람이 보게 된다. 반대로
+    적었다면(버스만 허용) 그 자리는 조용히 사라졌을 것이다.
+    """
+    _names, blind = _names_and_blind("self.wheels.publish(msg)")
+
+    assert blind
+
+
+def test_the_relay_allowance_does_not_cover_an_ordinary_variable():
+    """중계는 이름이 다른 자리에서 읽히기 때문에 봐주는 것이다.
+
+    튜플 언팩도 `_emit` 파라미터도 아닌 변수는 그 근거가 없다.
+    """
+    _names, blind = _names_and_blind(
+        "def send(self, kind):\n"
+        "    self._events.publish(kind, data={})\n")
+
+    assert blind
+
+
+def test_a_relayed_name_is_read_at_the_tuple_not_at_the_relay():
+    source = (
+        'def _emit_all(self, pending):\n'
+        '    for type_, severity, data in pending:\n'
+        '        self._events.publish(type_, severity=severity, data=data)\n'
+        '\n'
+        'def collect(self):\n'
+        '    pending.append(("battery.deep", "critical", {"percent": 3}))\n')
+    names, blind = _names_and_blind(source)
+
+    assert names == {"battery.deep"}
+    assert not blind
+
+
+def test_a_severity_left_to_the_default_is_read_as_info():
+    """기본값에 기대는 발행 지점을 검사에서 빼면 3 분의 1 이 감시 밖이다."""
+    sites, _blind = scan('self._events.publish("nav.started", data={})')
+
+    assert [site.severity for site in sites] == ["info"]
+
+
+def test_a_plain_tuple_is_not_read_as_an_emit():
+    """`("config.yaml", "path")` 나 `x in ("mission.assigned", ...)` 같은 것."""
+    names, blind = _names_and_blind(
+        'PATHS = ("config.yaml", "rosy.yaml")\n'
+        'if kind in ("mission.assigned", "mission.done"):\n'
+        '    pass\n')
+
+    assert not names and not blind
