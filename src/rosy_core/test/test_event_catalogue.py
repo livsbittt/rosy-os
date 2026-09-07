@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import re
 from pathlib import Path
 from typing import Optional
@@ -175,125 +176,67 @@ def _publishes(node: ast.AST) -> bool:
     return False
 
 
-#: 새 스코프. 여기 안쪽의 대입은 바깥 이름을 다시 묶는 것이 아니다.
-_NESTED_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda,
-                  ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
+def _qualified(stack: list[str], name: str) -> str:
+    return ".".join(stack + [name])
 
 
-def _rebound_in(node: ast.AST) -> set[str]:
-    """이 몸통에서 **다시 묶이는** 이름들.
+def relay_fingerprints() -> dict[tuple[str, str], str]:
+    """중계 함수들과 **그 몸통의 지문**.
 
-    `def _emit(type_, …): type_ = compute(); self._events.publish(type_, …)` 는
-    더 이상 중계가 아니다 — 호출 자리에서 읽은 이름과 발행되는 이름이 다르다.
+    중계란 이름을 받아 그대로 버스로 넘기는 함수다 — `_emit(type_, …)` 과
+    `_emit_all(pending)` 처럼. 그 몸통에서 발행되는 이름은 정적으로 읽을 수
+    없지만, 읽어야 할 이름은 호출 자리나 튜플 리터럴 쪽에 있고 그것은 이미
+    잡힌다. 그래서 중계 몸통은 발행 지점 추출에서 통째로 뺀다.
 
-    대입문만 보면 부족하다. `type_, extra = f()`, `(type_ := f())`,
-    `for type_ in xs`, `with o() as type_`, `except E as type_`,
-    `import os as type_`, `case [type_]`, `global type_`, 그리고 `def type_():`
-    까지 전부 같은 일을 한다. 열두 가지가 조용히 빠져 있었고, 그렇게 되면 이
-    검사는 장식이다 — 면제를 안전하게 만들라고 있는 것이기 때문이다.
-
-    중첩 스코프에는 들어가지 않는다. 그 안의 대입은 다른 이름이고, 세면
-    멀쩡한 중계가 거짓으로 빨개진다.
+    **면제는 패턴이 아니라 이 네 함수의 이 몸통들에만 준다.** 네 번의 리뷰가
+    모두 이 면제로 들어왔고, 매번 "어떤 모양이면 중계인가"를 좁혔지만 그
+    질문에는 끝이 없었다 — 면제의 근거는 데이터 흐름("이 이름은 caller 가
+    준 것이다")인데 검사할 수 있는 것은 이름의 철자뿐이기 때문이다. 그래서
+    모양을 묻기를 그만두고 몸통 자체를 고정한다. 한 줄이라도 바뀌면 지문이
+    달라져 면제가 사라지고, 그 순간 그 안의 동적 발행이 곧바로 걸린다.
     """
-    names: set[str] = set()
-
-    def walk(parent: ast.AST) -> None:
-        for child in ast.iter_child_nodes(parent):
-            if isinstance(child, _NESTED_SCOPES):
-                # 이름 자체는 여기서 묶인다. 몸통은 다른 스코프다.
-                names.add(getattr(child, "name", ""))
-                continue
-            if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Store):
-                names.add(child.id)
-            elif isinstance(child, ast.ExceptHandler) and child.name:
-                names.add(child.name)
-            elif isinstance(child, ast.alias) and child.asname:
-                names.add(child.asname)
-            elif isinstance(child, (ast.MatchAs, ast.MatchStar)) and child.name:
-                names.add(child.name)
-            elif isinstance(child, (ast.Global, ast.Nonlocal)):
-                names.update(child.names)
-            walk(child)
-
-    walk(node)
-    names.discard("")
-    return names
-
-
-class _Relay:
-    """중계 함수 안에서의 상태.
-
-    `params` 는 그 함수가 받은 이름들(어떤 이터러블이 중계 대상인지 알기 위해),
-    `blessed` 는 지금 이 자리에서 면제되는 이름들이다.
-    """
-
-    __slots__ = ("params", "blessed")
-
-    def __init__(self, params: frozenset[str], blessed: frozenset[str]) -> None:
-        self.params = params
-        self.blessed = blessed
-
-
-def _relay_bindings(node: ast.AST, inherited: Optional[_Relay]) -> Optional[_Relay]:
-    """이 노드가 **자기 안쪽에** 새로 걸어 주는 중계 이름들.
-
-    `None` 은 "중계 함수 안이 아니다" 이다.
-
-    중계를 봐주는 근거는 "그 이름은 다른 자리에서 이미 읽혔다"이지 "그렇게
-    생긴 변수는 봐준다"가 아니다. 그래서 세 겹으로 좁힌다.
-
-    **범위로**: 걸어 주는 것은 그 이름을 묶은 구문의 안쪽뿐이다. 파일 전체에
-    뿌리면 `name`·`key`·`value`·`source`·`component` 처럼 흔한 식별자가 통째로
-    면제된다.
-
-    **자리로**: 중계 함수(`_emit…` 이면서 실제로 발행하는 것) 안에서만 건다.
-    그리고 파라미터를 봐주는 것은 이름이 정확히 `_emit` 일 때뿐이다 — 추출기가
-    이름을 읽는 호출은 그것 하나이므로, `_emit_health(component)` 의 파라미터를
-    봐주면 그 이름은 **어디에서도** 읽히지 않은 채 지나간다.
-
-    **대상으로**: for 튜플 언팩은 **중계가 받은 것을 푸는 자리**일 때만 건다.
-    `for … in <파라미터>` 여야 한다. 이것이 없으면 `_emit_all` 안에 관계없는
-    루프를 하나 더 놓는 것으로 그물이 다시 뚫린다 — 리뷰가 실제
-    `power/manager.py` 의 `_emit_all` 에 몇 줄 붙여 659 개 테스트를 전부
-    초록으로 통과시킨 것이 그것이다.
-
-    `self` 는 뺀다. 중계가 아닌 함수는 새 스코프이므로 바깥에서 걸린 것도
-    함께 끊는다.
-    """
-    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-        if not (node.name.startswith("_emit") and _publishes(node)):
-            return None
-        params = frozenset(arg.arg for arg in node.args.args if arg.arg != "self")
-        if node.name != "_emit":
-            # 중계 안이긴 하나 스스로 걸어 주는 것은 없다. `_emit_all` 처럼
-            # 튜플을 푸는 중계는 아래 for 규칙으로 성립한다 — 그 이름들은
-            # 튜플 리터럴 쪽에서 이미 읽혔다.
-            return _Relay(params, frozenset())
-        return _Relay(params, frozenset(params - _rebound_in(node)))
-    if (inherited is not None
-            and isinstance(node, ast.For) and isinstance(node.target, ast.Tuple)
-            and isinstance(node.iter, ast.Name) and node.iter.id in inherited.params):
-        unpacked = {elt.id for elt in node.target.elts if isinstance(elt, ast.Name)}
-        # 다시 묶이는지는 **몸통에서** 본다. for 의 target 자체는 묶는 자리이지
-        # 다시 묶는 자리가 아니다 — 거기까지 세면 자기 자신을 빼게 된다.
-        rebound: set[str] = set()
-        for statement in list(node.body) + list(node.orelse):
-            rebound |= _rebound_in(statement)
-        return _Relay(inherited.params,
-                      inherited.blessed | frozenset(unpacked - rebound))
-    return inherited
-
-
-def relay_functions() -> set[tuple[str, str]]:
-    """중계 면제를 받는 함수들. 이 목록이 늘어나면 사람이 봐야 한다."""
-    found: set[tuple[str, str]] = set()
+    found: dict[tuple[str, str], str] = {}
     for path in sorted(PACKAGE.rglob("*.py")):
+        origin = path.relative_to(PACKAGE).as_posix()
         tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-                    and node.name.startswith("_emit") and _publishes(node)):
-                found.add((path.relative_to(PACKAGE).as_posix(), node.name))
+        for qualname, node in _functions_in(tree):
+            if node.name.startswith("_emit") and _publishes(node):
+                found[(origin, qualname)] = fingerprint(node)
     return found
+
+
+def _functions_in(tree: ast.AST):
+    """`(한정 이름, 노드)`. 같은 이름의 메서드가 두 클래스에 있어도 구분된다."""
+    def walk(node: ast.AST, stack: list[str]):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                yield _qualified(stack, child.name), child
+                yield from walk(child, stack + [child.name])
+            elif isinstance(child, ast.ClassDef):
+                yield from walk(child, stack + [child.name])
+            else:
+                yield from walk(child, stack)
+    yield from walk(tree, [])
+
+
+def fingerprint(node: ast.AST) -> str:
+    """주석·공백에는 둔감하고 코드에는 민감한 지문."""
+    dumped = ast.dump(node, annotate_fields=False, include_attributes=False)
+    return hashlib.sha256(dumped.encode("utf-8")).hexdigest()[:16]
+
+
+#: 몸통이 이 지문과 같을 때에만 중계로 인정한다. 값을 손으로 고치는 것이
+#: 곧 "이 함수를 다시 읽었다"는 서명이다 — 그러라고 있는 목록이다.
+PINNED_RELAYS = {
+    ("docking/manager.py", "DockingManager._emit"):
+        "f4feef4e5c93e7da",
+    ("safety/manager.py", "SafetyManager._emit"):
+        "4126b877798f6431",
+    ("power/battery.py", "BatteryMonitor._emit_all"):
+        "6ce47629a32f58a2",
+    ("power/manager.py", "PowerManager._emit_all"):
+        "a308c2783ff9d12d",
+}
 
 
 #: 이벤트 이름과 모양이 같은 파일 이름들 (`app.js`, `docks.json`, `audit.jsonl`).
@@ -354,13 +297,22 @@ def scan(source: str, origin: str = "<test>") -> tuple[list[Emit], list[str]]:
     tree = ast.parse(source)
     spellings = severity_spellings(tree)
 
-    def descend(node: ast.AST, inherited: Optional[_Relay]) -> None:
-        relayed = _relay_bindings(node, inherited)
-        read(node, relayed)
+    def descend(node: ast.AST, stack: list[str]) -> None:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            key = (origin, _qualified(stack, node.name))
+            if PINNED_RELAYS.get(key) == fingerprint(node):
+                # 고정된 중계다. 이 몸통이 발행하는 이름은 호출 자리와 튜플
+                # 리터럴 쪽에서 이미 읽혔으므로 여기서는 아무것도 보지 않는다.
+                # 한 줄이라도 바뀌면 지문이 달라져 이 가지로 오지 않는다.
+                return
+            stack = stack + [node.name]
+        elif isinstance(node, ast.ClassDef):
+            stack = stack + [node.name]
+        read(node)
         for child in ast.iter_child_nodes(node):
-            descend(child, relayed)
+            descend(child, stack)
 
-    def read(node: ast.AST, relayed: Optional[_Relay]) -> None:
+    def read(node: ast.AST) -> None:
         first: ast.AST | None = None
         severity_node: ast.AST | None = None
         payloads: list[ast.AST] = []
@@ -375,12 +327,14 @@ def scan(source: str, origin: str = "<test>") -> tuple[list[Emit], list[str]]:
                 severity_node = (node.args[1] if len(node.args) > 1
                                  else keywords.get("severity"))
                 payloads = list(node.args[1:]) + [k.value for k in node.keywords]
-        elif (isinstance(node, ast.Tuple) and 2 <= len(node.elts) <= 3
+        elif (isinstance(node, (ast.Tuple, ast.List)) and 2 <= len(node.elts) <= 3
               and _looks_like_an_emit_tuple(node.elts, spellings)):
             # 절전·배터리는 `(type, severity, data)` 튜플을 모아 두었다가
             # 한 번에 낸다 — append 로도, 리스트 리터럴로도.
             first = node.elts[0]
-            severity_node = node.elts[1] if len(node.elts) > 1 else None
+            # `(name, payload)` 의 둘째 칸은 심각도 자리가 아니다 — 거기서
+            # 읽으려 하면 "심각도를 못 읽었다"고 틀린 이유로 빨개진다.
+            severity_node = node.elts[1] if len(node.elts) == 3 else None
             payloads = list(node.elts[1:])
 
         if first is None and not is_call:
@@ -391,9 +345,6 @@ def scan(source: str, origin: str = "<test>") -> tuple[list[Emit], list[str]]:
             return
         names = _names_in(first)
         if names is None:
-            if (relayed is not None and isinstance(first, ast.Name)
-                    and first.id in relayed.blessed):
-                return  # 중계 — 이름은 튜플 리터럴·호출 자리에서 이미 읽었다
             # 호출이든 튜플이든 마찬가지다. `_looks_like_an_emit_tuple` 을
             # 통과한 튜플은 이미 자기가 발행 자리라고 말한 것이므로, 그
             # 이름을 못 읽으면 그것도 눈을 감은 것이다. 이 모양은
@@ -417,7 +368,7 @@ def scan(source: str, origin: str = "<test>") -> tuple[list[Emit], list[str]]:
                 keys = frozenset(literal)
         sites.extend(Emit(name, severity, keys, where) for name in names)
 
-    descend(tree, None)
+    descend(tree, [])
     return sites, unresolved
 
 
@@ -663,7 +614,11 @@ def test_the_events_this_change_was_about_are_covered(event):
 
 
 def _names_and_blind(source: str) -> tuple[set[str], list[str]]:
-    sites, unresolved = scan(source)
+    return _names_and_blind_at(source, "<test>")
+
+
+def _names_and_blind_at(source: str, origin: str) -> tuple[set[str], list[str]]:
+    sites, unresolved = scan(source, origin)
     return {site.name for site in sites}, unresolved
 
 
@@ -853,18 +808,24 @@ def test_a_tuple_whose_name_cannot_be_read_is_reported_too():
     assert blind
 
 
-def test_a_relayed_name_is_read_at_the_tuple_not_at_the_relay():
-    source = (
-        'def _emit_all(self, pending):\n'
-        '    for type_, severity, data in pending:\n'
-        '        self._events.publish(type_, severity=severity, data=data)\n'
-        '\n'
-        'def collect(self):\n'
-        '    pending.append(("battery.deep", "critical", {"percent": 3}))\n')
-    names, blind = _names_and_blind(source)
+def test_a_relay_is_read_at_the_tuple_and_its_own_body_is_not_trusted():
+    """이름은 튜플 리터럴 쪽에서 읽는다.
+
+    그리고 **고정되지 않은** 중계의 몸통은 면제받지 못한다 — 합성 소스는
+    `PINNED_RELAYS` 에 없으므로 그 안의 동적 발행이 그대로 걸린다. 이것이
+    이 설계의 요점이다: 면제는 "이렇게 생겼으면"이 아니라 "이 함수의 이
+    몸통이면"이다.
+    """
+    names, blind = _names_and_blind(
+        "def _emit_all(self, pending):\n"
+        "    for type_, severity, data in pending:\n"
+        "        self._events.publish(type_, severity=severity, data=data)\n"
+        "\n"
+        "def collect(self):\n"
+        "    pending.append(('battery.deep', 'critical', {'percent': 3}))\n")
 
     assert names == {"battery.deep"}
-    assert not blind
+    assert blind, "an unpinned relay body must not be trusted"
 
 
 def test_a_severity_left_to_the_default_is_read_as_info():
@@ -898,23 +859,24 @@ def test_the_documented_severity_is_matched_by_value_not_by_substring():
     assert Row("info/error/info", "Fleet", "{}").severities == {"info", "error"}
 
 
-def test_the_set_of_functions_that_get_the_relay_exemption_is_the_one_we_reviewed():
+def test_the_relay_bodies_that_get_the_exemption_are_the_ones_we_reviewed():
     """면제는 좁히는 것만으로는 부족하다. **셀 수 있어야** 한다.
 
-    중계 규칙은 "이 이름은 다른 자리에서 이미 읽혔다"를 정적으로 증명하지
-    못한다 — 넓게 잡으면 구멍이고, 좁게 잡으면 진짜 중계가 빨개진다. 세 번의
-    리뷰가 모두 이 면제의 어느 틈으로 들어왔다.
+    네 번의 리뷰가 모두 이 면제로 들어왔다. 매번 "어떤 모양이면 중계인가"를
+    좁혔지만 그 질문에는 끝이 없다 — 근거는 데이터 흐름("이 이름은 caller 가
+    준 것이다")인데 정적으로 볼 수 있는 것은 철자뿐이기 때문이다. 마지막
+    판본은 `for … in <파라미터>` 를 요구했고, 루프 바로 위에서 그 파라미터를
+    다시 대입하는 것으로 뚫렸다.
 
-    그래서 면제받는 함수 목록 자체를 고정한다. 새 중계가 생기면 여기가 빨개지고
-    사람이 그 하나를 본다. 이 목록은 **이벤트** 목록이 아니라 **예외** 목록이라,
-    길어지는 것이 곧 위험 신호다.
+    그래서 모양을 묻기를 그만두었다. 면제는 이 네 함수의 **이 몸통들** 에만
+    준다. 한 줄이라도 바뀌면 지문이 달라지고, 면제가 사라지고, 그 안의 동적
+    발행이 곧바로 걸린다. 이 값을 손으로 고치는 것이 "이 함수를 다시 읽었다"는
+    서명이다.
     """
-    assert relay_functions() == {
-        ("docking/manager.py", "_emit"),
-        ("safety/manager.py", "_emit"),
-        ("power/battery.py", "_emit_all"),
-        ("power/manager.py", "_emit_all"),
-    }
+    assert relay_fingerprints() == PINNED_RELAYS, (
+        "중계 함수의 몸통이 바뀌었거나 새 중계가 생겼다. 그 함수를 읽고, "
+        "발행되는 이름이 정말로 호출 자리나 튜플 리터럴에서 오는지 확인한 뒤 "
+        "PINNED_RELAYS 를 고칠 것.")
 
 
 def test_a_ros_publisher_does_not_make_a_function_a_relay():
@@ -926,3 +888,43 @@ def test_a_ros_publisher_does_not_make_a_function_a_relay():
         "    pending.append((type_, severity, {'a': 1}))\n")
 
     assert blind
+
+
+def test_a_pinned_relay_whose_body_changed_is_no_longer_exempt():
+    """면제는 그 이름에 주는 것이 아니라 **그 몸통** 에 준다.
+
+    이름만 맞으면 봐주는 것은 지난 판본들과 같은 실수다 — 리뷰는 실제
+    `_emit_all` 의 루프 바로 위에 한 줄을 더해 통과했고, 함수의 이름도 위치도
+    그대로였다.
+    """
+    origin, qualname = next(iter(PINNED_RELAYS))
+    package, _, module = origin.rpartition("/")
+    holder = qualname.rpartition(".")[0]
+
+    _names, blind = _names_and_blind_at(
+        f"class {holder}:\n"
+        "    def _emit(self, type_, severity, data):\n"
+        "        type_ = self._rewrite(type_)\n"
+        "        self._events.publish(type_, severity=severity, data=data)\n",
+        origin)
+
+    assert blind, "a pinned name with a different body must not be trusted"
+
+
+def test_a_collected_emit_written_as_a_list_is_read_too():
+    """`append((…))` 와 `append([…])` 는 같은 일을 한다. 튜플만 보면 대괄호
+    하나로 수집 경로 전체가 감시 밖으로 나간다."""
+    names, blind = _names_and_blind(
+        "pending.append(['battery.deep', 'critical', {'percent': 3}])\n")
+
+    assert names == {"battery.deep"} and not blind
+
+
+def test_a_two_element_emit_has_no_severity_slot_to_fail_on():
+    """`(name, payload)` 의 둘째 칸은 payload 다. 거기서 심각도를 읽으려 하면
+    "심각도를 못 읽었다"고 **틀린 이유로** 빨개진다."""
+    sites, blind = scan("pending.append(('nav.started', {'goal': 1}))\n")
+
+    assert [(site.name, site.severity) for site in sites] == [("nav.started", "info")]
+    assert not blind
+    assert sites[0].keys == frozenset({"goal"})
