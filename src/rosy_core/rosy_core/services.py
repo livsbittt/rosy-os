@@ -202,6 +202,7 @@ class CoreServices:
             # 도킹 실패 한 번이 군집을 영구히 비활성화한다.
             docking_active_provider=lambda: docking.state in (
                 DockState.DOCKING, DockState.UNDOCKING),
+            map_id_provider=lambda: state.map_id,
         )
         nav.session_closed_listener = swarm.on_navigation_session_closed
         safety.estop_listeners.append(swarm.on_estop)

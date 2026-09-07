@@ -51,6 +51,9 @@ class SafetyManager:
         self.estop: bool = False
         self.estop_source: str = ""
         self._battery_state: str = "ok"
+        #: 한 활동이 자기 구간 동안만 더 낮춰 쓰는 상한 (SWM-002 max_speed).
+        #: 프로필 상한을 넘겨 올릴 수는 없다 — clip 이 둘 중 작은 값을 쓴다.
+        self._session_linear: Optional[float] = None
         #: E-Stop 이 실제로 걸릴 때 한 번 불린다. API·배터리·어느 경로로
         #: 들어오든 같은 자리를 지나므로, 중단해야 할 활동은 여기에 붙는다.
         self.estop_listeners: list = []
@@ -81,6 +84,20 @@ class SafetyManager:
         self._emit("safety.estop_released", "warning", "safety_manager", {"by": by})
         return True
 
+    def set_session_speed(self, max_linear: Optional[float]) -> None:
+        """활동 구간용 추가 상한. `None` 이면 해제하고 프로필 상한으로 돌아간다.
+
+        SWM-002 의 `max_speed` 가 여기로 들어온다. 검증만 하고 흘려보내면
+        계약이 거짓이 되고, Nav2 파라미터로 내려보내려면 CORE 에 없는 파라미터
+        클라이언트가 필요하다. cmd_vel 이 어차피 전부 `clip` 을 지나므로
+        (D-2), 실제로 바퀴에 닿는 값을 여기서 줄인다.
+        """
+        self._session_linear = None if max_linear is None else float(max_linear)
+
+    @property
+    def session_linear(self) -> Optional[float]:
+        return self._session_linear
+
     def clip(self, linear: float, angular: float, scope: str = "nav") -> tuple[float, float]:
         if scope == "manual":
             max_l, max_a = self.limits.manual_linear, self.limits.manual_angular
@@ -90,6 +107,9 @@ class SafetyManager:
             max_l, max_a = self.limits.max_linear, self.limits.max_angular
         max_l = min(max_l, self.limits.max_linear)
         max_a = min(max_a, self.limits.max_angular)
+        if self._session_linear is not None:
+            # 낮추기만 한다. 활동이 프로필 상한을 넘겨 달릴 수는 없다.
+            max_l = min(max_l, self._session_linear)
         l = max(-max_l, min(max_l, linear))
         a = max(-max_a, min(max_a, angular))
         return l, a

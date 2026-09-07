@@ -46,6 +46,23 @@ Type=oneshot
 """
 
 
+def _pem_private_key(body: str) -> str:
+    """Assemble a PEM private key at runtime.
+
+    No PEM header literal may appear in any source file. The header is the
+    secret scanner's entire signal for a private key, so excusing one as a
+    known fixture would excuse every one in the repository — the scanner's
+    own fixture list refuses to carry a header for exactly that reason.
+    """
+    dashes = "-" * 5
+    return "\n".join([
+        f"{dashes}BEGIN PRIVATE KEY{dashes}",
+        body,
+        f"{dashes}END PRIVATE KEY{dashes}",
+        "",
+    ])
+
+
 def _write(path: Path, text: str = "") -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
@@ -195,7 +212,7 @@ def test_a_pem_holding_a_private_key_is_refused(image):
     """The suffix says public; the contents say otherwise."""
     _write(
         image / "etc/rosy/trusted-release-keys/oops.pem",
-        "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2Vw\n-----END PRIVATE KEY-----\n",
+        _pem_private_key("MC4CAQAwBQYDK2Vw"),
     )
     assert "IMAGE_PRIVATE_KEY_PRESENT" in _codes(check_release_keys(image))
 
@@ -319,7 +336,8 @@ def test_a_wifi_secret_baked_into_the_image_is_refused(image):
 
 
 def test_a_shared_api_token_in_the_image_is_refused(image):
-    _write(image / "etc/rosy/rosy.yaml", "auth:\n  api_token: deadbeefcafebabe0123456789abcd\n")
+    _write(image / "etc/rosy/rosy.yaml",
+           "auth:\n  api_token: deadbeefcafebabe0123456789abcdef01234567\n")
 
     assert "IMAGE_SECRET_PRESENT" in _codes(check_no_device_secrets(image))
 

@@ -21,6 +21,25 @@ from rosy_core.protocol.schemas import (
 )
 
 
+def _as_map_id(value) -> Optional[str]:
+    """MAP-001 map id, normalised to a string or nothing.
+
+    `navigation.map_id: 42` in YAML parses as an int, and every consumer here
+    treats the id as a string: the swarm map guard compares it (so a non-string
+    never matches and the formation silently stops issuing goals), and the
+    leader pose stream declares it `Optional[str]` (so pydantic raises and the
+    socket closes on connect, with the handler's bare except hiding why). A
+    scalar the operator typed becomes its text; anything else is not an id.
+    """
+    if isinstance(value, str):
+        return value or None
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return str(value)
+    return None
+
+
 class StateManager:
     def __init__(self, robot_id: str) -> None:
         self._robot_id = robot_id
@@ -74,9 +93,9 @@ class StateManager:
         with self._lock:
             self._swarm = status
 
-    def set_map_id(self, map_id: Optional[str]) -> None:
+    def set_map_id(self, map_id) -> None:
         with self._lock:
-            self._map_id = map_id
+            self._map_id = _as_map_id(map_id)
 
     @property
     def map_id(self) -> Optional[str]:
