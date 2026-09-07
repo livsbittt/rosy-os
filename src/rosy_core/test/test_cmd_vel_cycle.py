@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -120,11 +121,16 @@ def test_the_bridge_actually_calls_the_cycle():
     """
     text = _bridge_source()
 
-    # `in` 이 아니라 개수다. 주석으로 만들어도 문자열은 파일에 남으므로,
-    # `in` 으로 적은 검사는 주석 처리 한 번으로 만족된다.
-    assert text.count("from rosy_core.bridge.cmd_vel import cmd_vel_cycle") == 1
-    assert text.count(
-        "        cmd_vel_cycle(self._svc.command, self._svc.power, self._send_twist)") == 1
+    # 문자열이 아니라 **호출** 을 센다. 문자열 검사는 주석 처리 한 번으로
+    # 만족되고(주석도 파일에 남는다), 개수로 고쳐도 들여쓰기를 박아 넣게 되어
+    # 그 줄을 `if` 안으로 옮기는 멀쩡한 변경에 빨개진다.
+    calls = [node for node in ast.walk(ast.parse(text))
+             if isinstance(node, ast.Call)
+             and getattr(node.func, "id", "") == "cmd_vel_cycle"
+             and [ast.unparse(arg) for arg in node.args]
+             == ["self._svc.command", "self._svc.power", "self._send_twist"]]
+
+    assert len(calls) == 1, "the bridge does not call the cycle exactly once"
 
 
 def test_the_bridge_still_owns_the_only_cmd_vel_publisher():

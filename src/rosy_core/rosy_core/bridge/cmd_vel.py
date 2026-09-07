@@ -15,7 +15,7 @@ SAF-002 정지가 늦어지지 않게 하는 규칙 두 가지:
 
 from __future__ import annotations
 
-from typing import Callable, Protocol
+from typing import Any, Callable, Protocol
 
 
 class _Output(Protocol):
@@ -24,7 +24,7 @@ class _Output(Protocol):
 
 
 class _Command(Protocol):
-    def select_output(self): ...
+    def select_output(self) -> _Output: ...
     def announce_pending(self) -> None: ...
 
 
@@ -35,12 +35,18 @@ class _Power(Protocol):
 
 
 def cmd_vel_cycle(command: _Command, power: _Power,
-                  send: Callable[[_Output], None]) -> None:
+                  send: Callable[[Any], None]) -> None:
     """값을 고르고, 바퀴로 내보내고, 그 뒤에 알린다.
 
     `send` 에는 고른 값을 **통째로** 넘긴다. `(linear, angular)` 두 개를
     자리로 넘기면 받는 쪽에서 둘을 바꿔 적어도 타입은 맞고, 그것은
     전진 명령을 제자리 회전으로 바꾼다.
+
+    `send` 자체는 `Any` 를 받는다. 콜백 인자는 반공변이라 `_Output` 으로
+    좁히면 구체 타입(`CoreTwist`)을 받는 실제 콜백이 대입되지 않는다 —
+    `_Command`·`_Power` 는 인자 자리라 구조적 타이핑이 그대로 되지만
+    콜백은 방향이 뒤집힌다. 지키려는 것(두 값을 바꿔 적는 것)은
+    `select_output` 의 반환 타입으로 이미 검사된다.
     """
     out = command.select_output()
     send(out)
