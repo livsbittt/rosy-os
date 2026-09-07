@@ -22,6 +22,8 @@ Host-side pytest for deploy/release/motor/network contracts. These tests do **no
 | `test_network_provisioner.py` | Wi-Fi / nmcli provisioning |
 | `test_network_topology_contracts.py` | Pins ADR D-26 / CORE SRS / OS design / Implementation Plan on `SITE_STA` + opt-in `RELAY_AP_STA` |
 | `test_pi_wifi_deployment.py` | SD-card Wi-Fi/SSH first-boot contracts |
+| `test_dds_identity_contracts.py` | Pins ADR D-33: identity derives from one robot number, with no default in the template, installer or compose. Drives the real installer through bash rather than asserting the call exists |
+| `test_nav2_bandwidth_contracts.py` | Pins ADR D-34 publish rates against the dashboard poll they are matched to, including the launch-time rewritten params file |
 | `test_release_boundary_guards.py` | CORE must not hold host privilege (D-22) |
 | `test_release_layout.py` | On-disk release layout |
 | `test_release_manifest.py` | Manifest schema |
@@ -48,6 +50,7 @@ None (ignore `__pycache__/`).
 - Changing SITE_STA / relay wording in one doc without the others fails `test_network_topology_contracts.py`.
 - In `test_dashboard_browser.py`, waiting on `window.__apiCalls` proves the click fired, not that the handler finished — the fetch stub records the call before it answers. Wait on the visible outcome (the message element) or the assertion races the promise.
 - Run it before shipping dashboard JS: `ROSY_RUN_BROWSER_TESTS=1 python -m pytest test/test_dashboard_browser.py`. Opt-in tests that are never run are not coverage.
+- A new guard, gate or contract test is not believed until it has been **mutation-proven**: change the thing it guards, watch it go red, restore, watch it go green — and confirm the mutation actually landed before trusting the red. Assertions on source text are the easiest to write as tautologies, so mutate them harder, not less (`docs/solutions/workflow-issues/inability-to-check-recorded-as-clean-result.md`).
 
 ### Testing Requirements
 

@@ -13,6 +13,7 @@ ROSY is a robot middleware and fleet-control platform (ROS 2 Jazzy, first hardwa
 | `README.md` | Repo overview, colcon/sim launch, Pi 5 runtime, phase roadmap |
 | `LICENSE` | Apache License 2.0 |
 | `env.sh` | Dev env: source ROS 2 Jazzy then workspace `install/setup.bash` |
+| `CONCEPTS.md` | Shared domain vocabulary — entities, named processes, status concepts with project-specific meaning |
 | `.gitignore` | Ignores colcon `build/` `install/` `log/`, `__pycache__`, `.omc/` |
 
 ## Subdirectories
@@ -25,6 +26,7 @@ ROSY is a robot middleware and fleet-control platform (ROS 2 Jazzy, first hardwa
 | `dock/` | Charging-dock firmware and ROSY-DOCK-001 contract (see `dock/AGENTS.md`) |
 | `test/` | Host pytest for deploy/release/motor contracts (see `test/AGENTS.md`) |
 | `doc/` | Architecture images and ARM64 notes (see `doc/AGENTS.md`) |
+| `docs/solutions/` | Documented solutions to past problems — bugs, best practices, workflow patterns — by category, with YAML frontmatter (`module`, `tags`, `problem_type`). Relevant when implementing or debugging in a documented area |
 | `reference/` | Frozen upstream pinky_pro zip (see `reference/AGENTS.md`) |
 | `.github/` | CI workflow (see `.github/AGENTS.md`) |
 
@@ -62,7 +64,10 @@ CI (`.github/workflows/ci.yml`) on `main` / PRs: colcon build in `ros:jazzy-ros-
 
 - Requirement IDs (`CORE-001`, `SAF-005`, `PWR-001`) not section numbers (D-17).
 - Python packages: ament_python (`setup.py` + `package.xml`). C++/URDF/Nav2/interfaces: ament_cmake.
-- Namespaces + `frame_prefix` for multi-robot (D-4). Default robot id `rosy_01`.
+- Namespaces + `frame_prefix` for multi-robot (D-4). Robot identity has **no default**:
+  `ROS_DOMAIN_ID` = 40 + N and `ROSY_NAMESPACE` = `rosy_%02d` are derived from
+  `ROSY_ROBOT_NUMBER` at install, and a missing identity stops the runtime (D-33).
+  A default here is what once shipped every unit as 42/`rosy_01`.
 - Dashboard is FastAPI static files under `rosy_core/web/`, not a Node server (D-23). D-7 (React+Vite) is not the current dashboard.
 
 ## Dependencies
