@@ -116,9 +116,9 @@ Create `src/rosy_core/rosy_core/docking/profile.py`:
 """rosy_core.docking.profile — 스캔에서 도크 기둥 배치를 찾아 상대 포즈를 낸다.
 
 **횡방향은 방위각으로, 깊이만 거리로 잰다.** 방위각에는 거리 잡음이 없어서 이
-추정기의 횡오차는 거리 잡음이 6배 변해도 거의 움직이지 않는다(5.25 → 4.94 mm).
-그 성질이 V 면 대신 기둥을 고른 이유다 — V 는 26.2 → 2.1 mm 로 잡음에 비례해서,
-통과 여부가 아직 아무도 재지 않은 C1 잡음에 인질로 잡힌다.
+추정기의 횡오차는 거리 잡음이 6배 변해도 거의 움직이지 않는다(0.87 → 0.60 mm).
+그 성질이 V 면 대신 기둥을 고른 이유다 — V 는 잡음에 비례해서, 통과 여부가 아직
+아무도 재지 않은 C1 잡음에 인질로 잡힌다.
 
 ROS 무의존 — 평평한 배열을 받고 `base_link` 기준 포즈를 돌려준다. 스캔 메시지를
 보지 않으므로 host pytest 가 이 결정을 전부 본다(criterion C1).
@@ -669,6 +669,7 @@ picker of the worst noise sample: at sigma = 20 mm it pushed a correct dock
 to 29.4 mm residual while a wrong layout sat at 21.8 mm, so no threshold
 could do both jobs. Averaging the arc and correcting by (pi/4)r drops the
 worst correct case to 13.0 mm.'
+```
 
 ---
 
@@ -1010,9 +1011,10 @@ class ProbeVerdict:
 def verdict(rows: Iterable[ProbeRow]) -> tuple[ProbeVerdict, ...]:
     """표에 등장한 후보마다 판정을 낸다. 순서는 후보 이름 순이다."""
     collected = list(rows)
-    arms = {"geometry": _verdict_geometry,
-            "intensity": _verdict_intensity,
-            "ir": _verdict_ir}
+    # 후보 팔은 Task 7 에서 두 개가 더 등록된다. 여기서 미리 이름을 적어 두면
+    # `verdict()` 를 호출하는 순간 NameError 가 나고, Task 6 커밋이 red 로
+    # 남는다 — 파이썬은 전역을 호출 시점에 찾는다.
+    arms = {"geometry": _verdict_geometry}
     out = []
     for name in sorted({row.candidate for row in collected}):
         arm = arms.get(name)
@@ -1190,7 +1192,18 @@ Expected: FAIL — the intensity rows return `ProbeVerdict("intensity", False, (
 
 - [ ] **Step 3: Implement both arms**
 
-Append to `src/rosy_core/rosy_core/docking/probe.py`:
+First register them, so `verdict()` can reach them. In
+`src/rosy_core/rosy_core/docking/probe.py`, extend the dispatch table inside
+`verdict()` — dropping the Task 6 comment about the missing arms, which is now
+untrue:
+
+```python
+    arms = {"geometry": _verdict_geometry,
+            "intensity": _verdict_intensity,
+            "ir": _verdict_ir}
+```
+
+Then append to the same file:
 
 ```python
 def _verdict_intensity(rows: Sequence[ProbeRow]) -> ProbeVerdict:
