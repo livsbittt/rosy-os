@@ -238,7 +238,8 @@ argparse 구동, read-only, "무엇을 일부러 하지 않는지"를 docstring�
 
 한 줄 = 한 표본:
 
-- 출처: `lane`(sim/bench), `candidate`(geometry/intensity/ir)
+- 출처: `lane`(sim/bench), `candidate`(geometry/intensity/ir),
+  `dock_present`(도크가 앞에 있었는가 — 거짓 양성과 주변광 바닥을 이 칸이 가른다)
 - 정답: `truth_x`, `truth_y`, `truth_yaw`, `ambient`(실기 조명 조건)
 - 관측(기하): `fit_x`, `fit_y`, `fit_yaw`, `residual`, `points`, `confidence`
 - 관측(intensity): `int_target`, `int_baseline`

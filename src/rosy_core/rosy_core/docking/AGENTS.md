@@ -17,6 +17,8 @@ Docking state machine (DNC-002–003). Map pose is only for staging; final appro
 | `detector.py` | `DockDetector` protocol + `SimulatedDetector` |
 | `charging.py` | `ChargingConfirmation` (contact vs current) |
 | `agent.py` | Poll client for dock `GET /status` (urllib only; required `load_present`/`charging`) |
+| `profile.py` | `DockProfile`, `fit()` — three asymmetric posts in a flat scan → `base_link` pose |
+| `probe.py` | `ProbeRow` CSV schema + `verdict()` — picks the detector from measured rows |
 
 ## Subdirectories
 
@@ -34,6 +36,10 @@ None.
 
 ```bash
 python3 -m pytest src/rosy_core/test/test_docking.py -v
+```
+
+```bash
+python3 -m pytest src/rosy_core/test/test_dock_profile.py src/rosy_core/test/test_dock_probe.py -v
 ```
 
 ### Common Patterns
