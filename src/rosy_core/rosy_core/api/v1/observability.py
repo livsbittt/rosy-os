@@ -93,6 +93,16 @@ def metrics(svc: CoreServices = Depends(get_services)):
         "# HELP rosy_audit_write_failures consecutive audit log write failures (LOG-001)",
         "# TYPE rosy_audit_write_failures gauge",
         f"rosy_audit_write_failures {audit['write_failures']}",
+        # 게이지만 있으면 스크레이프 사이에서 실패했다 복구한 로봇은 늘 0 이다.
+        # 누적 카운터는 되돌아가지 않으므로 `increase()` 로 그것이 보인다.
+        "# HELP rosy_audit_write_failures_total audit log write failures since boot (LOG-001)",
+        "# TYPE rosy_audit_write_failures_total counter",
+        f"rosy_audit_write_failures_total {audit['write_failures_total']}",
+        # 정리 실패는 기록 실패가 아니다. 감사 기록은 남고 있는데 파일이 30 일보다
+        # 길게 자라는 중이라는 뜻이라, 경보 기준이 다르다.
+        "# HELP rosy_audit_prune_failures_total audit log prune failures since boot",
+        "# TYPE rosy_audit_prune_failures_total counter",
+        f"rosy_audit_prune_failures_total {audit['prune_failures']}",
     ]
     for component, health in snap.diagnostics_summary.items():
         lines.append(f'rosy_diagnostics_health{{component="{component}"}} {_HEALTH_VALUE[health.value]}')

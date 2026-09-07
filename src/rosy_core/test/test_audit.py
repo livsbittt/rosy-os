@@ -150,9 +150,13 @@ def test_pruning_keeps_the_original_line_rather_than_re_serialising(tmp_path):
     kept_line = path.read_text(encoding="utf-8").strip()
 
     log.record(_event(2, (now - timedelta(days=31)).isoformat()))
-    FileAuditLog(path, retention_days=30, now=lambda: now).history()
+    # 정리는 쓰기 경로가 한다. 새 인스턴스의 첫 기록이 그 시각이다.
+    fresh = FileAuditLog(path, retention_days=30, now=lambda: now)
+    fresh.record(_event(3, now.isoformat()))
 
-    assert path.read_text(encoding="utf-8").strip() == kept_line
+    lines = path.read_text(encoding="utf-8").strip().splitlines()
+    assert lines[0] == kept_line
+    assert len(lines) == 2, "the stale line is gone and the two fresh ones are byte-identical"
 
 
 def test_a_failed_prune_leaves_the_log_intact(tmp_path, monkeypatch):
@@ -165,12 +169,82 @@ def test_a_failed_prune_leaves_the_log_intact(tmp_path, monkeypatch):
     log.record(_event(1, now.isoformat()))
     before = path.read_text(encoding="utf-8")
 
-    monkeypatch.setattr(_os, "replace", lambda *a, **k: (_ for _ in ()).throw(OSError("disk")))
-    with pytest.raises(OSError):
-        FileAuditLog(path, retention_days=30, now=lambda: now).history()
+    log.record(_event(2, (now - timedelta(days=31)).isoformat()))
+    before = path.read_text(encoding="utf-8")
 
-    assert path.read_text(encoding="utf-8") == before
+    monkeypatch.setattr(_os, "replace", lambda *a, **k: (_ for _ in ()).throw(OSError("disk")))
+    fresh = FileAuditLog(path, retention_days=30, now=lambda: now)
+    fresh.record(_event(3, now.isoformat()))       # 덧붙이기는 되고 정리만 실패한다
+
+    assert path.read_text(encoding="utf-8").startswith(before)
     assert not list(tmp_path.glob("*.tmp")), "the temporary file must not be left behind"
+
+
+def test_a_failed_prune_is_not_reported_as_an_unwritable_log(tmp_path, monkeypatch):
+    """덧붙이기가 성공했으면 그 이벤트는 기록됐다.
+
+    정리 실패를 쓰기 실패로 세면 `/logs/audit` 은 감사 기록이 멀쩡한 로봇을
+    두고 "LOG-001 이 꺼졌다"고 답한다 — 운영자가 좇을 곳이 틀린다.
+    """
+    import os as _os
+
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    # 지난 실행이 남긴 오래된 줄. `record()` 로 넣으면 그 자리에서 정리돼 버린다.
+    stale = _event(1, (now - timedelta(days=31)).isoformat()).model_dump_json()
+    path.write_text(stale + "\n", encoding="utf-8")
+
+    monkeypatch.setattr(_os, "replace", lambda *a, **k: (_ for _ in ()).throw(OSError("disk")))
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+    log.record(_event(2, now.isoformat()))         # 예외가 밖으로 나오지 않는다
+
+    health = log.health()
+    assert health["writable"] is True
+    assert health["write_failures"] == 0 and health["write_failures_total"] == 0
+    assert health["prune_failures"] == 1
+    assert "prune" in health["last_error"]
+    assert [event.seq for event in log.history()] == [2], "the new event is on disk"
+
+
+def test_a_read_does_not_rewrite_the_file(tmp_path):
+    """조회는 파일을 건드리지 않는다.
+
+    예전에는 읽을 때마다 정리를 돌렸다 — 대시보드가 5 초마다 폴링하면 5 초마다
+    30 일치 감사 로그를 통째로 재작성하는 것이고, 그 비용은 `record()` 와 같은
+    락 안에 있어 50 Hz cmd_vel 스레드가 문다.
+    """
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+    log.record(_event(1, (now - timedelta(days=31)).isoformat()))
+    log.record(_event(2, now.isoformat()))
+    before = path.read_bytes()
+    mtime = path.stat().st_mtime_ns
+
+    assert [event.seq for event in log.history()] == [2], "the stale one is filtered out"
+
+    assert path.read_bytes() == before
+    assert path.stat().st_mtime_ns == mtime
+
+
+def test_a_prune_with_nothing_to_drop_does_not_rewrite(tmp_path):
+    """버릴 것이 없으면 쓰지 않는다. 같은 내용으로 갈아 끼우는 동안 원본이
+    잠깐 사라지는 창이 생기고, 그것을 매 시각 여는 이유가 없다."""
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    FileAuditLog(path, retention_days=30, now=lambda: now).record(_event(1, now.isoformat()))
+
+    seen = []
+    import os as _os
+    real = _os.replace
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+    try:
+        _os.replace = lambda *a, **k: (seen.append(a), real(*a, **k))[1]
+        log.record(_event(2, now.isoformat()))     # 첫 기록 = 정리 시각
+    finally:
+        _os.replace = real
+
+    assert seen == []
 
 
 # --- LOG-001 이 꺼졌다는 사실은 어딘가에 남아야 한다 ---------------------------
@@ -183,7 +257,9 @@ def test_a_write_failure_is_counted_rather_than_lost(tmp_path, monkeypatch):
     않는다 — 나중에 사고를 조사할 때 비어 있는 로그와 구분되지 않는다.
     """
     log = FileAuditLog(tmp_path / "audit.jsonl")
-    assert log.health() == {"writable": True, "write_failures": 0, "last_error": None}
+    assert log.health() == {"writable": True, "write_failures": 0,
+                            "write_failures_total": 0, "prune_failures": 0,
+                            "last_error": None}
 
     def refuse(*args, **kwargs):
         raise OSError(28, "No space left on device")
@@ -196,6 +272,7 @@ def test_a_write_failure_is_counted_rather_than_lost(tmp_path, monkeypatch):
     health = log.health()
     assert health["writable"] is False
     assert health["write_failures"] == 3
+    assert health["write_failures_total"] == 3
     assert "No space left" in health["last_error"]
 
 
@@ -231,5 +308,11 @@ def test_a_recovered_write_clears_the_alarm(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "open", real_open)
     log.record(_event(2, "2026-09-03T12:00:00+00:00"))
 
-    assert log.health() == {"writable": True, "write_failures": 0, "last_error": None}
+    health = log.health()
+    assert health["writable"] is True and health["write_failures"] == 0
+    # 누적 카운터와 마지막 사유는 남는다. 성공 한 번에 지워 버리면 간헐적으로
+    # 실패하는 디스크는 운영자가 볼 때마다 늘 깨끗하고, Prometheus 는 카운터가
+    # 0 으로 돌아간 것을 재시작으로 읽어 그 실패를 통째로 잃는다.
+    assert health["write_failures_total"] == 1
+    assert "nope" in health["last_error"]
 
