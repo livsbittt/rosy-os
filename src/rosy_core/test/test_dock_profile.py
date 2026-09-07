@@ -130,3 +130,39 @@ def test_three_posts_cluster_as_three_even_at_pessimistic_noise():
         profile, 0.5, 0.0, 0.0, sigma=0.020, seed=3)
     got = fit(ranges, angle_min, step, profile, SensorOffset(), now=1.0)
     assert got.clusters == 3
+
+
+def test_an_exact_scan_recovers_the_pose_in_base_link():
+    profile = DockProfile()
+    sensor = SensorOffset()
+    ranges, angle_min, step = _scan_of_posts(
+        profile, 0.500, 0.030, math.radians(8.0), step=STEP_C1)
+    got = fit(ranges, angle_min, step, profile, sensor, now=12.5)
+
+    assert got.found is True
+    # base_link = sensor frame shifted by the scanner offset
+    assert got.observation.x == pytest.approx(0.500 + sensor.x, abs=0.005)
+    assert got.observation.y == pytest.approx(0.030, abs=0.003)
+    assert got.observation.yaw == pytest.approx(math.radians(8.0), abs=math.radians(3.0))
+    assert got.observation.at == 12.5
+    assert got.residual_m is not None and got.residual_m < profile.max_residual_m
+
+
+def test_the_scanner_offset_is_applied_and_not_forgotten():
+    profile = DockProfile()
+    ranges, angle_min, step = _scan_of_posts(profile, 0.500, 0.0, 0.0, step=STEP_C1)
+    zero = fit(ranges, angle_min, step, profile, SensorOffset(0.0, 0.0, 0.0), now=1.0)
+    real = fit(ranges, angle_min, step, profile, SensorOffset(), now=1.0)
+    assert zero.observation.x - real.observation.x == pytest.approx(0.017, abs=1e-6)
+
+
+def test_a_layout_that_does_not_match_is_refused_by_the_residual_gate():
+    # Three posts really are there, but not at this profile's spacing. The
+    # residual is what separates "the dock" from "three things".
+    seen = DockProfile(post_lateral_m=(-0.075, -0.015, 0.075))
+    ranges, angle_min, step = _scan_of_posts(
+        DockProfile(post_lateral_m=(-0.100, 0.010, 0.090)),
+        0.500, 0.0, 0.0, step=STEP_C1)
+    got = fit(ranges, angle_min, step, seen, SensorOffset(), now=1.0)
+    assert got.found is False
+    assert "residual" in (got.reason or "")

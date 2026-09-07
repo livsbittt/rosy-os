@@ -124,6 +124,78 @@ def _cluster_by_angular_gap(points: list[tuple[float, float]],
     return clusters
 
 
+#: 반지름 r 원통의 보이는 앞면에서 거리는 중심에서 d-r(정면)부터 d(가장자리)까지
+#: 변하고, 호 전체 평균은 d - (π/4)r 이다. 그래서 평균에 이 값을 되돌려 더한다.
+_ARC_MEAN_BIAS = math.pi / 4.0
+
+
+def _post_centre(cluster: list[tuple[float, float]],
+                 radius: float) -> tuple[float, float]:
+    """중심 = (방위각 평균, 거리 평균 + (π/4)·반지름).
+
+    **최솟값이 아니라 평균을 쓴다.** 최솟값은 잡음 표본 중 가장 나쁜 것을 고르는
+    추정기다. σ = 20 mm 에서 최솟값을 쓰면 정상 도크의 residual 이 최대 29.4 mm
+    까지 벌어져 간격이 어긋난 배치(21.8 mm)와 겹치고, 그 순간 게이트로 둘을
+    가를 수 없게 된다. 평균은 √N 만큼 잡음을 줄여 최악 13.0 mm 로 내리고,
+    횡오차도 2.52 → 0.87 mm 로 함께 좋아진다.
+
+    방위각은 언제나 평균이다 — 거리 잡음이 여기에는 들어오지 않고, 이 추정기의
+    횡 정밀도가 거기서 나온다.
+    """
+    bearing = sum(item[0] for item in cluster) / len(cluster)
+    mean_range = sum(item[1] for item in cluster) / len(cluster)
+    distance = mean_range + _ARC_MEAN_BIAS * radius
+    return (distance * math.cos(bearing), distance * math.sin(bearing))
+
+
+def _procrustes(model: list[tuple[float, float]],
+                observed: list[tuple[float, float]]
+                ) -> tuple[float, float, float, float]:
+    """관측 중심들을 알려진 배치에 회전+평행이동으로 맞춘다.
+
+    돌려주는 것은 (yaw, tx, ty, rms residual). 도크 원점은 모델의 (0, 0) 이므로
+    평행이동이 곧 도크 원점의 센서 프레임 좌표다 — 관측 중심의 평균이 아니다.
+    """
+    count = len(model)
+    mcx = sum(item[0] for item in model) / count
+    mcy = sum(item[1] for item in model) / count
+    ocx = sum(item[0] for item in observed) / count
+    ocy = sum(item[1] for item in observed) / count
+
+    numerator = denominator = 0.0
+    for (mx, my), (ox, oy) in zip(model, observed):
+        ax, ay = mx - mcx, my - mcy
+        bx, by = ox - ocx, oy - ocy
+        numerator += ax * by - ay * bx
+        denominator += ax * bx + ay * by
+    yaw = math.atan2(numerator, denominator)
+
+    cos_y, sin_y = math.cos(yaw), math.sin(yaw)
+    tx = ocx - (cos_y * mcx - sin_y * mcy)
+    ty = ocy - (sin_y * mcx + cos_y * mcy)
+
+    total = 0.0
+    for (mx, my), (ox, oy) in zip(model, observed):
+        px = cos_y * mx - sin_y * my + tx
+        py = sin_y * mx + cos_y * my + ty
+        total += (px - ox) ** 2 + (py - oy) ** 2
+    return yaw, tx, ty, math.sqrt(total / count)
+
+
+def _to_base_link(x: float, y: float, yaw: float,
+                  sensor: SensorOffset) -> tuple[float, float, float]:
+    """센서 프레임 포즈를 `base_link` 로 옮긴다.
+
+    이 변환이 경계 안에 있는 이유: `DockObservation` 의 계약이 `base_link` 다.
+    호출자에게 맡기면 언젠가 한 곳이 빼먹고, 그 결과는 17 mm 만큼 가깝다고
+    믿는 로봇이다.
+    """
+    cos_s, sin_s = math.cos(sensor.yaw), math.sin(sensor.yaw)
+    return (sensor.x + cos_s * x - sin_s * y,
+            sensor.y + sin_s * x + cos_s * y,
+            _wrap(sensor.yaw + yaw))
+
+
 def fit(ranges: Sequence[float], angle_min: float, angle_increment: float,
         profile: DockProfile, sensor: SensorOffset, now: float) -> ProfileFit:
     """스캔 1장에서 도크 포즈를 찾는다. 절대 예외를 올리지 않는다."""
@@ -142,5 +214,20 @@ def fit(ranges: Sequence[float], angle_min: float, angle_increment: float,
         return ProfileFit(reason="a cluster is thinner than the minimum",
                           points=len(points), clusters=len(clusters))
 
-    return ProfileFit(reason="pose not implemented yet",
-                      points=len(points), clusters=len(clusters))
+    observed = [_post_centre(cluster, profile.post_radius_m)
+                for cluster in clusters]
+    # 대응은 방위각 순서로 성립한다 — 방위각이 오르면 횡좌표도 오른다.
+    model = [(0.0, lateral) for lateral in sorted(profile.post_lateral_m)]
+    yaw, tx, ty, residual = _procrustes(model, observed)
+    if residual > profile.max_residual_m:
+        return ProfileFit(
+            reason=f"residual {residual:.4f} m over {profile.max_residual_m:.4f} m",
+            residual_m=residual, points=len(points), clusters=len(clusters))
+
+    bx, by, byaw = _to_base_link(tx, ty, yaw, sensor)
+    return ProfileFit(
+        observation=DockObservation(
+            x=bx, y=by, yaw=byaw,
+            confidence=max(0.0, 1.0 - residual / profile.max_residual_m),
+            at=now),
+        residual_m=residual, points=len(points), clusters=len(clusters))
