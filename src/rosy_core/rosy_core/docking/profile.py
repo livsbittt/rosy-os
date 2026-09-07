@@ -78,3 +78,69 @@ class ProfileFit:
     @property
     def found(self) -> bool:
         return self.observation is not None
+
+
+def _forward_points(ranges: Sequence[float], angle_min: float,
+                    angle_increment: float,
+                    profile: DockProfile) -> list[tuple[float, float]]:
+    """(방위각, 거리) 목록. 전방 창 밖·비유한·과대 거리는 버린다."""
+    points: list[tuple[float, float]] = []
+    for index, value in enumerate(ranges):
+        bearing = _wrap(angle_min + index * angle_increment)
+        if abs(bearing) > profile.search_half_angle_rad:
+            continue
+        try:
+            distance = float(value)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(distance):
+            continue
+        if distance <= 0.0 or distance > profile.max_range_m:
+            continue
+        points.append((bearing, distance))
+    points.sort()
+    return points
+
+
+def _cluster_by_angular_gap(points: list[tuple[float, float]],
+                            angle_increment: float
+                            ) -> list[list[tuple[float, float]]]:
+    """각도 간극으로만 자른다.
+
+    기둥 사이는 광선이 아무것도 맞히지 않아 방위각이 그냥 건너뛴다. 그 간극에는
+    거리 잡음이 없다. 거리 불연속으로 자르면 σ = 20 mm 에서 클러스터가 갈라져
+    400회 중 398회를 놓친다 — 실제로 그렇게 짜서 확인했다.
+    """
+    gap = 1.5 * abs(angle_increment)
+    clusters: list[list[tuple[float, float]]] = []
+    current = [points[0]]
+    for previous, point in zip(points, points[1:]):
+        if point[0] - previous[0] > gap:
+            clusters.append(current)
+            current = [point]
+        else:
+            current.append(point)
+    clusters.append(current)
+    return clusters
+
+
+def fit(ranges: Sequence[float], angle_min: float, angle_increment: float,
+        profile: DockProfile, sensor: SensorOffset, now: float) -> ProfileFit:
+    """스캔 1장에서 도크 포즈를 찾는다. 절대 예외를 올리지 않는다."""
+    wanted = len(profile.post_lateral_m)
+    points = _forward_points(ranges, angle_min, angle_increment, profile)
+    if len(points) < profile.min_points_per_post * wanted:
+        return ProfileFit(reason="too few returns in the forward window",
+                          points=len(points))
+
+    clusters = _cluster_by_angular_gap(points, angle_increment)
+    if len(clusters) != wanted:
+        return ProfileFit(
+            reason=f"expected {wanted} clusters, saw {len(clusters)}",
+            points=len(points), clusters=len(clusters))
+    if any(len(cluster) < profile.min_points_per_post for cluster in clusters):
+        return ProfileFit(reason="a cluster is thinner than the minimum",
+                          points=len(points), clusters=len(clusters))
+
+    return ProfileFit(reason="pose not implemented yet",
+                      points=len(points), clusters=len(clusters))
