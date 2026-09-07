@@ -215,11 +215,15 @@ Each cites an in-tree counter-example, because an anti-criterion without one is 
 
 ## Verdicts
 
-### `bridge/ros_bridge.py` — split **within** `bridge/`
+### `bridge/ros_bridge.py` — split **within** `bridge/` · **done, and bounded**
 
-C1, C2, C3 and C6 all fire. Not a new package: ROS-101 keeps all ROS I/O in `bridge/`, and D-1 keeps the process single. The split is into ROS-free siblings inside `bridge/`, following `translate.py` and `goal_tracker.py`.
+C1, C2, C3 and C6 all fired. Not a new package: ROS-101 keeps all ROS I/O in `bridge/`, and D-1 keeps the process single. The split was into ROS-free siblings inside `bridge/`, following `translate.py` and `goal_tracker.py`.
 
-**The target is decisions covered by real-value host tests, not fewer lines.** A 559-line file of `translate → call service` one-liners would be correct. Note the corollary, learned from `goal_tracker.py`: extracting *stateful* logic can make the caller **longer**, because the sibling absorbs the algorithm and the call site grows the wiring. Net line count is not the measure.
+**The target is decisions covered by real-value host tests, not fewer lines** — and that target is met. Seven decisions now live in ROS-free siblings with real-value host tests: `translate.py`, `goal_tracker.py`, `display.py`, `reconcile.py`, `odometry.py`, `save_map.py`, `battery_policy.py`. What remains in `ros_bridge.py` (516 lines) is registration, one-line callbacks delegating to those siblings, and the Nav2 action plumbing. **C1 no longer fires on anything in it**: there is no remaining decision host pytest cannot see.
+
+Note the corollary, learned from `goal_tracker.py`: extracting *stateful* logic can make the caller **longer**, because the sibling absorbs the algorithm and the call site grows the wiring. Net line count is not the measure.
+
+**C2 and C3 still fire, and are accepted — see the accept-row below.**
 
 ### mapping — **no `mapping/` package**
 
@@ -259,3 +263,27 @@ C5 fired with `{nav, maps, waypoints}`. Resolved: `map_router` → `api/v1/map.p
 - **`api/v1/control.py` → `{command, nav}`.** `svc.nav.cancel()` inside a mode transition is coordination, not ownership: leaving a navigation mode must stop navigation. Splitting would put half a state transition in each of two files. **No action.**
 - **`api/v1/safety.py` → `{safety, battery}`.** `svc.battery.apply_thresholds()` is a `power/` object mutated from a `safety/` endpoint — one settings write that must land atomically across both. **No split**; fix the *access shape* only (the C6 `_cfg` reaches → a public `BatteryMonitor.deep_percent`). Whether SAF or PWR owns battery thresholds is genuinely open and larger than this document.
 - **`NavigationManager` — the C7 instance.** NAV-005 mapping-session state on a NAV-001~004/006 manager. Accepted; unblocks on the `mapping/` trigger. Recorded in `navigation/AGENTS.md`.
+- **`RosBridge` — the C2 and C3 instances. Accepted; the per-domain adapter reshape (3b) is declined.**
+
+  **C2** — six timers across five independently-failing domains. **C3** — one class satisfying `NavExecutor` and `DockingExecutor`, both `typing.Protocol`, with no declared base.
+
+  **Why declined.** Both are *worked verdicts*, not published criteria — records of a judgement over one class, which is what this section is for. Three reasons, in descending weight:
+
+  1. **The stated target is met.** The verdict above defines it as *"decisions covered by real-value host tests, not fewer lines."* The extraction delivered exactly that. Reshaping the remaining wiring into per-domain adapters buys class shape, which that sentence names as not the objective.
+  2. **Neither benefit is worth what it costs here.** C2's real content is fault isolation between timer ticks — but D-1 keeps the process single, so adapters built by a composition root share the executor and the coupling exactly as today. Only the source file changes. The isolation C2 actually wants is a per-tick `try/except`, which `_tick_swarm` already has; extending it is a **per-timer judgement, not a blanket edit**, and on the D-2 `cmd_vel` timer a guard is *harmful* — swallowing there means the robot silently stops receiving velocity commands while the node looks healthy. That change alters failure behaviour on the D-2 and SAF-005 paths and needs Pi evidence.
+  3. **The gate cannot see the reshape's failure modes.** `test/test_bridge_timers.py` now pins callbacks, QoS and the four clients, which is a real gate — but CI boot smoke does not currently run (this repository has no remote), and no Pi evidence is available. A timer-ownership change whose primary risks sit in the semantic layer the harness disclaims does not merge on a document's tidiness.
+
+  **Rejected remedy, recorded so it is not re-proposed.** Declaring `class RosBridge(NavExecutor, DockingExecutor)` looks like a one-line fix for C3 — nominal instead of duck-typed conformance. **It is worse than the status quo.** Protocol members are declared with `...` bodies, so explicit subclassing *inherits them as methods returning `None`*: a member added to the Protocol and forgotten on the bridge becomes a **silent no-op** instead of an `AttributeError`. Verified:
+
+  ```
+  duck-typed, missing member : AttributeError -> 'Duck' object has no attribute 'forgotten'
+  explicit Protocol base     : returned None  <-- SILENT NO-OP
+  ```
+
+  That is D-32's exact failure shape — the defect this plan's Step 2 existed to fix. Duck typing plus `test_executor_contracts.py`'s AST check is strictly safer: the omission raises loudly at runtime *and* fails a test at author time.
+
+  **X6 applies independently:** `ros_bridge.py` is under active contention across five worktrees and the DDS Phase 0 measurement work.
+
+  **What holds the line instead.** `test/test_bridge_timers.py` pins six timers with periods and order, eleven subscriptions with callback and QoS, five publishers with QoS, four service clients, the action client, the TF listener and both executor wirings. `test/test_executor_contracts.py` pins both Protocols' member sets and the five diagnostics providers. Together these make the accepted violation *stable* — it cannot silently grow — which is what an accepted violation has to be.
+
+  **Re-entry trigger.** Any one of: (a) a seventh timer, or a sixth independently-failing domain, is added to `RosBridge`; (b) a third Protocol is satisfied by it; (c) a Pi becomes routinely available **and** CI boot smoke runs on the branch. Until then this is a recorded accept, not a backlog item.

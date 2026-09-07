@@ -12,7 +12,7 @@ ROS-101: the only module allowed to import rclpy message types and talk to the R
 | File | Description |
 |------|-------------|
 | `__init__.py` | Package marker |
-| `ros_bridge.py` | Subs (odom, battery, nav_cmd_vel, range, batt_state), pubs (cmd_vel, power/mode, display/info), Nav2 action, TF, LiDAR motor services, SetLed |
+| `ros_bridge.py` | 11 subs, 5 pubs, 4 service clients, 6 timers, the Nav2 action client and TF. Exact list pinned in `test/test_bridge_timers.py` — update both together |
 | `translate.py` | ROS-free message → domain dict conversion. Imports no ROS type, so host pytest runs it |
 | `goal_tracker.py` | ROS-free Nav2 goal generations: which result is current, what to cancel |
 | `display.py` | ROS-free `display/info` decisions: address resolution and payload rounding (PWR-003) |
@@ -37,14 +37,24 @@ None.
 - `_setup_diagnostics` registers exactly `{rosy_core, cpu, memory, disk, odom_topic}`. That set is the baseline any
   refactor of this file must reproduce — compare `GET /api/v1/diagnostics` key-for-key, not for non-emptiness. A dropped
   provider shows up as a missing key, never as an error.
+- Costmaps: subscribe to `*_costmap/costmap_raw` only. Nav2 publishes the same grid on two topics —
+  `costmap` is `nav_msgs/OccupancyGrid`, `costmap_raw` is `nav2_msgs/Costmap`. Four subscriptions used to
+  exist; the two non-`_raw` ones read the wrong type, so they never matched and cost discovery for no data.
+  Corroborated by `rosy_navigation/params/nav2_params.yaml`, which points Nav2's own consumers at `_raw`.
+  *(Recorded here because the deletion shipped inside a commit about battery policy and is not reviewable
+  from that commit's message.)*
 - Message → dict conversion belongs in `translate.py`, not in a callback. A callback should read one line: translate, then hand the result to a service. Anything computed inline in `ros_bridge.py` cannot be tested on the host, and the source-grep tests that stand in for it pass on wrong values.
 
 ### Testing Requirements
 
-Host pytest does not import `ros_bridge.py` (optional ROS): CI boot smoke + SaveMap guard cover it.
+Host pytest does not import `ros_bridge.py` (optional ROS). CI boot smoke + the SaveMap guard are what
+*should* cover it — **but note they have not run on this branch**: `ci.yml` triggers on `push: [main]` and
+`pull_request`, and this repository has no remote, so neither event can fire. Treat construction-time
+correctness in this file as unverified until CI actually runs.
 One exception, deliberately narrow — `test/test_bridge_timers.py` stubs `rclpy` in `sys.modules` to build
 the bridge against a recording node and assert **what it registers**: six timers at fixed periods, eleven
-subscriptions, five publishers, three service clients. Structural only. It exists so the 3b adapter reshape
+subscriptions with their callbacks and QoS, five publishers with QoS, four service clients, the action
+client, the TF listener and both executor wirings. Structural only. It exists so the 3b adapter reshape
 is gradable without a robot. Do not add semantic tests there and do not move the stub into `conftest.py` —
 a stub asserts stub semantics, and its blast radius is meant to stay one file.
 The ROS-free siblings are host-testable and carry real value assertions — `translate.py` (`test_bridge_translate.py`), `goal_tracker.py` (`test_goal_tracker.py`), `display.py` (`test_bridge_display.py`), `reconcile.py` (`test_bridge_reconcile.py`), `odometry.py` (`test_bridge_odometry.py`), `save_map.py` (`test_bridge_save_map.py`), `battery_policy.py` (`test_bridge_battery_policy.py`). Duck-typed `SimpleNamespace` inputs, no rclpy. Extract a decision here rather than leaving it inline: this file is the one place host pytest cannot reach.
