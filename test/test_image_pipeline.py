@@ -24,8 +24,30 @@ IMAGE_DIR = ROOT / "deploy" / "image"
 LOCK = IMAGE_DIR / "inputs.lock.yaml"
 SCRIPTS = ("build-image.sh", "verify-inputs.sh", "verify-artifacts.sh")
 
+
+def _bash_is_usable() -> bool:
+    """Probe once, but do not let one slow start silence the whole file.
+
+    A single probe made this file nondeterministic: three identical runs gave
+    43 passed, then 31 passed with 12 skipped, then a failure. Starting WSL
+    here is not reliably fast (5.7s cold against 0.23s warm), so a probe that
+    loses the race marked twelve gate tests "skipped" — which reads as a pass
+    in the summary line and is how a suite stops being a gate.
+    """
+    for _ in range(3):
+        try:
+            probe = subprocess.run(
+                ["bash", "-c", "true"], capture_output=True, check=False, timeout=60
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if probe.returncode == 0:
+            return True
+    return False
+
+
 bash_only = pytest.mark.skipif(
-    subprocess.run(["bash", "-c", "true"], capture_output=True, check=False).returncode != 0,
+    not _bash_is_usable(),
     reason="bash is required to exercise the pipeline scripts",
 )
 
@@ -295,13 +317,34 @@ def _bash_view(path: Path) -> str:
 
     The bash here is WSL, so the repository is /mnt/f/... and a Windows path
     means nothing to it. Asking bash itself avoids guessing.
+
+    This used to return whatever `pwd` printed, with check=False and no
+    validation. Starting WSL is not reliably fast on this host - a cold start
+    measured 5.7s against a 0.23s warm one - so the call sometimes came back
+    empty, and an empty answer became `ROSY_LAYOUT_ROOT=""`. The gate script
+    then fell back to its production default, never saw the fabricated
+    recovery-hold.json, exited 0, and `test_the_gate_blocks_a_held_device`
+    reported that a held device was allowed to boot. A flaky probe was being
+    read as a real verdict about the product.
+
+    So: retry, and refuse to answer rather than answer emptily.
     """
-    result = subprocess.run(
-        ["bash", "-c", "pwd"],
-        cwd=str(path), capture_output=True, text=True, encoding="utf-8",
-        errors="replace", check=False,
+    last = ""
+    for attempt in range(3):
+        result = subprocess.run(
+            ["bash", "-c", "pwd"],
+            cwd=str(path), capture_output=True, text=True, encoding="utf-8",
+            errors="replace", check=False, timeout=60,
+        )
+        answer = result.stdout.strip()
+        if result.returncode == 0 and answer:
+            return answer
+        last = (result.stderr or "").strip() or f"exit {result.returncode}, empty stdout"
+    raise RuntimeError(
+        f"bash could not report a path for {path} after 3 attempts ({last}). "
+        f"Refusing to continue: an empty path silently sends the script under "
+        f"test to its production defaults and turns this into a false verdict."
     )
-    return result.stdout.strip()
 
 
 def _run_gate(tmp_path: Path) -> subprocess.CompletedProcess:
