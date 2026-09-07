@@ -18,6 +18,7 @@ from __future__ import annotations
 import ast
 import re
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -43,50 +44,167 @@ class Emit:
         return f"{self.name} @ {self.where}"
 
 
-def _names_in(node: ast.AST) -> list[str]:
-    """이벤트 **이름 자리**의 문자열만. payload 안의 값은 세지 않는다.
+def _names_in(node: ast.AST) -> Optional[list[str]]:
+    """이벤트 **이름 자리**의 문자열. 정적으로 못 읽으면 `None`.
 
     `publish("config.changed", data={"key": "safety.limits"})` 에서
-    `safety.limits` 는 설정 키이지 이벤트가 아니다. 이름 자리만 보면 그런 것을
-    걸러내려고 예외 목록을 둘 이유가 없어진다 — 그 목록이 지난번에 실제
-    이벤트를 하나 숨겼다.
+    `safety.limits` 는 설정 키이지 이벤트가 아니다. 이름 자리만 보는 것으로
+    그런 것이 걸러진다.
+
+    `None` 과 빈 목록은 다르다. 빈 목록은 "이름이 아니다"(예: 첫 인자가 숫자),
+    `None` 은 "이름 자리인데 읽지 못했다"(f-string, 모듈 상수, 변수) 이고 —
+    그것은 조용히 넘길 것이 아니라 실패시킬 것이다. 읽지 못한 것을 통과시키는
+    가드는 통과시키는 법을 하나 더 배운 것뿐이다.
     """
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return [node.value] if _EVENT_NAME.fullmatch(node.value) else []
+    if isinstance(node, ast.Constant):
+        if isinstance(node.value, str):
+            return [node.value] if _EVENT_NAME.fullmatch(node.value) else []
+        return []
     if isinstance(node, ast.IfExp):
         # self._emit("docking.charging" if confirmed else "docking.charge_lost", ...)
-        return _names_in(node.body) + _names_in(node.orelse)
-    return []
+        left, right = _names_in(node.body), _names_in(node.orelse)
+        if left is None or right is None:
+            return None
+        return left + right
+    return None
 
 
-def emit_sites() -> list[Emit]:
+def _severity_of(rest: list[ast.AST]) -> str:
+    """심각도. 못 찾으면 `EventBus.publish` 의 기본값인 info 다.
+
+    `None` 을 돌려주면 그 발행 지점은 심각도 검사에서 통째로 빠진다 — 43 개 중
+    15 개가 기본값에 기대고 있어서, 그렇게 두면 검사가 3 분의 1을 놓쳤다.
+    """
+    for arg in rest:
+        if isinstance(arg, ast.Constant) and arg.value in _SEVERITIES:
+            return arg.value
+        if isinstance(arg, ast.Attribute) and arg.attr.lower() in _SEVERITIES:
+            return arg.attr.lower()
+    return "info"
+
+
+def _looks_like_an_emit_tuple(elts: list[ast.AST]) -> bool:
+    """`(type, severity, data)` 인가, 아니면 그냥 문자열 두 개짜리 튜플인가.
+
+    모양만 보면 `("config.yaml", "path")` 나 `if x in ("mission.assigned", …)`
+    같은 평범한 튜플이 이벤트로 잡힌다. 심각도나 payload 가 함께 있어야
+    발행 자리다.
+    """
+    return any(
+        isinstance(node, ast.Dict)
+        or (isinstance(node, ast.Constant) and node.value in _SEVERITIES)
+        or (isinstance(node, ast.Attribute) and node.attr.lower() in _SEVERITIES)
+        for node in elts[1:]
+    )
+
+
+def _is_event_bus(func: ast.AST) -> bool:
+    """`self._events.publish(...)` 인가 `self.cmd_vel_pub.publish(msg)` 인가.
+
+    ROS 퍼블리셔도 `publish` 다. 이름 자리에 `Twist()` 가 앉아 있으니 "이름을
+    못 읽었다"로 잡혀 가드가 영원히 빨개진다. 받는 쪽이 이벤트 버스일 때만
+    발행 자리로 본다 — 버스를 다른 이름에 담으면 여기가 실패하고, 그때
+    이 집합을 넓히는 것이 옳다.
+    """
+    if not isinstance(func, ast.Attribute):
+        return False
+    owner = func.value
+    return isinstance(owner, ast.Attribute) and owner.attr in {"events", "_events"}
+
+
+def _relayed_names(tree: ast.AST) -> set[str]:
+    """이름이 이미 **다른 자리에서** 읽힌 중계 지점의 변수들.
+
+    두 가지뿐이다. `for type_, severity, data in pending:` — 배터리·절전은
+    `(type, severity, data)` 튜플을 모았다가 한 자리에서 풀어 발행하고, 읽어야
+    할 것은 튜플 리터럴 쪽이며 그건 이미 잡힌다. 그리고 `def _emit(type_, …)` —
+    그 몸통은 중계일 뿐이고 이름은 `_emit(…)` 호출 자리에서 읽힌다.
+
+    이 둘만 봐준다. 아무 변수나 봐주면 `publish(EVT)` 가 다시 조용히 지나간다.
+    """
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.For) and isinstance(node.target, ast.Tuple):
+            names.update(elt.id for elt in node.target.elts if isinstance(elt, ast.Name))
+        elif isinstance(node, ast.FunctionDef) and node.name.startswith("_emit"):
+            names.update(arg.arg for arg in node.args.args)
+    return names
+
+
+#: 이벤트 이름과 모양이 같은 파일 이름들 (`app.js`, `docks.json`, `audit.jsonl`).
+_FILE_SUFFIXES = {"js", "css", "html", "json", "jsonl", "yaml", "yml", "md", "sh", "py"}
+
+#: 첫 인자가 "점 찍힌 이름"인데 이벤트가 아닌 호출들. capability 경로(CAP-001)와
+#: Host Agent RPC 메서드가 그렇다 — 목록이 아니라 **자리** 로 걸러진다.
+_NAMESPACED_FIRST_ARG = {"require", "supports", "request"}
+
+
+def _literals_with_another_job(tree: ast.AST) -> set[str]:
+    """이벤트가 아닌 것이 이미 분명한 자리에 놓인 문자열들."""
+    spoken_for: set[str] = set()
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and node.args):
+            continue
+        func = node.func
+        called = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+        first = node.args[0]
+        if called in _NAMESPACED_FIRST_ARG and isinstance(first, ast.Constant):
+            if isinstance(first.value, str):
+                spoken_for.add(first.value)
+        for keyword in node.keywords:
+            # `_authorize(websocket, capability="swarm.lead")` — 자리는 같고
+            # 이름만 키워드로 적힌 것.
+            if keyword.arg == "capability" and isinstance(keyword.value, ast.Constant):
+                if isinstance(keyword.value.value, str):
+                    spoken_for.add(keyword.value.value)
+    return spoken_for
+
+
+def emit_sites() -> tuple[list[Emit], list[str]]:
+    """발행 지점들과, **이름을 읽지 못한 자리들**.
+
+    두 번째 목록이 비어 있지 않으면 가드는 그만큼 눈을 감고 있는 것이다.
+    """
     sites: list[Emit] = []
+    unresolved: list[str] = []
     for path in sorted(PACKAGE.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
+        relayed = _relayed_names(tree)
         for node in ast.walk(tree):
             first: ast.AST | None = None
             rest: list[ast.AST] = []
+            is_call = False
             if isinstance(node, ast.Call):
                 func = node.func
                 called = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
-                if called in {"publish", "_emit"} and node.args:
-                    first, rest = node.args[0], list(node.args[1:]) + [k.value for k in node.keywords]
-            elif isinstance(node, ast.Tuple) and 2 <= len(node.elts) <= 3:
+                if called == "_emit" or (called == "publish" and _is_event_bus(func)):
+                    is_call = True
+                    keywords = {k.arg: k.value for k in node.keywords}
+                    first = node.args[0] if node.args else keywords.get("type_") or keywords.get("type")
+                    rest = list(node.args[1:]) + [k.value for k in node.keywords]
+            elif (isinstance(node, ast.Tuple) and 2 <= len(node.elts) <= 3
+                  and _looks_like_an_emit_tuple(node.elts)):
                 # 절전·배터리는 `(type, severity, data)` 튜플을 모아 두었다가
-                # 한 번에 낸다 — append 로도, 리스트 리터럴로도. 호출 모양을
-                # 하나씩 세는 대신 튜플 자체를 알아본다.
+                # 한 번에 낸다 — append 로도, 리스트 리터럴로도.
                 first, rest = node.elts[0], list(node.elts[1:])
-            names = _names_in(first) if first is not None else []
+
+            if first is None and not is_call:
+                continue
+            where = f"{path.name}:{getattr(node, 'lineno', 0)}"
+            if first is None:
+                unresolved.append(f"{where}: 이름 인자가 없다")
+                continue
+            names = _names_in(first)
+            if names is None:
+                if isinstance(first, ast.Name) and first.id in relayed:
+                    continue  # 튜플에서 풀린 이름 — 튜플 리터럴 쪽에서 이미 읽었다
+                if is_call:
+                    unresolved.append(f"{where}: 이름을 정적으로 읽을 수 없다")
+                continue
             if not names:
                 continue
 
-            severity = next(
-                (a.value for a in rest
-                 if isinstance(a, ast.Constant) and a.value in _SEVERITIES), None)
-            if severity is None:
-                severity = next(
-                    (a.attr.lower() for a in rest
-                     if isinstance(a, ast.Attribute) and a.attr.lower() in _SEVERITIES), None)
+            severity = _severity_of(rest)
             payload = next((a for a in rest if isinstance(a, ast.Dict)), None)
             keys: frozenset[str] | None = None
             if payload is not None:
@@ -94,9 +212,12 @@ def emit_sites() -> list[Emit]:
                            if isinstance(k, ast.Constant) and isinstance(k.value, str)]
                 if len(literal) == len(payload.keys):
                     keys = frozenset(literal)
-            where = f"{path.name}:{node.lineno}"
             sites.extend(Emit(name, severity, keys, where) for name in names)
-    return sites
+    return sites, unresolved
+
+
+def emitted() -> list[Emit]:
+    return emit_sites()[0]
 
 
 #: `type` 열 한 칸에 여러 이벤트가 들어가는 행이 있다.
@@ -149,12 +270,12 @@ def test_the_catalogue_is_not_a_wish_list():
     `safety.watchdog` 은 v1.0 부터 여기 있었고 코드에는 없었다. 계약을 읽고
     `safety.*` 를 구독한 쪽은 조종이 끊겨 로봇이 서도 아무 신호를 받지 못했다.
     """
-    emitted = {site.name for site in emit_sites()}
+    names = {site.name for site in emitted()}
     promised = {name for name, row in catalogue().items()
                 if row.robot_sent and not row.unimplemented}
 
-    assert not promised - emitted, (
-        "카탈로그가 약속하는데 코드가 내지 않는다: " + ", ".join(sorted(promised - emitted))
+    assert not promised - names, (
+        "카탈로그가 약속하는데 코드가 내지 않는다: " + ", ".join(sorted(promised - names))
     )
 
 
@@ -165,7 +286,7 @@ def test_nothing_is_emitted_behind_the_contract():
     폐기 정책 바깥에 있어, 언제 사라져도 아무도 약속을 깬 것이 아니게 된다.
     """
     documented = set(catalogue())
-    undocumented = sorted({site.name for site in emit_sites()} - documented)
+    undocumented = sorted({site.name for site in emitted()} - documented)
 
     assert not undocumented, "코드가 내는데 카탈로그에 없다: " + ", ".join(undocumented)
 
@@ -177,7 +298,7 @@ def test_every_documented_payload_key_is_one_the_code_sends():
     계약대로 읽은 소비자는 KeyError 를 받는다.
     """
     sent: dict[str, set[str]] = {}
-    for site in emit_sites():
+    for site in emitted():
         if site.keys is not None:
             sent.setdefault(site.name, set()).update(site.keys)
 
@@ -194,7 +315,7 @@ def test_every_documented_payload_key_is_one_the_code_sends():
 def test_every_key_the_code_sends_is_documented():
     documented = catalogue()
     missing: list[str] = []
-    for site in emit_sites():
+    for site in emitted():
         row = documented.get(site.name)
         if row is None or site.keys is None:
             continue
@@ -208,9 +329,9 @@ def test_the_documented_severity_is_the_one_the_code_uses():
     """심각도는 소비자가 경보를 거는 기준이다. 장식이 아니다."""
     documented = catalogue()
     wrong: list[str] = []
-    for site in emit_sites():
+    for site in emitted():
         row = documented.get(site.name)
-        if row is None or site.severity is None:
+        if row is None:
             continue
         if site.severity not in row.severity:
             wrong.append(f"{site.name} ({site.where}): 코드 {site.severity}, 문서 {row.severity}")
@@ -227,7 +348,7 @@ def test_an_event_this_package_emits_is_marked_as_the_robot_sending_it():
     """
     documented = catalogue()
     mislabelled = sorted({
-        site.name for site in emit_sites()
+        site.name for site in emitted()
         if site.name in documented and not documented[site.name].robot_sent
     })
 
@@ -245,9 +366,65 @@ def test_the_fleet_rows_are_excluded_by_their_sender_column():
     assert rows["safety.estop"].robot_sent
 
 
+def test_no_emit_site_hides_its_name_from_the_guard():
+    """이름을 정적으로 못 읽는 발행 자리가 있으면 가드는 그만큼 눈을 감는다.
+
+    `publish(type_=…)`, `publish(f"docking.{stage}")`, `publish(EVT)` 는 모두
+    조용히 통과했다. 통과시키는 대신 여기서 실패한다 — 새 발행 자리는 이름을
+    리터럴로 적거나, 이 검사를 고치고 왜 그런지 적어야 한다.
+    """
+    _sites, unresolved = emit_sites()
+
+    assert not unresolved, "\n".join(unresolved)
+
+
+def test_a_literal_that_looks_like_an_event_is_either_emitted_or_declared():
+    """발행 자리를 우회한 이름을 잡는 두 번째 그물.
+
+    래퍼 함수를 거치면 발행 자리 추출은 놓친다 — 그래도 문자열은 소스에 남는다.
+    이벤트처럼 생긴 문자열은 실제 발행 이름이거나, 아래 목록에 이유와 함께
+    있어야 한다.
+
+    목록이 실제 이벤트를 숨기는 것이 지난 판본의 실패였다. 그래서 목록과 발행
+    이름이 겹치면 그것 자체가 실패다 — 숨기려면 먼저 그 교집합을 통과해야 한다.
+    """
+    #: 이벤트처럼 생겼지만 이벤트가 아닌 것. 각각 그 자리에서 무엇인지 적는다.
+    #: **목록이 아니라 자리로** 거르는 것이 원칙이다 — 아래 셋은 자리로 설명되지
+    #: 않아서 남은 것들이고, 이 목록이 길어지면 그건 새 *자리* 를 배워야 한다는
+    #: 신호이지 한 줄 더 적으라는 신호가 아니다.
+    not_events = {
+        "safety.limits": "config.changed 의 key 값",
+        "robot.identity": "config.changed 의 key 값",
+        "auth.tokens": "config.changed 의 key 값",
+    }
+    names = {site.name for site in emitted()}
+
+    overlap = sorted(set(not_events) & names)
+    assert not overlap, (
+        "이 목록이 실제 발행 이벤트를 숨기고 있다: " + ", ".join(overlap))
+
+    unclassified: list[str] = []
+    for path in sorted(PACKAGE.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        spoken_for = _literals_with_another_job(tree)
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
+                continue
+            value = node.value
+            if not _EVENT_NAME.fullmatch(value) or value in names or value in not_events:
+                continue
+            if value in spoken_for or value.rpartition(".")[2] in _FILE_SUFFIXES:
+                continue
+            unclassified.append(f"{path.name}:{node.lineno}: {value}")
+
+    assert not unclassified, (
+        "이벤트처럼 생긴 문자열인데 발행 이름도 아니고 목록에도 없다:\n"
+        + "\n".join(unclassified))
+
+
 def test_the_extractor_reads_the_shapes_this_package_actually_uses():
     """추출기가 조용히 아무것도 못 찾으면 위의 모든 검사가 공허해진다."""
-    sites = emit_sites()
+    sites = emitted()
     names = {site.name for site in sites}
 
     assert len(names) >= 30, f"only found {len(names)}"
@@ -262,4 +439,4 @@ def test_the_extractor_reads_the_shapes_this_package_actually_uses():
 def test_the_events_this_change_was_about_are_covered(event):
     """회귀 방지: 이 셋이 각각 이 파일이 존재하는 이유다."""
     assert event in catalogue()
-    assert event in {site.name for site in emit_sites()}
+    assert event in {site.name for site in emitted()}

@@ -182,7 +182,10 @@ def test_a_late_write_cannot_swallow_a_fresh_session():
 
     cycle(command, 103.0)
 
-    assert events.types().count("safety.watchdog") >= 1, (
+    # 두 번이다: 뒤늦게 도착한 첫 세션의 알림 하나, 새 세션 자신의 끊김 하나.
+    # `>= 1` 로 적으면 불리언 래치 회귀(첫 알림 하나만 나고 새 세션은 영영
+    # 조용한 상태)도 통과한다 — 이 테스트가 막으려던 바로 그것이다.
+    assert events.types().count("safety.watchdog") == 2, (
         "the new session's own lapse must still be announced"
     )
 

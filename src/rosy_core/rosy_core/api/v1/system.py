@@ -65,7 +65,8 @@ def update_system_info(body: IdentityRequest, _: AuthContext = Depends(admin),
     if "name" in patch_robot:
         svc.identity.robot_name = patch_robot["name"]
         svc.config.setdefault("robot", {})["name"] = patch_robot["name"]
-    svc.events.publish("config.changed", source="api", data={"key": "robot.identity"})
+    svc.events.publish("config.changed", severity="warning", source="api",
+                       data={"key": "robot.identity"})
     return svc.identity.info()
 
 
@@ -113,7 +114,7 @@ def add_token(body: TokenRequest, _: AuthContext = Depends(admin),
     records.append(record)
     _persist_tokens(svc, records)
     svc.events.publish(
-        "config.changed", source="api",
+        "config.changed", severity="warning", source="api",
         data={"key": "auth.tokens", "id": record["id"], "role": role},
     )
     created = {"id": record["id"], "role": role, "label": record["label"],
@@ -137,7 +138,7 @@ def delete_token(token_id: str, auth: AuthContext = Depends(admin),
         raise ApiError("VALIDATION_ERROR", 409, "cannot delete the last administrator token")
     _persist_tokens(svc, remaining)
     svc.events.publish(
-        "config.changed", source="api",
+        "config.changed", severity="warning", source="api",
         data={"key": "auth.tokens", "id": token_id, "deleted": True},
     )
 

@@ -35,6 +35,7 @@ from std_msgs.msg import Bool, Float32, String
 from std_srvs.srv import Empty
 
 from rosy_core.bridge import translate
+from rosy_core.bridge.cmd_vel import cmd_vel_cycle
 from rosy_core.bridge.goal_tracker import GoalTracker
 from rosy_core.maps import occupancy_map_id
 from rosy_core.navigation.initial_pose import amcl_pose_covariance
@@ -199,19 +200,14 @@ class RosBridge:
         self._svc.command.set_nav_twist(CoreTwist(linear=msg.linear.x, angular=msg.angular.z))
 
     def _publish_cmd_vel(self) -> None:
-        out = self._svc.command.select_output()
-        if out.linear != 0.0 or out.angular != 0.0:
-            # 절전 정책은 모터 경로에 개입하지 않는다. 명령이 나가는 것을
-            # 관측만 하고 센서·화면을 즉시 ACTIVE로 되돌린다 (안전 인터록).
-            self._svc.power.on_activity("cmd_vel")
+        # 순서는 cmd_vel_cycle 이 정한다 (rclpy 없이 검사되는 자리).
+        cmd_vel_cycle(self._svc.command, self._svc.power, self._send_twist)
+
+    def _send_twist(self, linear: float, angular: float) -> None:
         msg = Twist()
-        msg.linear.x = out.linear
-        msg.angular.z = out.angular
+        msg.linear.x = linear
+        msg.angular.z = angular
         self.cmd_vel_pub.publish(msg)
-        # 정지가 나간 뒤에 알린다. 이벤트 발행은 구독자를 동기로 부르고 그중
-        # 하나가 감사 로그를 다시 쓰므로, 앞에 두면 SAF-002 의 정지가 그만큼
-        # 늦게 바퀴에 닿는다.
-        self._svc.command.announce_pending()
 
     def _tick_state(self) -> None:
         try:
