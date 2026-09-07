@@ -23,6 +23,15 @@ So:
   semantics by accident.
 - The periods below are the contract. `1/50` is D-2, the sole `cmd_vel`
   publisher, and a reshape that changes it is the failure this exists to catch.
+- Every literal here is read off `ros_bridge.py`, never pasted from this
+  harness's own output. A baseline derived from the thing it checks ratifies
+  whatever that thing currently does — which is how an undeclared costmap
+  change once got pinned without anyone reviewing it.
+
+What it still cannot see, so that nobody mistakes green for verified: whether a
+callback *does* the right thing, whether QoS means what the profile says on a
+real DDS, and anything about executor re-entrancy or action futures. It proves
+the wiring diagram, not the wiring.
 """
 
 from __future__ import annotations
@@ -51,6 +60,10 @@ _ROS_MODULES = [
     "std_srvs", "std_srvs.srv",
     "rosy_interfaces", "rosy_interfaces.srv",
     "tf2_ros",
+    # Stubbed so the optional-import branch at `ros_bridge.py` is *taken*, and the
+    # fourth service client is part of the contract rather than an accident of
+    # what happens to be installed on the machine running the suite.
+    "slam_toolbox", "slam_toolbox.srv",
 ]
 
 
@@ -72,25 +85,39 @@ class _Anything(types.ModuleType):
         return created
 
 
+def _qos_kind(qos) -> object:
+    """`10` for a plain depth, `"LATCHED"` for a `QoSProfile`.
+
+    Three endpoints are latched (`TRANSIENT_LOCAL`, depth 1) and the latch is
+    load-bearing: PWR-003 needs a late-joining node to receive the current
+    power mode immediately. Losing it is invisible on the host and presents on
+    a robot as "a node that started late never learned the mode".
+    """
+    return qos if isinstance(qos, int) else "LATCHED"
+
+
 class RecordingNode:
     """Records what the bridge registers. Executes nothing."""
 
     def __init__(self) -> None:
         self.timers: list[float] = []
-        self.subscriptions: list[str] = []
-        self.publishers: list[str] = []
+        self.subscriptions: list[tuple[str, str]] = []
+        self.publishers: list[tuple[str, object]] = []
         self.clients: list[str] = []
 
     def create_timer(self, period_s, _callback):
         self.timers.append(period_s)
         return object()
 
-    def create_subscription(self, _type, topic, _callback, _qos):
-        self.subscriptions.append(topic)
+    def create_subscription(self, _type, topic, callback, qos):
+        # The callback is the point: the reshape's core operation is rewiring
+        # topic -> handler across module boundaries, and a topic-only baseline
+        # cannot see `scan` pointed at `_on_imu`.
+        self.subscriptions.append((topic, callback.__name__, _qos_kind(qos)))
         return object()
 
-    def create_publisher(self, _type, topic, _qos):
-        self.publishers.append(topic)
+    def create_publisher(self, _type, topic, qos):
+        self.publishers.append((topic, _qos_kind(qos)))
         return object()
 
     def create_client(self, _type, name):
@@ -110,13 +137,22 @@ class RecordingNode:
 
 @pytest.fixture
 def registered(tmp_path, monkeypatch):
-    """Build a `RosBridge` against stubbed ROS and return the recording node."""
+    """Build a `RosBridge` against stubbed ROS. Returns node, bridge and services."""
+    import rosy_core.bridge as bridge_pkg
     from rosy_core.profile import RobotProfile
     from rosy_core.services import CoreServices
 
     for name in _ROS_MODULES:
         monkeypatch.setitem(sys.modules, name, _Anything(name))
-    monkeypatch.delitem(sys.modules, "rosy_core.bridge.ros_bridge", raising=False)
+
+    # The stubs unwind on their own; the module *built against* them does not.
+    # Both the `sys.modules` entry and the parent-package attribute have to go,
+    # and they have to go on the way *out* — monkeypatch cannot record an undo
+    # for a key that does not exist yet at setup time. Left in place, the
+    # stub-bound module outlives the fixture and the next test to import it gets
+    # a result that depends on file ordering.
+    key = "rosy_core.bridge.ros_bridge"
+    sys.modules.pop(key, None)
 
     def read(name):
         return yaml.safe_load((CONFIG_DIR / name).read_text(encoding="utf-8"))
@@ -129,55 +165,99 @@ def registered(tmp_path, monkeypatch):
     from rosy_core.bridge.ros_bridge import RosBridge
 
     node = RecordingNode()
-    RosBridge(node, services)
-    return node
+    bridge = RosBridge(node, services)
+    yield types.SimpleNamespace(node=node, bridge=bridge, services=services)
+
+    sys.modules.pop(key, None)
+    if getattr(bridge_pkg, "ros_bridge", None) is not None:
+        delattr(bridge_pkg, "ros_bridge")
 
 
 #: Period in seconds, in registration order. `1/50` is D-2's sole `cmd_vel`
-#: publisher; `1/10` is the state snapshot rate from `rosy_default.yaml`.
+#: publisher; `1/10` is `state.rate_hz` from `rosy_default.yaml`.
 EXPECTED_TIMERS = [1.0 / 50.0, 1.0 / 10.0, 1.0, 1.0 / 5.0, 1.0 / 5.0, 1.0 / 5.0]
+
+#: `(topic, callback, qos)` — read off `ros_bridge.py:89-103`, not off this
+#: harness's own output. Topic alone would not see `scan` rewired to `_on_imu`,
+#: and QoS alone would not see the `map` latch dropped.
+EXPECTED_SUBSCRIPTIONS = [
+    ("odom", "_on_odom", 10),
+    ("battery/voltage", "_on_battery", 10),
+    ("nav_cmd_vel", "_on_nav_cmd_vel", 10),
+    ("scan", "_on_scan", 10),
+    ("imu_raw", "_on_imu", 10),
+    ("us_sensor/range", "_on_us_range", 10),
+    ("batt_state", "_on_batt_state", 10),
+    ("map", "_on_map", "LATCHED"),
+    ("plan", "_on_plan", 10),
+    ("local_costmap/costmap_raw", "_on_local_costmap", 10),
+    ("global_costmap/costmap_raw", "_on_global_costmap", 10),
+]
+
+#: `(topic, qos)` — `ros_bridge.py:81-107`.
+EXPECTED_PUBLISHERS = [
+    ("cmd_vel", 10),
+    ("initialpose", 10),
+    ("power/mode", "LATCHED"),
+    ("display/info", 10),
+    ("docking/collision_exemption", "LATCHED"),
+]
+
+#: Four, not three. The fourth is behind the optional `slam_toolbox` import and
+#: the harness stubs that module so the branch is always taken — otherwise this
+#: literal would pin whatever happened to be installed, and a reshape could drop
+#: `_slam_client` entirely and stay green.
+EXPECTED_CLIENTS = ["set_led", "start_motor", "stop_motor", "slam_toolbox/save_map"]
 
 
 def test_the_bridge_registers_six_timers_at_the_expected_periods(registered):
-    """The one thing this harness exists to hold across the 3b reshape.
+    """The one thing this harness exists to hold across a reshape.
 
-    Moving the timers into per-domain adapters must not change how many there
-    are, how fast they run, or the order they are created in. A dropped timer is
-    a subsystem that silently stops ticking; a changed period on the first one
-    is the D-2 cmd_vel contract.
+    Moving the timers must not change how many there are, how fast they run, or
+    the order they are created in. A dropped timer is a subsystem that silently
+    stops ticking.
     """
-    assert registered.timers == EXPECTED_TIMERS
+    assert registered.node.timers == EXPECTED_TIMERS
 
 
 def test_the_cmd_vel_timer_is_first_and_fifty_hertz(registered):
     """D-2 called out on its own, because it is the one with a safety argument."""
-    assert registered.timers[0] == pytest.approx(0.02)
+    assert registered.node.timers[0] == pytest.approx(0.02)
 
 
-#: Every topic, publisher and service the bridge wires at construction. Same
-#: mandate as the timers: 3b moves these into per-domain adapters, and a
-#: subscription that quietly fails to move is a sensor the robot stops hearing.
-EXPECTED_SUBSCRIPTIONS = [
-    "odom", "battery/voltage", "nav_cmd_vel", "scan", "imu_raw",
-    "us_sensor/range", "batt_state", "map", "plan",
-    "local_costmap/costmap_raw", "global_costmap/costmap_raw",
-]
-EXPECTED_PUBLISHERS = [
-    "cmd_vel", "initialpose", "power/mode", "display/info",
-    "docking/collision_exemption",
-]
-EXPECTED_CLIENTS = ["set_led", "start_motor", "stop_motor"]
+def test_every_subscription_keeps_its_topic_callback_and_qos(registered):
+    assert registered.node.subscriptions == EXPECTED_SUBSCRIPTIONS
 
 
-def test_the_bridge_subscribes_to_the_same_topics(registered):
-    assert registered.subscriptions == EXPECTED_SUBSCRIPTIONS
-
-
-def test_the_bridge_advertises_the_same_publishers(registered):
+def test_every_publisher_keeps_its_topic_and_qos(registered):
     """`cmd_vel` first and once: D-2 says there is exactly one publisher."""
-    assert registered.publishers == EXPECTED_PUBLISHERS
-    assert registered.publishers.count("cmd_vel") == 1
+    assert registered.node.publishers == EXPECTED_PUBLISHERS
+    assert [topic for topic, _ in registered.node.publishers].count("cmd_vel") == 1
+
+
+def test_the_three_latched_endpoints_stay_latched(registered):
+    """PWR-003 needs a late-joining node to receive the current mode at once.
+    A dropped latch is invisible on the host and intermittent on a robot."""
+    latched = {topic for topic, qos in registered.node.publishers if qos == "LATCHED"}
+    latched |= {t for t, _cb, qos in registered.node.subscriptions if qos == "LATCHED"}
+
+    assert latched == {"map", "power/mode", "docking/collision_exemption"}
 
 
 def test_the_bridge_opens_the_same_service_clients(registered):
-    assert registered.clients == EXPECTED_CLIENTS
+    assert registered.node.clients == EXPECTED_CLIENTS
+
+
+def test_the_nav2_action_client_and_tf_listener_are_built(registered):
+    """Neither goes through `node.create_*`, so the recording node cannot see
+    them. They are where a navigation adapter would put them, so assert directly."""
+    assert registered.bridge.nav_client is not None
+    assert registered.bridge.tf_buffer is not None
+    assert registered.bridge.tf_listener is not None
+
+
+def test_both_executor_contracts_are_wired_to_the_bridge(registered):
+    """C3 itself: one class answering two Protocols. A composition root has to
+    reproduce these two assignments, and nothing else checks that it did."""
+    assert registered.services.nav.executor is registered.bridge
+    assert registered.services.docking.executor is registered.bridge
