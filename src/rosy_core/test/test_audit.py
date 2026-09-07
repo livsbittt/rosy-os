@@ -260,7 +260,8 @@ def test_a_write_failure_is_counted_rather_than_lost(tmp_path, monkeypatch):
     log = FileAuditLog(tmp_path / "audit.jsonl")
     assert log.health() == {"writable": True, "write_failures": 0,
                             "write_failures_total": 0, "prune_failures": 0,
-                            "last_write_error": None, "last_prune_error": None}
+                            "prune_skipped": 0, "last_write_error": None,
+                            "last_prune_error": None}
 
     def refuse(*args, **kwargs):
         raise OSError(28, "No space left on device")
@@ -385,17 +386,28 @@ def test_blank_lines_are_compacted_rather_than_kept_forever(tmp_path):
 
 
 def _prune_with(log: FileAuditLog, path: Path, during) -> None:
-    """정리의 디코드 자리에 `during` 을 끼워 넣고 한 번 기록한다.
+    """정리의 **파싱 루프 안**에 `during` 을 끼워 넣고 한 번 기록한다.
 
     디코드와 파싱은 락 밖에서 도는 유일한 구간이다. 그 자리에서 무슨 일이
     벌어질 수 있는지가 이 설계의 대가이므로, 거기에 직접 손을 넣어 본다.
+    루프 바깥(예: 디코드 진입점)에 걸면 루프 자체가 락 안으로 되돌아가도
+    검사가 통과한다 — 그 350 ms 가 이 커밋의 요점이므로 루프 안에 건다.
     """
-    real = FileAuditLog._decode
+    real = FileAuditLog._is_fresh
+    fired: list[int] = []
+
+    def once(self, ts, cutoff):
+        if not fired:                      # 창 안에서 정확히 한 번만
+            fired.append(1)
+            during()
+        return real(self, ts, cutoff)
+
     try:
-        FileAuditLog._decode = staticmethod(lambda raw: (during(), real(raw))[1])
+        FileAuditLog._is_fresh = once
         log.record(_event(2, datetime(2026, 9, 3, tzinfo=timezone.utc).isoformat()))
     finally:
-        FileAuditLog._decode = staticmethod(real)
+        FileAuditLog._is_fresh = real
+    assert fired, "the hook never ran; the prune did not reach the parse loop"
 
 
 def test_an_event_written_during_a_prune_is_not_lost(tmp_path):
@@ -495,3 +507,236 @@ def test_a_deleted_file_is_not_recreated_from_a_stale_snapshot(tmp_path):
     _prune_with(log, path, lambda: path.unlink())
 
     assert not path.exists()
+
+
+# --- 정전이 개행을 남기지 못한 경우 -------------------------------------------
+
+#: 잘린 꼬리 — 개행이 **없다**. 개행은 마지막에 쓰이는 바이트이므로, 글자
+#: 가운데가 잘렸다면 그것은 애초에 디스크에 닿지 못했다. 개행으로 끝나는 잘린
+#: 꼬리를 픽스처로 쓰면 이 문제 하나만 비껴간다.
+UNTERMINATED = b'{"seq":2,"data":{"name":"\xed\x95'
+
+
+def test_the_next_event_is_not_swallowed_by_an_unterminated_line(tmp_path):
+    """그냥 이어 쓰면 새 이벤트가 망가진 줄의 일부가 되어 함께 버려진다.
+
+    정전 직후 처음 기록되는 것이 하필 `safety.estop` 일 수 있다.
+    """
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    good = _event(1, now.isoformat()).model_dump_json()
+    path.write_bytes(good.encode("utf-8") + b"\n" + UNTERMINATED)
+
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+    log.record(_event(3, now.isoformat(), "safety.estop"))
+
+    seqs = [event.seq for event in log.history()]
+    assert 3 in seqs, "the estop was concatenated onto the torn line and pruned away"
+    assert seqs == [1, 3]
+
+
+def test_the_terminator_is_checked_once_not_on_every_record(tmp_path):
+    """50 Hz 경로다. 기록마다 stat+seek 을 붙이면 470ce7b 가 없앤 비용이 돌아온다."""
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    path.write_bytes(UNTERMINATED)
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+
+    opens: list[str] = []
+    real_open = Path.open
+
+    def note(self, *args, **kwargs):
+        opens.append(str(args[0]) if args else "r")
+        return real_open(self, *args, **kwargs)
+
+    log.record(_event(1, now.isoformat()))          # 첫 기록이 확인한다
+    before = len(opens)
+    try:
+        Path.open = note
+        for seq in range(2, 12):
+            log.record(_event(seq, now.isoformat()))
+    finally:
+        Path.open = real_open
+
+    assert [mode for mode in opens if mode.startswith("rb")] == [], (
+        "the terminator was re-checked after the first append")
+    assert before == 0
+
+
+# --- 스냅샷 읽기도 세어야 한다 -------------------------------------------------
+
+
+def test_a_snapshot_read_failure_is_counted_rather_than_swallowed(tmp_path, monkeypatch):
+    """이 읽기가 가드 밖에 있으면 열린 핸들 하나(백신·인덱서)가 정리를 영원히
+    멈추면서 건강 상태는 깨끗하다고 답한다."""
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+    monkeypatch.setattr(FileAuditLog, "_snapshot_locked",
+                        lambda self: (_ for _ in ()).throw(PermissionError("in use")))
+
+    log.record(_event(1, now.isoformat()))          # 예외가 밖으로 나오지 않는다
+
+    health = log.health()
+    assert health["prune_failures"] == 1
+    assert "PermissionError" in health["last_prune_error"]
+    assert health["writable"] is True and health["write_failures_total"] == 0
+
+
+def test_a_failing_snapshot_read_is_not_retried_on_every_record(tmp_path, monkeypatch):
+    """50 Hz 스레드가 실패하는 읽기를 매 주기 다시 하면 안 된다.
+
+    `_last_prune` 을 읽기 **앞**에서 태우는 것이 그것을 막는다.
+    """
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    log = FileAuditLog(tmp_path / "audit.jsonl", retention_days=30, now=lambda: now)
+    attempts: list[int] = []
+
+    def refuse(self):
+        attempts.append(1)
+        raise PermissionError("in use")
+
+    monkeypatch.setattr(FileAuditLog, "_snapshot_locked", refuse)
+    for seq in range(6):
+        log.record(_event(seq, now.isoformat()))
+
+    assert attempts == [1], "the prune retried on the hot path"
+
+
+# --- 이어 붙이기의 전제 --------------------------------------------------------
+
+
+def test_a_file_swapped_for_a_longer_one_is_not_spliced(tmp_path):
+    """크기만 보면 같은 길이거나 더 긴 것으로 갈아 끼운 것을 못 잡는다 —
+    그러면 남의 내용 한가운데에 우리 옛 스냅샷을 이어 붙인다."""
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    stale = _event(1, (now - timedelta(days=31)).isoformat()).model_dump_json()
+    path.write_text(stale + "\n", encoding="utf-8")
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+    replacement = ("x" * (len(stale) + 400)) + "\n"
+
+    def someone_swaps_it():
+        path.unlink()
+        path.write_text(replacement, encoding="utf-8")   # 더 길다
+
+    _prune_with(log, path, someone_swaps_it)
+
+    assert path.read_text(encoding="utf-8") == replacement
+    health = log.health()
+    assert health["prune_skipped"] == 1
+    assert health["prune_failures"] == 0, "전제가 깨진 것이지 실패한 것이 아니다"
+    assert "no longer" in health["last_prune_error"]
+
+
+# --- 회귀 방지: 검사가 없어 조용히 바뀔 수 있던 계약들 -------------------------
+
+
+def test_a_read_returns_the_newest_not_the_oldest(tmp_path):
+    """`/logs/audit` 의 기본 limit 은 500 이다. 오래된 쪽을 돌려주면 운영자는
+    사고를 조사하는 동안 한 달 전 사건을 본다."""
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    log = FileAuditLog(tmp_path / "audit.jsonl", retention_days=30, now=lambda: now)
+    for seq in range(1, 11):
+        log.record(_event(seq, now.isoformat()))
+
+    assert [event.seq for event in log.history(limit=3)] == [8, 9, 10]
+
+
+def test_a_record_with_an_unreadable_timestamp_is_kept_not_deleted(tmp_path):
+    """열려 있는 쪽을 고른 것이다 — 감사 로그에서 삭제는 되돌릴 수 없다.
+
+    대가는 그 줄이 `history()` 에 영원히 남는 것이고, 그것은 알고 하는 거래다.
+    """
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    broken = _event(1, now.isoformat()).model_dump_json().replace(
+        now.isoformat(), "not-a-timestamp")
+    path.write_text(broken + "\n", encoding="utf-8")
+
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+    log.record(_event(2, now.isoformat()))
+
+    assert [event.seq for event in log.history()] == [1, 2]
+    assert broken in path.read_text(encoding="utf-8")
+
+
+def test_corrupt_bytes_are_marked_rather_than_quietly_removed(tmp_path):
+    """`errors="ignore"` 는 훼손된 바이트를 지워 그럴듯한 기록을 만든다.
+
+    `"현\xff관"` 이 `"현관"` 이 되면 훼손과 정상 기록을 구분할 방법이 없다.
+    `replace` 는 U+FFFD 를 남겨 표시한다.
+    """
+    assert FileAuditLog._decode(b'{"name":"\xed\x98\x84\xff\xea\xb4\x80"}') == (
+        '{"name":"현\ufffd관"}')
+
+
+def test_a_line_the_decoder_had_to_mangle_is_not_rewritten_mangled(tmp_path):
+    """디코드해서 자르고 다시 인코드하면 U+FFFD 가 디스크에 쓰인다 —
+    "원본 줄을 그대로 남긴다"가 깨진 줄에 대해서만 조용히 거짓이 된다.
+
+    그러면 운영자는 훼손된 기록과 정말로 U+FFFD 를 실은 기록을 구분할 수 없다.
+    """
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    named = _event(1, now.isoformat())
+    named.data = {"name": "현관앞"}
+    line = named.model_dump_json().encode("utf-8")
+    # 한글 한 글자 가운데 한 바이트만 망가뜨린다 — JSON 으로는 여전히 읽힌다.
+    at = line.index("현관앞".encode("utf-8"))
+    corrupt = line[:at] + b"\xff" + line[at + 1:]
+    stale = _event(2, (now - timedelta(days=31)).isoformat()).model_dump_json()
+    path.write_bytes(corrupt + b"\n" + stale.encode("utf-8") + b"\n")
+
+    FileAuditLog(path, retention_days=30, now=lambda: now).record(_event(3, now.isoformat()))
+
+    raw = path.read_bytes()
+    assert stale.encode("utf-8") not in raw, "the prune did run"
+    assert corrupt in raw, "the corrupt line was rewritten with the decoder's guesses"
+    assert b"\xef\xbf\xbd" not in raw
+
+
+def test_only_one_record_is_ever_inside_the_compaction_window(tmp_path):
+    """직렬화가 `prune_interval_s > 0` 에 기대는 창발적 성질이면 생성자 인자
+    하나로 깨진다. 두 정리가 겹치면 나중 것이 앞선 것의 스냅샷을 덮어써,
+    그 사이 덧붙은 이벤트가 사라진다.
+
+    간격을 0 으로 두고 창을 넓혀, 겹칠 수 있으면 반드시 겹치게 한다.
+    """
+    import threading
+    import time
+
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    path.write_text(_event(1, (now - timedelta(days=31)).isoformat()).model_dump_json() + "\n",
+                    encoding="utf-8")
+    log = FileAuditLog(path, retention_days=30, now=lambda: now, prune_interval_s=0.0)
+
+    real = FileAuditLog._is_fresh
+    guard = threading.Lock()
+    active: list[int] = []
+    high_water: list[int] = []
+
+    def note(self, ts, cutoff):
+        with guard:
+            active.append(threading.get_ident())
+            high_water.append(len(set(active)))
+        time.sleep(0.05)                   # 창을 넓힌다
+        with guard:
+            active.remove(threading.get_ident())
+        return real(self, ts, cutoff)
+
+    try:
+        FileAuditLog._is_fresh = note
+        threads = [threading.Thread(target=log.record, args=(_event(seq, now.isoformat()),))
+                   for seq in range(20, 24)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+    finally:
+        FileAuditLog._is_fresh = real
+
+    assert high_water, "no compaction ran; the test proves nothing"
+    assert max(high_water) == 1, "two records compacted at once"
+    assert sorted(event.seq for event in log.history()) == [20, 21, 22, 23]

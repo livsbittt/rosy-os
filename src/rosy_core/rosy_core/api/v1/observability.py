@@ -106,6 +106,11 @@ def metrics(svc: CoreServices = Depends(get_services)):
         "# HELP rosy_audit_prune_failures_total audit log prune failures since boot",
         "# TYPE rosy_audit_prune_failures_total counter",
         f"rosy_audit_prune_failures_total {audit['prune_failures']}",
+        # 실패가 아니라 "전제가 깨졌다"이다. 오르고 있으면 이 파일을 우리 말고
+        # 누가 자르거나 갈아 끼우고 있다는 뜻이고, 그동안 정리는 무동작이다.
+        "# HELP rosy_audit_prune_skipped_total prunes skipped because the file changed underneath",
+        "# TYPE rosy_audit_prune_skipped_total counter",
+        f"rosy_audit_prune_skipped_total {audit['prune_skipped']}",
     ]
     for component, health in snap.diagnostics_summary.items():
         lines.append(f'rosy_diagnostics_health{{component="{component}"}} {_HEALTH_VALUE[health.value]}')
