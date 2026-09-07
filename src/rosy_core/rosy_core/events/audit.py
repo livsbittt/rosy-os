@@ -254,6 +254,8 @@ class FileAuditLog:
         head = b"\n".join(kept) + b"\n" if kept else b""
         with self._lock:
             tail = self._tail_after_locked(len(snapshot))
+            if tail is None:
+                return
             # 감사 로그를 자르는 도중에 죽으면 기록이 사라진다. 설정 오버레이와
             # 같은 규칙으로 임시 파일에 쓰고 바꿔 끼운다.
             tmp = self._path.with_name(self._path.name + ".tmp")
@@ -269,10 +271,20 @@ class FileAuditLog:
                 tmp.unlink(missing_ok=True)
                 raise
 
-    def _tail_after_locked(self, offset: int) -> bytes:
-        """스냅샷 이후에 덧붙은 바이트."""
+    def _tail_after_locked(self, offset: int) -> Optional[bytes]:
+        """스냅샷 이후에 덧붙은 바이트. 이어 붙일 수 없으면 `None`.
+
+        이 자리가 성립하는 근거는 "그 사이 이 파일에는 덧붙이기만 일어난다"
+        (D-1: 쓰는 것은 한 프로세스, 그리고 정리는 락으로 직렬화된다) 이다.
+        근거가 깨졌다면 — 파일이 지워졌거나, 줄어들었거나, 누가 갈아 끼웠다면
+        — 우리가 든 스냅샷은 더 이상 이 파일의 앞부분이 아니다. 그때
+        `seek(offset)` 은 EOF 너머로 가 빈 꼬리를 돌려주고, 우리는 남의 파일을
+        우리 옛 내용으로 덮어쓰게 된다. 이어 붙이지 않고 이번 시각을 거른다.
+        """
         if not self._path.is_file():
-            return b""
+            return None
+        if self._path.stat().st_size < offset:
+            return None
         with self._path.open("rb") as handle:
             handle.seek(offset)
             return handle.read()

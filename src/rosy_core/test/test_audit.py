@@ -461,3 +461,37 @@ def test_whatever_the_prune_throws_is_counted_rather_than_swallowed(tmp_path):
     assert "ValueError" in health["last_prune_error"]
     assert health["writable"] is True and health["write_failures_total"] == 0
     assert [event.seq for event in log.history()] == [2], "the append still happened"
+
+
+def test_a_file_that_shrank_under_the_prune_is_left_alone(tmp_path):
+    """락 밖에서 파싱하는 대가로 생긴 창이다.
+
+    그 사이 파일이 지워지거나 줄어들면 우리가 든 스냅샷은 더 이상 이 파일의
+    앞부분이 아니다. 그대로 이어 붙이면 남의 파일을 우리 옛 내용으로
+    덮어쓰게 된다 — 이어 붙이지 않고 이번 시각을 거른다.
+    """
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    stale = _event(1, (now - timedelta(days=31)).isoformat()).model_dump_json()
+    survivor = _event(7, now.isoformat()).model_dump_json()
+    path.write_text(stale + "\n", encoding="utf-8")
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+
+    def someone_replaces_the_file():
+        path.write_text(survivor + "\n", encoding="utf-8")   # 더 짧다
+
+    _prune_with(log, path, someone_replaces_the_file)
+
+    assert path.read_text(encoding="utf-8") == survivor + "\n"
+
+
+def test_a_deleted_file_is_not_recreated_from_a_stale_snapshot(tmp_path):
+    now = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    path = tmp_path / "audit.jsonl"
+    path.write_text(_event(1, (now - timedelta(days=31)).isoformat()).model_dump_json() + "\n",
+                    encoding="utf-8")
+    log = FileAuditLog(path, retention_days=30, now=lambda: now)
+
+    _prune_with(log, path, lambda: path.unlink())
+
+    assert not path.exists()
