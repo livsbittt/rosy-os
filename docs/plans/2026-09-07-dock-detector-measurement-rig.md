@@ -46,6 +46,28 @@ changes are folded in below:
 
 The numbers quoted in the tasks below are measured, not estimated.
 
+## This plan has been executed, and review changed it again
+
+**The task code below is what was planned, not what shipped.** It is kept as
+written because the divergences are the record of why the shipped version looks
+the way it does; rewriting the blocks would delete that. Read `profile.py` and
+the design document for current behaviour. What changed:
+
+| Where | Planned | Shipped, and why |
+|---|---|---|
+| Task 2 clustering | angular gap only | **gap OR range step** (80 mm = 4σ, against the cluster mean). Gap-only assumed the dock stands in a void; a wall inside `max_range_m` fills every bearing, leaves no gaps, and collapsed the scene to one cluster — `found=False` at 0.60 m and 1.00 m. All 15 tests passed because the synthetic scan emitted `inf` for missed rays, i.e. a scene that cannot occur. |
+| Task 3 cluster count | reject unless exactly 3 | **candidate filter + best-subset search.** Forced by the above: once range splits the wall there are more than three clusters. Also closes a latent `_procrustes` truncation that a `!=`→`<` mutation survived. |
+| Task 1 shape | three collinear posts | **middle post 20 mm forward** (`post_forward_m`). A collinear model makes the residual measure only "collinear with the right spacing", leaving yaw on ~21 mm depth differences against 20 mm noise. Offset chosen by measuring 0/10/20/30/40/60 mm, not by picking. |
+| Task 2 gap factor | 1.5× step | **2.5× step.** The dropout brittleness that motivated this turned out to be an artefact of the exact-count rejection; the constant now bounds a different, re-measured pair of failures and its justification was rewritten to be true. |
+| Task 3 constant name | `_ARC_MEAN_BIAS` | **`_CHORD_MEAN_BIAS`.** π/4 is the chord-uniform mean; the arc-length mean is 2/π. The value was right, the name and comment named the other quantity. |
+| Task 8 SDF | posts collinear at x=0 | middle post at **x = −0.020**, to match. |
+| Test count | 15 | **32**, after tests were added for nineteen mutations that survived the planned suite. |
+
+Two of the review's own premises did not survive measurement and were not forced
+through: the 1.5× dropout claim above, and "move the middle post to reach zero
+false positives" — no offset reaches zero, for a structural reason recorded in
+the design document under "거짓 양성 0 은 기둥 세 개로 도달할 수 없다".
+
 ---
 
 ### Task 1: Dock shape config, and the asymmetry it must have

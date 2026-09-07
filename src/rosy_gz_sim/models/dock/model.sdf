@@ -13,8 +13,20 @@
         <geometry><box><size>0.10 0.20 0.01</size></box></geometry>
       </collision>
 
-      <!-- Three posts at -75 / -15 / +75 mm. The asymmetry is what gives yaw
-           a sign and what an accidental pair of furniture legs cannot fake. -->
+      <!-- Three posts at -75 / -15 / +75 mm laterally. The asymmetry is what
+           gives yaw a sign and what an accidental pair of furniture legs
+           cannot fake.
+
+           The middle post also stands 20 mm forward, toward the robot, at
+           x = -0.020. That is not decoration: a collinear trio makes the fit
+           residual measure only whether the trio is collinear with the right spacing, and leaves
+           yaw resting on inter-post depth differences of about 21 mm at 8
+           degrees, the same size as the simulator's declared range noise.
+           Moving the middle post gives the pattern two-dimensional extent, so
+           yaw becomes observable through that post's lateral position, which
+           is the precisely measured quantity. Measured: lateral RMS 0.87 to
+           0.70 mm. This 20 mm must match DockProfile.post_forward_m and the
+           dock's mechanical drawing. -->
       <visual name="post_l_visual">
         <pose>0 -0.075 0.055 0 0 0</pose>
         <geometry><cylinder><radius>0.015</radius><length>0.11</length></cylinder></geometry>
@@ -25,11 +37,11 @@
       </collision>
 
       <visual name="post_m_visual">
-        <pose>0 -0.015 0.055 0 0 0</pose>
+        <pose>-0.020 -0.015 0.055 0 0 0</pose>
         <geometry><cylinder><radius>0.015</radius><length>0.11</length></cylinder></geometry>
       </visual>
       <collision name="post_m_collision">
-        <pose>0 -0.015 0.055 0 0 0</pose>
+        <pose>-0.020 -0.015 0.055 0 0 0</pose>
         <geometry><cylinder><radius>0.015</radius><length>0.11</length></cylinder></geometry>
       </collision>
 
