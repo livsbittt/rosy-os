@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import math
+import random
 
 import pytest
 from pydantic import ValidationError
 
-from rosy_core.docking.profile import DockProfile, ProfileFit, SensorOffset
+from rosy_core.docking.profile import DockProfile, ProfileFit, SensorOffset, fit
 
 
 def test_the_default_profile_is_the_three_posts_the_design_settled_on():
@@ -43,10 +44,6 @@ def test_an_empty_fit_is_a_value_not_an_exception():
     assert empty.found is False
     assert empty.observation is None
 
-
-import random
-
-from rosy_core.docking.profile import fit
 
 STEP_SIM = math.radians(360.0 / 640.0)      # Gazebo declares 640 samples
 STEP_C1 = math.radians(0.24)                # C1 DenseBoost, denser

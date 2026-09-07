@@ -124,9 +124,12 @@ def _cluster_by_angular_gap(points: list[tuple[float, float]],
     return clusters
 
 
-#: 반지름 r 원통의 보이는 앞면에서 거리는 중심에서 d-r(정면)부터 d(가장자리)까지
-#: 변하고, 호 전체 평균은 d - (π/4)r 이다. 그래서 평균에 이 값을 되돌려 더한다.
-_ARC_MEAN_BIAS = math.pi / 4.0
+#: 반지름 r 원통의 보이는 앞면에서 거리는 중심에서 d−r(정면)부터 d(가장자리)까지
+#: 변한다. 등간격 광선은 그 앞면을 **현(chord) 위에서 등간격으로** 훑으므로(횡
+#: 오프셋 u 가 균일) 평균은 d − (π/4)r 이고, 그래서 평균에 이 값을 되돌려 더한다.
+#: 호 길이로 균일하게 훑었다면 평균은 d − (2/π)r 이다 — 값이 아니라 **어느
+#: 평균인지**가 이 상수의 정체이고, 예전 이름은 그것을 정확히 반대로 적고 있었다.
+_CHORD_MEAN_BIAS = math.pi / 4.0
 
 
 def _post_centre(cluster: list[tuple[float, float]],
@@ -144,7 +147,7 @@ def _post_centre(cluster: list[tuple[float, float]],
     """
     bearing = sum(item[0] for item in cluster) / len(cluster)
     mean_range = sum(item[1] for item in cluster) / len(cluster)
-    distance = mean_range + _ARC_MEAN_BIAS * radius
+    distance = mean_range + _CHORD_MEAN_BIAS * radius
     return (distance * math.cos(bearing), distance * math.sin(bearing))
 
 
@@ -225,6 +228,13 @@ def fit(ranges: Sequence[float], angle_min: float, angle_increment: float,
             residual_m=residual, points=len(points), clusters=len(clusters))
 
     bx, by, byaw = _to_base_link(tx, ty, yaw, sensor)
+    # `confidence` 는 residual 의 단조 감소 함수일 뿐이다. **우도가 아니고,
+    # 보정되지 않았고, 검출기 사이에 비교할 수도 없다.** σ = 20 mm 의 진짜
+    # 도크가 0.28–0.98 을 받는 동안 무작위 원통 세 개의 거짓 양성이 0.02–0.48 을
+    # 받으므로, 이 값에 임계를 걸어 둘을 가를 수 없다 — 가르는 것은
+    # `max_residual_m` 이다. `SimulatedDetector` 는 같은 `DockObservation`
+    # 필드에 1.0 을 박아 넣으므로 검출기 사이에 비교하면 틀린다. 오늘 이 값을
+    # 소비하는 코드는 없고, 리그의 CSV 기록 항목으로만 둔다.
     return ProfileFit(
         observation=DockObservation(
             x=bx, y=by, yaw=byaw,
