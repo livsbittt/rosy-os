@@ -24,7 +24,7 @@ Dated design and execute plans (2026-08-31 onward). These are the working trail 
 | `2026-09-02-docking-station.md` (+ `-design`) | Dock SM; last cm is sensor-closed-loop |
 | `2026-09-03-runtime-maintainability-rules.md` | Runtime slice module rules (catalog, launch compose, Nav2 policy) |
 | `2026-09-05-vision-accelerator-shield-design.md` | Pi 5 HAT/M.2 AI Kit vision offload (D-29 proposed; compose profile `vision`) |
-| `2026-09-07-dock-detector-measurement-rig-design.md` | Rig that decides the dock detector by measurement; feeds a D-28 amendment |
+| `2026-09-07-dock-detector-measurement-rig.md` (+ `-design`) | Rig that decides the dock detector by measurement; feeds a D-28 amendment |
 
 ## Subdirectories
 
