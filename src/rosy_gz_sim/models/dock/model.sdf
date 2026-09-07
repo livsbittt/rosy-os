@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="dock">
+    <static>true</static>
+    <link name="body">
+      <!-- Base plate. Below the scan plane, so it contributes no returns. -->
+      <visual name="plate_visual">
+        <pose>0.03 0 0.005 0 0 0</pose>
+        <geometry><box><size>0.10 0.20 0.01</size></box></geometry>
+      </visual>
+      <collision name="plate_collision">
+        <pose>0.03 0 0.005 0 0 0</pose>
+        <geometry><box><size>0.10 0.20 0.01</size></box></geometry>
+      </collision>
+
+      <!-- Three posts at -75 / -15 / +75 mm. The asymmetry is what gives yaw
+           a sign and what an accidental pair of furniture legs cannot fake. -->
+      <visual name="post_l_visual">
+        <pose>0 -0.075 0.055 0 0 0</pose>
+        <geometry><cylinder><radius>0.015</radius><length>0.11</length></cylinder></geometry>
+      </visual>
+      <collision name="post_l_collision">
+        <pose>0 -0.075 0.055 0 0 0</pose>
+        <geometry><cylinder><radius>0.015</radius><length>0.11</length></cylinder></geometry>
+      </collision>
+
+      <visual name="post_m_visual">
+        <pose>0 -0.015 0.055 0 0 0</pose>
+        <geometry><cylinder><radius>0.015</radius><length>0.11</length></cylinder></geometry>
+      </visual>
+      <collision name="post_m_collision">
+        <pose>0 -0.015 0.055 0 0 0</pose>
+        <geometry><cylinder><radius>0.015</radius><length>0.11</length></cylinder></geometry>
+      </collision>
+
+      <visual name="post_r_visual">
+        <pose>0 0.075 0.055 0 0 0</pose>
+        <geometry><cylinder><radius>0.015</radius><length>0.11</length></cylinder></geometry>
+      </visual>
+      <collision name="post_r_collision">
+        <pose>0 0.075 0.055 0 0 0</pose>
+        <geometry><cylinder><radius>0.015</radius><length>0.11</length></cylinder></geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>
