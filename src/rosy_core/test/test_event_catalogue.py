@@ -79,9 +79,14 @@ def _severity_written_at(node: ast.AST) -> Optional[str]:
     """
     if isinstance(node, ast.Constant) and node.value in _SEVERITIES:
         return node.value
-    if (isinstance(node, ast.Attribute) and node.attr.lower() in _SEVERITIES
-            and getattr(node.value, "id", "") == "Severity"):
-        return node.attr.lower()
+    if isinstance(node, ast.Attribute) and node.attr.lower() in _SEVERITIES:
+        # 철자에 매이지 않는다. `Severity.X`·`schemas.Severity.X`·`Sev.X` 는 모두
+        # 심각도이고, 그중 어느 하나를 못 알아보면 그 발행 지점은 **조용히**
+        # 검사 밖으로 나간다.
+        owner = node.value
+        spelled = getattr(owner, "attr", None) or getattr(owner, "id", "")
+        if spelled.lower().endswith("sev") or spelled.lower().endswith("severity"):
+            return node.attr.lower()
     return None
 
 
@@ -136,13 +141,35 @@ def _is_event_bus(func: ast.AST) -> bool:
 
 
 def _publishes(node: ast.AST) -> bool:
-    """이 함수 몸통에 발행 호출이 있는가."""
-    return any(
-        isinstance(inner, ast.Call)
-        and (getattr(inner.func, "attr", "") in {"publish", "_emit"}
-             or getattr(inner.func, "id", "") in {"publish", "_emit"})
-        for inner in ast.walk(node)
-    )
+    """이 함수 몸통에 발행 호출이 있는가.
+
+    ROS 퍼블리셔는 세지 않는다. `self.cmd_vel_pub.publish(msg)` 하나가 함수를
+    중계로 승격시키면, 중계에만 주는 면제가 그 함수에 딸려 들어간다.
+    """
+    for inner in ast.walk(node):
+        if not isinstance(inner, ast.Call):
+            continue
+        called = getattr(inner.func, "attr", "") or getattr(inner.func, "id", "")
+        if called == "_emit" or (called == "publish" and _is_event_bus(inner.func)):
+            return True
+    return False
+
+
+def _reassigned_in(node: ast.AST) -> set[str]:
+    """이 몸통 안에서 다시 대입되는 이름들.
+
+    `def _emit(type_, …): type_ = compute(); self._events.publish(type_, …)` 는
+    더 이상 중계가 아니다 — 호출 자리에서 읽은 이름과 발행되는 이름이 다르다.
+    """
+    names: set[str] = set()
+    for inner in ast.walk(node):
+        targets: list[ast.AST] = []
+        if isinstance(inner, ast.Assign):
+            targets = list(inner.targets)
+        elif isinstance(inner, (ast.AnnAssign, ast.AugAssign)):
+            targets = [inner.target]
+        names.update(item.id for item in targets if isinstance(item, ast.Name))
+    return names
 
 
 def _relay_bindings(node: ast.AST,
@@ -170,9 +197,20 @@ def _relay_bindings(node: ast.AST,
     함께 끊는다.
     """
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-        if node.name.startswith("_emit") and _publishes(node):
-            return frozenset(arg.arg for arg in node.args.args if arg.arg != "self")
-        return None
+        if not (node.name.startswith("_emit") and _publishes(node)):
+            return None
+        if node.name != "_emit":
+            # 중계 안이긴 하나 **스스로 걸어 주는 것은 없다.** 파라미터를 봐주는
+            # 근거는 그 이름이 `_emit(…)` 호출 자리에서 읽힌다는 것인데, 추출기가
+            # 읽는 호출 이름은 정확히 `_emit` 뿐이다. `_emit_health(component)`
+            # 처럼 한 글자만 붙여도 호출 자리는 아무 데서도 읽히지 않으므로,
+            # 그 파라미터를 봐주면 이름이 **어디에서도** 읽히지 않은 채 지나간다.
+            # 리뷰가 실제 패키지에서 그 한 단어로 같은 구멍을 다시 통과했다.
+            # `_emit_all` 처럼 튜플을 푸는 중계는 아래 for 규칙으로 성립한다 —
+            # 그 이름들은 튜플 리터럴 쪽에서 이미 읽혔다.
+            return frozenset()
+        blessed = {arg.arg for arg in node.args.args if arg.arg != "self"}
+        return frozenset(blessed - _reassigned_in(node))
     if (inherited is not None
             and isinstance(node, ast.For) and isinstance(node.target, ast.Tuple)):
         return inherited | {elt.id for elt in node.target.elts if isinstance(elt, ast.Name)}
@@ -626,11 +664,48 @@ def test_a_publisher_that_breaks_the_naming_convention_fails_loudly():
      "    return type_.upper()\n"
      "def send(self, type_):\n"
      "    self._events.publish(type_, data={})\n"),
+    # **발행하는** `_emit…` 헬퍼도 마찬가지다. 파라미터를 봐주는 근거는 그
+    # 이름이 `_emit(…)` 호출 자리에서 읽힌다는 것인데, 추출기가 읽는 호출
+    # 이름은 정확히 `_emit` 뿐이다. 리뷰가 실제 패키지에서 이름 한 단어를
+    # 늘리는 것만으로 같은 구멍을 다시 통과했다.
+    ("발행하는 _emit… 래퍼 함수",
+     "def _emit_component_health(component):\n"
+     "    svc.events.publish(component, severity='error', data={'health': 1})\n"
+     "def metrics(svc):\n"
+     "    for component, health in items:\n"
+     "        _emit_component_health(component)\n"),
+    ("발행하는 _emit… 메서드",
+     "class S:\n"
+     "    def _emit_health(self, component):\n"
+     "        self._events.publish(component, data={})\n"),
+    # ROS 퍼블리셔는 함수를 중계로 승격시키지 않는다.
+    ("ROS 퍼블리셔로 중계 행세를 한 것",
+     "def _emit_wheels(self, kind):\n"
+     "    self.cmd_vel_pub.publish(msg)\n"
+     "    self._events.publish(kind, data={})\n"),
+    # 다시 대입하면 호출 자리에서 읽은 이름과 발행되는 이름이 다르다.
+    ("_emit 안에서 파라미터를 다시 대입한 것",
+     "def _emit(self, type_, severity, data):\n"
+     "    type_ = compute()\n"
+     "    self._events.publish(type_, severity=severity, data=data)\n"),
 ])
 def test_the_relay_allowance_does_not_cover_a_name_read_nowhere_else(label, source):
     _names, blind = _names_and_blind(source)
 
     assert blind, f"{label} 이(가) 조용히 지나갔다"
+
+
+@pytest.mark.parametrize("spelling", ["Severity.CRITICAL", "schemas.Severity.CRITICAL",
+                                      "Sev.CRITICAL", "'critical'"])
+def test_the_severity_is_read_whatever_it_is_spelled(spelling):
+    """철자에 매이면 그 발행 지점은 **조용히** 심각도 검사 밖으로 나간다.
+
+    `Severity` 라는 식별자만 알아보면 `import … as Sev` 하나가 그렇게 만든다.
+    """
+    sites, blind = scan(f"pending.append(('battery.deep', {spelling}, data))\n")
+
+    assert [(site.name, site.severity) for site in sites] == [("battery.deep", "critical")]
+    assert not blind
 
 
 def test_an_enum_membership_test_is_not_an_emit_tuple():

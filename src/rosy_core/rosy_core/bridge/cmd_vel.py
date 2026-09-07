@@ -15,7 +15,12 @@ SAF-002 정지가 늦어지지 않게 하는 규칙 두 가지:
 
 from __future__ import annotations
 
-from typing import Any, Callable, Protocol
+from typing import Callable, Protocol
+
+
+class _Output(Protocol):
+    linear: float
+    angular: float
 
 
 class _Command(Protocol):
@@ -30,7 +35,7 @@ class _Power(Protocol):
 
 
 def cmd_vel_cycle(command: _Command, power: _Power,
-                  send: Callable[[Any], None]) -> None:
+                  send: Callable[[_Output], None]) -> None:
     """값을 고르고, 바퀴로 내보내고, 그 뒤에 알린다.
 
     `send` 에는 고른 값을 **통째로** 넘긴다. `(linear, angular)` 두 개를

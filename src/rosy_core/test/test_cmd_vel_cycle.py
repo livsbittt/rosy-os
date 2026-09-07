@@ -41,8 +41,8 @@ class Recorder:
         self.log.append("announce")
 
     # power
-    def on_activity(self, reason: str) -> None:
-        self.log.append(f"activity:{reason}")
+    def on_activity(self, source: str) -> None:
+        self.log.append(f"activity:{source}")
 
     # 바퀴
     def send(self, out: Out) -> None:
@@ -120,8 +120,11 @@ def test_the_bridge_actually_calls_the_cycle():
     """
     text = _bridge_source()
 
-    assert "from rosy_core.bridge.cmd_vel import cmd_vel_cycle" in text
-    assert "cmd_vel_cycle(self._svc.command, self._svc.power, self._send_twist)" in text
+    # `in` 이 아니라 개수다. 주석으로 만들어도 문자열은 파일에 남으므로,
+    # `in` 으로 적은 검사는 주석 처리 한 번으로 만족된다.
+    assert text.count("from rosy_core.bridge.cmd_vel import cmd_vel_cycle") == 1
+    assert text.count(
+        "        cmd_vel_cycle(self._svc.command, self._svc.power, self._send_twist)") == 1
 
 
 def test_the_bridge_still_owns_the_only_cmd_vel_publisher():
