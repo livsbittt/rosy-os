@@ -95,6 +95,9 @@ async def handle_command(line: str, session, base: FormationSpec) -> bool:
             spec = FormationSpec(Formation(rest[0].upper()), spacing=spacing, grid_cols=base.grid_cols,
                                  max_speed=base.max_speed, stream_timeout_ms=base.stream_timeout_ms)
             await session.reform(spec)
+            if session.state.value == "HOLDING":
+                # 무장 중에 무엇인가 걸렸다. 다음 통계 줄을 기다려 알게 하지 않는다.
+                print(f"held: {session.reason} — resume when clear")
         elif cmd == "resume":
             await session.resume()
         elif cmd == "status":

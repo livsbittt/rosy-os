@@ -322,6 +322,7 @@ def test_an_abort_that_lands_while_rearming_disarms_the_robots_the_reform_just_a
         gate = asyncio.Event()
         followers[0].follow_gate = gate
         before = {f.robot_id: f.calls.count(("swarm_cancel",)) for f in followers}
+        watchers = list(s._watchers)          # abort 는 목록을 비운다 — 그 전에 잡아 둔다
         task = asyncio.create_task(s.reform(FormationSpec(Formation.LINE, spacing=0.6)))
         await settle()
         followers[1].event_frames.put_nowait({"type": "nav.stuck", "robot_id": "rosy_03",
@@ -339,7 +340,7 @@ def test_an_abort_that_lands_while_rearming_disarms_the_robots_the_reform_just_a
         last_follow = max(i for i, c in enumerate(followers[0].calls) if c[0] == "follow")
         assert ("swarm_cancel",) in followers[0].calls[last_follow:]
         await settle()
-        assert all(t.done() for t in s._watchers)
+        assert watchers and all(t.done() for t in watchers)
     run(main())
 
 
@@ -348,11 +349,12 @@ def test_an_aborted_session_lets_go_of_its_event_sockets():
         leader, followers, log = _robots(2)
         s = _session(leader, followers, log=log, policy=HoldPolicy.ABORT)
         await s.start()
+        watchers = list(s._watchers)          # abort 는 목록을 비운다 — 그 전에 잡아 둔다
         followers[0].event_frames.put_nowait({"type": "nav.stuck", "robot_id": "rosy_02",
                                               "data": {}})
         await settle()
         assert s.state is SessionState.STOPPED
-        assert all(t.done() for t in s._watchers)
+        assert watchers and all(t.done() for t in watchers)
         opens = {f.robot_id: f.event_opens for f in followers}
         followers[1].event_frames.put_nowait(END)        # 끝난 세션은 소켓을 다시 열지 않는다
         await settle(40)
@@ -463,4 +465,201 @@ def test_a_leader_found_in_estop_after_a_socket_drop_holds_the_formation():
         assert s.reason == ("safety.estop", "rosy_01")
         assert s.relay.paused
         await s.stop()
+    run(main())
+
+
+# --- 재개 직전에 들어온 것, 되지 않는 릴레이 정지, e-stop 상태의 리더 ------------------
+
+
+def test_a_trigger_that_lands_while_resume_is_checking_blocks_the_resume():
+    """재개 전 확인도 await 여러 개짜리 구간이다. 그 사이에 온 사고를 재개가 지나칠 수 없다."""
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        followers[0].event_frames.put_nowait({"type": "nav.blocked", "robot_id": "rosy_02",
+                                              "data": {}})
+        await settle()
+        assert s.state is SessionState.HOLDING
+        gate = asyncio.Event()
+        followers[1].swarm_state_gate = gate              # 확인이 여기서 멈춘다
+        task = asyncio.create_task(s.resume())
+        await settle()
+        followers[0].event_frames.put_nowait({"type": "safety.estop", "robot_id": "rosy_02",
+                                              "data": {}})
+        await settle()
+        gate.set()
+        with pytest.raises(SessionError):
+            await task
+        assert s.relay.paused                             # 풀지 않았다
+        assert s.state is SessionState.HOLDING
+        assert s.pending_triggers == [("safety.estop", "rosy_02")]
+        await s.stop()
+    run(main())
+
+
+def test_a_stop_that_lands_while_resume_is_checking_is_not_overridden():
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        followers[0].event_frames.put_nowait({"type": "nav.blocked", "robot_id": "rosy_02",
+                                              "data": {}})
+        await settle()
+        assert s.state is SessionState.HOLDING
+        gate = asyncio.Event()
+        followers[1].swarm_state_gate = gate
+        task = asyncio.create_task(s.resume())
+        await settle()
+        await s.stop()                                    # 확인 중에 운영자가 끝냈다
+        assert s.state is SessionState.STOPPED
+        gate.set()
+        try:
+            await task
+        except SessionError:
+            pass
+        assert s.state is SessionState.STOPPED            # 재개가 되살리지 않는다
+        assert s.relay.stopped
+    run(main())
+
+
+def test_the_same_trigger_from_the_same_robot_is_only_kept_once():
+    """끊긴 이벤트 소켓은 2 s 마다 다시 열린다. 같은 사고를 무한히 쌓으면 안 된다."""
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        followers[0].event_frames.put_nowait({"type": "nav.blocked", "robot_id": "rosy_02",
+                                              "data": {}})
+        await settle()
+        assert s.state is SessionState.HOLDING
+        followers[0]._swarm_state = {"active": False, "holding": False}
+        for _ in range(3):
+            followers[0].event_frames.put_nowait(END)     # 소켓 단절 → reconcile
+            await settle(40)
+        assert followers[0].event_opens >= 4
+        assert s.pending_triggers.count(("swarm.aborted", "rosy_02")) == 1
+        assert s.pending_triggers == [("swarm.aborted", "rosy_02")]
+        await s.stop()
+    run(main())
+
+
+def test_an_abort_lets_the_robots_go_even_when_the_relay_cannot_be_stopped():
+    async def main():
+        leader, followers, log = _robots(2)
+
+        class BrokenStopRelay(FakeRelay):
+            async def stop(self):
+                self.log.append(("relay", "stop"))
+                raise ConnectionError("relay socket already gone")
+
+        s = FormationSession(leader, followers, FormationSpec(Formation.COLUMN, spacing=0.6),
+                             policy=HoldPolicy.ABORT, sleep=_no_sleep,
+                             relay_factory=lambda ld, f, **_: BrokenStopRelay(ld, f, log=log))
+        await s.start()
+        followers[0].event_frames.put_nowait({"type": "nav.stuck", "robot_id": "rosy_02",
+                                              "data": {}})
+        await settle()
+        # 릴레이를 못 끄는 것은 로봇을 무장한 채 두는 이유가 되지 못한다.
+        assert all(("swarm_cancel",) in f.calls for f in followers)
+        assert ("navigation_cancel",) in leader.calls
+        assert s.state is SessionState.STOPPED
+        await s.stop()
+    run(main())
+
+
+def test_a_leader_in_estop_is_refused_before_any_follower_is_armed():
+    async def main():
+        leader, followers, log = _robots(2)
+        leader._state["mode"] = RobotMode.EMERGENCY.value
+        s = _session(leader, followers, log=log)
+        with pytest.raises(ArmingFailed) as exc:
+            await s.start()
+        assert exc.value.robot_id == "rosy_01" and exc.value.code == "EMERGENCY_ACTIVE"
+        assert not any(_follows(f) for f in followers)
+        assert s.state is SessionState.STOPPED
+    run(main())
+
+
+def test_resume_refuses_while_the_leader_is_still_in_estop():
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        leader._state["mode"] = RobotMode.EMERGENCY.value
+        leader.event_frames.put_nowait({"type": "safety.estop", "robot_id": "rosy_01", "data": {}})
+        await settle()
+        assert s.state is SessionState.HOLDING
+        with pytest.raises(SessionError):
+            await s.resume()                              # 리더가 아직 서 있다
+        assert s.state is SessionState.HOLDING and s.relay.paused
+        leader._state["mode"] = RobotMode.IDLE.value      # e-stop 이 풀렸다
+        await s.resume()
+        assert s.state is SessionState.RUNNING and not s.relay.paused
+        await s.stop()
+    run(main())
+
+
+def test_a_relay_that_cannot_be_started_does_not_leave_the_followers_armed():
+    async def main():
+        leader, followers, log = _robots(2)
+        created = []
+
+        class BrokenStartRelay(FakeRelay):
+            async def start(self):
+                raise ConnectionError("reference socket refused")
+
+        def factory(ld, f, **_):
+            relay = BrokenStartRelay(ld, f, log=log)
+            created.append(relay)
+            return relay
+
+        s = FormationSession(leader, followers, FormationSpec(Formation.COLUMN, spacing=0.6),
+                             relay_factory=factory, sleep=_no_sleep)
+        with pytest.raises(SessionError):
+            await s.start()
+        assert s.state is SessionState.STOPPED
+        assert all(("swarm_cancel",) in f.calls for f in followers)
+        assert created[0].stopped
+        assert s.reason[0].startswith("relay_failed")
+    run(main())
+
+
+def test_a_reform_from_a_hold_carries_only_what_was_already_there():
+    """HOLDING 중의 reform 은 시작 시점에 쌓여 있던 몫만 책임진다."""
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        followers[0].event_frames.put_nowait({"type": "nav.blocked", "robot_id": "rosy_02",
+                                              "data": {}})
+        await settle()
+        followers[1].event_frames.put_nowait({"type": "safety.estop", "robot_id": "rosy_03",
+                                              "data": {}})
+        await settle()
+        assert s.pending_triggers == [("safety.estop", "rosy_03")]
+        gate = asyncio.Event()
+        followers[0].follow_gate = gate
+        task = asyncio.create_task(s.reform(FormationSpec(Formation.LINE, spacing=0.6)))
+        await settle()
+        followers[1].event_frames.put_nowait({"type": "nav.stuck", "robot_id": "rosy_03",
+                                              "data": {}})
+        await settle()
+        gate.set()
+        await task
+        assert s.state is SessionState.HOLDING
+        assert s.pending_triggers == [("nav.stuck", "rosy_03")]   # 새로 온 것만 남는다
+        assert s.relay.paused
+        await s.stop()
+    run(main())
+
+
+def test_stop_from_idle_has_nothing_to_cancel():
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.stop()
+        assert s.state is SessionState.STOPPED
+        assert not any(("swarm_cancel",) in f.calls for f in followers)
+        assert not any(entry[1] == "swarm_cancel" for entry in log)
     run(main())

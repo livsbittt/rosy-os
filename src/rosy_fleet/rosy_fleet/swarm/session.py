@@ -7,6 +7,10 @@
 - 재개는 운영자만 한다. 자동 재개는 SRS 가 금지한 자동 재시도다.
 - HOLDING 중에 온 트리거는 버리지 않고 `pending_triggers` 에 쌓는다. 그것이 남아
   있으면 `resume()` 은 거절한다 — 운영자는 `reform` 으로 다시 무장하거나 `stop` 한다.
+  같은 `(사유, robot_id)` 는 한 번만 쌓는다. 끊긴 소켓은 2 s 마다 다시 열리므로
+  그러지 않으면 같은 사고 하나가 목록을 끝없이 늘린다.
+- `resume()` 도 `reform()` 도 await 여러 개짜리 구간이다. 그 사이에 감시가 돌고
+  운영자가 `stop` 할 수 있다 — 릴레이를 만지기 직전에 무엇이 들어왔는지 다시 본다.
 """
 
 from __future__ import annotations
@@ -193,6 +197,9 @@ class FormationSession:
             raise SessionError(
                 f"cannot resume: unhandled triggers {self.pending_triggers}; "
                 "reform to re-arm or stop")
+        # 확인은 await 여러 개짜리 구간이다. 그 사이에 온 것을 재개가 덮어써서는 안 된다.
+        seq = self._policy_seq
+        carried = len(self.pending_triggers)
         for follower in self._followers:
             # HOLD 중에 팔로워가 대형을 떠났을 수 있다. 스트림만 다시 켜면 남은 팔로워만
             # 달려나간다 — 재개 전에 전원이 아직 따라오고 있는지 직접 본다.
@@ -205,9 +212,33 @@ class FormationSession:
                 raise SessionError(
                     f"cannot resume: {follower.robot_id} is no longer following; "
                     "reform to re-arm or stop")
+        await self._verify_resumable(seq, carried)
         self.relay.resume()
         self.state = SessionState.RUNNING
         self.reason = None
+
+    async def _verify_resumable(self, seq: int, carried: int) -> None:
+        """재개 직전의 마지막 확인. 릴레이를 만지기 전에 이 구간 동안 무엇이 들어왔는지 본다."""
+        try:
+            leader_state = await self._leader.state()
+        except Exception as exc:
+            raise SessionError(
+                f"cannot resume: {self._leader.robot_id} state unavailable: {exc}") from exc
+        if leader_state.get("mode") == RobotMode.EMERGENCY.value:
+            # 팔로워만 물어보면 리더가 선 채로 스트림이 다시 열린다.
+            raise SessionError(
+                f"cannot resume: {self._leader.robot_id} is in e-stop; clear it first")
+        if self.state is not SessionState.HOLDING:
+            raise SessionError(
+                f"cannot resume: the session became {self.state.value} while it was being checked")
+        if len(self.pending_triggers) != carried or self.pending_triggers:
+            raise SessionError(
+                f"cannot resume: {self.pending_triggers} arrived while it was being checked; "
+                "reform to re-arm or stop")
+        if self._policy_seq != seq:
+            raise SessionError(
+                f"cannot resume: the policy fired again while it was being checked "
+                f"({self._reason_text()}); reform to re-arm or stop")
 
     async def stop(self) -> None:
         if self.state is SessionState.IDLE:
@@ -216,8 +247,7 @@ class FormationSession:
             return
         await self._cancel_watchers()
         self._watchers.clear()
-        if self.relay is not None:
-            await self.relay.stop()
+        await self._stop_relay()
         for follower in self._followers:
             try:
                 await follower.swarm_cancel()
@@ -229,6 +259,10 @@ class FormationSession:
 
     async def _arm(self, spec: FormationSpec) -> dict[str, SlotOffset]:
         leader_state = await self._leader.state()
+        if leader_state.get("mode") == RobotMode.EMERGENCY.value:
+            # 팔로워를 리더에 묶는 것이 무장이다. 선 리더에 묶으면 e-stop 이 풀리는 순간
+            # 전원이 그 프레임을 따라간다 — 한 대도 묶기 전에 거절한다.
+            raise ArmingFailed(self._leader.robot_id, "EMERGENCY_ACTIVE", "leader is in e-stop")
         states = {f.robot_id: await f.state() for f in self._followers}
 
         map_ids = {self._leader.robot_id: leader_state.get("map_id"),
@@ -314,12 +348,13 @@ class FormationSession:
     async def _cancel_watchers(self) -> None:
         """감시를 끝낸다. 자기 자신은 취소하지 않는다 — 그 태스크는 상태 검사로 나간다."""
         current = asyncio.current_task()
-        for task in self._watchers:
-            if task is not current:
-                task.cancel()
-        for task in self._watchers:
-            if task is current:
-                continue
+        cancelled = [task for task in self._watchers if task is not current]
+        # 목록에는 살아 있는 감시만 남긴다. 두 번 부르는 abort→stop 이 끝난 태스크를
+        # 다시 await 하지 않게, 그리고 "남은 감시"를 묻는 쪽이 참을 보게.
+        self._watchers = [task for task in self._watchers if task is current]
+        for task in cancelled:
+            task.cancel()
+        for task in cancelled:
             try:
                 await task
             except asyncio.CancelledError:
@@ -370,6 +405,11 @@ class FormationSession:
     async def _trigger(self, type_: str, robot_id: str) -> None:
         if self.state is SessionState.HOLDING:
             # 이미 서 있다고 해서 새 사고가 없던 일이 되지는 않는다. resume 이 이것을 본다.
+            if (type_, robot_id) in self.pending_triggers:
+                # 끊긴 소켓은 2 s 마다 다시 열리고 그때마다 같은 사실을 다시 말한다.
+                # 같은 사고를 두 번 세면 목록만 끝없이 길어진다.
+                log.debug("%s: %s while HOLDING (already pending)", robot_id, type_)
+                return
             self.pending_triggers.append((type_, robot_id))
             log.warning("%s: %s while HOLDING — resume is blocked until reform or stop",
                         robot_id, type_)
@@ -397,10 +437,19 @@ class FormationSession:
         self._policy_seq += 1
         # 감시를 먼저 끝낸다. 끝난 세션의 소켓을 계속 다시 여는 감시는 유령이다.
         await self._cancel_watchers()
-        if self.relay is not None:
-            await self.relay.stop()
+        # 릴레이를 못 끄는 것은 로봇을 무장한 채 두는 이유가 되지 못한다. 안전 작업이
+        # 릴레이 뒤에 있으면, 릴레이가 던지는 순간 팔로워는 풀리지 않고 리더는 선다.
+        await self._stop_relay()
         await self._disarm(self._followers)
         await self._cancel_leader()
+
+    async def _stop_relay(self) -> None:
+        if self.relay is None:
+            return
+        try:
+            await self.relay.stop()
+        except Exception as exc:
+            log.error("relay stop failed: %s", exc)
 
     async def _cancel_leader(self) -> None:
         try:

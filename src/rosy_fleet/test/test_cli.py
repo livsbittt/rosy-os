@@ -80,3 +80,21 @@ def test_a_bad_console_command_does_not_end_the_session():
     base = FormationSpec(Formation.COLUMN, spacing=0.6)
     assert run(cli.handle_command("reform TRIANGLE", Recorder(), base)) is True
     assert run(cli.handle_command("dance", Recorder(), base)) is True
+
+
+def test_a_reform_that_ends_in_a_hold_says_so(capsys):
+    """reform 이 재개하지 않고 끝났다는 것을 운영자가 다음 통계 줄까지 기다려 알면 늦다."""
+    class Held:
+        def __init__(self):
+            self.state = type("S", (), {"value": "HOLDING"})()
+            self.reason = ("safety.estop", "rosy_03")
+
+        async def reform(self, spec):
+            self.reformed = spec
+
+    held = Held()
+    base = FormationSpec(Formation.COLUMN, spacing=0.6)
+    assert run(cli.handle_command("reform LINE", held, base)) is True
+    out = capsys.readouterr().out
+    assert out.startswith("held:")
+    assert "safety.estop" in out
