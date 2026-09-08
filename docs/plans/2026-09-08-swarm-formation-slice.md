@@ -327,7 +327,7 @@ from typing import Callable
 #: footprint** 로 충돌을 검사하므로 하한은
 #:   inflation_radius + 리더 외접반경 + 팔로워 외접반경 + footprint_padding
 #:   = 0.15 + 0.085 + 0.085 + 0.03 ≈ 0.35 m
-#: 이다 (`src/rosy_navigation/params/nav2_params.yaml`: footprint 6 cm 정사각 → 외접반경
+#: 이다 (`src/rosy_navigation/params/nav2_params.yaml`: footprint 반폭 6 cm(한 변 12 cm) 정사각 → 외접반경
 #: 0.085, inflation_radius 0.15, global costmap footprint_padding 0.03). 0.4 는 그 위로
 #: 약 5 cm 여유다 — 넉넉하지 않다. Nav2 파라미터가 바뀌면 이 식으로 다시 계산한다.
 MIN_SPACING = 0.4
