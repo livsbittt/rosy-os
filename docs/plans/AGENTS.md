@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-08 -->
 
 # plans
 
@@ -24,6 +24,7 @@ Dated design and execute plans (2026-08-31 onward). These are the working trail 
 | `2026-09-02-docking-station.md` (+ `-design`) | Dock SM; last cm is sensor-closed-loop |
 | `2026-09-03-runtime-maintainability-rules.md` | Runtime slice module rules (catalog, launch compose, Nav2 policy) |
 | `2026-09-05-vision-accelerator-shield-design.md` | Pi 5 HAT/M.2 AI Kit vision offload (D-29 proposed; compose profile `vision`) |
+| `2026-09-08-swarm-formation-slice-design.md` | Fleet-less N-robot formation slice: `rosy_fleet` seed (geometry, slot assignment, relay, FOR-004 session), `gz_multi core:=true`, sim bench; D-35 candidate |
 
 ## Subdirectories
 
@@ -35,7 +36,7 @@ None.
 
 - Read the matching `-design.md` before changing power, docking, battery, or release code.
 - Do not treat these as the API contract; that remains `docs/reference/`.
-- Current git branch work maps to `2026-09-02-battery-integrity-low-battery-alert*`.
+- Branch `feat/swarm-formation-slice` maps to `2026-09-08-swarm-formation-slice-design.md`.
 
 ### Testing Requirements
 
