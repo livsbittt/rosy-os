@@ -16,6 +16,7 @@ N대의 로봇을 rosy_01 .. rosy_NN namespace로 시뮬레이션한다.
 사용 예:
   ros2 launch rosy_gz_sim gz_multi.launch.py robots:=2
   ros2 launch rosy_gz_sim gz_multi.launch.py robots:=3 mode:=slam headless:=true
+  ros2 launch rosy_gz_sim gz_multi.launch.py robots:=3 mode:=nav core:=true   # 로봇별 rosy_core, 8080..8082
 """
 
 import os
@@ -28,6 +29,7 @@ from launch.actions import (
     DeclareLaunchArgument,
     GroupAction,
     IncludeLaunchDescription,
+    LogInfo,
     OpaqueFunction,
     SetEnvironmentVariable,
 )
@@ -37,6 +39,32 @@ from launch.launch_description_sources import AnyLaunchDescriptionSource, Python
 from launch.substitutions import LaunchConfiguration
 
 import yaml
+
+
+#: 시뮬 로봇의 API 토큰. rosy_core 기본 설정(`config/rosy_default.yaml`)의 개발 토큰이다.
+SIM_OPERATOR_TOKEN = "rosy-dev-operator"
+
+
+def _core_config(ns: str, api_port: int) -> dict:
+    """로봇별 rosy_core 오버라이드(ROSY_CONFIG). 기본 설정 위에 병합된다.
+
+    frame_prefix 는 ROSY_NAMESPACE 환경변수가 넣으므로 여기 두지 않는다. capabilities 는
+    기본 파일이 이미 swarm.follow/lead: true 라 그대로 쓴다.
+    """
+    number = ns.rsplit("_", 1)[-1]
+    return {
+        "robot": {"id": ns, "name": f"Rosy {number}"},
+        "network": {"api_host": "0.0.0.0", "api_port": api_port},
+    }
+
+
+def _robots_manifest(namespaces: list, api_port_base: int) -> list:
+    """rosy_fleet CLI 가 읽는 robots.yaml 의 `robots` 목록."""
+    return [
+        {"robot_id": ns, "base_url": f"http://127.0.0.1:{api_port_base + i}",
+         "token": SIM_OPERATOR_TOKEN}
+        for i, ns in enumerate(namespaces)
+    ]
 
 
 # per-robot bridge 매핑 템플릿 (rosy_bridge.yaml 기반, prefix 적용)
@@ -81,6 +109,8 @@ def _launch_setup(context):
     mode = LaunchConfiguration("mode").perform(context)
     headless = LaunchConfiguration("headless").perform(context).lower() in ("true", "1")
     spacing = float(LaunchConfiguration("spawn_spacing").perform(context))
+    core = LaunchConfiguration("core").perform(context).lower() in ("true", "1")
+    api_port_base = int(LaunchConfiguration("api_port_base").perform(context))
 
     gz_sim_share = get_package_share_directory("ros_gz_sim")
     rosy_gz_share = get_package_share_directory("rosy_gz_sim")
@@ -192,7 +222,39 @@ def _launch_setup(context):
                 ])
             )
 
+        # 5) rosy_core (core:=true) — 로봇마다 포트·HOME·설정을 가른다.
+        #    HOME 을 가르는 이유: waypoints.json 과 audit.jsonl 이 Path.home()/.rosy 에
+        #    고정돼 있어, 같은 HOME 이면 N대가 한 파일을 쓴다.
+        if core:
+            core_home = os.path.join(bridge_dir, f"home_{ns}")
+            os.makedirs(core_home, exist_ok=True)
+            core_cfg = os.path.join(bridge_dir, f"rosy_{ns}.yaml")
+            with open(core_cfg, "w") as f:
+                yaml.safe_dump(_core_config(ns, api_port_base + i - 1), f)
+            group_actions.append(
+                Node(
+                    package="rosy_core",
+                    executable="rosy_core",
+                    name="rosy_core",
+                    namespace=ns,
+                    output="screen",
+                    parameters=[{"use_sim_time": True}],
+                    additional_env={
+                        "ROSY_NAMESPACE": ns,
+                        "ROSY_CONFIG": core_cfg,
+                        "HOME": core_home,
+                    },
+                )
+            )
+
         actions.extend(group_actions)
+
+    if core:
+        namespaces = [f"{prefix}_{i:02d}" for i in range(1, robots + 1)]
+        manifest_path = os.path.join(bridge_dir, "robots.yaml")
+        with open(manifest_path, "w") as f:
+            yaml.safe_dump({"robots": _robots_manifest(namespaces, api_port_base)}, f, sort_keys=False)
+        actions.append(LogInfo(msg=f"rosy_fleet robots.yaml: {manifest_path}"))
 
     return actions
 
@@ -210,5 +272,9 @@ def generate_launch_description():
         DeclareLaunchArgument("headless", default_value="false"),
         DeclareLaunchArgument("spawn_spacing", default_value="1.5",
                               description="로봇 간 x축 배치 간격 (m)"),
+        DeclareLaunchArgument("core", default_value="false",
+                              description="로봇별 rosy_core 기동 (포트 api_port_base + i - 1)"),
+        DeclareLaunchArgument("api_port_base", default_value="8080",
+                              description="첫 로봇의 rosy_core API 포트"),
         OpaqueFunction(function=_launch_setup),
     ])
