@@ -32,6 +32,7 @@ provoke on real hardware.
 from __future__ import annotations
 
 import time
+import subprocess
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
@@ -136,6 +137,7 @@ class Journal:
     backup_path: str | None = None
     complete: bool = False
     states: list[dict] = field(default_factory=list)
+    old_previous_activation: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -272,6 +274,7 @@ class Updater:
             backup_path=data.get("backup_path"),
             complete=data.get("complete", False),
             states=data.get("states", []),
+            old_previous_activation=data.get("old_previous_activation"),
         )
 
     def _clear_journal(self) -> None:
@@ -319,6 +322,9 @@ class Updater:
             )
 
         old = self._current_activation()
+        import json
+        old_previous = (json.loads(self.layout.previous_activation.read_text(encoding="utf-8"))
+                        if self.layout.previous_activation.exists() else None)
 
         # Freeze before the record moves. Immutability is what rollback rests
         # on: the previous set has to still be what was activated. A function
@@ -333,6 +339,7 @@ class Updater:
             old_current=old.release_id if old else None,
             old_previous=self._link_target_id(self.layout.previous_link),
             backup_path=str(backup_path) if backup_path else None,
+            old_previous_activation=old_previous,
         )
         self._write_journal(journal)
 
@@ -345,10 +352,17 @@ class Updater:
             current=candidate.release_id,
             previous=old.release_id if old else None,
         )
-        self._start_runtime(candidate.runtime_mode)
+        try:
+            self._start_runtime(candidate.runtime_mode)
+            healthy = self._await_health(health_timeout_s)
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as exc:
+            # A failed compose start is an unhealthy candidate too. Preserve the
+            # journal and roll back; do not expose command stderr or environment.
+            return self._roll_back(journal, detail=f"candidate startup failed: {type(exc).__name__}")
 
-        if self._await_health(health_timeout_s):
+        if healthy:
             self.record_state(UpdateState.CORE_HEALTHY, candidate.release_id)
+            self._write_previous(asdict(old) if old else None)
             journal = self.read_journal() or journal
             journal.complete = True
             self._write_journal(journal)
@@ -415,6 +429,12 @@ class Updater:
 
     # --- rollback ---------------------------------------------------------
 
+    def _write_previous(self, record: dict | None) -> None:
+        if record is None:
+            self.layout.previous_activation.unlink(missing_ok=True)
+        else:
+            write_json_atomic(self.layout.previous_activation, record, mode=0o600)
+
     def _roll_back(self, journal: Journal, *, detail: str) -> Outcome:
         """Restore the previous activation set and bring it up core-only."""
         self.record_state(UpdateState.ROLLING_BACK, journal.release_id, detail)
@@ -434,15 +454,20 @@ class Updater:
         previous = self._previous_record(journal)
         write_activation(self.layout, previous)
         update_display_pointers(self.layout, current=previous.release_id, previous=journal.old_previous)
-        self._start_runtime(previous.runtime_mode)
+        try:
+            self._start_runtime(previous.runtime_mode)
+            healthy = self._await_health(DEFAULT_HEALTH_TIMEOUT_S)
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError):
+            healthy = False
 
-        if not self._await_health(DEFAULT_HEALTH_TIMEOUT_S):
+        if not healthy:
             return self._enter_recovery_hold(
                 journal,
                 release_id=previous.release_id,
                 detail="the previous release also failed its health check; runtime left disabled",
             )
 
+        self._write_previous(journal.old_previous_activation)
         self._complete_journal(journal)
         self.record_state(UpdateState.ROLLED_BACK_CORE_ONLY, previous.release_id, detail)
         self._clear_journal()

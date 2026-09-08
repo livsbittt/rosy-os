@@ -1,0 +1,17 @@
+[Unit]
+Description=Check and stage a signed ROSY release (never install)
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/rosy/updates.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/rosy-release check --download --json
+User=root
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/etc/rosy /var/cache/rosy
+TimeoutStartSec=30min

@@ -175,13 +175,12 @@ ROSY_IMAGE_MOUNT=/mnt/rosy ./deploy/image/verify-artifacts.sh dist/<release-id>
 
 ## 6. UPDATE_GO — 실기 update와 rollback
 
-activation·rollback·전원손실 복구는 tmpdir에서 검증되어 있다
-(`test_release_updater.py`). 아래 항목 중 **`deploy/release/`에 구현이 없어 지금은
-어떤 테스트로도 실패시킬 수 없는 것**은 ⚠로 표시했다 — WP-6에서 구현하며, 그전까지
-이 항목들은 인수 대상이 아니라 구현 대상이다.
+서명 번들 staging·activation·rollback·전원손실 상태 복구는 임시 디렉터리에서 검증되어 있다
+(`test_release_bundle.py`, `test_release_delivery.py`, `test_release_updater.py`).
+실제 Pi 검증은 모두 HOLD다. ⚠는 아직 CLI와 연결되지 않은 통합 구현 항목이다.
 
-- [ ] ⚠ 정상 번들 설치 → `current`가 새 릴리스, `previous`가 이전 릴리스
-      (번들 압축 해제와 staging은 아직 구현되지 않았다)
+- [ ] 정상 번들 설치 → `current`가 새 릴리스, `previous`가 이전 릴리스
+      (서명 번들 staging CLI는 로컬 구현됨. 실제 Pi 시험은 HOLD; github-updates.md 참조)
 - [ ] **손상된 번들** 거부 — payload를 1바이트 바꾼다 → `CHECKSUM_MISMATCH`
 - [ ] **미서명 번들** 거부 → `SIGNATURE_MISSING`
 - [ ] **다른 키로 서명된 번들** 거부 → `SIGNATURE_INVALID`
@@ -192,10 +191,10 @@ activation·rollback·전원손실 복구는 tmpdir에서 검증되어 있다
       `rosy-release-recover.service`가 runtime보다 먼저 돌고, 이전 릴리스가
       `core`로 올라오는가
 - [ ] 위 모든 경우에 `rosy-motor`/`rosy-io`가 **시작되지 않았는가**
-- [ ] 대시보드에 current/previous/staged와 실패 사유가 표시되는가
+- [ ] ⚠ 대시보드에 current/previous/staged와 실패 사유가 표시되는가
 - [ ] 롤백 후 이전 릴리스의 컨테이너 이미지가 남아 있는가 —
       `release-retention.md` §4의 prune 금지 규칙이 지켜지는가
-- [ ] 활성화 성공 후 staging 디렉터리가 정리되는가
+- [ ] ⚠ 활성화 성공 후 staging 디렉터리가 정리되는가
       (`storage.clear_staging`. 롤백 경로에서는 정리하지 않는 것도 함께 확인)
 - [ ] 여유 공간 부족 시 업데이트를 **시작하지 않고** 거부하는가
       (`Updater.check_headroom`. 거부 사유에 필요·가용 용량이 숫자로 나오는지)

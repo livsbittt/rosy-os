@@ -1,0 +1,10 @@
+[Unit]
+Description=Recover a ROSY activation before starting the runtime
+Requires=docker.service
+After=docker.service
+Before=rosy-runtime.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/rosy-release recover --json
+TimeoutStartSec=5min

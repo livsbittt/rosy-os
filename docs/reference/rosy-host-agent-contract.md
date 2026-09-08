@@ -246,3 +246,8 @@ install 거부, idempotency, 요청 크기·스키마, 감사 redaction — 은
 
 전송과 인증(§2, §3)은 확정된 것으로 취급한다. 구현 중 이를 바꾸려면 이 문서를
 함께 고친다.
+
+
+## 2026-09-08 delivery integration status
+
+`rosy-release` is now a separate root maintenance CLI for signed staging, installation, rollback and boot recovery. The systemd timer only checks/downloads/stages. This does not implement or change the socket API above: wiring the host-agent server or dashboard to this CLI requires a separate authorization/integration change. See `docs/deployment/github-updates.md`.

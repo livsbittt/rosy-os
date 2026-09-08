@@ -21,7 +21,7 @@ jobs:
           apt-get update -qq
           # openssl: the release signing contract requires OpenSSL 3 raw Ed25519.
           # Installed explicitly so a slimmer base image cannot silently remove it.
-          apt-get install -y -qq python3-colcon-common-extensions python3-pip openssl
+          apt-get install -y -qq python3-colcon-common-extensions python3-pip openssl zstd
           pip3 install --no-cache-dir flake8 pydantic fastapi uvicorn httpx websockets pyyaml
 
       - name: Build (colcon)
@@ -45,6 +45,9 @@ jobs:
       # ROS 오버레이는 필요 없다 — test_motor_control.py 가 직접 sys.path 를 잡는다.
       - name: Test (deployment and release contracts)
         run: python3 -m pytest test/ -v
+
+      - name: Test (Fleet client and formation contracts)
+        run: python3 -m pytest src/rosy_fleet/test/ -v
 
       # 호스트 테스트는 ros_bridge 를 임포트하지 않으므로, 모듈 최상단의 ROS
       # 임포트가 노드 생성자를 죽이는 결함을 잡지 못한다. 이 러너에는

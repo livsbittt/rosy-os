@@ -315,6 +315,9 @@ build_and_start_core() {
 }
 
 enable_boot_service() {
+    install -m 0644 "$INSTALL_ROOT/deploy/robot/rosy-release-recover.service" \
+        /etc/systemd/system/rosy-release-recover.service
+    chmod 0755 "$INSTALL_ROOT/deploy/robot/release-recover.sh"
     install -m 0644 "$INSTALL_ROOT/deploy/robot/rosy-runtime.service" \
         /etc/systemd/system/rosy-runtime.service
 

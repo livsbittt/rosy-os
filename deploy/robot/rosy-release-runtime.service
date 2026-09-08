@@ -1,0 +1,17 @@
+[Unit]
+Description=ROSY runtime selected by activation.json
+Requires=docker.service
+After=docker.service
+Requires=rosy-release-recover.service
+After=rosy-release-recover.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/rosy-release runtime up
+ExecStop=/usr/local/bin/rosy-release runtime down
+TimeoutStartSec=5min
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

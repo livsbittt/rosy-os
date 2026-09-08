@@ -716,3 +716,8 @@ ROSY OS v1 이미지 작업은 다음 조건을 모두 만족할 때 완료다.
 업링크가 끊겨도 로봇 AP 서브넷 안의 로컬 제어가 유지됨을 함께 확인한다.
 
 전체 OS A/B OTA와 도메인별 응용 기능은 이 완료 정의에 포함하지 않는다.
+
+
+## 2026-09-08 implementation addendum (D-36)
+
+The local delivery CLI now verifies/stages signed bundles and activates them through the existing journal with a Docker adapter. Immutable data generations are snapshots; runtime writes go to `data-working/<data_generation>`, selected by the same activation record. This clarifies the writable runtime mount in the earlier layout design. Automatic GitHub checks only stage; installation is explicit stopped-runtime maintenance. Full host OS updates, host-tool self-update, host-agent/dashboard wiring and physical Pi proof remain outside this implementation. See `docs/deployment/github-updates.md`.

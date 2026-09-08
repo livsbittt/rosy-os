@@ -133,6 +133,11 @@ class Layout:
         return self.var / "release-state.json"
 
     @property
+    def previous_activation(self) -> Path:
+        """Host-owned rollback authority, committed before an activation journal completes."""
+        return self.etc / "previous-activation.json"
+
+    @property
     def recovery_hold(self) -> Path:
         """Set while the device is held for recovery; survives reboot."""
         return self.var / "recovery-hold.json"
