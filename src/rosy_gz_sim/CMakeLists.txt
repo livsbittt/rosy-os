@@ -36,6 +36,12 @@ if(gz-sim8_FOUND AND gz-plugin2_FOUND)
 endif()
 
 install(
+  PROGRAMS
+    scripts/swarm_bench.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(
   DIRECTORY
     worlds
     models
