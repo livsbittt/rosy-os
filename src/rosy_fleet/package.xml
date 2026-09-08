@@ -7,7 +7,9 @@
   <maintainer email="dev@rosy.local">rosy</maintainer>
   <license>Apache-2.0</license>
 
-  <!-- D-18: 프로토콜 스키마는 rosy_core 의 것을 import 한다. ROS 런타임 의존은 없다. -->
+  <!-- D-18: rosy_core 는 스키마 소스로만 쓴다 — 이 패키지의 코드에 ROS import 는 없다.
+       이 exec_depend 는 colcon 워크스페이스의 빌드 순서용이다. ROS 없는 Fleet 배포에서는
+       rosy_core 를 rosdep 으로 끌어오지 않고 소스 트리를 sys.path 에 얹는다(test/conftest.py). -->
   <exec_depend>rosy_core</exec_depend>
   <exec_depend>python3-httpx</exec_depend>
   <exec_depend>python3-websockets</exec_depend>
