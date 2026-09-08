@@ -56,6 +56,44 @@ def _sdf_posts() -> list[tuple[float, float, float, float, float]]:
     return sorted(posts, key=lambda post: post[1])
 
 
+def _sdf_cylinders(kind: str) -> dict[str, tuple[float, float, float, float, float]]:
+    """`<kind>` 원통들을 이름(`post_l` 등) → (x, y, z, 반지름, 길이) 로.
+
+    `_sdf_posts()` 와 달리 `post_` 로 걸러내지 않는다 — `visual` 과 `collision`
+    을 같은 규칙으로 읽어 서로 비교하는 것이 목적이라, 한쪽에만 있는 이름도
+    보여야 한다. 접미사(`_visual` / `_collision`) 를 떼어 키를 맞춘다.
+    """
+    root = ET.parse(MODEL).getroot()
+    out: dict[str, tuple[float, float, float, float, float]] = {}
+    for element in root.iter(kind):
+        cylinder = element.find(".//cylinder")
+        if cylinder is None:
+            continue
+        pose = [float(value) for value in element.find("pose").text.split()]
+        name = element.get("name", "").rsplit("_", 1)[0]
+        out[name] = (pose[0], pose[1], pose[2],
+                     float(cylinder.find("radius").text),
+                     float(cylinder.find("length").text))
+    return out
+
+
+def _sdf_boxes(kind: str) -> dict[str, tuple[tuple[float, float, float],
+                                             tuple[float, float, float]]]:
+    """`<kind>` 상자들을 이름 → ((x, y, z), (길이, 폭, 높이)) 로."""
+    root = ET.parse(MODEL).getroot()
+    out: dict[str, tuple[tuple[float, float, float],
+                         tuple[float, float, float]]] = {}
+    for element in root.iter(kind):
+        box = element.find(".//box")
+        if box is None:
+            continue
+        pose = [float(value) for value in element.find("pose").text.split()]
+        size = [float(value) for value in box.find("size").text.split()]
+        name = element.get("name", "").rsplit("_", 1)[0]
+        out[name] = ((pose[0], pose[1], pose[2]), (size[0], size[1], size[2]))
+    return out
+
+
 def _raycast(centres, radius, x, y, yaw, step, half=0.6):
     """센서 프레임 (x, y, yaw) 에 놓인 기둥들의 스캔."""
     placed = [(x + cx * math.cos(yaw) - cy * math.sin(yaw),
@@ -111,6 +149,59 @@ def test_every_post_crosses_the_scan_plane():
         assert bottom <= SCAN_PLANE_M <= top, (
             f"post at ({x}, {y}) spans z {bottom:.3f}..{top:.3f} and misses "
             f"the {SCAN_PLANE_M} m scan plane")
+
+
+def test_each_post_collision_matches_its_own_visual():
+    """측정은 `visual` 만 쓴다. 그래서 `collision` 만 어긋난 판은 조용히 산다.
+
+    시뮬의 라이다는 `<sensor type='gpu_lidar'>` — 렌더 기반이라 `visual` 을
+    자른다. 위의 검사들이 재는 쪽을 이미 못 박고 있고, 이 리그가 기록하는 모든
+    숫자는 그 `visual` 형상에서 나온다. **그래서 `collision` 만 바꾼 변이는
+    위의 검사를 전부 통과한다** — 가운데 기둥을 일직선으로 되돌리든, 배치를
+    거울로 뒤집든, 반지름을 두 배로 하든, 기둥을 스캔 평면 아래로 가라앉히든.
+
+    남는 위험은 측정이 아니라 물리다: 스캔이 "기둥이 여기 없다"고 말하는 자리에
+    로봇이 부딪히고, 접점 판정이 그 충돌을 도크로 읽는다. 급한 결함은 아니지만
+    닫는 값이 세 줄이라 닫는다. 두 형상이 갈라져야 할 이유가 이 모델에는 없다.
+    """
+    visuals = _sdf_cylinders("visual")
+    collisions = _sdf_cylinders("collision")
+
+    assert set(collisions) == set(visuals), (
+        f"model.sdf has cylinder visuals {sorted(visuals)} but collisions "
+        f"{sorted(collisions)}; a post the physics does not have (or one the "
+        f"scan does not have) is not a shape either half can be trusted on")
+    for name in sorted(visuals):
+        assert collisions[name] == pytest.approx(visuals[name]), (
+            f"{name}: collision {collisions[name]} does not match visual "
+            f"{visuals[name]}; the gpu_lidar scans the visual, so this "
+            f"mismatch is invisible to every measurement the rig records")
+
+
+def test_the_base_plate_stays_below_the_scan_plane():
+    """`model.sdf` 는 밑판이 반사를 내지 않는다고 **주석으로만** 말하고 있었다.
+
+    `_sdf_posts()` 가 `post_` 로 걸러내므로 `plate_visual` 은 이 파일의 어느
+    검사도 들여다보지 않았다. 밑판이 95 mm 를 뚫고 올라오면 기둥 세 개가 서
+    있는 바로 그 자리에 100 × 200 mm 평판이 반사를 내고, 클러스터링은 기둥 셋
+    대신 넓은 물체 하나를 본다 — 기하 후보가 설계의 가장 강한 기준에서
+    탈락하는데, 그 이유가 도크 형상이 아니라 밑판이 된다. 리그가 자기 자신에
+    대한 판정을 내는 자리다.
+
+    `collision` 도 같이 본다. 위의 검사는 원통만 짝지으므로 상자는 그쪽에
+    걸리지 않고, 밑판은 로봇이 실제로 타고 넘는 물건이다.
+    """
+    for kind in ("visual", "collision"):
+        boxes = _sdf_boxes(kind)
+        assert "plate" in boxes, (
+            f"model.sdf has no plate_{kind} box; the comment claiming the "
+            f"plate sits below the scan plane has nothing to be true about")
+        (_, _, z), (_, _, height) = boxes["plate"]
+        top = z + height / 2.0
+        assert top < SCAN_PLANE_M, (
+            f"plate_{kind} reaches z {top:.3f} m, at or above the "
+            f"{SCAN_PLANE_M} m scan plane; it would return a flat slab across "
+            f"the posts and the geometry candidate would fail on the plate")
 
 
 def test_the_fit_recovers_a_pose_from_the_models_own_geometry():

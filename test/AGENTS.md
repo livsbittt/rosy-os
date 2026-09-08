@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-08 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-09 -->
 
 # test
 
@@ -35,7 +35,7 @@ Host-side pytest for deploy/release/motor/network contracts. These tests do **no
 | `test_nav2_hardware_slice.py` | Hardware Nav2 launch, D-2/D-4, packaging |
 | `test_dashboard_browser.py` | Optional Chromium regression (teleop zero + field-settings saves); skipped unless `ROSY_RUN_BROWSER_TESTS=1` |
 | `test_dock_contract.py` | Dock firmware contract: `/status` fields, no Wi-Fi secrets in `dock/` sources |
-| `test_dock_shape_contract.py` | Dock shape contract: the Gazebo model's posts are the layout `DockProfile` looks for, they cross the 95 mm scan plane, and a mirrored middle post is refused |
+| `test_dock_shape_contract.py` | Dock shape contract: the Gazebo model's posts are the layout `DockProfile` looks for, they cross the 95 mm scan plane, each `post_*_collision` matches its own `post_*_visual` (the `gpu_lidar` scans visuals, so a collision-only mutation is invisible to every measurement), the base plate stays below the scan plane, and a mirrored middle post is refused |
 
 ## Subdirectories
 
