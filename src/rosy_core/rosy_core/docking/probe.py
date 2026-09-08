@@ -42,6 +42,16 @@ FIELDS = ("lane", "candidate", "dock_present", "truth_x", "truth_y",
           "ir_l", "ir_mid", "ir_r")
 
 
+class ProbeFormatError(ValueError):
+    """CSV 칸 하나를 읽을 수 없다. 파일·줄·칸을 메시지에 담는다.
+
+    판정의 실패는 값으로 돌려주지만(`ProbeVerdict.reasons`), 파싱 실패는
+    돌려줄 줄이 없다. `ValueError` 를 상속하는 이유는 예전 판이 맨 `ValueError`
+    를 던졌고 부르는 쪽이 그것을 잡고 있을 수 있어서다. 고친 것은 예외의
+    종류가 아니라 **어느 파일 어느 줄 어느 칸인지 말하지 않던 것**이다.
+    """
+
+
 @dataclass(frozen=True)
 class ProbeRow:
     """표본 하나. 후보와 무관한 칸은 `None` 으로 남는다."""
@@ -70,6 +80,14 @@ _INT_FIELDS = frozenset({"points", "ir_l", "ir_mid", "ir_r"})
 _FLOAT_FIELDS = frozenset({"truth_x", "truth_y", "truth_yaw", "fit_x", "fit_y",
                            "fit_yaw", "residual", "confidence", "int_target",
                            "int_baseline"})
+_TEXT_FIELDS = frozenset({"lane", "candidate", "ambient"})
+
+#: 양쪽을 다 화이트리스트로 둔다. 예전 판은 `text not in ("0","false","False")`
+#: 였고, 그래서 `FALSE`·`no`·`off`·`0.0` 이 전부 "도크 있었다"로 읽혔다 —
+#: 거짓 양성 집계가 조용히 뒤집히는 자리이고, 손으로 쓴 CSV 는 예상된 입력이다.
+_TRUE_TEXT = frozenset({"1", "true", "yes"})
+_FALSE_TEXT = frozenset({"0", "false", "no"})
+
 
 
 def _encode(row: ProbeRow) -> dict[str, str]:
@@ -86,16 +104,28 @@ def _encode(row: ProbeRow) -> dict[str, str]:
     return out
 
 
+def _decode_dock_present(text: str) -> bool:
+    if text == "":
+        # 빈칸은 dataclass 기본값(True)과 같게 읽는다. 손으로 쓴 CSV 에서
+        # 칸이 비었다고 "도크가 없었다"로 뒤집히면 거짓 양성 집계가 조용히
+        # 부풀어 통과할 후보를 떨어뜨린다.
+        return True
+    lowered = text.lower()
+    if lowered in _TRUE_TEXT:
+        return True
+    if lowered in _FALSE_TEXT:
+        return False
+    raise ProbeFormatError(
+        f"{text!r} is neither true (1/true/yes) nor false (0/false/no)")
+
+
 def _decode(record: dict[str, str]) -> ProbeRow:
     kwargs: dict[str, Any] = {}
     for field in fields(ProbeRow):
         text = (record.get(field.name) or "").strip()
         if field.name == "dock_present":
-            # 빈칸은 dataclass 기본값(True)과 같게 읽는다. 손으로 쓴 CSV 에서
-            # 칸이 비었다고 "도크가 없었다"로 뒤집히면 거짓 양성 집계가 조용히
-            # 부풀어 통과할 후보를 떨어뜨린다.
-            kwargs[field.name] = text not in ("0", "false", "False")
-        elif field.name in ("lane", "candidate", "ambient"):
+            kwargs[field.name] = _decode_dock_present(text)
+        elif field.name in _TEXT_FIELDS:
             kwargs[field.name] = text
         elif text == "":
             # 필수 진실값이 비었으면 NaN 이다 — 0 으로 채우면 도크가 로봇 위에
@@ -126,9 +156,45 @@ def append_row(path: Path, row: ProbeRow) -> None:
         handle.flush()
 
 
+def _blame(record: dict[str, str], exc: ValueError) -> str:
+    """어느 칸이 터졌는지 되짚는다. 못 짚으면 원래 메시지를 그대로 쓴다."""
+    for field in fields(ProbeRow):
+        text = (record.get(field.name) or "").strip()
+        try:
+            if field.name == "dock_present":
+                _decode_dock_present(text)
+            elif field.name in _TEXT_FIELDS or text == "":
+                continue
+            elif field.name in _INT_FIELDS:
+                int(float(text))
+            elif field.name in _FLOAT_FIELDS:
+                float(text)
+        except ValueError:
+            return f"column {field.name}: {text!r}"
+    return str(exc)
+
+
 def read_rows(path: Path) -> list[ProbeRow]:
-    with Path(path).open("r", encoding="utf-8", newline="") as handle:
-        return [_decode(record) for record in csv.DictReader(handle)]
+    """CSV 를 읽는다. 못 읽는 칸은 파일·줄·칸을 대며 거부한다.
+
+    `utf-8-sig` 인 이유: Excel 이 BOM 을 쓴다. 맨 `utf-8` 로 열면 첫 헤더
+    이름이 `﻿lane` 이 되어 `lane` 이 조용히 빈칸이 되고, 그러면 갈래별
+    판정이 통째로 "모르는 갈래" 로 무너진다.
+    """
+    target = Path(path)
+    with target.open("r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        rows: list[ProbeRow] = []
+        for record in reader:
+            try:
+                rows.append(_decode(record))
+            except ValueError as exc:
+                # 손으로 고친 CSV 는 예상된 입력이다. 어느 칸인지 말하지 않는
+                # 예외는 수백 줄짜리 측정 파일 앞에서 아무 쓸모가 없다.
+                raise ProbeFormatError(
+                    f"{target}:{reader.line_num} {_blame(record, exc)}"
+                ) from exc
+        return rows
 
 
 @dataclass(frozen=True)

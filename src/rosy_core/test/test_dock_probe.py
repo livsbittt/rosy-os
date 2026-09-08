@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import math
 
-from rosy_core.docking.probe import (FIELDS, LATERAL_RMS_MAX_M, ProbeRow,
-                                     append_row, read_rows)
+import pytest
+
+from rosy_core.docking.probe import (FIELDS, LATERAL_RMS_MAX_M,
+                                     ProbeFormatError, ProbeRow, append_row,
+                                     read_rows)
 
 
 def test_the_schema_is_one_table_for_all_three_candidates():
@@ -56,6 +59,76 @@ def test_a_dock_absent_row_is_explicit_rather_than_a_missing_truth(tmp_path):
     back = read_rows(path)
     assert back[0].dock_present is False
     assert math.isnan(back[0].truth_x)
+
+
+# --- hand-edited CSVs, which are the expected input ------------------------
+
+def _hand_written(tmp_path, body, name="hand.csv", encoding="utf-8"):
+    path = tmp_path / name
+    path.write_text(",".join(FIELDS) + "\n" + body, encoding=encoding)
+    return path
+
+
+def test_a_genuinely_blank_truth_cell_reads_as_nan_not_zero(tmp_path):
+    # `_encode(math.nan)` writes the literal text "nan", so a row built in
+    # Python never exercises this branch. A human deleting a cell does, and
+    # reading that blank as 0.0 means "the dock was on top of the robot".
+    path = _hand_written(tmp_path, "sim,geometry,1,,,,,,,,,,,,,,,\n")
+    row = read_rows(path)[0]
+    assert math.isnan(row.truth_x)
+    assert math.isnan(row.truth_y)
+    assert math.isnan(row.truth_yaw)
+    assert row.fit_x is None
+
+
+def test_a_blank_dock_present_cell_reads_as_present(tmp_path):
+    # Reading a blank as "no dock" would silently inflate the false-positive
+    # count and drop a candidate that should have passed.
+    path = _hand_written(tmp_path, "sim,geometry,,0.7,0.0,0.0,,0.7,0.0,,,,,,,,,\n")
+    assert read_rows(path)[0].dock_present is True
+
+
+@pytest.mark.parametrize("text,expected", [("1", True), ("true", True),
+                                           ("TRUE", True), ("yes", True),
+                                           ("0", False), ("false", False),
+                                           ("FALSE", False), ("no", False)])
+def test_dock_present_accepts_both_spellings_case_insensitively(tmp_path, text,
+                                                                expected):
+    path = _hand_written(tmp_path,
+                         f"sim,geometry,{text},0.7,0.0,0.0,,0.7,0.0,,,,,,,,,\n")
+    assert read_rows(path)[0].dock_present is expected
+
+
+@pytest.mark.parametrize("text", ["off", "0.0", "maybe", "-1"])
+def test_an_unrecognised_dock_present_cell_is_refused_not_guessed(tmp_path, text):
+    # The old denylist read every one of these as "the dock was there".
+    path = _hand_written(tmp_path,
+                         f"sim,geometry,{text},0.7,0.0,0.0,,0.7,0.0,,,,,,,,,\n")
+    with pytest.raises(ProbeFormatError) as caught:
+        read_rows(path)
+    assert "dock_present" in str(caught.value)
+
+
+def test_an_unreadable_cell_names_the_file_row_and_column(tmp_path):
+    path = _hand_written(tmp_path,
+                         "sim,geometry,1,0.7,0.0,0.0,,None,,,,,,,,,,\n",
+                         name="measured.csv")
+    with pytest.raises(ProbeFormatError) as caught:
+        read_rows(path)
+    message = str(caught.value)
+    assert "measured.csv" in message
+    assert ":2" in message                 # the data row, not the header
+    assert "column fit_x" in message
+    assert "'None'" in message
+
+
+def test_a_utf8_bom_does_not_blank_the_lane(tmp_path):
+    # Excel writes a BOM. Read as plain utf-8 the first header becomes
+    # "﻿lane", every lane reads empty, and the per-lane floors cannot be
+    # applied to anything.
+    path = _hand_written(tmp_path, "sim,geometry,1,0.7,0.0,0.0,,0.7,0.0,,,,,,,,,\n",
+                         encoding="utf-8-sig")
+    assert read_rows(path)[0].lane == "sim"
 
 
 from rosy_core.docking.probe import ProbeVerdict, verdict
