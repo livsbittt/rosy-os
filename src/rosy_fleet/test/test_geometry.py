@@ -85,3 +85,53 @@ def test_slot_world_position_matches_follow_goal_convention():
     left = slot_world_position(SlotOffset(0.0, 1.0), 1.0, 2.0, math.pi / 2)
     assert math.isclose(behind[0], 1.0, abs_tol=1e-9) and math.isclose(behind[1], 1.0, abs_tol=1e-9)
     assert math.isclose(left[0], 0.0, abs_tol=1e-9) and math.isclose(left[1], 2.0, abs_tol=1e-9)
+
+
+def test_a_string_formation_name_is_normalized_so_the_follow_guard_still_holds():
+    assert slots("COLUMN", 2, 0.5) == slots(Formation.COLUMN, 2, 0.5)
+    with pytest.raises(FormationError):
+        slots("FOLLOW", 3, 0.6)
+
+
+def test_an_unknown_formation_is_a_formation_error():
+    with pytest.raises(FormationError):
+        slots("TRIANGLE", 2, 0.6)
+
+
+def test_spacing_exactly_at_the_floor_is_accepted_and_the_list_has_one_slot_per_follower():
+    got = slots(Formation.V, 4, MIN_SPACING)
+    assert len(got) == 4
+
+
+def test_slot_world_position_is_the_point_follow_goal_drives_to():
+    # 이 모듈의 존재 이유다: 로봇 쪽 follow_goal 과 같은 점을 내야 한다. 손계산이 아니라
+    # 그 함수와 직접 비교한다 — 어느 쪽 규약이 바뀌어도 여기서 드러난다.
+    from rosy_core.navigation.swarm import ReferencePose, follow_goal
+
+    for x, y, yaw, d, lat in [(0.0, 0.0, 0.0, 0.6, 0.0), (1.0, 2.0, math.pi / 2, 1.0, 1.0),
+                              (-3.2, 0.7, -2.1, 0.45, -0.6), (5.0, -1.0, 3.0, 1.2, 0.3)]:
+        ours = slot_world_position(SlotOffset(d, lat), x, y, yaw)
+        theirs = follow_goal(ReferencePose("leader", x, y, yaw), d, lat)
+        assert math.isclose(ours[0], theirs.x, abs_tol=1e-12)
+        assert math.isclose(ours[1], theirs.y, abs_tol=1e-12)
+
+
+@pytest.mark.parametrize("formation", list(Formation))
+@pytest.mark.parametrize("followers", [1, 2, 3, 4, 5, 6])
+def test_no_two_robots_are_ever_closer_than_spacing(formation, followers):
+    # MIN_SPACING 이 지키려는 성질 그 자체. 새 대형이 _GENERATORS 에 들어와도 이 테스트가 막는다.
+    if formation is Formation.FOLLOW and followers != 1:
+        pytest.skip("FOLLOW is a single follower")
+    s = 0.5
+    points = [(0.0, 0.0)] + [(o.distance, o.lateral) for o in slots(formation, followers, s)]
+    for i, a in enumerate(points):
+        for b in points[i + 1:]:
+            assert math.dist(a, b) >= s - 1e-9, (formation, followers, a, b)
+
+
+@pytest.mark.parametrize("followers", [1, 2, 3, 4, 5, 6])
+def test_circle_chord_equals_spacing_for_any_size(followers):
+    s = 0.5
+    ring = [(0.0, 0.0)] + [(p.distance, p.lateral) for p in slots(Formation.CIRCLE, followers, s)]
+    for a, b in zip(ring, ring[1:] + ring[:1]):
+        assert math.isclose(math.dist(a, b), s, abs_tol=1e-9)

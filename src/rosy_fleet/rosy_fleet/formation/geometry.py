@@ -13,10 +13,14 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable
 
-#: Pinky Pro footprint 반폭 0.06 m + Nav2 `inflation_radius` 0.15 m = 0.21 m
-#: (`src/rosy_navigation/params/nav2_params.yaml`). 그 안에 목표를 두면 팔로워의
-#: 목표점이 리더라는 장애물 안이라 Nav2 가 BLOCKED 를 낸다. 여유를 둔 하한이다.
-#: Nav2 파라미터가 바뀌면 이 값도 같이 본다.
+#: 두 로봇이 가장 가까워지는 거리의 하한. LINE 과 GRID 앞줄은 팔로워를 리더와 나란히
+#: 세우므로 이 값이 그대로 로봇 사이 거리다. Nav2 는 목표점이 아니라 **팔로워의
+#: footprint** 로 충돌을 검사하므로 하한은
+#:   inflation_radius + 리더 외접반경 + 팔로워 외접반경 + footprint_padding
+#:   = 0.15 + 0.085 + 0.085 + 0.03 ≈ 0.35 m
+#: 이다 (`src/rosy_navigation/params/nav2_params.yaml`: footprint 6 cm 정사각 → 외접반경
+#: 0.085, inflation_radius 0.15, global costmap footprint_padding 0.03). 0.4 는 그 위로
+#: 약 5 cm 여유다 — 넉넉하지 않다. Nav2 파라미터가 바뀌면 이 식으로 다시 계산한다.
 MIN_SPACING = 0.4
 DEFAULT_SPACING = 0.6
 
@@ -98,6 +102,10 @@ _GENERATORS: dict[Formation, Callable[[int, float, int], list[SlotOffset]]] = {
 def slots(formation: Formation, followers: int, spacing: float, *,
           grid_cols: int = 2) -> list[SlotOffset]:
     """`followers` 명의 팔로워 슬롯. 리더는 슬롯 0 이며 반환 목록에 들어가지 않는다."""
+    try:
+        formation = Formation(formation)
+    except ValueError as exc:
+        raise FormationError(f"unknown formation {formation!r}") from exc
     if not math.isfinite(spacing) or spacing < MIN_SPACING:
         raise FormationError(
             f"spacing {spacing} is below the floor {MIN_SPACING} m — the follower's goal "
@@ -108,7 +116,7 @@ def slots(formation: Formation, followers: int, spacing: float, *,
         raise FormationError("FOLLOW is a single follower; use COLUMN for more")
     if grid_cols < 1:
         raise FormationError("grid_cols must be at least 1")
-    return _GENERATORS[Formation(formation)](followers, spacing, grid_cols)
+    return _GENERATORS[formation](followers, spacing, grid_cols)
 
 
 def slot_world_position(offset: SlotOffset, x: float, y: float, yaw: float) -> Point:
