@@ -47,6 +47,18 @@ def test_malformed_files_are_refused(tmp_path, body):
         load_robots(p)
 
 
+def test_a_missing_file_is_a_robots_file_error_not_an_os_error(tmp_path):
+    with pytest.raises(RobotsFileError):
+        load_robots(tmp_path / "does-not-exist.yaml")
+
+
+def test_invalid_yaml_is_a_robots_file_error_not_a_yaml_error(tmp_path):
+    p = tmp_path / "robots.yaml"
+    p.write_text("robots: [\n  - unclosed\n", encoding="utf-8")
+    with pytest.raises(RobotsFileError):
+        load_robots(p)
+
+
 def test_ws_url_switches_scheme_and_carries_the_token():
     assert ws_url("http://10.0.0.11:8080", "/ws/swarm/pose", "t") == "ws://10.0.0.11:8080/ws/swarm/pose?token=t"
     assert ws_url("https://rosy-01.local", "/ws/events", "t") == "wss://rosy-01.local/ws/events?token=t"

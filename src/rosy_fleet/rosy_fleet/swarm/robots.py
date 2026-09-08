@@ -28,7 +28,14 @@ _REQUIRED = ("robot_id", "base_url", "token")
 
 
 def load_robots(path: Path) -> list[RobotEndpoint]:
-    data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except OSError as exc:
+        raise RobotsFileError(f"{path}: cannot read robots file: {exc}") from exc
+    try:
+        data = yaml.safe_load(text) or {}
+    except yaml.YAMLError as exc:
+        raise RobotsFileError(f"{path}: not valid YAML: {exc}") from exc
     rows = data.get("robots") if isinstance(data, dict) else None
     if not isinstance(rows, list) or not rows:
         raise RobotsFileError(f"{path}: needs a non-empty 'robots' list")
