@@ -19,10 +19,13 @@ from rosy_core.docking.probe import (ACQUIRE_RATE_MIN, FIELDS,
                                      ProbeFormatError, ProbeRow, ProbeVerdict,
                                      append_row, read_rows, verdict)
 
-#: The grid `dock_sweep.py` ships. The tests use it verbatim because the
-#: envelope walk has to survive the spacing of the sweep that feeds it.
-GRID = (0.02, 0.05, 0.08, 0.12, 0.16, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60,
-        0.68, 0.70, 0.72, 0.85, 1.00)
+#: The grid `dock_sweep.py` ships, kept in step with its `--distances` default
+#: because the envelope walk has to survive the spacing of the sweep that feeds
+#: it. If the two drift apart the walk is being tested against a grid nobody
+#: measures, which is how a comment starts asserting a correspondence that no
+#: longer holds.
+GRID = (0.08, 0.12, 0.16, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55,
+        0.60, 0.68, 0.70, 0.72, 0.85, 1.00)
 LATERALS = (-0.15, -0.08, -0.03, 0.0, 0.03, 0.08, 0.15)
 YAWS = (-20.0, -10.0, 0.0, 10.0, 20.0)
 

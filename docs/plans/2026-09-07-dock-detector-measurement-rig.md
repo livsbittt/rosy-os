@@ -68,6 +68,26 @@ through: the 1.5× dropout claim above, and "move the middle post to reach zero
 false positives" — no offset reaches zero, for a structural reason recorded in
 the design document under "거짓 양성 0 은 기둥 세 개로 도달할 수 없다".
 
+**A final review then rejected the `probe.py` half outright, and it was right.**
+`profile.py` killed 20 of 22 mutations; `probe.py` survived 9 of 19, and the
+survivors were not cosmetic. What shipped after that round:
+
+| Where | Planned | Shipped, and why |
+|---|---|---|
+| Task 6 `_envelope_low` | walk contiguous bins down from the top | **anchor on the measured staging distances and walk down over the distances themselves.** The planned version returned the *top* of the working range: true lower bound 0.02 m, reported 1.00 m. The grid's 0.10 m steps leave bins empty, and the walk stopped at the first hole. That value sets `DockType.docking_threshold_m`, so it was going into robot configuration. The reviewer's own proposed fix also failed — 0.65 is not a grid point, so its anchor bin is always empty and it returns NaN for every real sweep. |
+| Task 6 metric gates | compare each metric to its threshold | **check `isfinite` first.** `nan > threshold` is `False`, so an all-NaN `truth_y` column passed with no reasons at all, and `fit_x = nan` counted as an acquisition. |
+| Task 6/7 sample floors | none | **`MIN_ABSENT` / `MIN_STAGING` per lane.** A two-row CSV certified "zero false positives". The design demanded sim ≥ 500 and bench ≥ 50 and the code accepted one; `measure-dock-baseline.sh` recorded ten. |
+| Task 7 IR monotonicity | count adjacent pairs in the right order | **score inversions only, ties excluded, and cut on a contact band.** Charging ties as direction failures rejected a sensor with zero inversions at 36%, with a reason that read "cannot tell left from right" — and the onset rows the same arm requires were what created the ties. |
+| Task 6 `verdict(rows)` | one verdict per candidate | **`verdict(rows, lane=None)`, one per (candidate, lane).** `lane` was recorded and read nowhere, so ruler-read bench truth pooled into the sim's exact truth and neither lane's floor was checkable. |
+| Task 9 `next_scan` | clear the cache, take the first arrival | **drain the queue, then require a stamp newer than the pose change.** Clearing the attribute does not clear the middleware queue, so sample N was systematically a scan of pose N−1 — and one stale frame in the park phase turns "zero false positives" into a rejection caused by a queue. Reproduced against a fake Gazebo: 1 false positive and 2 mislabelled rows before, 0 of both after. |
+| Task 9 `gz` call | `check=True` | **inspect the reply.** A wrong `--world` returns `data: false` with exit 0. The check looks for `data: true` rather than against `false`, because protobuf text format omits default values — false prints as empty output, so checking the negative would have caught nothing. |
+| Task 9 grid | 0.02–1.00 m | **0.08–1.00 m, plus 0.35/0.45/0.55.** At 0.02 and 0.05 every ray falls under the sim lidar's 0.05 m minimum, so zero rays survive. The added points matter: for a detector working to 0.45 m the old grid reported an envelope of 0.500 and the new one 0.450. |
+
+The clutter finding is the one to carry forward: the false-positive rate is
+20–90× worse when a scene holds six or ten random cylinders instead of exactly
+three, and a furnished room holds more post-shaped things than three, not fewer.
+The design document records it under "그리고 클러터에서는 20–90배 나쁘다".
+
 ---
 
 ### Task 1: Dock shape config, and the asymmetry it must have
