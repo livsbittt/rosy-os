@@ -761,6 +761,14 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Task 5: 전송 — `RobotClient` 프로토콜과 `HttpRobotClient`
 
+> **리뷰 후 갱신 (2026-09-08):** 아래 Step 3 코드는 첫 판이다. Task 5 리뷰가 잡은 것 — 로봇이 4401/4403 으로
+> 거부한 소켓이 정상 종료와 구분되지 않아 잘못된 토큰이면 릴레이가 영원히 조용히 재시도함, 200 응답이 JSON
+> 객체가 아닐 때 bare 예외, 프레임 변환 로직이 테스트 불가 — 은 그 다음 fix 커밋에서 고쳤다: **거부(4401/4403,
+> 핸드셰이크 거절)는 `RobotApiError`(code `WS_<code>`) 로 올라오고, 그 외 종료는 조용히 끝난다.** 순수 변환은
+> `_as_text`/`_as_event` 로 나뉘어 테스트된다. 정본은 `src/rosy_fleet/rosy_fleet/swarm/transport.py` 다.
+> Task 7 의 릴레이는 그 예외를 받아 `RelayStats.leader_last_error` 에 남기고 재연결을 계속한다(아래 반영).
+
+
 **Files:**
 - Create: `src/rosy_fleet/rosy_fleet/swarm/transport.py`
 - Create: `src/rosy_fleet/test/test_transport.py`
@@ -1143,6 +1151,8 @@ class FakeRobot:
         self.next_sink_fail_on_send = False
         self.pose_opens = 0
         self.event_opens = 0
+        #: 설정돼 있으면 pose_stream 이 열리자마자 이것을 raise 한다 (4401/4403 거부 흉내).
+        self.pose_error = None
 
     def _record(self, *call) -> None:
         self.calls.append(call)
@@ -1176,6 +1186,9 @@ class FakeRobot:
 
     async def pose_stream(self) -> AsyncIterator[str]:
         self.pose_opens += 1
+        if self.pose_error is not None:
+            await asyncio.sleep(0)
+            raise self.pose_error
         while True:
             frame = await self.pose_frames.get()
             if frame is END:
@@ -1273,6 +1286,7 @@ import json
 from fakes import END, FakeRobot, run, settle
 
 from rosy_fleet.swarm.relay import Relay
+from rosy_fleet.swarm.transport import RobotApiError
 
 
 def frame(seq: int) -> str:
@@ -1414,6 +1428,25 @@ def test_stats_count_frames_and_seq_gaps():
     run(main())
 
 
+def test_a_rejected_leader_socket_is_named_in_the_stats_and_still_retried():
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        leader.pose_error = RobotApiError("rosy_01", 403, "WS_4403", "capability swarm.lead not declared")
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await settle(40)
+        assert relay.stats().leader_last_error is not None
+        assert "WS_4403" in relay.stats().leader_last_error
+        assert leader.pose_opens >= 2                   # 포기하지 않는다 — 정책은 호출자 것
+        leader.pose_error = None
+        leader.pose_frames.put_nowait(frame(1))
+        await settle(40)
+        assert f1.sinks[0].sent == [frame(1)]
+        assert relay.stats().leader_last_error is None  # 프레임이 오면 지운다
+        await relay.stop()
+    run(main())
+
+
 def test_stop_closes_the_sinks():
     async def main():
         leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
@@ -1457,7 +1490,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Awaitable, Callable, Optional, Sequence
 
-from rosy_fleet.swarm.transport import RobotClient
+from rosy_fleet.swarm.transport import RobotApiError, RobotClient
 
 _BACKOFF_FIRST_S = 0.1
 _RATE_WINDOW = 20
@@ -1468,6 +1501,9 @@ class RelayStats:
     leader_frames: int = 0
     leader_dropped: int = 0
     leader_rx_hz: float = 0.0
+    #: 리더 소켓이 마지막으로 **거부**된 이유 (4401/4403 → RobotApiError 문자열). 재연결은
+    #: 계속하지만, "0 Hz 가 영원히" 인 화면에 이유가 붙어야 한다. 프레임이 오면 None 으로 돈다.
+    leader_last_error: Optional[str] = None
     paused: bool = False
     follower_tx: dict[str, int] = field(default_factory=dict)
     follower_tx_hz: dict[str, float] = field(default_factory=dict)
@@ -1518,6 +1554,7 @@ class Relay:
         self._leader_dropped = 0
         self._leader_rate = _Rate(clock)
         self._last_seq: Optional[int] = None
+        self._leader_last_error: Optional[str] = None
         self._running = False
 
     # --- 수명 --------------------------------------------------------------------
@@ -1568,6 +1605,7 @@ class Relay:
             leader_frames=self._leader_frames,
             leader_dropped=self._leader_dropped,
             leader_rx_hz=self._leader_rate.hz(),
+            leader_last_error=self._leader_last_error,
             paused=self._paused,
             follower_tx={rid: lane.tx for rid, lane in self._lanes.items()},
             follower_tx_hz={rid: lane.rate.hz() for rid, lane in self._lanes.items()},
@@ -1584,9 +1622,14 @@ class Relay:
                 async for frame in self._leader.pose_stream():
                     got_any = True
                     backoff = _BACKOFF_FIRST_S
+                    self._leader_last_error = None
                     self._on_frame(frame)
             except asyncio.CancelledError:
                 raise
+            except RobotApiError as exc:
+                # 4401/4403: 토큰이나 capability 문제다. 재연결은 계속하되 이유를 남긴다 —
+                # 조용히 0 Hz 로 도는 것이 이 릴레이의 가장 나쁜 실패다.
+                self._leader_last_error = str(exc)
             except Exception:
                 pass
             if not self._running:
@@ -2549,7 +2592,8 @@ def _stats_line(relay: Relay, session: Optional[FormationSession]) -> str:
     tx = " ".join(f"{rid}:{hz:.1f}Hz{'' if ok else '!'}"
                   for rid, hz in st.follower_tx_hz.items() for ok in [st.follower_connected[rid]])
     state = f" {session.state.value}" + (f" {session.reason}" if session and session.reason else "") if session else ""
-    return f"leader {st.leader_rx_hz:.1f}Hz drop={st.leader_dropped}{' PAUSED' if st.paused else ''} | {tx}{state}"
+    err = f" LEADER REFUSED: {st.leader_last_error}" if st.leader_last_error else ""
+    return f"leader {st.leader_rx_hz:.1f}Hz drop={st.leader_dropped}{' PAUSED' if st.paused else ''}{err} | {tx}{state}"
 
 
 async def run_relay(args: argparse.Namespace) -> None:

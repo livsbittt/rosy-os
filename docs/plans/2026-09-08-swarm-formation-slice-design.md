@@ -208,7 +208,10 @@ robots:
 다. 리더 pose 소켓은 viewer 면 되지만 같은 토큰을 쓴다. 파일 권한은 배포 문제라
 여기서 강제하지 않되, CLI 는 world-readable 파일이면 경고한다.
 
-`RobotClient` 프로토콜:
+`RobotClient` 프로토콜 (아래는 설계 시점의 스케치다. 구현은 `open_reference_sink()` 가 async 이고
+`navigation_goal(x, y, yaw)` 이 있으며, **로봇이 4401/4403 으로 거부한 소켓은 `RobotApiError` 로 올라온다** —
+"닫힘" 과 "거부" 를 구분하지 않으면 잘못된 토큰이 조용히 0 Hz 로 영원히 재시도된다는 것을 Task 5 리뷰가
+잡았다. 정본은 `src/rosy_fleet/rosy_fleet/swarm/transport.py`):
 
 ```python
 class RobotClient(Protocol):
@@ -408,6 +411,7 @@ waypoint 를 순서대로 걸고(다음 목표는 `nav.completed` 이벤트로),
 | 무장 중 한 대 실패 | 무장된 것 전부 cancel, `ArmingFailed`. 릴레이 시작 안 함 |
 | 시작 전 `map_id` 불일치 | 시작 거절 `MapMismatch` |
 | 리더 소켓 단절 | 재연결(backoff ≤2 s). 합성 없음. 팔로워는 스스로 HOLD |
+| 리더 소켓 거부 (4401/4403, 핸드셰이크 거절) | `RobotApiError` 로 올라온다. 릴레이는 재연결을 계속하되 `RelayStats.leader_last_error` 에 이유를 남기고 CLI 가 그것을 찍는다 — "0 Hz 가 영원히" 에는 이유가 붙어야 한다 |
 | 팔로워 소켓 단절 | 그 소켓만 재연결. 나머지 계속 |
 | 이벤트 소켓 단절 | 재연결. 끊긴 동안의 이벤트는 놓친다 — 재연결 직후 전원 `swarm_state()` 를 읽어 `active: false` 인 팔로워가 있으면 `swarm.aborted` 로 간주 |
 | FOR-004 트리거 | §6.3 정책 |
