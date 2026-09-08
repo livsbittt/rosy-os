@@ -247,7 +247,12 @@ class RobotClient(Protocol):
   피한다) 팔로워에 쓰지 않는다. FOR-004 의 "전체 HOLD" 가 이것이다(§6.4).
 - **계측.** 팔로워별 송신 주기(이동 평균)와 리더 수신 주기를 `RelayStats` 로
   노출한다. 리더 프레임을 파싱해 `seq` 간격을 세고, 빠진 `seq` 는 `dropped` 로
-  센다. 파싱 실패는 계측만 건너뛰고 전달은 그대로 한다.
+  센다(한 연결 안의 간격만 — 단절은 드롭이 아니다). 파싱 실패는 계측만 건너뛰고
+  전달은 그대로 한다. **불변식: 스트림이 멎으면 주기는 0 으로 떨어진다.** 마지막
+  표본이 0.5 s 보다 오래됐으면 `hz` 는 0 이고 `leader_age_s` 가 그 나이를 말한다.
+  프레임을 합성하지 않는 릴레이가 건강한 주기를 합성하면 같은 거짓말이다 — Task 7
+  리뷰가 이것을 잡았고, §8 의 `relay_tx_hz ≥ 10` 판정은 이 불변식 없이는 실패할
+  수 없는 지표였다. 거부된 소켓은 리더든 팔로워든 `*_last_error` 에 이유를 남긴다.
 
 ### 5. 세션 (`swarm/session.py`)
 
@@ -411,7 +416,8 @@ waypoint 를 순서대로 걸고(다음 목표는 `nav.completed` 이벤트로),
 | 무장 중 한 대 실패 | 무장된 것 전부 cancel, `ArmingFailed`. 릴레이 시작 안 함 |
 | 시작 전 `map_id` 불일치 | 시작 거절 `MapMismatch` |
 | 리더 소켓 단절 | 재연결(backoff ≤2 s). 합성 없음. 팔로워는 스스로 HOLD |
-| 리더 소켓 거부 (4401/4403, 핸드셰이크 거절) | `RobotApiError` 로 올라온다. 릴레이는 재연결을 계속하되 `RelayStats.leader_last_error` 에 이유를 남기고 CLI 가 그것을 찍는다 — "0 Hz 가 영원히" 에는 이유가 붙어야 한다 |
+| 리더 소켓 거부 | `RobotApiError` 로 올라온다. 릴레이는 재연결을 계속하되 `RelayStats.leader_last_error` 에 이유를 남기고 CLI 가 그것을 찍는다 — "0 Hz 가 영원히" 에는 이유가 붙어야 한다. **와이어 사실:** `rosy_core` 의 `_authorize` 는 `accept()` 전에 `close(4401|4403)` 하므로 uvicorn 은 이것을 HTTP 403 핸드셰이크 거절로 보낸다. 클라이언트가 보는 코드는 `WS_403` 이고 4401/4403 의 구분은 와이어에서 사라진다. accept-then-close 로 바꿔 코드를 살리는 것은 로봇 쪽 사이클의 일이다(이 슬라이스는 `rosy_core` 를 건드리지 않는다) |
+| 팔로워 소켓 거부 | 같은 규칙: 그 레인만 backoff 로 재연결하고 `RelayStats.follower_last_error[robot_id]` 에 이유를 남긴다. 연결은 됐는데 send 에서 깨지는 소켓도 backoff 를 키운다 |
 | 팔로워 소켓 단절 | 그 소켓만 재연결. 나머지 계속 |
 | 이벤트 소켓 단절 | 재연결. 끊긴 동안의 이벤트는 놓친다 — 재연결 직후 전원 `swarm_state()` 를 읽어 `active: false` 인 팔로워가 있으면 `swarm.aborted` 로 간주 |
 | FOR-004 트리거 | §6.3 정책 |

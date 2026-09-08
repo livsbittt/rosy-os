@@ -764,7 +764,9 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 > **리뷰 후 갱신 (2026-09-08):** 아래 Step 3 코드는 첫 판이다. Task 5 리뷰가 잡은 것 — 로봇이 4401/4403 으로
 > 거부한 소켓이 정상 종료와 구분되지 않아 잘못된 토큰이면 릴레이가 영원히 조용히 재시도함, 200 응답이 JSON
 > 객체가 아닐 때 bare 예외, 프레임 변환 로직이 테스트 불가 — 은 그 다음 fix 커밋에서 고쳤다: **거부(4401/4403,
-> 핸드셰이크 거절)는 `RobotApiError`(code `WS_<code>`) 로 올라오고, 그 외 종료는 조용히 끝난다.** 순수 변환은
+> 핸드셰이크 거절)는 `RobotApiError`(code `WS_<code>`) 로 올라오고, 그 외 종료는 조용히 끝난다.** 와이어 사실
+> (Task 7 리뷰): 로봇은 `accept()` 전에 close 하므로 실제로 보이는 코드는 `WS_403` 이다 — 4401/4403 분기는
+> accept-then-close 하는 로봇을 위한 것이고, 핸드셰이크 403 경로가 테스트된다. 순수 변환은
 > `_as_text`/`_as_event` 로 나뉘어 테스트된다. 정본은 `src/rosy_fleet/rosy_fleet/swarm/transport.py` 다.
 > Task 7 의 릴레이는 그 예외를 받아 `RelayStats.leader_last_error` 에 남기고 재연결을 계속한다(아래 반영).
 
