@@ -290,7 +290,10 @@ class FormationSession:
 3. 팔로워마다 `follow(SwarmFollowParams(target_robot_id=leader.robot_id,
    distance=slot.distance, lateral=slot.lateral, max_speed, stream_timeout_ms))`.
    **전부 아니면 전무**: 하나라도 실패(409/501/네트워크)하면 이미 무장된 팔로워에
-   `swarm_cancel()` 을 보내고 `ArmingFailed(robot_id, code)` 로 끝낸다. 무장된
+   `swarm_cancel()` 을 보내고 `ArmingFailed(robot_id, code)` 로 끝낸다. 네트워크
+   실패(타임아웃 등)는 **결과를 알 수 없는** 실패다 — 로봇이 follow 를 적용한 뒤에
+   응답만 잃었을 수 있으므로, 그 로봇에도 `swarm_cancel()` 을 보낸다. 거절(`RobotApiError`)
+   만이 "무장되지 않았다"를 뜻한다. 무장된
    팔로워만 남기면 그 팔로워는 참조 프레임 하나에 달려나갈 준비가 된 채로
    남는다 — 로봇 쪽 `swarm_follow` 라우트가 같은 이유로 같은 규칙을 쓴다.
 4. 릴레이 시작. 각 로봇 `events(["nav.*", "swarm.*", "safety.estop"])` 구독.
@@ -304,6 +307,14 @@ pause 동안 HOLD 하고 새 오프셋으로 이어간다. 재호출이 하나�
 오프셋의 follow 세션을 쥐고 있어, HOLD 로 두고 나중에 스트림을 다시 켜면 대형이
 둘로 갈린다. 절반 대형은 재개할 수 없으므로 종료가 정직하다. 운영자가 새 formation
 명령으로 다시 무장한다.
+
+**reform 도중 FOR-004 트리거가 오면 reform 은 그것을 덮어쓰지 않는다.** 재무장은
+로봇 수만큼의 HTTP 왕복이고 그 사이에 감시 태스크가 돈다. 세션은 정책 세대 카운터를
+들고 있어, 재무장이 끝났을 때 세대가 바뀌었으면 (HOLD 가 걸렸으면) 새 오프셋은
+무장된 채 **HOLDING 에 머물고 릴레이를 켜지 않는다** — 운영자가 본다. 세션이 그
+사이 STOPPED 가 됐으면 (ABORT) 재무장된 로봇을 다시 풀고 `SessionError` 로 끝낸다.
+Task 8 리뷰가 이 창을 잡았다: 고치기 전에는 e-stop 이 났는데 reform 이 RUNNING 으로
+되돌리고, ABORT 정책에서는 취소한 로봇을 죽은 릴레이에 다시 무장시켰다.
 
 **stop.** 릴레이 종료 → 전 팔로워 `swarm_cancel()` → `STOPPED`. 리더 항법은 건드리지
 않는다 — 운영자가 리더를 몰고 있었다면 그것은 운영자의 것이다.
@@ -343,6 +354,14 @@ pause 동안 HOLD 하고 새 오프셋으로 이어간다. 재호출이 하나�
 `resume()` 은 운영자 명령이다. 자동 재개는 없다 — 로봇 쪽이 e-stop 해제와
 stuck 을 "재개가 아니라 해제"로 다루는 것과 같은 규칙이고, 자동 재개는 SRS 가
 금지한 자동 재시도가 된다.
+
+**HOLDING 중에 다른 로봇의 트리거가 오면 버리지 않고 `pending_triggers` 에 쌓는다.**
+리더를 다시 세우지는 않지만(이미 서 있다) 정보는 남긴다. `resume()` 은 그 목록이
+비어 있지 않으면 거절하고, 비어 있어도 릴레이를 켜기 전에 팔로워 전원의
+`swarm/state` 를 다시 읽어 `active: false` 인 팔로워가 있으면 거절한다 — HOLD 중에
+대형을 떠난 로봇을 향해 스트림을 켜면 안 된다. 거절 메시지는 `reform`(재무장) 이나
+`stop` 을 가리킨다. `reform` 이 성공하면 목록은 비워진다 — e-stop 상태의 로봇은
+`follow` 를 거절하므로 그것은 `ArmingFailed` 로 드러난다.
 
 #### 6.4 결정: 전체 HOLD 는 스트림을 끊는 것이다 (D-35 후보)
 
@@ -413,13 +432,15 @@ waypoint 를 순서대로 걸고(다음 목표는 `nav.completed` 이벤트로),
 
 | 상황 | 처리 |
 |---|---|
-| 무장 중 한 대 실패 | 무장된 것 전부 cancel, `ArmingFailed`. 릴레이 시작 안 함 |
+| 무장 중 한 대 실패 | 무장된 것 전부 cancel(결과 미상인 그 로봇 포함), `ArmingFailed`. 릴레이 시작 안 함 |
+| 무장은 됐는데 릴레이를 못 만들거나 못 켬 | 팔로워 전원 cancel, `STOPPED`, `SessionError`. 무장된 채 ARMING 에 걸려 있으면 안 된다 |
+| ABORT 뒤 | 감시 태스크도 끝낸다 — 세션이 끝난 로봇의 이벤트 소켓을 계속 열어 두지 않는다 |
 | 시작 전 `map_id` 불일치 | 시작 거절 `MapMismatch` |
 | 리더 소켓 단절 | 재연결(backoff ≤2 s). 합성 없음. 팔로워는 스스로 HOLD |
 | 리더 소켓 거부 | `RobotApiError` 로 올라온다. 릴레이는 재연결을 계속하되 `RelayStats.leader_last_error` 에 이유를 남기고 CLI 가 그것을 찍는다 — "0 Hz 가 영원히" 에는 이유가 붙어야 한다. **와이어 사실:** `rosy_core` 의 `_authorize` 는 `accept()` 전에 `close(4401|4403)` 하므로 uvicorn 은 이것을 HTTP 403 핸드셰이크 거절로 보낸다. 클라이언트가 보는 코드는 `WS_403` 이고 4401/4403 의 구분은 와이어에서 사라진다. accept-then-close 로 바꿔 코드를 살리는 것은 로봇 쪽 사이클의 일이다(이 슬라이스는 `rosy_core` 를 건드리지 않는다) |
 | 팔로워 소켓 거부 | 같은 규칙: 그 레인만 backoff 로 재연결하고 `RelayStats.follower_last_error[robot_id]` 에 이유를 남긴다. 연결은 됐는데 send 에서 깨지는 소켓도 backoff 를 키운다 |
 | 팔로워 소켓 단절 | 그 소켓만 재연결. 나머지 계속 |
-| 이벤트 소켓 단절 | 재연결. 끊긴 동안의 이벤트는 놓친다 — 재연결 직후 전원 `swarm_state()` 를 읽어 `active: false` 인 팔로워가 있으면 `swarm.aborted` 로 간주 |
+| 이벤트 소켓 단절 | 재연결(backoff, 조용한 종료도 같다 — 꺼진 로봇을 향해 빈 루프를 돌면 안 된다). 끊긴 동안의 이벤트는 놓친다 — 재연결 직후 그 로봇을 다시 본다: 팔로워는 `swarm_state()` 의 `active: false` 를 `swarm.aborted` 로, 리더는 `robot/state` 의 `mode == EMERGENCY` 를 `safety.estop` 으로 간주한다(리더에는 swarm 세션이 없어 `swarm_state` 로는 볼 수 없다). RUNNING 이면 정책, HOLDING 이면 `pending_triggers` |
 | FOR-004 트리거 | §6.3 정책 |
 | reform 실패 | 정책과 무관하게 종료: 전 팔로워 cancel, 릴레이 종료, 리더 cancel → `STOPPED(reform_failed)`. 절반 대형은 재개할 수 없다 (§5 reform) |
 | CLI 종료 (SIGINT) | `stop()` — 팔로워 전원 cancel 뒤 종료. 릴레이만 죽이고 팔로워를 무장 상태로 두지 않는다 |

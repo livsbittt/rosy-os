@@ -232,7 +232,10 @@ class Relay:
                 backoff = min(backoff * 2, self._reconnect_max)
                 continue
             except Exception as exc:
+                # 거부든 전송 오류든 화면에는 이유가 붙어야 한다 — 이름 없는 0 Hz 는
+                # 릴레이의 가장 나쁜 실패다. RobotApiError 만 이름이 붙던 자리다.
                 lane.connected = False
+                lane.last_error = str(exc)
                 log.warning("%s: reference socket open failed: %s", lane.robot.robot_id, exc)
                 await self._sleep(backoff)
                 backoff = min(backoff * 2, self._reconnect_max)
@@ -254,6 +257,7 @@ class Relay:
                 raise
             except Exception as exc:
                 lane.connected = False
+                lane.last_error = str(exc)
                 log.warning("%s: reference socket send failed: %s", lane.robot.robot_id, exc)
                 try:
                     await lane.sink.close()
