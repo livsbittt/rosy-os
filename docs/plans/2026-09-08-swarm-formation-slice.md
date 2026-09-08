@@ -3241,11 +3241,30 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-### Task 15: 마무리 — 계획 인덱스, 전체 테스트, D-35 판단
+### Task 15: 마무리 — 패키지 인덱스, 전체 테스트, D-35 판단
 
 **Files:**
+- Create: `src/rosy_fleet/AGENTS.md`
+- Modify: `src/AGENTS.md` (Subdirectories 표에 `rosy_fleet/` 행)
 - Modify: `docs/plans/AGENTS.md` (Task 14 에서 행을 넣었으면 확인만)
 - Modify (조건부): `docs/reference/ROSY ADR Log.md` — Task 14 결과가 HOLD ≤ 1 s 를 보였을 때만
+
+- [ ] **Step 0: 패키지 인덱스** — Task 1 리뷰가 잡은 누락. 워크스페이스의 다른 11개 패키지는
+  전부 `AGENTS.md` 를 갖고 `src/AGENTS.md` 표에 올라 있다. 패키지 내용이 다 갖춰진 지금 쓴다.
+
+`src/rosy_fleet/AGENTS.md` — `src/rosy_core/AGENTS.md` 와 같은 골격(Purpose / Key Files /
+Subdirectories / For AI Agents / Dependencies). 내용은 이 계획의 File Structure 표에서 가져온다:
+Purpose 는 "Fleet 쪽 씨앗 — 대형 기하·슬롯 배정·참조 스트림 릴레이·FOR-004 세션·CLI. Fleet
+서버 본체는 없다(Phase 4). 로봇 계약만 소비하고 `rosy_core` 는 스키마 재사용을 위해 import
+한다(D-18)." Working-in-this-directory 규칙 세 줄: `formation/` 은 전송을 모른다(`test_boundaries.py`
+가 지킨다); 릴레이는 프레임을 바꾸지 않는다; 로봇 쪽 `rosy_core` 를 여기서 고치지 않는다.
+Testing: `python -m pytest src/rosy_fleet/test -v` (ROS 불필요).
+
+`src/AGENTS.md` Subdirectories 표에 한 행:
+
+```markdown
+| `rosy_fleet/` | Fleet seed: formation geometry, slot assignment, reference-stream relay, FOR-004 session, CLI (see `rosy_fleet/AGENTS.md`) |
+```
 
 - [ ] **Step 1: 전체 호스트 테스트**
 
@@ -3289,9 +3308,14 @@ SWM-004(스트림 단절 → 자리 유지)와 의미가 겹치는 두 번째 HO
 `docs/plans/2026-09-08-swarm-formation-slice-results.md`.
 ```
 
-- [ ] **Step 3: 커밋 (D-35 를 썼을 때)**
+- [ ] **Step 3: 커밋**
 
 ```bash
+git add src/rosy_fleet/AGENTS.md src/AGENTS.md docs/plans/AGENTS.md
+git commit -m "docs(fleet): index the rosy_fleet package where the other eleven are indexed
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+# D-35 를 썼을 때만:
 git add docs/reference/ROSY\ ADR\ Log.md
 git commit -m "docs(adr): D-35 — the formation-wide HOLD is the stream going quiet, now measured
 
