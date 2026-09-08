@@ -1,0 +1,180 @@
+"""릴레이는 리더 프레임을 바꾸지 않고 팔로워에 전달한다(D-31). 합성하지 않고,
+느린 팔로워에 밀리지 않고, 팔로워 하나가 죽어도 나머지는 계속 받는다."""
+
+import asyncio
+import json
+
+from fakes import END, FakeRobot, run, settle
+
+from rosy_fleet.swarm.relay import Relay
+from rosy_fleet.swarm.transport import RobotApiError
+
+
+def frame(seq: int) -> str:
+    return json.dumps({"type": "pose", "payload": {"robot_id": "rosy_01", "seq": seq,
+                                                   "pose": {"x": 0.0, "y": 0.0, "yaw": 0.0}}})
+
+
+def _no_sleep():
+    async def sleep(_s):
+        await asyncio.sleep(0)
+    return sleep
+
+
+def test_frames_reach_every_follower_byte_for_byte():
+    async def main():
+        leader, f1, f2 = FakeRobot("rosy_01"), FakeRobot("rosy_02"), FakeRobot("rosy_03")
+        relay = Relay(leader, [f1, f2], sleep=_no_sleep())
+        await relay.start()
+        await settle()
+        leader.pose_frames.put_nowait(frame(1))
+        leader.pose_frames.put_nowait(frame(2))
+        await settle()
+        assert f1.sinks[0].sent == [frame(1), frame(2)]
+        assert f2.sinks[0].sent == [frame(1), frame(2)]
+        await relay.stop()
+    run(main())
+
+
+def test_pause_stops_delivery_and_resume_restarts_it_without_replaying():
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await settle()
+        leader.pose_frames.put_nowait(frame(1))
+        await settle()
+        relay.pause()
+        leader.pose_frames.put_nowait(frame(2))
+        leader.pose_frames.put_nowait(frame(3))
+        await settle()
+        assert f1.sinks[0].sent == [frame(1)]
+        relay.resume()
+        await settle()
+        assert f1.sinks[0].sent == [frame(1)]          # 멈춘 동안의 프레임은 재생하지 않는다
+        leader.pose_frames.put_nowait(frame(4))
+        await settle()
+        assert f1.sinks[0].sent == [frame(1), frame(4)]
+        await relay.stop()
+    run(main())
+
+
+def test_a_slow_follower_gets_the_latest_frame_not_the_backlog():
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await settle()
+        sink = f1.sinks[0]
+        sink.gate = asyncio.Event()                     # send 가 여기서 막힌다
+        leader.pose_frames.put_nowait(frame(1))        # 전송 중에 걸린다
+        await settle()
+        leader.pose_frames.put_nowait(frame(2))
+        leader.pose_frames.put_nowait(frame(3))
+        await settle()
+        sink.gate.set()
+        await settle()
+        assert sink.sent == [frame(1), frame(3)]        # 2 는 3 에 덮였다
+        await relay.stop()
+    run(main())
+
+
+def test_one_broken_follower_does_not_stop_the_others():
+    async def main():
+        leader, f1, f2 = FakeRobot("rosy_01"), FakeRobot("rosy_02"), FakeRobot("rosy_03")
+        f1.next_sink_fail_on_send = True
+        relay = Relay(leader, [f1, f2], sleep=_no_sleep())
+        await relay.start()
+        await settle()
+        leader.pose_frames.put_nowait(frame(1))
+        await settle()
+        assert f2.sinks[0].sent == [frame(1)]
+        # f1 은 첫 소켓이 깨져 재연결했고, 그다음 프레임은 새 소켓으로 받는다.
+        leader.pose_frames.put_nowait(frame(2))
+        await settle()
+        assert len(f1.sinks) >= 2
+        assert f1.sinks[-1].sent == [frame(2)]
+        assert relay.is_connected("rosy_02")
+        await relay.stop()
+    run(main())
+
+
+def test_a_lost_leader_is_reconnected_and_nothing_is_synthesized():
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await settle()
+        leader.pose_frames.put_nowait(frame(1))
+        leader.pose_frames.put_nowait(END)              # 리더 소켓 단절
+        await settle()
+        assert f1.sinks[0].sent == [frame(1)]           # 반복 전송 없음
+        assert leader.pose_opens >= 2                   # 다시 열었다
+        leader.pose_frames.put_nowait(frame(2))
+        await settle()
+        assert f1.sinks[0].sent == [frame(1), frame(2)]
+        await relay.stop()
+    run(main())
+
+
+def test_a_follower_socket_that_will_not_open_is_retried():
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        f1.sink_failures = 2
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await settle(40)
+        assert len(f1.sinks) == 1
+        assert relay.is_connected("rosy_02")
+        await relay.stop()
+    run(main())
+
+
+def test_stats_count_frames_and_seq_gaps():
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await settle()
+        for seq in (1, 2, 5, 6):                        # 3, 4 가 빠졌다
+            leader.pose_frames.put_nowait(frame(seq))
+        leader.pose_frames.put_nowait("not json")      # 계측만 건너뛰고 전달은 한다
+        await settle()
+        stats = relay.stats()
+        assert stats.leader_frames == 5
+        assert stats.leader_dropped == 2
+        assert stats.follower_tx["rosy_02"] == 5
+        assert f1.sinks[0].sent[-1] == "not json"
+        await relay.stop()
+    run(main())
+
+
+def test_a_rejected_leader_socket_is_named_in_the_stats_and_still_retried():
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        leader.pose_error = RobotApiError("rosy_01", 403, "WS_4403", "capability swarm.lead not declared")
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await settle(40)
+        assert relay.stats().leader_last_error is not None
+        assert "WS_4403" in relay.stats().leader_last_error
+        assert leader.pose_opens >= 2                   # 포기하지 않는다 — 정책은 호출자 것
+        leader.pose_error = None
+        leader.pose_frames.put_nowait(frame(1))
+        await settle(40)
+        assert f1.sinks[0].sent == [frame(1)]
+        assert relay.stats().leader_last_error is None  # 프레임이 오면 지운다
+        await relay.stop()
+    run(main())
+
+
+def test_stop_closes_the_sinks():
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await settle()
+        await relay.stop()
+        assert f1.sinks[0].closed
+        assert not relay.is_connected("rosy_02")
+    run(main())
