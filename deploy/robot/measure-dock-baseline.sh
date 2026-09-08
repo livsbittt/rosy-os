@@ -18,8 +18,10 @@
 #   필수 인자로 받는 이유다.
 #
 # 함정 3 — 도크 없는 표본을 안 찍으면 거짓 양성 기준이 검사되지 않는다.
-#   빈 방 표본이 0 개면 판정은 통과가 아니라 FAIL 로 나온다. 이 스크립트가
-#   먼저 그것부터 찍는다.
+#   설계가 못 박은 벤치 하한은 50 장이고 `probe.MIN_ABSENT["bench"]` 가 그
+#   숫자다. 모자라면 판정은 통과가 아니라 FAIL 로 나오므로 이 스크립트가
+#   먼저 50 장을 찍는다. (전에는 10 장이었다 — 하한의 1/5 로 "거짓 양성 0"
+#   을 인증할 참이었다.)
 
 set -euo pipefail
 
@@ -39,7 +41,7 @@ echo "위 값이 모두 같으면 intensity 후보는 측정 없이 탈락이다
 echo
 
 echo "== 도크 없는 표본 (거짓 양성 + 주변광 바닥) =="
-for _ in $(seq 1 10); do
+for _ in $(seq 1 50); do
   ros2 run rosy_bringup dock_probe --out "$OUT" --candidate geometry \
     --ambient "$AMBIENT" --no-dock
   ros2 run rosy_bringup dock_probe --out "$OUT" --candidate ir \
