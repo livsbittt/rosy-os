@@ -11,7 +11,6 @@ from typing import AsyncIterator, Optional, Sequence
 
 from rosy_core.protocol.schemas import SwarmFollowParams
 from rosy_fleet.swarm.relay import RelayStats
-from rosy_fleet.swarm.transport import RobotApiError
 
 END = None
 
@@ -62,7 +61,7 @@ class FakeSink:
 
 class FakeRobot:
     def __init__(self, robot_id: str, *, state: Optional[dict] = None,
-                 follow_error: Optional[RobotApiError] = None,
+                 follow_error: Optional[BaseException] = None,
                  swarm_state: Optional[dict] = None, log: Optional[list] = None) -> None:
         self.robot_id = robot_id
         self.calls: list[tuple] = []
@@ -71,7 +70,10 @@ class FakeRobot:
         self._state = state or {"robot_id": robot_id, "map_id": "m1",
                                 "pose": {"x": 0.0, "y": 0.0, "yaw": 0.0}}
         self._swarm_state = swarm_state or {"active": True, "holding": False}
+        #: RobotApiError 든 평범한 ConnectionError 든 그대로 raise 된다.
         self.follow_error = follow_error
+        #: 잡혀 있으면 follow 가 여기서 기다린다 — 무장이 여러 await 짜리 구간임을 드러낸다.
+        self.follow_gate: Optional[asyncio.Event] = None
         self.pose_frames: asyncio.Queue = asyncio.Queue()
         self.event_frames: asyncio.Queue = asyncio.Queue()
         self.sinks: list[FakeSink] = []
@@ -99,6 +101,8 @@ class FakeRobot:
 
     async def follow(self, params: SwarmFollowParams) -> dict:
         self._record("follow", params)
+        if self.follow_gate is not None:
+            await self.follow_gate.wait()
         if self.follow_error is not None:
             raise self.follow_error
         return {"role": "follower", "active": True}

@@ -281,3 +281,23 @@ def test_seq_accounting_ignores_bools_and_accepts_integral_floats_and_resets_on_
         assert relay.stats().leader_dropped == 0                 # 단절은 드롭이 아니다
         await relay.stop()
     run(main())
+
+
+def test_a_follower_failure_without_a_code_is_named_in_the_stats_too():
+    """RobotApiError 만 이름이 붙던 자리다. 이름 없는 0 Hz 가 릴레이의 가장 나쁜 실패다."""
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        f1.sink_failures = 1                                      # 평범한 ConnectionError
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await settle(40)
+        assert "cannot open reference socket" in (relay.stats().follower_last_error["rosy_02"] or "")
+        leader.pose_frames.put_nowait(frame(1))
+        await settle(40)
+        assert relay.stats().follower_last_error["rosy_02"] is None   # 보내면 지운다
+        f1.sinks[-1].fail_on_send = True                          # 이번엔 송신이 깨진다
+        leader.pose_frames.put_nowait(frame(2))
+        await settle(40)
+        assert "sink broke" in (relay.stats().follower_last_error["rosy_02"] or "")
+        await relay.stop()
+    run(main())
