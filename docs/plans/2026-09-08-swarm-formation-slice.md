@@ -6,7 +6,7 @@
 
 **Architecture:** 로봇 쪽 `rosy_core` 는 건드리지 않고 그 REST/WS 계약만 소비한다. 모든 대형은 팔로워가 이미 받는 `(distance, lateral)` 오프셋으로 환원되고, 릴레이는 리더 pose 프레임을 바꾸지 않고 팔로워 reference 소켓에 그대로 전달한다. 대형 전체 HOLD 는 릴레이를 멈춰 각 팔로워의 SWM-004 가 발동하게 하는 것으로 만든다(D-35 후보). 설계: `docs/plans/2026-09-08-swarm-formation-slice-design.md`.
 
-**Tech Stack:** Python 3.12, pydantic(`rosy_core.protocol.schemas` 재사용), httpx 0.28, websockets 17, PyYAML, asyncio, pytest(비동기는 `asyncio.run` 헬퍼로, pytest-asyncio 없음), ament_python, ROS 2 Jazzy launch (`gz_multi`).
+**Tech Stack:** Python 3.12, pydantic(`rosy_core.protocol.schemas` 재사용), httpx 0.28, websockets ≥ 13 (전송이 `InvalidStatus` 와 두 인자 `process_request(connection, request)` 에 의존한다 — 개발 환경은 17), PyYAML, asyncio, pytest(비동기는 `asyncio.run` 헬퍼로, pytest-asyncio 없음), ament_python, ROS 2 Jazzy launch (`gz_multi`).
 
 **Branch:** `feat/swarm-formation-slice` (main 기반). 커밋 메시지는 이 저장소의 관례대로 `type(scope): 무엇을 왜` 한 줄 + 본문, 끝에 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
 
@@ -1721,6 +1721,13 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ---
 
 ### Task 8: 세션 — 무장, FOR-004, reform, resume, stop
+
+> **리뷰 후 갱신 (2026-09-08):** 아래 코드는 첫 판이다. Task 8 리뷰가 잡은 것 — reform 도중 도착한 트리거를
+> reform 이 덮어씀(치명), ABORT 뒤 감시 태스크가 계속 소켓을 여는 것, 결과 미상(네트워크) 실패의 로봇을 풀지
+> 않는 것, HOLDING 중 2차 트리거와 reconcile 의 유실, 릴레이 생성 실패 시 무장된 채 ARMING 에 걸리는 것, 리더
+> reconcile 부재 — 은 그 다음 fix 커밋에서 고쳤다. 정본은 `src/rosy_fleet/rosy_fleet/swarm/session.py` 와
+> `test/test_session.py` 이고, 설계 문서 §5·§6·§9 가 같은 날 그 규칙을 적었다.
+
 
 **Files:**
 - Create: `src/rosy_fleet/rosy_fleet/swarm/session.py`
