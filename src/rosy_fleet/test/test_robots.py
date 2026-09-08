@@ -67,3 +67,52 @@ def test_ws_url_switches_scheme_and_carries_the_token():
 def test_ws_url_appends_extra_query():
     got = ws_url("http://h:1", "/ws/events", "t", types="nav.*,swarm.*")
     assert got == "ws://h:1/ws/events?token=t&types=nav.%2A%2Cswarm.%2A"
+
+
+def test_an_undecodable_file_is_a_robots_file_error(tmp_path):
+    p = tmp_path / "robots.yaml"
+    p.write_bytes(b"robots:\n  - robot_id: \xff\xfe\n")
+    with pytest.raises(RobotsFileError):
+        load_robots(p)
+
+
+@pytest.mark.parametrize("body", [
+    "robots:\n  - {robot_id: a, base_url: 10.0.0.11:8080, token: t}\n",     # 스킴 없음
+    "robots:\n  - {robot_id: a, base_url: 8080, token: t}\n",               # base_url 이 정수
+    "robots:\n  - {robot_id: a, base_url: http://x, token: 01234567}\n",    # YAML 8진수 → int
+    "robots:\n  - {robot_id: a, base_url: http://x, token: yes}\n",         # YAML bool
+])
+def test_a_scheme_less_url_or_a_non_string_secret_is_refused(tmp_path, body):
+    p = tmp_path / "robots.yaml"
+    p.write_text(body, encoding="utf-8")
+    with pytest.raises(RobotsFileError):
+        load_robots(p)
+
+
+def test_a_numeric_robot_id_is_accepted_as_text(tmp_path):
+    p = tmp_path / "robots.yaml"
+    p.write_text("robots:\n  - {robot_id: 7, base_url: http://x, token: t}\n", encoding="utf-8")
+    assert load_robots(p)[0].robot_id == "7"
+
+
+def test_write_refuses_what_load_would_refuse(tmp_path):
+    p = tmp_path / "robots.yaml"
+    with pytest.raises(RobotsFileError):
+        write_robots(p, [RobotEndpoint("", "http://x", "t")])
+    with pytest.raises(RobotsFileError):
+        write_robots(p, [RobotEndpoint("a", "http://x", "t"), RobotEndpoint("a", "http://y", "t")])
+    assert not p.exists()
+
+
+def test_write_normalizes_the_trailing_slash_so_the_round_trip_is_stable(tmp_path):
+    p = tmp_path / "robots.yaml"
+    write_robots(p, [RobotEndpoint("a", "http://x/", "t")])
+    assert load_robots(p) == [RobotEndpoint("a", "http://x", "t")]
+
+
+def test_ws_url_upper_case_https_is_still_secure_and_unknown_schemes_are_refused():
+    assert ws_url("HTTPS://rosy.local", "/ws/events", "t").startswith("wss://")
+    with pytest.raises(ValueError):
+        ws_url("ftp://rosy.local", "/ws/events", "t")
+    with pytest.raises(ValueError):
+        ws_url("10.0.0.11:8080", "/ws/events", "t")
