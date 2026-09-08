@@ -290,8 +290,12 @@ class FormationSession:
 
 **reform.** 릴레이 `pause()` → 새 슬롯 계산·배정 → 팔로워마다 `follow()` 재호출
 (로봇 쪽은 NAVIGATION 중 재호출을 대형 변경으로 받는다) → `resume()`. 팔로워는
-pause 동안 HOLD 하고 새 오프셋으로 이어간다. 재호출이 실패하면 §6.4 정책을
-적용하고 `HOLDING(reason=reform_failed)`.
+pause 동안 HOLD 하고 새 오프셋으로 이어간다. 재호출이 하나라도 실패하면 **정책과
+무관하게 세션을 끝낸다** (`STOPPED(reason=reform_failed)`, 전 팔로워 `swarm_cancel`,
+리더 `navigation_cancel`). 그 시점에 재무장된 팔로워는 이미 풀렸고 나머지는 옛
+오프셋의 follow 세션을 쥐고 있어, HOLD 로 두고 나중에 스트림을 다시 켜면 대형이
+둘로 갈린다. 절반 대형은 재개할 수 없으므로 종료가 정직하다. 운영자가 새 formation
+명령으로 다시 무장한다.
 
 **stop.** 릴레이 종료 → 전 팔로워 `swarm_cancel()` → `STOPPED`. 리더 항법은 건드리지
 않는다 — 운영자가 리더를 몰고 있었다면 그것은 운영자의 것이다.
@@ -407,7 +411,7 @@ waypoint 를 순서대로 걸고(다음 목표는 `nav.completed` 이벤트로),
 | 팔로워 소켓 단절 | 그 소켓만 재연결. 나머지 계속 |
 | 이벤트 소켓 단절 | 재연결. 끊긴 동안의 이벤트는 놓친다 — 재연결 직후 전원 `swarm_state()` 를 읽어 `active: false` 인 팔로워가 있으면 `swarm.aborted` 로 간주 |
 | FOR-004 트리거 | §6.3 정책 |
-| reform 실패 | §6.3 정책, `HOLDING(reform_failed)` |
+| reform 실패 | 정책과 무관하게 종료: 전 팔로워 cancel, 릴레이 종료, 리더 cancel → `STOPPED(reform_failed)`. 절반 대형은 재개할 수 없다 (§5 reform) |
 | CLI 종료 (SIGINT) | `stop()` — 팔로워 전원 cancel 뒤 종료. 릴레이만 죽이고 팔로워를 무장 상태로 두지 않는다 |
 
 ## Testing Strategy

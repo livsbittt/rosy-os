@@ -25,6 +25,7 @@ Dated design and execute plans (2026-08-31 onward). These are the working trail 
 | `2026-09-03-runtime-maintainability-rules.md` | Runtime slice module rules (catalog, launch compose, Nav2 policy) |
 | `2026-09-05-vision-accelerator-shield-design.md` | Pi 5 HAT/M.2 AI Kit vision offload (D-29 proposed; compose profile `vision`) |
 | `2026-09-08-swarm-formation-slice-design.md` | Fleet-less N-robot formation slice: `rosy_fleet` seed (geometry, slot assignment, relay, FOR-004 session), `gz_multi core:=true`, sim bench; D-35 candidate |
+| `2026-09-08-swarm-formation-slice.md` | Execution plan for that slice: 15 TDD tasks, ROS-free until the sim bench |
 
 ## Subdirectories
 
