@@ -33,15 +33,24 @@ def test_input_order_does_not_change_the_result():
     assert forward == backward
 
 
-def test_ties_break_deterministically():
-    # 두 로봇이 두 슬롯에서 같은 거리다. 어느 쪽이든 되지만 매번 같아야 한다.
+def test_ties_break_deterministically_regardless_of_input_order():
+    # 두 로봇이 두 슬롯에서 같은 거리다. robot_id 로 갈라야 하므로 dict 순서를 뒤집어도
+    # 같은 답이어야 한다 — 같은 입력을 다섯 번 부르는 것은 순수 함수에서 아무것도 증명하지 않는다.
     robots = {"a": (0.0, 0.0), "b": (0.0, 0.0)}
     slots = [(1.0, 0.0), (-1.0, 0.0)]
-    first = GreedyDistanceAssigner().assign(robots, slots)
-    assert all(GreedyDistanceAssigner().assign(robots, slots) == first for _ in range(5))
-    assert sorted(first.values()) == [0, 1]
+    forward = GreedyDistanceAssigner().assign(robots, slots)
+    backward = GreedyDistanceAssigner().assign(dict(reversed(list(robots.items()))), slots)
+    assert forward == backward == {"a": 0, "b": 1}
 
 
 def test_robot_and_slot_counts_must_match():
     with pytest.raises(AssignmentError):
         GreedyDistanceAssigner().assign({"a": (0.0, 0.0)}, [(0.0, 1.0), (1.0, 1.0)])
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf")])
+def test_a_non_finite_position_is_refused_instead_of_sorted_arbitrarily(bad):
+    with pytest.raises(AssignmentError):
+        GreedyDistanceAssigner().assign({"a": (bad, 0.0), "b": (1.0, 0.0)}, [(0.0, 1.0), (1.0, 1.0)])
+    with pytest.raises(AssignmentError):
+        GreedyDistanceAssigner().assign({"a": (0.0, 0.0), "b": (1.0, 0.0)}, [(bad, 1.0), (1.0, 1.0)])

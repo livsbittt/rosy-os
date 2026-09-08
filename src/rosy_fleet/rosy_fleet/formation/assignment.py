@@ -35,6 +35,12 @@ class GreedyDistanceAssigner:
             raise AssignmentError(
                 f"{len(robots)} robots for {len(slots)} slots — the formation must have one "
                 "slot per follower")
+        for robot_id, pos in robots.items():
+            if not all(math.isfinite(v) for v in pos):
+                raise AssignmentError(f"robot {robot_id!r} has a non-finite position {pos}")
+        for j, slot in enumerate(slots):
+            if not all(math.isfinite(v) for v in slot):
+                raise AssignmentError(f"slot {j} has a non-finite position {slot}")
         pairs = sorted(
             (math.dist(pos, slots[j]), robot_id, j)
             for robot_id, pos in robots.items()
