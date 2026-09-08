@@ -226,13 +226,12 @@ class FormationSession:
                 async for event in robot.events(EVENT_TYPES):
                     backoff = _BACKOFF_FIRST_S
                     await self._handle_event(robot.robot_id, event)
-                # 소켓이 조용히 끝났다(transport.py: 정상 종료는 예외를 올리지 않는다) —
-                # 팔로워가 대형을 떠났는지는 지금 바로 알아야 한다. 백오프 없이 다시 잇는다.
-                continue
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
                 log.warning("%s: events socket error: %s", robot.robot_id, exc)
+            # 조용히 닫혔든 예외였든 같은 backoff 다. 로봇이 꺼져 있으면 events() 는
+            # 조용히 끝나므로, 여기서 기다리지 않으면 꺼진 로봇을 향해 빈 루프를 돈다.
             await self._sleep(backoff)
             backoff = min(backoff * 2, _BACKOFF_MAX_S)
 

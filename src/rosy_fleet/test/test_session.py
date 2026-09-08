@@ -1,6 +1,8 @@
 """FormationSession — 무장은 전부 아니면 전무, HOLD 는 릴레이를 멈추는 것(D-35 후보),
 재개는 운영자만 한다."""
 
+import asyncio
+
 import pytest
 from fakes import END, FakeRelay, FakeRobot, run, settle
 
@@ -26,8 +28,13 @@ def _robots(n=2, log=None, leader_pose=(0.0, 0.0, 0.0)):
     return leader, followers, log
 
 
+async def _no_sleep(_s):
+    await asyncio.sleep(0)
+
+
 def _session(leader, followers, spec=None, log=None, **kw):
     spec = spec or FormationSpec(Formation.COLUMN, spacing=0.6)
+    kw.setdefault("sleep", _no_sleep)
     return FormationSession(leader, followers, spec,
                             relay_factory=lambda ld, f, **_: FakeRelay(ld, f, log=log), **kw)
 
@@ -247,5 +254,28 @@ def test_an_events_socket_that_drops_is_reopened_and_a_follower_found_inactive_i
         assert followers[0].event_opens >= 2
         assert s.state is SessionState.HOLDING
         assert s.reason == ("swarm.aborted", "rosy_02")
+        await s.stop()
+    run(main())
+
+
+def test_a_quietly_closed_events_socket_is_reopened_with_backoff_not_a_tight_loop():
+    async def main():
+        sleeps = []
+
+        async def sleep(s):
+            sleeps.append(s)
+            await asyncio.sleep(0)
+
+        leader, followers, log = _robots(1)
+        s = FormationSession(leader, followers, FormationSpec(Formation.COLUMN, spacing=0.6),
+                             relay_factory=lambda ld, f, **_: FakeRelay(ld, f, log=log), sleep=sleep)
+        await s.start()
+        for _ in range(4):
+            followers[0].event_frames.put_nowait(END)     # 소켓이 조용히 닫힌다, 반복해서
+            await settle(10)
+        follower_sleeps = [x for x in sleeps if x > 0]
+        assert len(follower_sleeps) >= 3                 # 매번 기다린다
+        assert follower_sleeps[1] > follower_sleeps[0]   # 커진다
+        assert max(follower_sleeps) <= 2.0
         await s.stop()
     run(main())

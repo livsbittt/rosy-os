@@ -1734,6 +1734,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 """FormationSession — 무장은 전부 아니면 전무, HOLD 는 릴레이를 멈추는 것(D-35 후보),
 재개는 운영자만 한다."""
 
+import asyncio
 import math
 
 import pytest
@@ -1761,8 +1762,13 @@ def _robots(n=2, log=None, leader_pose=(0.0, 0.0, 0.0)):
     return leader, followers, log
 
 
+async def _no_sleep(_s):
+    await asyncio.sleep(0)
+
+
 def _session(leader, followers, spec=None, log=None, **kw):
     spec = spec or FormationSpec(Formation.COLUMN, spacing=0.6)
+    kw.setdefault("sleep", _no_sleep)
     return FormationSession(leader, followers, spec,
                             relay_factory=lambda l, f, **_: FakeRelay(l, f, log=log), **kw)
 
@@ -2286,7 +2292,7 @@ class FormationSession:
 - [ ] **Step 4: 실행해서 통과 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_session.py -v`
-Expected: PASS (17 passed)
+Expected: PASS (전부 — parametrize 포함 18개 이상)
 
 `test_each_for_004_trigger...` 가 `log.index(("rosy_01", "navigation_cancel"))` 에서
 실패하면 FakeRobot 의 `_record` 가 `(robot_id, "navigation_cancel")` 을 남기는지 본다 —
