@@ -592,6 +592,13 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Task 4: 로봇 목록 — `robots.yaml` 로더와 WS URL
 
+> **리뷰 후 갱신 (2026-09-08):** 아래 Step 3 코드는 첫 판이다. Task 4 리뷰가 잡은 것 — `UnicodeDecodeError`
+> 는 `OSError` 가 아니라 새어 나감, 스킴 없는 `base_url` 이 `ws:///...` 를 만듦, YAML 이 `token: 01234567`
+> 을 8진 정수로 읽어 `str()` 이 다른 비밀을 만듦, `write_robots` 가 로더가 거절할 파일을 씀, 대문자
+> `HTTPS` 가 `ws` 로 떨어져 토큰이 평문으로 나감 — 은 커밋 `b160042` 와 그 다음 fix 커밋에서 고쳤다.
+> 정본은 `src/rosy_fleet/rosy_fleet/swarm/robots.py` 와 `test/test_robots.py` 다. 실행 전 그 파일을 읽을 것.
+
+
 **Files:**
 - Create: `src/rosy_fleet/rosy_fleet/swarm/robots.py`
 - Create: `src/rosy_fleet/test/test_robots.py`
@@ -739,7 +746,7 @@ def ws_url(base_url: str, path: str, token: str, **query: str) -> str:
 - [ ] **Step 4: 실행해서 통과 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_robots.py -v`
-Expected: PASS (10 passed)
+Expected: PASS (리뷰 후 추가된 테스트를 포함해 전부)
 
 - [ ] **Step 5: 커밋**
 
