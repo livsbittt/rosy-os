@@ -463,9 +463,14 @@ CI 는 `src/rosy_fleet` 을 colcon 빌드하고 `python3 -m pytest src/rosy_flee
 - **한 호스트에 `rosy_core` N개.** `HOME` 분리로 파일 충돌은 피하지만, 포트·로그
   경로 등 아직 모르는 공유 자원이 나올 수 있다. 런치 단위 실행이 잡지 못하는
   것은 시뮬 첫 기동에서 드러난다.
-- **리더가 팔로워 costmap 의 장애물이다.** `MIN_SPACING = 0.4` 는 footprint
-  반폭 0.06 + inflation 0.15 = 0.21 에 여유를 둔 값이다. Nav2 파라미터가 바뀌면
-  이 상수도 봐야 하므로 상수 옆에 유래를 적는다.
+- **리더가 팔로워 costmap 의 장애물이다.** Nav2 는 목표점이 아니라 팔로워의
+  footprint 로 충돌을 검사하므로 하한은 `inflation_radius + 리더 외접반경 + 팔로워
+  외접반경 + footprint_padding = 0.15 + 0.085 + 0.085 + 0.03 ≈ 0.35 m` 다. LINE 과
+  GRID 앞줄은 팔로워를 리더와 나란히 세우므로 이 값이 그대로 로봇 사이 거리다.
+  `MIN_SPACING = 0.4` 는 그 위로 약 5 cm 여유이며 넉넉하지 않다. (Task 2 리뷰가
+  "반폭 0.06 + inflation 0.15 = 0.21" 이라는 첫 유도가 점 목표 기준이라 실제보다
+  낮다는 것을 잡았다.) Nav2 파라미터가 바뀌면 이 식으로 다시 계산한다 — 상수 옆에
+  같은 식을 적어 둔다.
 - **시뮬과 실물의 DDS 차이**(§Background). 시뮬 통과가 WLAN 지연을 검증하지는
   않는다. 실물 슬라이스에서 `relay_tx_hz` 와 `stream_age_s` 를 다시 잰다.
 
