@@ -28,6 +28,24 @@ class RobotEndpoint:
 _REQUIRED = ("robot_id", "base_url", "token")
 
 
+def _endpoint(robot_id, base_url, token, where: str) -> RobotEndpoint:
+    """load_robots 와 write_robots 가 같은 규칙을 통과시킨다."""
+    if not robot_id or not base_url or not token:
+        raise RobotsFileError(f"{where}: robot_id, base_url and token are all required")
+    # 토큰은 바이트 그대로 살아야 하는 비밀이다. YAML 1.1 은 `01234567`(8진), `yes`,
+    # `1:23:45` 같은 따옴표 없는 값을 다른 타입으로 읽으므로, str() 로 억지로 바꾸면
+    # 다른 문자열이 되어 4401 로 조용히 실패한다. base_url 도 같은 이유로 문자열만 받는다.
+    for key, value in (("base_url", base_url), ("token", token)):
+        if not isinstance(value, str):
+            raise RobotsFileError(f"{where}: '{key}' must be a quoted string, not {type(value).__name__}")
+    base_url = base_url.rstrip("/")
+    if not base_url.lower().startswith(("http://", "https://")):
+        # 스킴이 없으면 ws_url 이 호스트를 잃고 `ws:///...` 를 만든다 — 연결 시점이 아니라
+        # 여기서 거절한다.
+        raise RobotsFileError(f"{where}: base_url needs an http:// or https:// scheme")
+    return RobotEndpoint(str(robot_id), base_url, token)
+
+
 def load_robots(path: Path) -> list[RobotEndpoint]:
     try:
         text = Path(path).read_text(encoding="utf-8")
@@ -49,41 +67,30 @@ def load_robots(path: Path) -> list[RobotEndpoint]:
         for key in _REQUIRED:
             if not row.get(key):
                 raise RobotsFileError(f"{path}: robots[{i}] is missing '{key}'")
-        # 토큰은 바이트 그대로 살아야 하는 비밀이다. YAML 1.1 은 `01234567`(8진), `yes`,
-        # `1:23:45` 같은 따옴표 없는 값을 다른 타입으로 읽으므로, str() 로 억지로 바꾸면
-        # 다른 문자열이 되어 4401 로 조용히 실패한다. base_url 도 같은 이유로 문자열만 받는다.
-        for key in ("base_url", "token"):
-            if not isinstance(row[key], str):
-                raise RobotsFileError(
-                    f"{path}: robots[{i}] '{key}' must be a quoted string, not {type(row[key]).__name__}")
-        robot_id = str(row["robot_id"])
-        if robot_id in seen:
-            raise RobotsFileError(f"{path}: duplicate robot_id {robot_id!r}")
-        seen.add(robot_id)
-        base_url = row["base_url"].rstrip("/")
-        if not base_url.lower().startswith(("http://", "https://")):
-            # 스킴이 없으면 ws_url 이 호스트를 잃고 `ws:///...` 를 만든다 — 연결 시점이 아니라
-            # 여기서 거절한다.
-            raise RobotsFileError(f"{path}: robots[{i}] base_url needs an http:// or https:// scheme")
-        out.append(RobotEndpoint(robot_id, base_url, row["token"]))
+        endpoint = _endpoint(row["robot_id"], row["base_url"], row["token"], f"{path}: robots[{i}]")
+        if endpoint.robot_id in seen:
+            raise RobotsFileError(f"{path}: duplicate robot_id {endpoint.robot_id!r}")
+        seen.add(endpoint.robot_id)
+        out.append(endpoint)
     return out
 
 
 def write_robots(path: Path, robots: list[RobotEndpoint]) -> None:
     """`gz_multi core:=true` 가 시뮬 로봇 목록을 써 주는 데 쓴다. 로더의 규칙을 먼저 통과시킨다."""
-    ids = [r.robot_id for r in robots]
-    if not robots or any(not r.robot_id or not r.base_url or not r.token for r in robots):
+    if not robots:
         raise RobotsFileError("every robot needs robot_id, base_url and token")
+    normalized = [_endpoint(r.robot_id, r.base_url, r.token, f"robots[{i}]") for i, r in enumerate(robots)]
+    ids = [r.robot_id for r in normalized]
     if len(set(ids)) != len(ids):
         raise RobotsFileError(f"duplicate robot_id in {ids}")
-    rows = [{"robot_id": r.robot_id, "base_url": r.base_url.rstrip("/"), "token": r.token} for r in robots]
+    rows = [{"robot_id": r.robot_id, "base_url": r.base_url, "token": r.token} for r in normalized]
     target = Path(path)
-    target.write_text(yaml.safe_dump({"robots": rows}, sort_keys=False), encoding="utf-8")
-    try:
-        # operator 토큰 N 개가 평문으로 든 파일이다. POSIX 에서는 소유자만 읽게 한다.
-        os.chmod(target, 0o600)
-    except OSError:
-        pass
+    text = yaml.safe_dump({"robots": rows}, sort_keys=False)
+    # operator 토큰 N 개가 평문으로 든 파일이다. POSIX 에서는 처음부터 소유자만 읽게 연다;
+    # Windows 는 mode 를 무시하므로 open 자체는 그대로 성공해야 한다.
+    fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
 
 
 def ws_url(base_url: str, path: str, token: str, **query: str) -> str:

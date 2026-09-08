@@ -101,6 +101,10 @@ def test_write_refuses_what_load_would_refuse(tmp_path):
         write_robots(p, [RobotEndpoint("", "http://x", "t")])
     with pytest.raises(RobotsFileError):
         write_robots(p, [RobotEndpoint("a", "http://x", "t"), RobotEndpoint("a", "http://y", "t")])
+    with pytest.raises(RobotsFileError):
+        write_robots(p, [RobotEndpoint("a", "10.0.0.11:8080", "t")])
+    with pytest.raises(RobotsFileError):
+        write_robots(p, [RobotEndpoint("a", "http://x", 1234)])
     assert not p.exists()
 
 

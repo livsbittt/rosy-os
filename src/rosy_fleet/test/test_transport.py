@@ -8,7 +8,7 @@ import pytest
 
 from rosy_core.protocol.schemas import SwarmFollowParams
 from rosy_fleet.swarm.robots import RobotEndpoint
-from rosy_fleet.swarm.transport import HttpRobotClient, RobotApiError, RobotClient
+from rosy_fleet.swarm.transport import HttpRobotClient, RobotApiError, RobotClient, _as_event, _as_text
 
 EP = RobotEndpoint("rosy_02", "http://robot:8080", "op-token")
 
@@ -105,3 +105,70 @@ def test_socket_urls_point_at_the_robot():
     assert c.pose_url() == "ws://robot:8080/ws/swarm/pose?token=op-token"
     assert c.reference_url() == "ws://robot:8080/ws/swarm/reference?token=op-token"
     assert c.events_url(["nav.*", "swarm.*"]) == "ws://robot:8080/ws/events?token=op-token&types=nav.%2A%2Cswarm.%2A"
+
+
+def test_frame_text_conversion_passes_str_decodes_bytes_and_drops_garbage():
+    assert _as_text("x") == "x"
+    assert _as_text(b"\xea\xb0\x80") == "가"
+    assert _as_text(b"\xff\xfe") is None
+
+
+def test_event_conversion_keeps_only_json_objects():
+    assert _as_event('{"type": "nav.stuck"}') == {"type": "nav.stuck"}
+    assert _as_event("[1, 2]") is None
+    assert _as_event("not json") is None
+    assert _as_event(b"\xff") is None
+
+
+def test_a_200_that_is_not_a_json_object_is_a_bad_response_error():
+    for body_kwargs in ({"text": "<html>captive portal</html>"}, {"json": [1, 2]}):
+        def handler(request: httpx.Request, kw=body_kwargs) -> httpx.Response:
+            return httpx.Response(200, **kw)
+        with pytest.raises(RobotApiError) as exc:
+            run(_client(handler).state())
+        assert exc.value.code == "BAD_RESPONSE"
+
+
+def test_aclose_leaves_an_injected_client_alone():
+    http = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, json={})),
+                             base_url=EP.base_url)
+    c = HttpRobotClient(EP, http=http)
+    run(c.aclose())
+    assert not http.is_closed
+    run(http.aclose())
+
+
+def test_a_socket_closed_with_4403_raises_a_robot_api_error():
+    websockets = pytest.importorskip("websockets")
+
+    async def main():
+        async def handler(ws):
+            await ws.close(code=4403, reason="capability swarm.lead not declared")
+
+        async with websockets.serve(handler, "127.0.0.1", 0) as server:
+            port = server.sockets[0].getsockname()[1]
+            client = HttpRobotClient(RobotEndpoint("rosy_09", f"http://127.0.0.1:{port}", "t"))
+            with pytest.raises(RobotApiError) as exc:
+                async for _ in client.pose_stream():
+                    pass
+            assert exc.value.code == "WS_4403" and exc.value.status == 403
+            with pytest.raises(RobotApiError):
+                async for _ in client.events(["nav.*"]):
+                    pass
+    run(main())
+
+
+def test_an_ordinary_close_ends_the_stream_quietly():
+    websockets = pytest.importorskip("websockets")
+
+    async def main():
+        async def handler(ws):
+            await ws.send('{"type": "pose"}')
+            await ws.close()
+
+        async with websockets.serve(handler, "127.0.0.1", 0) as server:
+            port = server.sockets[0].getsockname()[1]
+            client = HttpRobotClient(RobotEndpoint("rosy_09", f"http://127.0.0.1:{port}", "t"))
+            frames = [f async for f in client.pose_stream()]
+            assert frames == ['{"type": "pose"}']
+    run(main())

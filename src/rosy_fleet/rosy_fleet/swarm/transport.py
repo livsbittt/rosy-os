@@ -2,7 +2,9 @@
 
 릴레이와 세션은 `RobotClient` 프로토콜만 본다. 테스트는 가짜를 끼우고, 운용은
 `HttpRobotClient`(httpx + websockets) 를 끼운다. WS 이터레이터는 소켓이 닫히면
-**조용히 끝난다** — 재연결은 호출자(릴레이/세션)의 정책이다.
+**조용히 끝난다** — 재연결은 호출자(릴레이/세션)의 정책이다. 다만 **거절된** 소켓
+(핸드셰이크 거부, 또는 4401/4403 으로 닫힘) 은 `RobotApiError` 를 올린다 — 잘못된
+토큰으로 재시도만 반복하는 릴레이를 조용히 방치하지 않는다.
 """
 
 from __future__ import annotations
@@ -25,6 +27,42 @@ class RobotApiError(Exception):
         self.status = status
         self.code = code
         self.message = message
+
+
+def _rejection(robot_id: str, exc: BaseException) -> Optional["RobotApiError"]:
+    """4401/4403 (또는 핸드셰이크 거부)만 에러로 올린다. 나머지 종료는 None — 조용히 끝난다."""
+    from websockets.exceptions import ConnectionClosed, InvalidStatus
+
+    if isinstance(exc, InvalidStatus):
+        status = exc.response.status_code
+        return RobotApiError(robot_id, status, f"WS_{status}", "socket rejected during handshake")
+    if isinstance(exc, ConnectionClosed) and exc.rcvd is not None and exc.rcvd.code in (4401, 4403):
+        code = exc.rcvd.code
+        return RobotApiError(robot_id, 401 if code == 4401 else 403, f"WS_{code}",
+                             exc.rcvd.reason or "socket closed by robot")
+    return None
+
+
+def _as_text(frame) -> Optional[str]:
+    """WS 프레임 → 텍스트. 디코딩 불가면 None (버린다)."""
+    if isinstance(frame, str):
+        return frame
+    try:
+        return bytes(frame).decode("utf-8")
+    except (TypeError, UnicodeDecodeError):
+        return None
+
+
+def _as_event(frame) -> Optional[dict]:
+    """이벤트 프레임 → dict. JSON 이 아니거나 객체가 아니면 None (버린다)."""
+    text = _as_text(frame)
+    if text is None:
+        return None
+    try:
+        event = json.loads(text)
+    except (TypeError, ValueError):
+        return None
+    return event if isinstance(event, dict) else None
 
 
 class ReferenceSink(Protocol):
@@ -63,6 +101,7 @@ class HttpRobotClient:
                  timeout_s: float = 5.0) -> None:
         self.robot_id = endpoint.robot_id
         self._ep = endpoint
+        self._owns_http = http is None
         self._http = http or httpx.AsyncClient(base_url=endpoint.base_url, timeout=timeout_s)
 
     # --- REST -----------------------------------------------------------------
@@ -72,7 +111,17 @@ class HttpRobotClient:
 
     def _check(self, resp: httpx.Response) -> dict:
         if resp.status_code < 400:
-            return resp.json() if resp.content else {}
+            if not resp.content:
+                return {}
+            try:
+                data = resp.json()
+            except ValueError as exc:
+                raise RobotApiError(self.robot_id, resp.status_code, "BAD_RESPONSE",
+                                    f"expected a JSON object, got {resp.text[:120]!r}") from exc
+            if not isinstance(data, dict):
+                raise RobotApiError(self.robot_id, resp.status_code, "BAD_RESPONSE",
+                                    f"expected a JSON object, got {type(data).__name__}")
+            return data
         code, message = f"HTTP_{resp.status_code}", resp.text
         try:
             err = resp.json().get("error") or {}
@@ -107,7 +156,8 @@ class HttpRobotClient:
         return await self._post("/api/v1/navigation/goal", {"x": x, "y": y, "yaw": yaw})
 
     async def aclose(self) -> None:
-        await self._http.aclose()
+        if self._owns_http:
+            await self._http.aclose()
 
     # --- WS -------------------------------------------------------------------
 
@@ -121,32 +171,48 @@ class HttpRobotClient:
         return ws_url(self._ep.base_url, "/ws/events", self._ep.token, types=",".join(types))
 
     async def pose_stream(self) -> AsyncIterator[str]:
-        """리더 pose 프레임(텍스트). 소켓이 닫히면 끝난다 — 재연결은 호출자 몫."""
+        """리더 pose 프레임(텍스트). 소켓이 닫히면 끝난다 — 재연결은 호출자 몫.
+        4401/4403 으로 거절되면 `RobotApiError` 를 올린다."""
         import websockets
+        from websockets.exceptions import WebSocketException
 
         try:
             async with websockets.connect(self.pose_url()) as ws:
                 async for frame in ws:
-                    yield frame if isinstance(frame, str) else frame.decode("utf-8")
-        except (OSError, websockets.exceptions.WebSocketException):
+                    text = _as_text(frame)
+                    if text is not None:
+                        yield text
+        except (OSError, WebSocketException) as exc:
+            rejected = _rejection(self.robot_id, exc)
+            if rejected is not None:
+                raise rejected from exc
             return
 
     async def open_reference_sink(self) -> ReferenceSink:
         import websockets
+        from websockets.exceptions import InvalidStatus
 
-        return _WebsocketSink(await websockets.connect(self.reference_url()))
+        try:
+            ws = await websockets.connect(self.reference_url())
+        except InvalidStatus as exc:
+            rejected = _rejection(self.robot_id, exc)
+            if rejected is not None:
+                raise rejected from exc
+            raise
+        return _WebsocketSink(ws)
 
     async def events(self, types: Sequence[str]) -> AsyncIterator[dict]:
         import websockets
+        from websockets.exceptions import WebSocketException
 
         try:
             async with websockets.connect(self.events_url(types)) as ws:
                 async for frame in ws:
-                    try:
-                        event = json.loads(frame)
-                    except (TypeError, ValueError):
-                        continue
-                    if isinstance(event, dict):
+                    event = _as_event(frame)
+                    if event is not None:
                         yield event
-        except (OSError, websockets.exceptions.WebSocketException):
+        except (OSError, WebSocketException) as exc:
+            rejected = _rejection(self.robot_id, exc)
+            if rejected is not None:
+                raise rejected from exc
             return
