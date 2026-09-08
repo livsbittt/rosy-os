@@ -4,7 +4,8 @@
 import asyncio
 import json
 
-from fakes import END, FakeRobot, run, settle
+import pytest
+from fakes import END, FakeClock, FakeRobot, run, settle
 
 from rosy_fleet.swarm.relay import Relay
 from rosy_fleet.swarm.transport import RobotApiError
@@ -177,4 +178,106 @@ def test_stop_closes_the_sinks():
         await relay.stop()
         assert f1.sinks[0].closed
         assert not relay.is_connected("rosy_02")
+    run(main())
+
+
+def test_a_rate_falls_to_zero_when_the_stream_stops():
+    async def main():
+        clock = FakeClock()
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        relay = Relay(leader, [f1], clock=clock, sleep=_no_sleep())
+        await relay.start()
+        await settle()
+        for seq in range(1, 6):
+            leader.pose_frames.put_nowait(frame(seq))
+            clock.advance(0.1)
+            await settle()
+        assert relay.stats().leader_rx_hz > 5.0
+        assert relay.stats().follower_tx_hz["rosy_02"] > 5.0
+        clock.advance(600.0)
+        assert relay.stats().leader_rx_hz == 0.0
+        assert relay.stats().follower_tx_hz["rosy_02"] == 0.0
+        assert relay.stats().leader_age_s >= 600.0
+        await relay.stop()
+    run(main())
+
+
+def test_a_follower_that_accepts_then_fails_backs_off_instead_of_storming():
+    async def main():
+        sleeps = []
+
+        async def sleep(s):
+            sleeps.append(s)
+            await asyncio.sleep(0)
+
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        f1.next_sink_fail_on_send = True          # 첫 소켓부터 send 에서 깨진다
+        relay = Relay(leader, [f1], sleep=sleep, reconnect_max_s=2.0)
+        await relay.start()
+        await settle()
+        for seq in range(1, 6):
+            f1.next_sink_fail_on_send = True      # 다음 소켓도 send 에서 깨진다
+            leader.pose_frames.put_nowait(frame(seq))
+            await settle(10)
+        follower_sleeps = [s for s in sleeps if s > 0]
+        assert len(follower_sleeps) >= 3
+        assert follower_sleeps[-1] > follower_sleeps[0]          # 커진다
+        assert max(follower_sleeps) <= 2.0                       # 상한
+        await relay.stop()
+    run(main())
+
+
+def test_a_refused_follower_socket_is_named_in_the_stats():
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        f1.sink_error = RobotApiError("rosy_02", 403, "WS_403", "socket rejected during handshake")
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await settle(40)
+        assert "WS_403" in (relay.stats().follower_last_error["rosy_02"] or "")
+        assert relay.is_connected("rosy_02")                     # 한 번 거부, 그 뒤 재연결 성공
+        leader.pose_frames.put_nowait(frame(1))
+        await settle()
+        assert relay.stats().follower_last_error["rosy_02"] is None
+        await relay.stop()
+    run(main())
+
+
+def test_start_twice_does_not_double_the_lanes():
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await relay.start()
+        await settle()
+        assert leader.pose_opens == 1 and len(f1.sinks) == 1
+        await relay.stop()
+    run(main())
+
+
+def test_duplicate_or_self_following_robots_are_refused():
+    leader, a, b = FakeRobot("rosy_01"), FakeRobot("rosy_02"), FakeRobot("rosy_02")
+    with pytest.raises(ValueError):
+        Relay(leader, [a, b])
+    with pytest.raises(ValueError):
+        Relay(leader, [a, FakeRobot("rosy_01")])
+
+
+def test_seq_accounting_ignores_bools_and_accepts_integral_floats_and_resets_on_reconnect():
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await settle()
+        for raw in ('{"payload": {"seq": 1}}', '{"payload": {"seq": true}}', '{"payload": {"seq": 2.0}}',
+                    '{"payload": {"seq": 3}}'):
+            leader.pose_frames.put_nowait(raw)
+        await settle()
+        assert relay.stats().leader_dropped == 0
+        leader.pose_frames.put_nowait(END)                       # 소켓 단절
+        await settle()
+        leader.pose_frames.put_nowait('{"payload": {"seq": 50}}')  # 재연결 뒤 seq 가 점프해도
+        await settle()
+        assert relay.stats().leader_dropped == 0                 # 단절은 드롭이 아니다
+        await relay.stop()
     run(main())

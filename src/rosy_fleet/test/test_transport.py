@@ -148,13 +148,16 @@ def test_a_socket_closed_with_4403_raises_a_robot_api_error():
         async with websockets.serve(handler, "127.0.0.1", 0) as server:
             port = server.sockets[0].getsockname()[1]
             client = HttpRobotClient(RobotEndpoint("rosy_09", f"http://127.0.0.1:{port}", "t"))
-            with pytest.raises(RobotApiError) as exc:
-                async for _ in client.pose_stream():
-                    pass
-            assert exc.value.code == "WS_4403" and exc.value.status == 403
-            with pytest.raises(RobotApiError):
-                async for _ in client.events(["nav.*"]):
-                    pass
+            try:
+                with pytest.raises(RobotApiError) as exc:
+                    async for _ in client.pose_stream():
+                        pass
+                assert exc.value.code == "WS_4403" and exc.value.status == 403
+                with pytest.raises(RobotApiError):
+                    async for _ in client.events(["nav.*"]):
+                        pass
+            finally:
+                await client.aclose()
     run(main())
 
 
@@ -169,6 +172,36 @@ def test_an_ordinary_close_ends_the_stream_quietly():
         async with websockets.serve(handler, "127.0.0.1", 0) as server:
             port = server.sockets[0].getsockname()[1]
             client = HttpRobotClient(RobotEndpoint("rosy_09", f"http://127.0.0.1:{port}", "t"))
-            frames = [f async for f in client.pose_stream()]
-            assert frames == ['{"type": "pose"}']
+            try:
+                frames = [f async for f in client.pose_stream()]
+                assert frames == ['{"type": "pose"}']
+            finally:
+                await client.aclose()
+    run(main())
+
+
+def test_a_handshake_rejected_with_403_raises_ws_403_on_every_socket():
+    websockets = pytest.importorskip("websockets")
+    import http
+
+    async def main():
+        async def reject(connection, request):
+            return connection.respond(http.HTTPStatus.FORBIDDEN, "forbidden\n")
+
+        async def handler(ws):
+            await ws.wait_closed()
+
+        async with websockets.serve(handler, "127.0.0.1", 0, process_request=reject) as server:
+            port = server.sockets[0].getsockname()[1]
+            client = HttpRobotClient(RobotEndpoint("rosy_09", f"http://127.0.0.1:{port}", "t"))
+            try:
+                with pytest.raises(RobotApiError) as exc:
+                    async for _ in client.pose_stream():
+                        pass
+                assert exc.value.code == "WS_403" and exc.value.status == 403
+                with pytest.raises(RobotApiError) as exc2:
+                    await client.open_reference_sink()
+                assert exc2.value.code == "WS_403"
+            finally:
+                await client.aclose()
     run(main())

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -21,8 +22,12 @@ from typing import Awaitable, Callable, Optional, Sequence
 
 from rosy_fleet.swarm.transport import RobotApiError, RobotClient
 
+log = logging.getLogger(__name__)
+
 _BACKOFF_FIRST_S = 0.1
 _RATE_WINDOW = 20
+#: 마지막 표본이 이보다 오래됐으면 주기는 0 이다. 10 Hz 스트림에서 5 프레임 분량.
+_RATE_STALE_S = 0.5
 
 
 @dataclass
@@ -33,10 +38,12 @@ class RelayStats:
     #: 리더 소켓이 마지막으로 **거부**된 이유 (4401/4403 → RobotApiError 문자열). 재연결은
     #: 계속하지만, "0 Hz 가 영원히" 인 화면에 이유가 붙어야 한다. 프레임이 오면 None 으로 돈다.
     leader_last_error: Optional[str] = None
+    leader_age_s: Optional[float] = None
     paused: bool = False
     follower_tx: dict[str, int] = field(default_factory=dict)
     follower_tx_hz: dict[str, float] = field(default_factory=dict)
     follower_connected: dict[str, bool] = field(default_factory=dict)
+    follower_last_error: dict[str, Optional[str]] = field(default_factory=dict)
 
 
 class _Rate:
@@ -47,8 +54,17 @@ class _Rate:
     def tick(self) -> None:
         self._stamps.append(self._clock())
 
+    def age_s(self) -> Optional[float]:
+        """마지막 표본 이후 흐른 시간. 표본이 없으면 None."""
+        if not self._stamps:
+            return None
+        return self._clock() - self._stamps[-1]
+
     def hz(self) -> float:
+        """최근 창의 주기. 표본이 멎으면 0 으로 떨어진다 — 멎은 스트림이 살아 보이면 안 된다."""
         if len(self._stamps) < 2:
+            return 0.0
+        if self._clock() - self._stamps[-1] > _RATE_STALE_S:
             return 0.0
         span = self._stamps[-1] - self._stamps[0]
         return (len(self._stamps) - 1) / span if span > 0 else 0.0
@@ -65,6 +81,7 @@ class _Lane:
         self.tx = 0
         self.rate = _Rate(clock)
         self.sink = None
+        self.last_error: Optional[str] = None
 
 
 class Relay:
@@ -72,6 +89,11 @@ class Relay:
                  clock: Callable[[], float] = time.monotonic,
                  reconnect_max_s: float = 2.0,
                  sleep: Callable[[float], Awaitable[None]] = asyncio.sleep) -> None:
+        follower_ids = [f.robot_id for f in followers]
+        if len(set(follower_ids)) != len(follower_ids):
+            raise ValueError(f"duplicate robot_id among followers: {follower_ids}")
+        if leader.robot_id in follower_ids:
+            raise ValueError(f"leader {leader.robot_id!r} cannot also be a follower")
         self._leader = leader
         self._lanes = {f.robot_id: _Lane(f, clock) for f in followers}
         self._clock = clock
@@ -89,6 +111,8 @@ class Relay:
     # --- 수명 --------------------------------------------------------------------
 
     async def start(self) -> None:
+        if self._running:
+            return
         self._running = True
         self._tasks.append(asyncio.create_task(self._read_leader()))
         for lane in self._lanes.values():
@@ -101,8 +125,10 @@ class Relay:
         for task in self._tasks:
             try:
                 await task
-            except (asyncio.CancelledError, Exception):
+            except asyncio.CancelledError:
                 pass
+            except Exception as exc:
+                log.error("relay task died: %r", exc)
         self._tasks.clear()
         for lane in self._lanes.values():
             if lane.sink is not None:
@@ -114,6 +140,8 @@ class Relay:
             lane.connected = False
 
     def pause(self) -> None:
+        # 이미 sink.send 안에 들어간 프레임은 되돌릴 수 없다 — pause 뒤에도 최대 한 프레임은
+        # 나갈 수 있다. 여기서 지우는 것은 아직 보내지 않은, 큐에 있는 최신 프레임뿐이다.
         self._paused = True
         for lane in self._lanes.values():
             lane.latest = None   # 멈추기 전 프레임이 resume 뒤에 나가면 안 된다
@@ -135,10 +163,12 @@ class Relay:
             leader_dropped=self._leader_dropped,
             leader_rx_hz=self._leader_rate.hz(),
             leader_last_error=self._leader_last_error,
+            leader_age_s=self._leader_rate.age_s(),
             paused=self._paused,
             follower_tx={rid: lane.tx for rid, lane in self._lanes.items()},
             follower_tx_hz={rid: lane.rate.hz() for rid, lane in self._lanes.items()},
             follower_connected={rid: lane.connected for rid, lane in self._lanes.items()},
+            follower_last_error={rid: lane.last_error for rid, lane in self._lanes.items()},
         )
 
     # --- 리더 --------------------------------------------------------------------
@@ -146,10 +176,8 @@ class Relay:
     async def _read_leader(self) -> None:
         backoff = _BACKOFF_FIRST_S
         while self._running:
-            got_any = False
             try:
                 async for frame in self._leader.pose_stream():
-                    got_any = True
                     backoff = _BACKOFF_FIRST_S
                     self._leader_last_error = None
                     self._on_frame(frame)
@@ -159,12 +187,16 @@ class Relay:
                 # 4401/4403: 토큰이나 capability 문제다. 재연결은 계속하되 이유를 남긴다 —
                 # 조용히 0 Hz 로 도는 것이 이 릴레이의 가장 나쁜 실패다.
                 self._leader_last_error = str(exc)
-            except Exception:
-                pass
+                log.warning("%s: leader socket refused: %s", self._leader.robot_id, exc)
+            except Exception as exc:
+                log.warning("%s: leader socket failed: %s", self._leader.robot_id, exc)
+            # 연결(성공이든 거절이든)이 끝났다 — 시퀀스 이어붙임은 한 연결 안에서만 유효
+            # 하다. 끊긴 동안의 간격을 드롭으로 세면 안 되므로 여기서 리셋한다.
+            self._last_seq = None
             if not self._running:
                 return
             # 소켓이 끝났다. 합성하지 않고 다시 연다.
-            await self._sleep(backoff if not got_any else _BACKOFF_FIRST_S)
+            await self._sleep(backoff)
             backoff = min(backoff * 2, self._reconnect_max)
 
     def _on_frame(self, frame: str) -> None:
@@ -190,13 +222,22 @@ class Relay:
                 lane.sink = await lane.robot.open_reference_sink()
             except asyncio.CancelledError:
                 raise
-            except Exception:
+            except RobotApiError as exc:
+                # 거부(핸드셰이크 403, 4401/4403): 토큰이나 역할 문제다. 재연결은 계속하되
+                # 이유를 남긴다 — 리더와 같은 규칙이다.
                 lane.connected = False
+                lane.last_error = str(exc)
+                log.warning("%s: reference socket refused: %s", lane.robot.robot_id, exc)
+                await self._sleep(backoff)
+                backoff = min(backoff * 2, self._reconnect_max)
+                continue
+            except Exception as exc:
+                lane.connected = False
+                log.warning("%s: reference socket open failed: %s", lane.robot.robot_id, exc)
                 await self._sleep(backoff)
                 backoff = min(backoff * 2, self._reconnect_max)
                 continue
             lane.connected = True
-            backoff = _BACKOFF_FIRST_S
             try:
                 while self._running:
                     await lane.wake.wait()
@@ -207,22 +248,32 @@ class Relay:
                     await lane.sink.send(frame)
                     lane.tx += 1
                     lane.rate.tick()
+                    lane.last_error = None
+                    backoff = _BACKOFF_FIRST_S   # 실제로 보냈을 때만 초기화한다
             except asyncio.CancelledError:
                 raise
-            except Exception:
+            except Exception as exc:
                 lane.connected = False
+                log.warning("%s: reference socket send failed: %s", lane.robot.robot_id, exc)
                 try:
                     await lane.sink.close()
                 except Exception:
                     pass
                 lane.sink = None
                 await self._sleep(backoff)
+                backoff = min(backoff * 2, self._reconnect_max)
 
 
 def _seq_of(frame: str) -> Optional[int]:
     try:
         payload = json.loads(frame).get("payload") or {}
         seq = payload.get("seq")
-        return int(seq) if isinstance(seq, int) else None
+        if isinstance(seq, bool):
+            return None
+        if isinstance(seq, int):
+            return seq
+        if isinstance(seq, float) and seq.is_integer():
+            return int(seq)
+        return None
     except (TypeError, ValueError, AttributeError):
         return None

@@ -91,6 +91,12 @@ def write_robots(path: Path, robots: list[RobotEndpoint]) -> None:
     fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(text)
+    # O_CREAT 의 mode 는 파일이 이미 있으면 무시된다 — 예전에 0644 였던 파일은 그대로
+    # 세상에 읽힌다. 매번 다시 조인다. Windows 는 chmod 를 무시하므로 실패해도 조용히 넘어간다.
+    try:
+        os.chmod(target, 0o600)
+    except OSError:
+        pass
 
 
 def ws_url(base_url: str, path: str, token: str, **query: str) -> str:

@@ -1702,7 +1702,7 @@ def _seq_of(frame: str) -> Optional[int]:
 - [ ] **Step 4: 실행해서 통과 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_relay.py -v`
-Expected: PASS (8 passed)
+Expected: PASS (전부 — 리뷰 후 추가된 테스트 포함)
 
 `test_a_slow_follower_gets_the_latest_frame_not_the_backlog` 가 흔들리면 `settle()`
 회전 수를 늘린다. 시간 기반 대기는 쓰지 않는다.

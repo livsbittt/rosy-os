@@ -10,6 +10,7 @@ import asyncio
 from typing import AsyncIterator, Optional, Sequence
 
 from rosy_core.protocol.schemas import SwarmFollowParams
+from rosy_fleet.swarm.relay import RelayStats
 from rosy_fleet.swarm.transport import RobotApiError
 
 END = None
@@ -17,6 +18,21 @@ END = None
 
 def run(coro):
     return asyncio.run(coro)
+
+
+class FakeClock:
+    """단조 시계 대역. `advance()` 로 시간을 흘려보낸다 — 벽시계 sleep 은 쓰지 않는다."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, s: float) -> None:
+        # round() 는 반복적인 0.1 더하기가 뜬셈 오차를 쌓아 age_s 비교를 미세하게
+        # 어긋나게 하는 것을 막는다 — 실제 시계라면 없는, 가짜 시계만의 문제다.
+        self.now = round(self.now + s, 9)
 
 
 async def settle(rounds: int = 20) -> None:
@@ -66,6 +82,8 @@ class FakeRobot:
         self.event_opens = 0
         #: 설정돼 있으면 pose_stream 이 열리자마자 이것을 raise 한다 (4401/4403 거부 흉내).
         self.pose_error = None
+        #: 설정돼 있으면 open_reference_sink 가 이것을 한 번 raise 한다 (거부된 소켓 흉내).
+        self.sink_error = None
 
     def _record(self, *call) -> None:
         self.calls.append(call)
@@ -113,6 +131,9 @@ class FakeRobot:
             yield frame
 
     async def open_reference_sink(self) -> FakeSink:
+        if self.sink_error is not None:
+            err, self.sink_error = self.sink_error, None
+            raise err
         if self.sink_failures > 0:
             self.sink_failures -= 1
             raise ConnectionError("cannot open reference socket")
@@ -135,13 +156,16 @@ class FakeRobot:
 class FakeRelay:
     """세션 테스트용. 실제 소켓 대신 호출 순서만 남긴다."""
 
-    def __init__(self, leader, followers, *, log: Optional[list] = None, **_) -> None:
+    def __init__(self, leader, followers, *, log: Optional[list] = None) -> None:
         self.leader = leader
         self.followers = list(followers)
         self.log = log if log is not None else []
         self.paused = False
         self.started = False
         self.stopped = False
+
+    def stats(self) -> RelayStats:
+        return RelayStats(paused=self.paused)
 
     async def start(self) -> None:
         self.started = True
