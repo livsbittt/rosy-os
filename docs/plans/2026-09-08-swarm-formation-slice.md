@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.12, pydantic(`rosy_core.protocol.schemas` 재사용), httpx 0.28, websockets ≥ 13 (전송이 `InvalidStatus` 와 두 인자 `process_request(connection, request)` 에 의존한다 — 개발 환경은 17), PyYAML, asyncio, pytest(비동기는 `asyncio.run` 헬퍼로, pytest-asyncio 없음), ament_python, ROS 2 Jazzy launch (`gz_multi`).
 
-**Branch:** `feat/swarm-formation-slice` (main 기반). 커밋 메시지는 이 저장소의 관례대로 `type(scope): 무엇을 왜` 한 줄 + 본문, 끝에 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+**Branch:** `feat/swarm-formation-slice` (main 기반). **진행 (2026-09-09):** Task 1~13, 15(문서·인덱스) 완료, 호스트 테스트 통과. Task 12 Step 4·5(ROS 런타임 관문), Task 14(시뮬 계측), Task 15 의 D-35 등록은 ROS/Gazebo 머신에서 해야 하며 아직 실행되지 않았다 — `2026-09-08-swarm-formation-slice-results.md` 참고. 커밋 메시지는 이 저장소의 관례대로 `type(scope): 무엇을 왜` 한 줄 + 본문, 끝에 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
 
 **Windows 에서 실행:** 이 계획의 단위 테스트는 전부 ROS 없이 돈다. 명령은 저장소 루트에서 `python -m pytest src/rosy_fleet/test -v` 형태다. Task 12(런치 테스트)와 Task 14(시뮬 계측)만 ROS 환경이 필요하다.
 
@@ -25,7 +25,9 @@
 | `src/rosy_fleet/rosy_fleet/swarm/robots.py` | `RobotEndpoint`, `load_robots()`, `write_robots()`, `ws_url()` |
 | `src/rosy_fleet/rosy_fleet/swarm/transport.py` | `RobotClient` 프로토콜, `RobotApiError`, `HttpRobotClient`(httpx + websockets) |
 | `src/rosy_fleet/rosy_fleet/swarm/relay.py` | `Relay`, `RelayStats`: 리더 소켓 1 → 팔로워 소켓 N, pause/resume, 계측 |
-| `src/rosy_fleet/rosy_fleet/swarm/session.py` | `FormationSession`, `FormationSpec`, `HoldPolicy`, `SessionState`, FOR-004 |
+| `src/rosy_fleet/rosy_fleet/swarm/arming.py` | `FormationSpec`, `SessionError` 계열, 순수 사전검사·배정 계획 (`plan_assignment`) — 릴레이를 만지기 전에 끝난다. Task 12 리뷰의 추출 |
+| `src/rosy_fleet/AGENTS.md` | 패키지 인덱스 (Task 15) |
+| `src/rosy_fleet/rosy_fleet/swarm/session.py` | `FormationSession`, `HoldPolicy`, `SessionState`, FOR-004 (`FormationSpec` 와 예외 계열은 `arming.py` 에서 재수출) |
 | `src/rosy_fleet/rosy_fleet/cli.py` | `rosy_fleet relay` / `rosy_fleet formation` |
 | `src/rosy_fleet/test/conftest.py` | `src/rosy_core` 를 sys.path 에 얹어 colcon 없이 스키마 import |
 | `src/rosy_fleet/test/fakes.py` | `FakeRobot`, `FakeSink`, `FakeRelay`, `run()` 헬퍼 — 릴레이·세션 테스트가 공유 |
@@ -51,7 +53,7 @@
 - Create: `src/rosy_fleet/test/conftest.py`
 - Create: `src/rosy_fleet/test/test_package.py`
 
-- [ ] **Step 1: 실패하는 테스트 — 패키지가 import 되고 `rosy_core` 스키마에 닿는다**
+- [x] **Step 1: 실패하는 테스트 — 패키지가 import 되고 `rosy_core` 스키마에 닿는다**
 
 `src/rosy_fleet/test/test_package.py`:
 
@@ -67,12 +69,12 @@ def test_package_imports_and_reaches_rosy_core_schemas():
     assert SwarmFollowParams(target_robot_id="rosy_01").distance == 0.5
 ```
 
-- [ ] **Step 2: 실행해서 실패 확인**
+- [x] **Step 2: 실행해서 실패 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_package.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'rosy_fleet'`
 
-- [ ] **Step 3: conftest — colcon 없이 두 패키지를 sys.path 에 얹는다**
+- [x] **Step 3: conftest — colcon 없이 두 패키지를 sys.path 에 얹는다**
 
 `src/rosy_fleet/test/conftest.py`:
 
@@ -97,7 +99,7 @@ for path in (SRC / "rosy_fleet", SRC / "rosy_core"):
         sys.path.insert(0, entry)
 ```
 
-- [ ] **Step 4: 패키지 파일들**
+- [x] **Step 4: 패키지 파일들**
 
 `src/rosy_fleet/rosy_fleet/__init__.py`:
 
@@ -181,12 +183,12 @@ script_dir=$base/lib/rosy_fleet
 install_scripts=$base/lib/rosy_fleet
 ```
 
-- [ ] **Step 5: 실행해서 통과 확인**
+- [x] **Step 5: 실행해서 통과 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_package.py -v`
 Expected: PASS (1 passed)
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add src/rosy_fleet
@@ -203,7 +205,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Create: `src/rosy_fleet/rosy_fleet/formation/geometry.py`
 - Create: `src/rosy_fleet/test/test_geometry.py`
 
-- [ ] **Step 1: 실패하는 테스트 — 6종 대형의 손계산 값**
+- [x] **Step 1: 실패하는 테스트 — 6종 대형의 손계산 값**
 
 `src/rosy_fleet/test/test_geometry.py`:
 
@@ -297,12 +299,12 @@ def test_slot_world_position_matches_follow_goal_convention():
     assert math.isclose(left[0], 0.0, abs_tol=1e-9) and math.isclose(left[1], 2.0, abs_tol=1e-9)
 ```
 
-- [ ] **Step 2: 실행해서 실패 확인**
+- [x] **Step 2: 실행해서 실패 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_geometry.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'rosy_fleet.formation.geometry'`
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 `src/rosy_fleet/rosy_fleet/formation/geometry.py`:
 
@@ -434,12 +436,12 @@ def slot_world_position(offset: SlotOffset, x: float, y: float, yaw: float) -> P
     )
 ```
 
-- [ ] **Step 4: 실행해서 통과 확인**
+- [x] **Step 4: 실행해서 통과 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_geometry.py -v`
 Expected: PASS (15 passed)
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/rosy_fleet/rosy_fleet/formation/geometry.py src/rosy_fleet/test/test_geometry.py
@@ -456,7 +458,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Create: `src/rosy_fleet/rosy_fleet/formation/assignment.py`
 - Create: `src/rosy_fleet/test/test_assignment.py`
 
-- [ ] **Step 1: 실패하는 테스트**
+- [x] **Step 1: 실패하는 테스트**
 
 `src/rosy_fleet/test/test_assignment.py`:
 
@@ -510,12 +512,12 @@ def test_robot_and_slot_counts_must_match():
         GreedyDistanceAssigner().assign({"a": (0.0, 0.0)}, [(0.0, 1.0), (1.0, 1.0)])
 ```
 
-- [ ] **Step 2: 실행해서 실패 확인**
+- [x] **Step 2: 실행해서 실패 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_assignment.py -v`
 Expected: FAIL — `ModuleNotFoundError`
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 `src/rosy_fleet/rosy_fleet/formation/assignment.py`:
 
@@ -574,12 +576,12 @@ class GreedyDistanceAssigner:
         return out
 ```
 
-- [ ] **Step 4: 실행해서 통과 확인**
+- [x] **Step 4: 실행해서 통과 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_assignment.py -v`
 Expected: PASS (6 passed)
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/rosy_fleet/rosy_fleet/formation/assignment.py src/rosy_fleet/test/test_assignment.py
@@ -603,7 +605,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Create: `src/rosy_fleet/rosy_fleet/swarm/robots.py`
 - Create: `src/rosy_fleet/test/test_robots.py`
 
-- [ ] **Step 1: 실패하는 테스트**
+- [x] **Step 1: 실패하는 테스트**
 
 `src/rosy_fleet/test/test_robots.py`:
 
@@ -667,12 +669,12 @@ def test_ws_url_appends_extra_query():
     assert got == "ws://h:1/ws/events?token=t&types=nav.%2A%2Cswarm.%2A"
 ```
 
-- [ ] **Step 2: 실행해서 실패 확인**
+- [x] **Step 2: 실행해서 실패 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_robots.py -v`
 Expected: FAIL — `ModuleNotFoundError`
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 `src/rosy_fleet/rosy_fleet/swarm/robots.py`:
 
@@ -743,12 +745,12 @@ def ws_url(base_url: str, path: str, token: str, **query: str) -> str:
     return f"{ws_scheme}://{host}{path}?{urlencode(params)}"
 ```
 
-- [ ] **Step 4: 실행해서 통과 확인**
+- [x] **Step 4: 실행해서 통과 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_robots.py -v`
 Expected: PASS (리뷰 후 추가된 테스트를 포함해 전부)
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/rosy_fleet/rosy_fleet/swarm/robots.py src/rosy_fleet/test/test_robots.py
@@ -779,7 +781,7 @@ REST 는 httpx `MockTransport` 로 검증한다. WS 는 `websockets` 를 실제�
 URL 조립과 프레임 변환만 검증한다 — 소켓 위의 동작(재연결, pause)은 Task 6/7 이
 가짜 클라이언트로 검증한다.
 
-- [ ] **Step 1: 실패하는 테스트**
+- [x] **Step 1: 실패하는 테스트**
 
 `src/rosy_fleet/test/test_transport.py`:
 
@@ -893,12 +895,12 @@ def test_socket_urls_point_at_the_robot():
     assert c.events_url(["nav.*", "swarm.*"]) == "ws://robot:8080/ws/events?token=op-token&types=nav.%2A%2Cswarm.%2A"
 ```
 
-- [ ] **Step 2: 실행해서 실패 확인**
+- [x] **Step 2: 실행해서 실패 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_transport.py -v`
 Expected: FAIL — `ModuleNotFoundError`
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 `src/rosy_fleet/rosy_fleet/swarm/transport.py`:
 
@@ -1057,12 +1059,12 @@ class HttpRobotClient:
             return
 ```
 
-- [ ] **Step 4: 실행해서 통과 확인**
+- [x] **Step 4: 실행해서 통과 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_transport.py -v`
 Expected: PASS (10 passed)
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/rosy_fleet/rosy_fleet/swarm/transport.py src/rosy_fleet/test/test_transport.py
@@ -1082,7 +1084,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 스트림은 `asyncio.Queue` 로 바깥에서 밀어 넣는다. 큐에 `None` 을 넣으면 그 스트림은
 끝난다(소켓 단절을 흉내낸다).
 
-- [ ] **Step 1: 가짜 작성**
+- [x] **Step 1: 가짜 작성**
 
 `src/rosy_fleet/test/fakes.py`:
 
@@ -1252,12 +1254,12 @@ class FakeRelay:
         return True
 ```
 
-- [ ] **Step 2: import 만 확인**
+- [x] **Step 2: import 만 확인**
 
 Run: `python -c "import sys; sys.path[:0]=['src/rosy_fleet','src/rosy_core','src/rosy_fleet/test']; import fakes; print('ok')"`
 Expected: `ok`
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add src/rosy_fleet/test/fakes.py
@@ -1274,7 +1276,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Create: `src/rosy_fleet/rosy_fleet/swarm/relay.py`
 - Create: `src/rosy_fleet/test/test_relay.py`
 
-- [ ] **Step 1: 실패하는 테스트**
+- [x] **Step 1: 실패하는 테스트**
 
 `src/rosy_fleet/test/test_relay.py`:
 
@@ -1461,12 +1463,12 @@ def test_stop_closes_the_sinks():
     run(main())
 ```
 
-- [ ] **Step 2: 실행해서 실패 확인**
+- [x] **Step 2: 실행해서 실패 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_relay.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'rosy_fleet.swarm.relay'`
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 `src/rosy_fleet/rosy_fleet/swarm/relay.py`:
 
@@ -1701,7 +1703,7 @@ def _seq_of(frame: str) -> Optional[int]:
         return None
 ```
 
-- [ ] **Step 4: 실행해서 통과 확인**
+- [x] **Step 4: 실행해서 통과 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_relay.py -v`
 Expected: PASS (전부 — 리뷰 후 추가된 테스트 포함)
@@ -1709,7 +1711,7 @@ Expected: PASS (전부 — 리뷰 후 추가된 테스트 포함)
 `test_a_slow_follower_gets_the_latest_frame_not_the_backlog` 가 흔들리면 `settle()`
 회전 수를 늘린다. 시간 기반 대기는 쓰지 않는다.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/rosy_fleet/rosy_fleet/swarm/relay.py src/rosy_fleet/test/test_relay.py
@@ -1733,7 +1735,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Create: `src/rosy_fleet/rosy_fleet/swarm/session.py`
 - Create: `src/rosy_fleet/test/test_session.py`
 
-- [ ] **Step 1: 실패하는 테스트**
+- [x] **Step 1: 실패하는 테스트**
 
 `src/rosy_fleet/test/test_session.py`:
 
@@ -1999,12 +2001,12 @@ def test_an_events_socket_that_drops_is_reopened_and_a_follower_found_inactive_i
     run(main())
 ```
 
-- [ ] **Step 2: 실행해서 실패 확인**
+- [x] **Step 2: 실행해서 실패 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_session.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'rosy_fleet.swarm.session'`
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 `src/rosy_fleet/rosy_fleet/swarm/session.py`:
 
@@ -2296,7 +2298,7 @@ class FormationSession:
             log.warning("%s: navigation/cancel failed: %s", self._leader.robot_id, exc)
 ```
 
-- [ ] **Step 4: 실행해서 통과 확인**
+- [x] **Step 4: 실행해서 통과 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_session.py -v`
 Expected: PASS (전부 — parametrize 포함 18개 이상)
@@ -2305,7 +2307,7 @@ Expected: PASS (전부 — parametrize 포함 18개 이상)
 실패하면 FakeRobot 의 `_record` 가 `(robot_id, "navigation_cancel")` 을 남기는지 본다 —
 Task 6 의 가짜가 그렇게 기록한다.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/rosy_fleet/rosy_fleet/swarm/session.py src/rosy_fleet/test/test_session.py
@@ -2321,7 +2323,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 **Files:**
 - Create: `src/rosy_fleet/test/test_boundaries.py`
 
-- [ ] **Step 1: 테스트 작성 (바로 통과해야 한다 — 회귀 방지용)**
+- [x] **Step 1: 테스트 작성 (바로 통과해야 한다 — 회귀 방지용)**
 
 `src/rosy_fleet/test/test_boundaries.py`:
 
@@ -2356,12 +2358,12 @@ def test_formation_modules_import_no_transport(module):
         assert not name.startswith(FORBIDDEN), f"{module} imports {name}"
 ```
 
-- [ ] **Step 2: 실행해서 통과 확인**
+- [x] **Step 2: 실행해서 통과 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_boundaries.py -v`
 Expected: PASS (3 passed — `__init__.py`, `assignment.py`, `geometry.py`)
 
-- [ ] **Step 3: 전체 실행**
+- [x] **Step 3: 전체 실행**
 
 Run: `python -m pytest src/rosy_fleet/test -v`
 Expected: 전부 PASS. flake8 도 확인한다:
@@ -2369,7 +2371,7 @@ Expected: 전부 PASS. flake8 도 확인한다:
 Run: `python -m flake8 src/rosy_fleet/rosy_fleet --max-line-length=120`
 Expected: 출력 없음. (flake8 이 없으면 `pip install flake8`.)
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add src/rosy_fleet/test/test_boundaries.py
@@ -2389,7 +2391,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 CLI 는 얇다. 테스트는 인자 파싱과 `robots.yaml` → 리더/팔로워 분리, stdin 명령 한
 줄 → 세션 메서드 매핑만 본다. 실제 소켓은 열지 않는다.
 
-- [ ] **Step 1: 실패하는 테스트**
+- [x] **Step 1: 실패하는 테스트**
 
 `src/rosy_fleet/test/test_cli.py`:
 
@@ -2478,12 +2480,12 @@ def test_a_bad_console_command_does_not_end_the_session():
     assert run(cli.handle_command("dance", Recorder(), base)) is True
 ```
 
-- [ ] **Step 2: 실행해서 실패 확인**
+- [x] **Step 2: 실행해서 실패 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_cli.py -v`
 Expected: FAIL — `ImportError: cannot import name 'cli'`
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 `src/rosy_fleet/rosy_fleet/cli.py`:
 
@@ -2668,7 +2670,7 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 4: 실행해서 통과 확인**
+- [x] **Step 4: 실행해서 통과 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/test_cli.py -v`
 Expected: PASS (5 passed)
@@ -2676,7 +2678,7 @@ Expected: PASS (5 passed)
 Run: `python -m flake8 src/rosy_fleet/rosy_fleet --max-line-length=120`
 Expected: 출력 없음.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/rosy_fleet/rosy_fleet/cli.py src/rosy_fleet/test/test_cli.py
@@ -2692,7 +2694,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 **Files:**
 - Modify: `.github/workflows/ci.yml` (Lint 스텝과 `Test (rosy_core protocol schemas, P1-19)` 스텝 사이)
 
-- [ ] **Step 1: Lint 대상에 `rosy_fleet` 추가**
+- [x] **Step 1: Lint 대상에 `rosy_fleet` 추가**
 
 `.github/workflows/ci.yml` 의 Lint 스텝을 이렇게 바꾼다:
 
@@ -2703,7 +2705,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
           flake8 rosy_core/rosy_core rosy_fleet/rosy_fleet rosy_gz_sim/launch --count --max-line-length=120 --show-source --statistics || true
 ```
 
-- [ ] **Step 2: 테스트 스텝 추가**
+- [x] **Step 2: 테스트 스텝 추가**
 
 `Test (rosy_core protocol schemas, P1-19)` 스텝 바로 뒤에 넣는다:
 
@@ -2714,12 +2716,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
         run: python3 -m pytest src/rosy_fleet/test/ -v
 ```
 
-- [ ] **Step 3: 로컬에서 같은 명령으로 확인**
+- [x] **Step 3: 로컬에서 같은 명령으로 확인**
 
 Run: `python -m pytest src/rosy_fleet/test/ -v`
 Expected: 전부 PASS.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add .github/workflows/ci.yml
@@ -2732,6 +2734,13 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Task 12: `gz_multi.launch.py core:=true` — 로봇별 `rosy_core` 와 `robots.yaml`
 
+> **리뷰 후 갱신 (2026-09-09):** 이 태스크의 품질 리뷰가 세션 쪽에서 잡은 것 — 잘못된 대형 스펙으로 `reform` 하면
+> `FormationError` 가 `except SessionError` 를 지나쳐 릴레이만 멈춘 채 RUNNING 으로 남음, 리더 e-stop 뒤의 reform 이
+> 멀쩡한 대형을 종료시킴, 사전 `state()` 의 네트워크 오류가 콘솔을 죽임, stdin 스레드가 종료를 막음 — 은
+> `swarm/arming.py` 추출(순수 사전검사가 `relay.pause()` 앞에서 끝난다)과 그 다음 fix 커밋들로 고쳤다. 런치 자체는
+> `Node(namespace=ns)` 를 쓰고(`PushRosNamespace` 와 동치), `robots.yaml` 을 0600 으로 쓰며 `api_host` 는 127.0.0.1 이다.
+
+
 **Files:**
 - Modify: `src/rosy_gz_sim/launch/gz_multi.launch.py`
 - Create: `src/rosy_gz_sim/test/test_gz_multi_core.py`
@@ -2739,7 +2748,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 이 태스크는 ROS 환경(Linux/WSL, `source env.sh`, `colcon build`)이 필요하다. 테스트는
 `launch` 가 없으면 skip 한다.
 
-- [ ] **Step 1: 실패하는 테스트 — 순수 헬퍼 두 개와 `OpaqueFunction` 단위 실행**
+- [x] **Step 1: 실패하는 테스트 — 순수 헬퍼 두 개와 `OpaqueFunction` 단위 실행**
 
 `src/rosy_gz_sim/test/test_gz_multi_core.py`:
 
@@ -2848,14 +2857,14 @@ def test_core_false_adds_no_rosy_core():
     assert not _core_nodes(actions, context)
 ```
 
-- [ ] **Step 2: 실행해서 실패 확인 (ROS 환경)**
+- [x] **Step 2: 실행해서 실패 확인 (ROS 환경)**
 
 Run: `source env.sh && python3 -m pytest src/rosy_gz_sim/test/test_gz_multi_core.py -v`
 Expected: FAIL — `AttributeError: module 'gz_multi_launch' has no attribute '_core_config'`
 
 Windows 에서는 `SKIPPED (could not import 'launch')` 가 정상이다.
 
-- [ ] **Step 3: 런치 수정 — 헬퍼 두 개, 인자 두 개, 로봇별 노드**
+- [x] **Step 3: 런치 수정 — 헬퍼 두 개, 인자 두 개, 로봇별 노드**
 
 `src/rosy_gz_sim/launch/gz_multi.launch.py` 를 다음과 같이 고친다.
 
@@ -2988,7 +2997,7 @@ Expected: 두 로봇의 토픽, TF 조회 성공, 두 포트에서 각각 `"robo
 (`POST /api/v1/localization/initialpose` 로 스폰 좌표를 넣는다: 로봇 i 는
 `x = (i-1) * spawn_spacing, y = 0, yaw = 0`). 발견한 것은 실행 계획서 §결과 에 적는다.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add src/rosy_gz_sim/launch/gz_multi.launch.py src/rosy_gz_sim/test/test_gz_multi_core.py
@@ -3008,7 +3017,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 스크립트는 `rosy_fleet` 만 쓴다 — rclpy 없음. stuck 주입만 `gz service` 서브프로세스다.
 
-- [ ] **Step 1: 스크립트 작성**
+- [x] **Step 1: 스크립트 작성**
 
 `src/rosy_gz_sim/scripts/swarm_bench.py`:
 
@@ -3181,7 +3190,7 @@ if __name__ == "__main__":
     sys.exit(main())
 ```
 
-- [ ] **Step 2: CMake 설치와 의존 선언**
+- [x] **Step 2: CMake 설치와 의존 선언**
 
 `src/rosy_gz_sim/CMakeLists.txt` 의 `install(DIRECTORY ...)` 블록 **앞**에:
 
@@ -3200,7 +3209,7 @@ install(
   <exec_depend>rosy_fleet</exec_depend>
 ```
 
-- [ ] **Step 3: 파싱만 로컬 확인 (Windows 가능)**
+- [x] **Step 3: 파싱만 로컬 확인 (Windows 가능)**
 
 Run: `python -c "import sys; sys.path[:0]=['src/rosy_fleet','src/rosy_core']; sys.argv=['x','--robots','r.yaml','--scenario','stuck']; import importlib.util as u; s=u.spec_from_file_location('b','src/rosy_gz_sim/scripts/swarm_bench.py'); m=u.module_from_spec(s); s.loader.exec_module(m); a=m.parse_args(); print(a.scenario, m._parse_waypoints(a.waypoints)[1])"`
 Expected: `stuck (1.5, 1.0, 1.57)`
@@ -3208,7 +3217,7 @@ Expected: `stuck (1.5, 1.0, 1.57)`
 Run: `python -m flake8 src/rosy_gz_sim/scripts --max-line-length=120`
 Expected: 출력 없음.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add src/rosy_gz_sim/scripts/swarm_bench.py src/rosy_gz_sim/CMakeLists.txt src/rosy_gz_sim/package.xml
@@ -3319,7 +3328,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Modify: `docs/plans/AGENTS.md` (Task 14 에서 행을 넣었으면 확인만)
 - Modify (조건부): `docs/reference/ROSY ADR Log.md` — Task 14 결과가 HOLD ≤ 1 s 를 보였을 때만
 
-- [ ] **Step 0: 패키지 인덱스** — Task 1 리뷰가 잡은 누락. 워크스페이스의 다른 11개 패키지는
+- [x] **Step 0: 패키지 인덱스** — Task 1 리뷰가 잡은 누락. 워크스페이스의 다른 11개 패키지는
   전부 `AGENTS.md` 를 갖고 `src/AGENTS.md` 표에 올라 있다. 패키지 내용이 다 갖춰진 지금 쓴다.
 
 `src/rosy_fleet/AGENTS.md` — `src/rosy_core/AGENTS.md` 와 같은 골격(Purpose / Key Files /
@@ -3336,7 +3345,7 @@ Testing: `python -m pytest src/rosy_fleet/test -v` (ROS 불필요).
 | `rosy_fleet/` | Fleet seed: formation geometry, slot assignment, reference-stream relay, FOR-004 session, CLI (see `rosy_fleet/AGENTS.md`) |
 ```
 
-- [ ] **Step 1: 전체 호스트 테스트**
+- [x] **Step 1: 전체 호스트 테스트**
 
 Run: `python -m pytest src/rosy_fleet/test src/rosy_core/test -q`
 Expected: 전부 PASS. `rosy_core` 테스트에 변화가 없어야 한다 — 이 슬라이스는 로봇 쪽을 건드리지 않았다.

@@ -4,7 +4,7 @@
 환경: 미실행 — 아래 노트 참고.
 
 2026-09-09: 이 세션은 Windows 개발 환경이라 ROS 2 Jazzy·Gazebo 가 없다. Task 1~13 의
-코드와 호스트 테스트(188 passed)는 끝났고, Task 12 Step 5 의 선행 관문
+코드와 호스트 테스트(`python -m pytest src/rosy_fleet/test -q`, 2026-09-09 기준 190개 이상 통과 — 정확한 수는 실행 시점의 것을 쓴다)는 끝났고, Task 12 Step 5 의 선행 관문
 (`gz_multi robots:=2 mode:=nav core:=true` 런타임 확인)과 Task 14 의 네 시나리오는
 **실행되지 않았다**. 아래 표의 빈 칸은 측정 전이라 비어 있다 — 측정하지 못한 것을
 깨끗한 결과로 적지 않는다

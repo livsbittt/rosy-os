@@ -427,7 +427,7 @@ http://127.0.0.1:808(i−1)`, 토큰은 기본 설정의 `rosy-dev-operator`. CL
 
 #### 8.2 `swarm_bench.py`
 
-`dock_sweep.py` 와 같은 자리, 같은 구조다. 리더에 `POST /navigation/goal` 로
+`rosy_gz_sim/scripts/` 의 계측 스크립트 자리다 (도킹 측정 리그 브랜치의 `dock_sweep.py` 와 같은 자리·구조 — 그 파일은 아직 main 에 없다). 리더에 `POST /navigation/goal` 로
 waypoint 를 순서대로 걸고(다음 목표는 `nav.completed` 이벤트로), 1 s 마다 팔로워
 전원의 `GET /swarm/state`(`holding`, `stream_age_s`)와 `GET /robot/state` pose 를
 읽어, 그 시각 리더 pose 로 계산한 슬롯 월드 좌표와의 거리 오차를 CSV 한 줄로
