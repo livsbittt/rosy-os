@@ -12,10 +12,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import contextlib
 import os
 import stat
 import sys
+import threading
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -58,11 +58,14 @@ def split_robots(args: argparse.Namespace) -> tuple[RobotEndpoint, list[RobotEnd
 
 
 def _warn_if_world_readable(path: Path) -> None:
+    # 그룹도 본다. robots.yaml 은 운영자 토큰이고, 공유 워크스테이션에서 group-readable
+    # 은 world-readable 과 실질적으로 같은 노출이다 (dialout/docker 같은 그룹).
     if os.name == "nt":
         return
     try:
-        if Path(path).stat().st_mode & stat.S_IROTH:
-            print(f"warning: {path} is world-readable and holds operator tokens", file=sys.stderr)
+        if Path(path).stat().st_mode & (stat.S_IROTH | stat.S_IRGRP):
+            print(f"warning: {path} is readable beyond its owner and holds operator tokens",
+                  file=sys.stderr)
     except OSError:
         pass
 
@@ -77,10 +80,8 @@ def policy_from(args: argparse.Namespace) -> HoldPolicy:
 
 
 def _pending_suffix(session) -> str:
-    """`session.pending_triggers` 가 있고 비어있지 않으면 ` pending=<n>`. 없으면 빈 문자열
-    — status 테스트의 Recorder 는 이 필드를 갖지 않으므로 getattr 로 넘어간다."""
-    pending = getattr(session, "pending_triggers", None)
-    return f" pending={len(pending)}" if pending else ""
+    """비어 있지 않으면 ` pending=<n>`. 세션은 항상 이 필드를 갖는다."""
+    return f" pending={len(session.pending_triggers)}" if session.pending_triggers else ""
 
 
 async def handle_command(line: str, session, base: FormationSpec) -> bool:
@@ -99,7 +100,12 @@ async def handle_command(line: str, session, base: FormationSpec) -> bool:
                 # 무장 중에 무엇인가 걸렸다. 다음 통계 줄을 기다려 알게 하지 않는다.
                 print(f"held: {session.reason} — resume when clear")
         elif cmd == "resume":
+            was_running = session.state.value == "RUNNING"
             await session.resume()
+            if was_running:
+                # RUNNING 에서 resume 은 무해한 no-op 이다. 조용히 넘어가면 운영자는
+                # 명령이 씹혔는지 이미 달리고 있는지 구분할 수 없다.
+                print("already running")
         elif cmd == "status":
             print(f"state={session.state.value} reason={session.reason}{_pending_suffix(session)}")
         elif cmd == "stop":
@@ -112,14 +118,33 @@ async def handle_command(line: str, session, base: FormationSpec) -> bool:
     return True
 
 
-async def _read_stdin(queue: asyncio.Queue) -> None:
+def _start_stdin_reader(queue: asyncio.Queue) -> None:
+    """stdin 을 데몬 스레드에서 읽어 명령 큐로 넘긴다.
+
+    `run_in_executor(None, sys.stdin.readline)` 이면 안 된다: 스레드는 readline 안에서
+    막혀 있어 태스크를 `cancel()` 해도 풀리지 않고, `asyncio.run` 은 끝날 때 기본
+    실행기를 join 한다 — `stop` 이나 Ctrl-C 뒤에도 다음 한 줄이 들어올 때까지
+    (파이프라면 영원히, 터미널이면 stream_timeout 300 s 까지) 콘솔이 붙잡힌다.
+    데몬 스레드는 join 되지 않고 프로세스와 함께 죽는다.
+    """
     loop = asyncio.get_running_loop()
-    while True:
-        line = await loop.run_in_executor(None, sys.stdin.readline)
-        if not line:
-            await queue.put("stop")
-            return
-        await queue.put(line)
+
+    def pump() -> None:
+        while True:
+            try:
+                line = sys.stdin.readline()
+            except Exception:
+                # 프로세스가 내려가는 중에 stdin 이 닫히면 여기로 온다. 남길 말이 없다.
+                return
+            try:
+                # EOF 는 파이프가 닫힌 것이다 — 명령을 줄 사람이 없으니 대형을 푼다.
+                loop.call_soon_threadsafe(queue.put_nowait, line or "stop")
+            except RuntimeError:
+                return          # 루프가 이미 닫혔다: 세션이 먼저 끝났다.
+            if not line:
+                return
+
+    threading.Thread(target=pump, name="rosy-fleet-stdin", daemon=True).start()
 
 
 def _follower_token(rid: str, hz: float, ok: bool, error: Optional[str]) -> str:
@@ -164,9 +189,14 @@ async def run_formation(args: argparse.Namespace) -> None:
         sys.exit(f"could not arm the formation: {exc}")
     print(f"armed: {session.assignment}", flush=True)
     commands: asyncio.Queue = asyncio.Queue()
-    reader = asyncio.create_task(_read_stdin(commands))
+    _start_stdin_reader(commands)
     try:
         while True:
+            if session.state.value == "STOPPED":
+                # 세션이 스스로 끝났다 (ABORT 정책, 또는 중단된 reform). 통계 줄만
+                # 계속 찍으면 운영자는 대형이 이미 풀렸다는 것을 모른 채 앉아 있다.
+                print(f"session stopped: {session.reason_text()}", flush=True)
+                return
             try:
                 line = await asyncio.wait_for(commands.get(), timeout=1.0)
             except asyncio.TimeoutError:
@@ -175,9 +205,6 @@ async def run_formation(args: argparse.Namespace) -> None:
             if not await handle_command(line, session, base):
                 return
     finally:
-        reader.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await reader
         if session.state.value != "STOPPED":
             await session.stop()
 

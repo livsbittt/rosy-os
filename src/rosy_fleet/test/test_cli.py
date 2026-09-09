@@ -6,7 +6,7 @@ from fakes import run
 from rosy_fleet import cli
 from rosy_fleet.formation.geometry import Formation
 from rosy_fleet.swarm.robots import RobotEndpoint, write_robots
-from rosy_fleet.swarm.session import FormationSpec, HoldPolicy
+from rosy_fleet.swarm.session import FormationSpec, HoldPolicy, SessionError
 
 
 def _write(tmp_path):
@@ -52,6 +52,7 @@ def test_console_commands_map_to_session_methods():
             self.calls = []
             self.state = type("S", (), {"value": "RUNNING"})()
             self.reason = None
+            self.pending_triggers = []
 
         async def reform(self, spec):
             self.calls.append(("reform", spec))
@@ -76,10 +77,47 @@ def test_a_bad_console_command_does_not_end_the_session():
     class Recorder:
         state = type("S", (), {"value": "RUNNING"})()
         reason = None
+        pending_triggers = []
 
     base = FormationSpec(Formation.COLUMN, spacing=0.6)
     assert run(cli.handle_command("reform TRIANGLE", Recorder(), base)) is True
     assert run(cli.handle_command("dance", Recorder(), base)) is True
+
+
+def test_resume_while_already_running_says_so(capsys):
+    """RUNNING 에서 resume 은 세션 쪽에서 무해한 no-op 이다. 콘솔이 조용하면 운영자는
+    명령이 씹혔는지 이미 달리고 있는지 알 수 없다."""
+    class Recorder:
+        def __init__(self):
+            self.calls = []
+            self.state = type("S", (), {"value": "RUNNING"})()
+            self.reason = None
+            self.pending_triggers = []
+
+        async def resume(self):
+            self.calls.append(("resume",))
+
+    rec = Recorder()
+    base = FormationSpec(Formation.COLUMN, spacing=0.6)
+    assert run(cli.handle_command("resume", rec, base)) is True
+    assert rec.calls == [("resume",)]                 # 세션에게는 그대로 넘긴다
+    assert capsys.readouterr().out.strip() == "already running"
+
+
+def test_a_refused_reform_is_printed_and_the_console_keeps_going(capsys):
+    """사전 점검 거절은 세션을 그대로 둔다. 콘솔도 그대로 열려 있어야 한다."""
+    class Refusing:
+        def __init__(self):
+            self.state = type("S", (), {"value": "RUNNING"})()
+            self.reason = None
+            self.pending_triggers = []
+
+        async def reform(self, spec):
+            raise SessionError("FOLLOW is a single follower; use COLUMN for more")
+
+    base = FormationSpec(Formation.COLUMN, spacing=0.6)
+    assert run(cli.handle_command("reform FOLLOW", Refusing(), base)) is True
+    assert capsys.readouterr().out.startswith("refused:")
 
 
 def test_a_reform_that_ends_in_a_hold_says_so(capsys):

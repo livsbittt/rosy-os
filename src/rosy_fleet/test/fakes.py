@@ -76,6 +76,10 @@ class FakeRobot:
         self.follow_gate: Optional[asyncio.Event] = None
         #: 잡혀 있으면 swarm_state 가 여기서 기다린다 — 재개 전 확인도 여러 await 짜리다.
         self.swarm_state_gate: Optional[asyncio.Event] = None
+        #: 설정돼 있으면 state()/swarm_state() 가 이것을 raise 한다. 실제
+        #: `HttpRobotClient` 는 날것의 httpx 예외를 올린다 — 세션이 그것을 감싸는지 본다.
+        self.state_error: Optional[BaseException] = None
+        self.swarm_state_error: Optional[BaseException] = None
         self.pose_frames: asyncio.Queue = asyncio.Queue()
         self.event_frames: asyncio.Queue = asyncio.Queue()
         self.sinks: list[FakeSink] = []
@@ -95,12 +99,16 @@ class FakeRobot:
 
     async def state(self) -> dict:
         self._record("state")
+        if self.state_error is not None:
+            raise self.state_error
         return dict(self._state)
 
     async def swarm_state(self) -> dict:
         self._record("swarm_state")
         if self.swarm_state_gate is not None:
             await self.swarm_state_gate.wait()
+        if self.swarm_state_error is not None:
+            raise self.swarm_state_error
         return dict(self._swarm_state)
 
     async def follow(self, params: SwarmFollowParams) -> dict:

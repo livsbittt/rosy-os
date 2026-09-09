@@ -205,7 +205,14 @@ def test_reform_pauses_rearms_with_the_new_offsets_and_resumes():
         mark = len(log)
         await s.reform(FormationSpec(Formation.LINE, spacing=0.6))
         tail = log[mark:]
-        assert tail[0] == ("relay", "pause")
+        # 릴레이에 처음 일어나는 일이 pause 이고, 그것이 첫 follow 앞이다. "로그의 맨
+        # 첫 줄이 pause" 는 더 이상 참이 아니다 — 사전 점검(state 읽기)이 먼저 오고,
+        # 그래야 거절되는 reform 이 릴레이를 만지지 않는다.
+        relay_kinds = [e[1] for e in tail if e[0] == "relay"]
+        assert relay_kinds[0] == "pause"
+        first_pause = next(i for i, e in enumerate(tail) if e == ("relay", "pause"))
+        first_follow = next(i for i, e in enumerate(tail) if e[1] == "follow")
+        assert first_pause < first_follow
         assert tail[-1] == ("relay", "resume")
         second = {f.robot_id: _follows(f)[1] for f in followers}
         assert sorted(p.lateral for p in second.values()) == [-0.6, 0.6]
@@ -652,6 +659,184 @@ def test_a_reform_from_a_hold_carries_only_what_was_already_there():
         assert s.relay.paused
         await s.stop()
     run(main())
+
+
+# --- 사전 점검 거절: 아무것도 만지지 않았으므로 아무것도 달라지지 않는다 ---------------
+
+
+def _touched(log, mark):
+    """`mark` 이후에 로봇이나 릴레이가 실제로 움직인 흔적. state 읽기는 움직임이 아니다."""
+    return [e for e in log[mark:]
+            if e[1] in ("pause", "resume", "stop", "follow", "swarm_cancel", "navigation_cancel")]
+
+
+@pytest.mark.parametrize("spec", [
+    FormationSpec(Formation.FOLLOW, spacing=0.6),   # 팔로워 2대에 FOLLOW 는 만들 수 없다
+    FormationSpec(Formation.LINE, spacing=0.1),     # spacing 이 하한(0.4) 아래다
+], ids=["follow_with_two", "spacing_below_floor"])
+def test_a_reform_that_cannot_be_planned_leaves_a_running_formation_running(spec):
+    """계획이 릴레이보다 먼저다. 거절되는 reform 이 멀쩡한 대형을 세우면 `resume()` 도
+    듣지 않는다 — 상태가 HOLDING 이 아니라 RUNNING 이기 때문이다."""
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        mark = len(log)
+        with pytest.raises(SessionError):
+            await s.reform(spec)
+        assert s.state is SessionState.RUNNING
+        assert not s.relay.paused
+        assert _touched(log, mark) == []
+        await s.stop()
+    run(main())
+
+
+def test_a_reform_that_cannot_be_planned_leaves_a_hold_holding():
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        followers[0].event_frames.put_nowait({"type": "nav.blocked", "robot_id": "rosy_02",
+                                              "data": {}})
+        await settle()
+        assert s.state is SessionState.HOLDING
+        mark = len(log)
+        with pytest.raises(SessionError):
+            await s.reform(FormationSpec(Formation.FOLLOW, spacing=0.6))
+        assert s.state is SessionState.HOLDING
+        assert s.relay.paused                              # HOLD 가 멈춘 그대로다
+        assert s.reason == ("nav.blocked", "rosy_02")
+        assert _touched(log, mark) == []
+        await s.stop()
+    run(main())
+
+
+def test_a_reform_refused_by_a_leader_in_estop_does_not_destroy_the_hold():
+    """`resume()` 은 "reform 으로 다시 무장하라"고 말한다. 그 reform 이 사전 점검에서
+    거절됐다고 대형을 끝내면, 운영자는 시키는 대로 하고 대형을 잃는다."""
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        followers[0].event_frames.put_nowait({"type": "nav.blocked", "robot_id": "rosy_02",
+                                              "data": {}})
+        await settle()
+        assert s.state is SessionState.HOLDING
+        leader._state["mode"] = RobotMode.EMERGENCY.value
+        mark = len(log)
+        with pytest.raises(ArmingFailed) as exc:
+            await s.reform(FormationSpec(Formation.LINE, spacing=0.6))
+        assert exc.value.robot_id == "rosy_01" and exc.value.code == "EMERGENCY_ACTIVE"
+        assert s.state is SessionState.HOLDING
+        assert s.relay.paused and not s.relay.stopped
+        assert _touched(log, mark) == []                   # 팔로워는 한 대도 만지지 않았다
+        await s.stop()
+    run(main())
+
+
+def test_a_reform_with_a_map_mismatch_never_pauses_the_relay():
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        followers[1]._state["map_id"] = "other"            # 그 사이에 다른 맵으로 갈아탔다
+        mark = len(log)
+        with pytest.raises(MapMismatch):
+            await s.reform(FormationSpec(Formation.LINE, spacing=0.6))
+        assert s.state is SessionState.RUNNING
+        assert not s.relay.paused
+        assert _touched(log, mark) == []
+        await s.stop()
+    run(main())
+
+
+def test_a_start_with_a_spec_that_cannot_be_built_is_a_session_error_not_a_value_error():
+    """`slots()` 의 `FormationError` 는 `ValueError` 다. 그대로 새어 나가면 호출자의
+    `except SessionError` 를 지나쳐 세션이 ARMING 에 남는다."""
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, spec=FormationSpec(Formation.FOLLOW, spacing=0.6), log=log)
+        with pytest.raises(SessionError):
+            await s.start()
+        assert s.state is SessionState.STOPPED             # 다른 start 실패와 같은 자리다
+        assert not any(_follows(f) for f in followers)
+        assert not any(e[1] == "start" for e in log)
+    run(main())
+
+
+# --- 전송 실패도 세션의 거절 언어로 -----------------------------------------------
+
+
+def test_a_state_read_that_dies_on_the_wire_is_an_arming_failure_not_a_raw_httpx_error():
+    async def main():
+        leader, followers, log = _robots(2)
+        followers[1].state_error = ConnectionError("connection reset by peer")
+        s = _session(leader, followers, log=log)
+        with pytest.raises(ArmingFailed) as exc:
+            await s.start()
+        assert exc.value.robot_id == "rosy_03" and exc.value.code == "TRANSPORT"
+        assert not any(_follows(f) for f in followers)
+        assert s.state is SessionState.STOPPED
+    run(main())
+
+
+def test_a_state_read_that_dies_during_a_reform_leaves_the_formation_running():
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        followers[1].state_error = ConnectionError("connection reset by peer")
+        mark = len(log)
+        with pytest.raises(ArmingFailed) as exc:
+            await s.reform(FormationSpec(Formation.LINE, spacing=0.6))
+        assert exc.value.code == "TRANSPORT"
+        assert s.state is SessionState.RUNNING
+        assert not s.relay.paused
+        assert _touched(log, mark) == []
+        followers[1].state_error = None
+        await s.stop()
+    run(main())
+
+
+def test_a_state_read_that_dies_while_resuming_keeps_the_hold():
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        followers[0].event_frames.put_nowait({"type": "nav.blocked", "robot_id": "rosy_02",
+                                              "data": {}})
+        await settle()
+        assert s.state is SessionState.HOLDING
+        leader.state_error = ConnectionError("connection reset by peer")
+        with pytest.raises(SessionError):
+            await s.resume()
+        assert s.state is SessionState.HOLDING
+        assert s.relay.paused
+        leader.state_error = None
+        await s.resume()
+        assert s.state is SessionState.RUNNING and not s.relay.paused
+        await s.stop()
+    run(main())
+
+
+def test_a_reconcile_that_cannot_read_swarm_state_does_not_kill_the_watcher(caplog):
+    """`_reconcile` 은 감시 루프 안이다. 여기서 날것의 예외가 올라가면 감시가 통째로
+    죽고, 그 로봇의 사고는 그때부터 아무도 보지 않는다."""
+    async def main():
+        leader, followers, log = _robots(1)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        followers[0].swarm_state_error = ConnectionError("socket gone")
+        opens = followers[0].event_opens
+        followers[0].event_frames.put_nowait(END)          # 소켓 단절 → reconcile
+        await settle(40)
+        assert followers[0].event_opens > opens            # 감시는 계속 다시 연다
+        assert s.state is SessionState.RUNNING             # 상태는 건드리지 않는다
+        assert s.pending_triggers == []
+        assert any("swarm/state unavailable" in r.getMessage() for r in caplog.records)
+        await s.stop()
+    with caplog.at_level("WARNING", logger="rosy_fleet.swarm.session"):
+        run(main())
 
 
 def test_stop_from_idle_has_nothing_to_cancel():

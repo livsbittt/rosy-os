@@ -7,7 +7,11 @@ from pathlib import Path
 import pytest
 
 FORMATION_DIR = Path(__file__).resolve().parents[1] / "rosy_fleet" / "formation"
+SWARM_DIR = Path(__file__).resolve().parents[1] / "rosy_fleet" / "swarm"
 FORBIDDEN = ("httpx", "websockets", "rclpy", "rosy_fleet.swarm", "asyncio")
+#: `arming` 은 `swarm` 안에 있으므로 형제를 import 해도 되지만, 전송과 스케줄링은
+#: 안 된다. 순수해야 세션이 릴레이를 만지기 **전에** 부를 수 있다.
+ARMING_FORBIDDEN = ("httpx", "websockets", "rclpy", "asyncio")
 
 
 def _imports(path: Path) -> set[str]:
@@ -26,3 +30,11 @@ def test_formation_modules_import_no_transport(module):
     names = _imports(FORMATION_DIR / module)
     for name in names:
         assert not name.startswith(FORBIDDEN), f"{module} imports {name}"
+
+
+def test_arming_stays_pure_so_the_plan_can_run_before_the_relay_is_touched():
+    """사전 점검이 전송이나 태스크를 알기 시작하면 릴레이보다 먼저 돌 수 없게 된다 —
+    그러면 거절되는 reform 이 다시 멀쩡한 대형을 멈춘 채로 남긴다."""
+    names = _imports(SWARM_DIR / "arming.py")
+    for name in names:
+        assert not name.startswith(ARMING_FORBIDDEN), f"arming.py imports {name}"

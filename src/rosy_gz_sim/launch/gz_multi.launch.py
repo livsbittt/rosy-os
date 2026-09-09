@@ -34,7 +34,6 @@ from launch.actions import (
     SetEnvironmentVariable,
 )
 from launch_ros.actions import Node, PushRosNamespace
-from launch.conditions import IfCondition
 from launch.launch_description_sources import AnyLaunchDescriptionSource, PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
@@ -50,11 +49,14 @@ def _core_config(ns: str, api_port: int) -> dict:
 
     frame_prefix 는 ROSY_NAMESPACE 환경변수가 넣으므로 여기 두지 않는다. capabilities 는
     기본 파일이 이미 swarm.follow/lead: true 라 그대로 쓴다.
+
+    api_host 는 루프백이다. 이 코어들은 시뮬이고 유일한 클라이언트인 rosy_fleet 은 같은
+    기계에서 돈다 — 0.0.0.0 이면 개발 토큰이 붙은 N 대의 API 가 로컬 네트워크에 열린다.
     """
     number = ns.rsplit("_", 1)[-1]
     return {
         "robot": {"id": ns, "name": f"Rosy {number}"},
-        "network": {"api_host": "0.0.0.0", "api_port": api_port},
+        "network": {"api_host": "127.0.0.1", "api_port": api_port},
     }
 
 
@@ -225,6 +227,9 @@ def _launch_setup(context):
         # 5) rosy_core (core:=true) — 로봇마다 포트·HOME·설정을 가른다.
         #    HOME 을 가르는 이유: waypoints.json 과 audit.jsonl 이 Path.home()/.rosy 에
         #    고정돼 있어, 같은 HOME 이면 N대가 한 파일을 쓴다.
+        #    HOME 을 가르면 ROS 로그도 따라간다: 각 코어의 ~/.ros/log 는 그 임시 HOME
+        #    아래에 생기므로(ROS_LOG_DIR 기본값이 $HOME/.ros/log), 로그는 로봇마다
+        #    나뉘고 런치가 끝나도 사용자의 ~/.ros 를 어지럽히지 않는다.
         if core:
             core_home = os.path.join(bridge_dir, f"home_{ns}")
             os.makedirs(core_home, exist_ok=True)
@@ -254,6 +259,13 @@ def _launch_setup(context):
         manifest_path = os.path.join(bridge_dir, "robots.yaml")
         with open(manifest_path, "w") as f:
             yaml.safe_dump({"robots": _robots_manifest(namespaces, api_port_base)}, f, sort_keys=False)
+        try:
+            # 이 파일은 운영자 토큰을 담는다. mkdtemp 은 디렉터리를 0700 으로 만들지만
+            # 파일 자체는 umask 를 따르므로, rosy_fleet 이 경고하는 것과 같은 조건을
+            # 우리가 먼저 만들지 않는다. Windows 는 이 비트를 무시한다.
+            os.chmod(manifest_path, 0o600)
+        except OSError as exc:
+            actions.append(LogInfo(msg=f"could not restrict robots.yaml permissions: {exc}"))
         actions.append(LogInfo(msg=f"rosy_fleet robots.yaml: {manifest_path}"))
 
     return actions

@@ -11,27 +11,45 @@
   그러지 않으면 같은 사고 하나가 목록을 끝없이 늘린다.
 - `resume()` 도 `reform()` 도 await 여러 개짜리 구간이다. 그 사이에 감시가 돌고
   운영자가 `stop` 할 수 있다 — 릴레이를 만지기 직전에 무엇이 들어왔는지 다시 본다.
+- 계획(`swarm/arming.py`)은 릴레이를 만지기 **전에** 끝난다. 거절될 reform 이 멀쩡한
+  대형을 세워서는 안 된다 — 사전 점검이 실패하면 세션은 손대기 전 그대로다.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass
 from enum import Enum
 from typing import Awaitable, Callable, Optional, Sequence
 
 from rosy_core.protocol.schemas import RobotMode, SwarmFollowParams
 from rosy_fleet.formation.assignment import GreedyDistanceAssigner, SlotAssigner
-from rosy_fleet.formation.geometry import (
-    DEFAULT_SPACING,
-    Formation,
-    SlotOffset,
-    slot_world_position,
-    slots,
+from rosy_fleet.formation.geometry import SlotOffset
+from rosy_fleet.swarm.arming import (
+    ArmingFailed,
+    FormationSpec,
+    InvalidFormation,
+    MapMismatch,
+    SessionError,
+    check_leader_ready,
+    plan_assignment,
 )
 from rosy_fleet.swarm.relay import Relay
 from rosy_fleet.swarm.transport import RobotApiError, RobotClient
+
+#: `from rosy_fleet.swarm.session import ArmingFailed` 는 계속 된다 — 정의만 옮겼다.
+__all__ = [
+    "ArmingFailed",
+    "EVENT_TYPES",
+    "FormationSession",
+    "FormationSpec",
+    "HoldPolicy",
+    "InvalidFormation",
+    "MapMismatch",
+    "SessionError",
+    "SessionState",
+    "TRIGGERS",
+]
 
 log = logging.getLogger(__name__)
 
@@ -55,32 +73,6 @@ class SessionState(str, Enum):
 class HoldPolicy(str, Enum):
     HOLD = "HOLD"      # 릴레이 pause + 리더 navigation/cancel. 팔로워 follow 세션은 산다.
     ABORT = "ABORT"    # 전 팔로워 swarm/cancel + 리더 navigation/cancel. 세션 종료.
-
-
-@dataclass
-class FormationSpec:
-    formation: Formation
-    spacing: float = DEFAULT_SPACING
-    grid_cols: int = 2
-    max_speed: float = 0.15
-    stream_timeout_ms: int = 1000
-
-
-class SessionError(Exception):
-    pass
-
-
-class ArmingFailed(SessionError):
-    def __init__(self, robot_id: str, code: str, message: str = "") -> None:
-        super().__init__(f"{robot_id} refused follow: {code} {message}".strip())
-        self.robot_id = robot_id
-        self.code = code
-
-
-class MapMismatch(SessionError):
-    def __init__(self, map_ids: dict[str, Optional[str]]) -> None:
-        super().__init__(f"robots are not on one map: {map_ids}")
-        self.map_ids = map_ids
 
 
 class FormationSession:
@@ -122,7 +114,9 @@ class FormationSession:
             raise SessionError(f"cannot start from {self.state.value}")
         self.state = SessionState.ARMING
         try:
-            self.assignment = await self._arm(self.spec)
+            assignment = await self._plan(self.spec)
+            await self._arm(self.spec, assignment)
+            self.assignment = assignment
         except SessionError as exc:
             self.state = SessionState.STOPPED
             self.reason = (f"arming_failed:{exc}", getattr(exc, "robot_id", None))
@@ -150,19 +144,35 @@ class FormationSession:
         self.reason = None
 
     async def reform(self, spec: FormationSpec) -> None:
+        """새 대형으로 다시 무장한다. 거절에는 두 종류가 있고 결과가 다르다.
+
+        - **사전 점검 거절** (`_plan`): 아무 로봇도 만지지 않았다. 세션은 부르기 전과
+          똑같이 남고(RUNNING 은 릴레이가 멈추지도 않은 채 RUNNING, HOLDING 은 HOLDING)
+          예외만 올라간다. 멀쩡한 대형이 잘못된 명령 한 줄에 무너지지 않는다.
+        - **무장 중 실패** (`_arm`): 이미 몇 대가 새 오프셋으로 follow 를 다시 받았다.
+          남은 대형은 둘로 갈려 있으므로 정책과 무관하게 `_abort` 다.
+        """
         if self.state not in (SessionState.RUNNING, SessionState.HOLDING):
             raise SessionError(f"cannot reform from {self.state.value}")
         assert self.relay is not None
-        self.relay.pause()
-        # 무장은 await 여러 개짜리 구간이다. 그 사이에 걸린 트리거를 재개가 지워서는 안 된다.
+        # 계획도 무장도 await 여러 개짜리 구간이다. 그 사이에 걸린 트리거를 재개가
+        # 지워서는 안 되므로, 세대와 몫은 아무것도 하기 전에 잡는다.
         seq = self._policy_seq
         carried = len(self.pending_triggers)
+        # 계획이 릴레이보다 먼저다. 거절되는 reform 은 아무것도 만지지 않은 채 던진다 —
+        # 맵 불일치도, 만들 수 없는 대형도, e-stop 인 리더도, 응답 없는 로봇도 여기서
+        # 걸린다. 멈춘 채 남는 대형은 `resume()` 도 듣지 않는다(상태가 HOLDING 이 아니다).
+        assignment = await self._plan(spec)
+        if self.state is SessionState.STOPPED:
+            # 계획하는 동안 ABORT 가 걸렸다. 죽은 릴레이를 다시 켤 이유가 없다.
+            raise SessionError(f"session aborted during reform: {self.reason_text()}")
+        self.relay.pause()
         try:
-            assignment = await self._arm(spec)
+            await self._arm(spec, assignment)
         except SessionError as exc:
             if self.state is SessionState.STOPPED:
                 await self._disarm(self._followers)
-                raise SessionError(f"session aborted during reform: {self._reason_text()}") from exc
+                raise SessionError(f"session aborted during reform: {self.reason_text()}") from exc
             # 정책과 무관하게 끝낸다. 재무장된 팔로워는 _arm 이 이미 풀었고 나머지는 옛
             # 오프셋의 follow 세션을 쥐고 있다 — 그 위에 스트림을 다시 켜면 대형이 둘로
             # 갈린다. HOLD 로 두면 resume 이 그것을 그대로 살린다.
@@ -174,7 +184,7 @@ class FormationSession:
             # 무장 도중 ABORT 가 걸렸다. 방금 무장한 팔로워들은 이미 죽은 릴레이를 보고
             # 있다 — 다시 푼다. 사유는 ABORT 쪽이 옳으므로 덮어쓰지 않는다.
             await self._disarm(self._followers)
-            raise SessionError(f"session aborted during reform: {self._reason_text()}")
+            raise SessionError(f"session aborted during reform: {self.reason_text()}")
         # 이 reform 이 책임지는 몫은 시작 시점에 쌓여 있던 것까지다. 무장하는 동안 새로
         # 들어온 것은 아직 아무도 보지 않았다.
         self.pending_triggers = self.pending_triggers[carried:]
@@ -198,8 +208,9 @@ class FormationSession:
                 f"cannot resume: unhandled triggers {self.pending_triggers}; "
                 "reform to re-arm or stop")
         # 확인은 await 여러 개짜리 구간이다. 그 사이에 온 것을 재개가 덮어써서는 안 된다.
+        # 위에서 이미 거절했으므로 여기 도달했다는 것은 목록이 비어 있다는 뜻이다 —
+        # 재개가 책임지고 지울 몫은 없고, 확인 중에 하나라도 들어오면 그것으로 끝이다.
         seq = self._policy_seq
-        carried = len(self.pending_triggers)
         for follower in self._followers:
             # HOLD 중에 팔로워가 대형을 떠났을 수 있다. 스트림만 다시 켜면 남은 팔로워만
             # 달려나간다 — 재개 전에 전원이 아직 따라오고 있는지 직접 본다.
@@ -212,16 +223,16 @@ class FormationSession:
                 raise SessionError(
                     f"cannot resume: {follower.robot_id} is no longer following; "
                     "reform to re-arm or stop")
-        await self._verify_resumable(seq, carried)
+        await self._verify_resumable(seq)
         self.relay.resume()
         self.state = SessionState.RUNNING
         self.reason = None
 
-    async def _verify_resumable(self, seq: int, carried: int) -> None:
+    async def _verify_resumable(self, seq: int) -> None:
         """재개 직전의 마지막 확인. 릴레이를 만지기 전에 이 구간 동안 무엇이 들어왔는지 본다."""
         try:
-            leader_state = await self._leader.state()
-        except Exception as exc:
+            leader_state = await self._state_of(self._leader)
+        except SessionError as exc:
             raise SessionError(
                 f"cannot resume: {self._leader.robot_id} state unavailable: {exc}") from exc
         if leader_state.get("mode") == RobotMode.EMERGENCY.value:
@@ -231,14 +242,14 @@ class FormationSession:
         if self.state is not SessionState.HOLDING:
             raise SessionError(
                 f"cannot resume: the session became {self.state.value} while it was being checked")
-        if len(self.pending_triggers) != carried or self.pending_triggers:
+        if self.pending_triggers:
             raise SessionError(
                 f"cannot resume: {self.pending_triggers} arrived while it was being checked; "
                 "reform to re-arm or stop")
         if self._policy_seq != seq:
             raise SessionError(
                 f"cannot resume: the policy fired again while it was being checked "
-                f"({self._reason_text()}); reform to re-arm or stop")
+                f"({self.reason_text()}); reform to re-arm or stop")
 
     async def stop(self) -> None:
         if self.state is SessionState.IDLE:
@@ -257,33 +268,42 @@ class FormationSession:
 
     # --- 무장 ---------------------------------------------------------------------
 
-    async def _arm(self, spec: FormationSpec) -> dict[str, SlotOffset]:
-        leader_state = await self._leader.state()
-        if leader_state.get("mode") == RobotMode.EMERGENCY.value:
-            # 팔로워를 리더에 묶는 것이 무장이다. 선 리더에 묶으면 e-stop 이 풀리는 순간
-            # 전원이 그 프레임을 따라간다 — 한 대도 묶기 전에 거절한다.
-            raise ArmingFailed(self._leader.robot_id, "EMERGENCY_ACTIVE", "leader is in e-stop")
-        states = {f.robot_id: await f.state() for f in self._followers}
+    async def _state_of(self, robot: RobotClient) -> dict:
+        """`state()` 한 번. 전송 실패도 세션의 거절 언어로 올린다.
 
-        map_ids = {self._leader.robot_id: leader_state.get("map_id"),
-                   **{rid: s.get("map_id") for rid, s in states.items()}}
-        known = {m for m in map_ids.values() if m}
-        if len(known) > 1:
-            # 로봇 쪽도 프레임마다 검사하지만(map_mismatch HOLD), 시작 전에 알 수 있는
-            # 것을 시작 뒤에 알게 하지 않는다. 값이 없는 로봇은 판단 대상이 아니다.
-            raise MapMismatch(map_ids)
+        `HttpRobotClient.state()` 는 날것의 `httpx` 예외를 던진다. 그것이 그대로
+        올라가면 호출자의 `except SessionError` 를 지나쳐, 사전 점검 실패인데도
+        세션이 어중간한 상태로 남는다.
+        """
+        try:
+            return await robot.state()
+        except SessionError:
+            raise
+        except Exception as exc:
+            raise ArmingFailed(robot.robot_id, "TRANSPORT", str(exc)) from exc
 
-        offsets = slots(spec.formation, len(self._followers), spec.spacing, grid_cols=spec.grid_cols)
-        pose = leader_state.get("pose") or {}
-        lx, ly, lyaw = float(pose.get("x", 0.0)), float(pose.get("y", 0.0)), float(pose.get("yaw", 0.0))
-        slot_points = [slot_world_position(o, lx, ly, lyaw) for o in offsets]
-        robot_points = {
-            rid: (float((s.get("pose") or {}).get("x", 0.0)), float((s.get("pose") or {}).get("y", 0.0)))
-            for rid, s in states.items()
-        }
-        chosen = self._assigner.assign(robot_points, slot_points)
-        assignment = {rid: offsets[j] for rid, j in chosen.items()}
+    async def _plan(self, spec: FormationSpec) -> dict[str, SlotOffset]:
+        """사전 점검과 배정. 로봇에게 `state()` 말고는 아무것도 보내지 않는다."""
+        leader_state = await self._state_of(self._leader)
+        check_leader_ready(leader_state, self._leader.robot_id)
+        # 팔로워는 동시에 묻는다. 한 대씩 물으면 로봇 수 × 타임아웃(5 s)이 그대로
+        # 대형이 멈춰 있는 시간이 된다. `return_exceptions` 인 이유는 둘 이상이 같이
+        # 죽는 경우다 — 첫 번째만 올리고 나머지를 버리면 "회수되지 않은 예외"가 된다.
+        results = await asyncio.gather(*(self._state_of(f) for f in self._followers),
+                                       return_exceptions=True)
+        states: dict[str, dict] = {}
+        failure: Optional[BaseException] = None
+        for follower, result in zip(self._followers, results):
+            if isinstance(result, BaseException):
+                failure = failure if failure is not None else result
+            else:
+                states[follower.robot_id] = result
+        if failure is not None:
+            raise failure
+        return plan_assignment(leader_state, states, spec, self._assigner,
+                               leader_id=self._leader.robot_id)
 
+    async def _arm(self, spec: FormationSpec, assignment: dict[str, SlotOffset]) -> None:
         armed: list[RobotClient] = []
         for follower in self._followers:
             if self.state is SessionState.STOPPED:
@@ -308,7 +328,6 @@ class FormationSession:
                 await self._disarm([*armed, follower])
                 raise ArmingFailed(follower.robot_id, "TRANSPORT", str(exc)) from exc
             armed.append(follower)
-        return assignment
 
     async def _disarm(self, armed: Sequence[RobotClient]) -> None:
         for follower in armed:
@@ -457,7 +476,8 @@ class FormationSession:
         except Exception as exc:
             log.warning("%s: navigation/cancel failed: %s", self._leader.robot_id, exc)
 
-    def _reason_text(self) -> str:
+    def reason_text(self) -> str:
+        """`reason` 을 한 줄로. CLI 가 세션이 스스로 끝난 이유를 찍을 때도 쓴다."""
         if self.reason is None:
             return "unknown"
         why, robot_id = self.reason

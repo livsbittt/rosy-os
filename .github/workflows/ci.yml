@@ -44,6 +44,18 @@ jobs:
       - name: Test (rosy_fleet formation, relay, session)
         run: python3 -m pytest src/rosy_fleet/test/ -v
 
+      # 멀티 인스턴스 런치는 로봇마다 포트·HOME·설정을 갈라야 한다. 그 계약은 런치
+      # 파일을 실제로 실행해야 검증되므로 ROS 오버레이가 필요하다. ros_gz_sim share 가
+      # 없는 러너에서는 테스트가 스스로 skip 한다 — 조용히 통과하는 것이 아니라
+      # skip 으로 드러난다.
+      - name: Test (rosy_gz_sim multi-instance launch)
+        run: |
+          # ROS setup.sh 는 미정의 변수를 참조하므로 -u 를 쓰지 않는다.
+          set -eo pipefail
+          . /opt/ros/jazzy/setup.sh
+          . src/install/setup.sh
+          python3 -m pytest src/rosy_gz_sim/test -v
+
       # 루트 test/ 는 배포·릴리스 계약을 담고 있으면서도 지금까지 CI 에서 한 번도
       # 실행되지 않았다. 위 스텝이 src/rosy_core/test 만 돌기 때문이다. 그래서
       # compose 권한 경계와 Wi-Fi 배포 계약이 검증 없이 지나갔다.
