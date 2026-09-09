@@ -8,7 +8,7 @@ component: development_workflow
 severity: high
 applies_when:
   - "a test's inputs come from a generator written by the same author, in the same sitting, as the code under test"
-  - "a fixture has a "nothing here" branch — inf, NaN, None, an empty list, a 404 — that the real world may never produce"
+  - 'a fixture has a "nothing here" branch — inf, NaN, None, an empty list, a 404 — that the real world may never produce'
   - "building an instrument, benchmark, sweep or evaluation harness whose errors come out as numbers about something else"
   - "a candidate is about to be eliminated on measured evidence"
   - "two artifacts describe one shape — a simulator model and a detector config, a schema and a migration"
