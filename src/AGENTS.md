@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-09 -->
 
 # src
 
@@ -26,6 +26,7 @@ No files at this level. Each child is a ROS 2 package with its own `package.xml`
 | `rosy_led/` | Python LED service (`set_led`, `set_brightness`) (see `rosy_led/AGENTS.md`) |
 | `rosy_emotion/` | LCD GIF emotions + info-screen renderer (see `rosy_emotion/AGENTS.md`) |
 | `rosy_lamp_control/` | C++ WS2811 lamp + SetLamp service — aarch64 only (see `rosy_lamp_control/AGENTS.md`) |
+| `rosy_fleet/` | Fleet seed: formation geometry, slot assignment, reference-stream relay, FOR-004 session, CLI (see `rosy_fleet/AGENTS.md`) |
 
 ## For AI Agents
 
