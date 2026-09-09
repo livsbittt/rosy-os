@@ -17,7 +17,7 @@ import stat
 import sys
 import threading
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Callable, Optional, Sequence
 
 from rosy_fleet.formation.geometry import DEFAULT_SPACING, Formation, FormationError
 from rosy_fleet.swarm.relay import Relay
@@ -118,8 +118,11 @@ async def handle_command(line: str, session, base: FormationSpec) -> bool:
     return True
 
 
-def _start_stdin_reader(queue: asyncio.Queue) -> None:
+def _start_stdin_reader(queue: asyncio.Queue, stream=None) -> None:
     """stdin 을 데몬 스레드에서 읽어 명령 큐로 넘긴다.
+
+    `stream` 은 테스트가 진짜 stdin 대신 무엇이든 끼울 수 있게 열어 둔 자리다 —
+    기본은 `sys.stdin` 이고, 부를 때 고른다(테스트가 갈아끼운 stdin 도 그대로 쓴다).
 
     `run_in_executor(None, sys.stdin.readline)` 이면 안 된다: 스레드는 readline 안에서
     막혀 있어 태스크를 `cancel()` 해도 풀리지 않고, `asyncio.run` 은 끝날 때 기본
@@ -128,11 +131,12 @@ def _start_stdin_reader(queue: asyncio.Queue) -> None:
     데몬 스레드는 join 되지 않고 프로세스와 함께 죽는다.
     """
     loop = asyncio.get_running_loop()
+    source = sys.stdin if stream is None else stream
 
     def pump() -> None:
         while True:
             try:
-                line = sys.stdin.readline()
+                line = source.readline()
             except Exception:
                 # 프로세스가 내려가는 중에 stdin 이 닫히면 여기로 온다. 남길 말이 없다.
                 return
@@ -177,6 +181,32 @@ async def run_relay(args: argparse.Namespace) -> None:
         await relay.stop()
 
 
+async def formation_console(session, base: FormationSpec, commands: asyncio.Queue,
+                            print_stats: Callable[[], None]) -> None:
+    """`formation` 의 콘솔 루프. 명령 큐와 통계 출력만 받는다 — 소켓도 argparse 도 모른다.
+
+    `run_formation` 에서 떼어 낸 이유는 이 루프가 시험할 것을 갖고 있기 때문이다:
+    스스로 끝난 세션에서 곧장 나오는지, 1 s 마다 통계를 찍는지, `stop` 에 닫히는지.
+    """
+    try:
+        while True:
+            if session.state.value == "STOPPED":
+                # 세션이 스스로 끝났다 (ABORT 정책, 또는 중단된 reform). 통계 줄만
+                # 계속 찍으면 운영자는 대형이 이미 풀렸다는 것을 모른 채 앉아 있다.
+                print(f"session stopped: {session.reason_text()}", flush=True)
+                return
+            try:
+                line = await asyncio.wait_for(commands.get(), timeout=1.0)
+            except asyncio.TimeoutError:
+                print_stats()
+                continue
+            if not await handle_command(line, session, base):
+                return
+    finally:
+        if session.state.value != "STOPPED":
+            await session.stop()
+
+
 async def run_formation(args: argparse.Namespace) -> None:
     leader_ep, follower_eps = split_robots(args)
     leader = HttpRobotClient(leader_ep)
@@ -190,23 +220,8 @@ async def run_formation(args: argparse.Namespace) -> None:
     print(f"armed: {session.assignment}", flush=True)
     commands: asyncio.Queue = asyncio.Queue()
     _start_stdin_reader(commands)
-    try:
-        while True:
-            if session.state.value == "STOPPED":
-                # 세션이 스스로 끝났다 (ABORT 정책, 또는 중단된 reform). 통계 줄만
-                # 계속 찍으면 운영자는 대형이 이미 풀렸다는 것을 모른 채 앉아 있다.
-                print(f"session stopped: {session.reason_text()}", flush=True)
-                return
-            try:
-                line = await asyncio.wait_for(commands.get(), timeout=1.0)
-            except asyncio.TimeoutError:
-                print(_stats_line(session.relay, session), flush=True)
-                continue
-            if not await handle_command(line, session, base):
-                return
-    finally:
-        if session.state.value != "STOPPED":
-            await session.stop()
+    await formation_console(session, base, commands,
+                            lambda: print(_stats_line(session.relay, session), flush=True))
 
 
 def main(argv: Optional[Sequence[str]] = None) -> None:

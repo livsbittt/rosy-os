@@ -165,14 +165,14 @@ class FormationSession:
         assignment = await self._plan(spec)
         if self.state is SessionState.STOPPED:
             # 계획하는 동안 ABORT 가 걸렸다. 죽은 릴레이를 다시 켤 이유가 없다.
-            raise SessionError(f"session aborted during reform: {self.reason_text()}")
+            raise SessionError(self._interrupted_text())
         self.relay.pause()
         try:
             await self._arm(spec, assignment)
         except SessionError as exc:
             if self.state is SessionState.STOPPED:
                 await self._disarm(self._followers)
-                raise SessionError(f"session aborted during reform: {self.reason_text()}") from exc
+                raise SessionError(self._interrupted_text()) from exc
             # 정책과 무관하게 끝낸다. 재무장된 팔로워는 _arm 이 이미 풀었고 나머지는 옛
             # 오프셋의 follow 세션을 쥐고 있다 — 그 위에 스트림을 다시 켜면 대형이 둘로
             # 갈린다. HOLD 로 두면 resume 이 그것을 그대로 살린다.
@@ -184,7 +184,7 @@ class FormationSession:
             # 무장 도중 ABORT 가 걸렸다. 방금 무장한 팔로워들은 이미 죽은 릴레이를 보고
             # 있다 — 다시 푼다. 사유는 ABORT 쪽이 옳으므로 덮어쓰지 않는다.
             await self._disarm(self._followers)
-            raise SessionError(f"session aborted during reform: {self.reason_text()}")
+            raise SessionError(self._interrupted_text())
         # 이 reform 이 책임지는 몫은 시작 시점에 쌓여 있던 것까지다. 무장하는 동안 새로
         # 들어온 것은 아직 아무도 보지 않았다.
         self.pending_triggers = self.pending_triggers[carried:]
@@ -252,6 +252,11 @@ class FormationSession:
                 f"({self.reason_text()}); reform to re-arm or stop")
 
     async def stop(self) -> None:
+        # 운영자가 세운 것도 이유다. 적어 두지 않으면 `_plan` 한가운데로 들어온 stop 이
+        # reform 쪽에서 "aborted ... unknown" 으로 보고된다 — 사고가 아니라 명령이었는데.
+        # 이미 이유가 있으면(HOLD, ABORT, 무장 실패) 그쪽이 먼저 일어난 일이므로 둔다.
+        if self.reason is None:
+            self.reason = ("stopped", None)
         if self.state is SessionState.IDLE:
             # 무장도 릴레이도 감시도 없다. 끌 것이 없다.
             self.state = SessionState.STOPPED
@@ -295,7 +300,13 @@ class FormationSession:
         failure: Optional[BaseException] = None
         for follower, result in zip(self._followers, results):
             if isinstance(result, BaseException):
-                failure = failure if failure is not None else result
+                if failure is None:
+                    failure = result
+                else:
+                    # 올라가는 것은 첫 번째뿐이다. 나머지를 조용히 버리면 두 대가 함께
+                    # 죽은 사고가 한 대의 사고로 보이고, 운영자는 한 대만 고치러 간다.
+                    log.warning("%s: state unavailable while planning: %s",
+                                follower.robot_id, result)
             else:
                 states[follower.robot_id] = result
         if failure is not None:
@@ -475,6 +486,13 @@ class FormationSession:
             await self._leader.navigation_cancel()
         except Exception as exc:
             log.warning("%s: navigation/cancel failed: %s", self._leader.robot_id, exc)
+
+    def _interrupted_text(self) -> str:
+        """`reform` 이 중단된 이유 한 줄. 운영자의 `stop` 은 사고가 아니다 — 정책이
+        세션을 끝낸 것과 운영자가 끝낸 것을 같은 문장으로 보고하면, 운영자는 자기가
+        방금 누른 것을 사고로 읽고 로그를 뒤진다."""
+        stopped = self.reason is not None and self.reason[0] == "stopped"
+        return f"session {'stopped' if stopped else 'aborted'} during reform: {self.reason_text()}"
 
     def reason_text(self) -> str:
         """`reason` 을 한 줄로. CLI 가 세션이 스스로 끝난 이유를 찍을 때도 쓴다."""

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import stat
 from pathlib import Path
 
 import pytest
@@ -31,6 +32,9 @@ def test_core_config_sets_identity_and_port():
     assert cfg["robot"]["id"] == "rosy_02"
     assert cfg["robot"]["name"] == "Rosy 02"
     assert cfg["network"]["api_port"] == 8081
+    # 이 코어들은 시뮬이고 유일한 클라이언트는 같은 기계의 rosy_fleet 이다. 0.0.0.0 이면
+    # 개발용 토큰을 문 API 가 랜에 열린다.
+    assert cfg["network"]["api_host"] == "127.0.0.1"
 
 
 def test_robots_manifest_lists_every_core_with_the_dev_operator_token():
@@ -94,6 +98,10 @@ def test_core_true_adds_one_rosy_core_per_robot_with_distinct_ports_and_homes():
     # robots.yaml 은 설정 파일과 같은 임시 디렉터리에 쓰인다.
     manifest = os.path.join(os.path.dirname(envs[0]["ROSY_CONFIG"]), "robots.yaml")
     assert os.path.exists(manifest)
+    if os.name != "nt":
+        # robots.yaml 은 운영자 토큰을 담고 있고 /tmp 에 쓰인다. 기본 모드로 두면
+        # 그 기계의 누구나 읽는다. (Windows 에는 대응하는 비트가 없다.)
+        assert stat.S_IMODE(os.stat(manifest).st_mode) == 0o600
 
 
 def test_core_false_adds_no_rosy_core():

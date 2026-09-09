@@ -1,5 +1,8 @@
 """CLI 는 파싱과 배선만 한다. 실제 로봇은 Task 14 의 시뮬 계측이 본다."""
 
+import asyncio
+import io
+
 import pytest
 from fakes import run
 
@@ -136,3 +139,39 @@ def test_a_reform_that_ends_in_a_hold_says_so(capsys):
     out = capsys.readouterr().out
     assert out.startswith("held:")
     assert "safety.estop" in out
+
+
+def test_the_stdin_reader_queues_every_line_and_turns_eof_into_a_stop():
+    """EOF 는 파이프가 닫힌 것이다 — 명령을 줄 사람이 없으니 대형을 푼다. 큐에 아무것도
+    넣지 않고 조용히 끝나면 콘솔은 무장된 대형을 붙잡은 채 통계만 찍는다."""
+    async def main():
+        commands: asyncio.Queue = asyncio.Queue()
+        cli._start_stdin_reader(commands, io.StringIO("status\nresume\n"))
+        # 타임아웃은 벽시계 대기가 아니라 매달리지 않기 위한 안전핀이다 — 줄은 스레드가
+        # 넣는 즉시 온다.
+        return [await asyncio.wait_for(commands.get(), timeout=5.0) for _ in range(3)]
+
+    assert run(main()) == ["status\n", "resume\n", "stop"]
+
+
+def test_a_session_that_stopped_on_its_own_ends_the_console_at_once(capsys):
+    """ABORT 정책이나 중단된 reform 은 세션을 스스로 끝낸다. 콘솔이 1 s 통계 줄을 계속
+    찍으면 운영자는 대형이 이미 풀린 것을 모른 채 앉아 있다."""
+    class Stopped:
+        state = type("S", (), {"value": "STOPPED"})()
+        reason = ("nav.stuck", "rosy_02")
+
+        def reason_text(self):
+            return "nav.stuck (rosy_02)"
+
+    printed = []
+    base = FormationSpec(Formation.COLUMN, spacing=0.6)
+
+    async def main():
+        await asyncio.wait_for(
+            cli.formation_console(Stopped(), base, asyncio.Queue(), lambda: printed.append(1)),
+            timeout=5.0)
+
+    run(main())
+    assert printed == []                     # 통계 줄 하나 없이, 1 s 를 기다리지도 않고 나온다
+    assert "session stopped: nav.stuck (rosy_02)" in capsys.readouterr().out

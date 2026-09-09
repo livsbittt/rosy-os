@@ -76,6 +76,9 @@ class FakeRobot:
         self.follow_gate: Optional[asyncio.Event] = None
         #: 잡혀 있으면 swarm_state 가 여기서 기다린다 — 재개 전 확인도 여러 await 짜리다.
         self.swarm_state_gate: Optional[asyncio.Event] = None
+        #: 잡혀 있으면 state 가 여기서 기다린다 — `_plan` 도 여러 await 짜리 구간이고,
+        #: 그 사이에 감시가 돌거나 운영자가 stop 한다.
+        self.state_gate: Optional[asyncio.Event] = None
         #: 설정돼 있으면 state()/swarm_state() 가 이것을 raise 한다. 실제
         #: `HttpRobotClient` 는 날것의 httpx 예외를 올린다 — 세션이 그것을 감싸는지 본다.
         self.state_error: Optional[BaseException] = None
@@ -99,6 +102,8 @@ class FakeRobot:
 
     async def state(self) -> dict:
         self._record("state")
+        if self.state_gate is not None:
+            await self.state_gate.wait()
         if self.state_error is not None:
             raise self.state_error
         return dict(self._state)

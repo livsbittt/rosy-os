@@ -848,3 +848,103 @@ def test_stop_from_idle_has_nothing_to_cancel():
         assert not any(("swarm_cancel",) in f.calls for f in followers)
         assert not any(entry[1] == "swarm_cancel" for entry in log)
     run(main())
+
+
+# --- 계획 중에 들어온 것들: reform 은 `_plan` 동안에도 열려 있는 창이다 -----------------
+
+
+def test_a_hold_that_lands_while_a_reform_is_planning_keeps_the_new_offsets_but_does_not_resume():
+    """`_plan` 도 await 여러 개짜리 구간이다. 무장 중에 걸린 HOLD 와 같은 대접을 받아야
+    한다 — 새 배정은 살고, 재개는 운영자 몫으로 남는다."""
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        gate = asyncio.Event()
+        followers[0].state_gate = gate                   # 계획이 여기서 멈춘다
+        task = asyncio.create_task(s.reform(FormationSpec(Formation.LINE, spacing=0.6)))
+        await settle()
+        followers[1].event_frames.put_nowait({"type": "nav.stuck", "robot_id": "rosy_03",
+                                              "data": {}})
+        await settle()
+        assert s.state is SessionState.HOLDING           # 계획 중에 걸렸다
+        gate.set()
+        await task                                       # reform 은 정상 반환한다
+        assert s.state is SessionState.HOLDING
+        assert s.reason == ("nav.stuck", "rosy_03")      # 사유는 트리거 쪽이다
+        assert s.relay.paused                            # 재개하지 않는다
+        assert all(len(_follows(f)) == 2 for f in followers)     # 새 오프셋 무장은 살린다
+        assert all(_follows(f)[1].distance == 0.0 for f in followers)   # LINE
+        await s.stop()
+    run(main())
+
+
+def test_an_abort_that_lands_while_a_reform_is_planning_never_pauses_the_relay_again():
+    """계획이 끝나기 전에 세션이 끝났다. 죽은 릴레이를 다시 만질 이유가 없고, 이미
+    풀린 팔로워를 한 번 더 풀 이유도 없다."""
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log, policy=HoldPolicy.ABORT)
+        await s.start()
+        gate = asyncio.Event()
+        followers[0].state_gate = gate
+        mark = len(log)
+        task = asyncio.create_task(s.reform(FormationSpec(Formation.LINE, spacing=0.6)))
+        await settle()
+        followers[1].event_frames.put_nowait({"type": "nav.stuck", "robot_id": "rosy_03",
+                                              "data": {}})
+        await settle()
+        assert s.state is SessionState.STOPPED
+        gate.set()
+        with pytest.raises(SessionError) as exc:
+            await task
+        assert "aborted during reform" in str(exc.value)
+        assert "nav.stuck" in str(exc.value)
+        assert not s.relay.paused                        # pause 는 계획 뒤에 온다
+        assert ("relay", "pause") not in log[mark:]
+        # 팔로워는 abort 가 한 번 풀었다. reform 이 그 위에 또 풀지 않는다.
+        assert all(f.calls.count(("swarm_cancel",)) == 1 for f in followers)
+    run(main())
+
+
+def test_an_operator_stop_while_a_reform_is_planning_is_reported_as_a_stop():
+    """운영자가 세운 것을 "aborted ... unknown" 으로 보고하면, 운영자는 자기가 방금
+    누른 것을 사고로 읽고 없는 로그를 뒤진다."""
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        gate = asyncio.Event()
+        followers[0].state_gate = gate
+        task = asyncio.create_task(s.reform(FormationSpec(Formation.LINE, spacing=0.6)))
+        await settle()
+        await s.stop()                                   # 계획 한가운데로 들어온 stop
+        assert s.state is SessionState.STOPPED
+        gate.set()
+        with pytest.raises(SessionError) as exc:
+            await task
+        assert "stopped" in str(exc.value)
+        assert "aborted" not in str(exc.value)
+        assert not s.relay.paused                        # 릴레이는 멈춘 게 아니라 끝났다
+        assert s.relay.stopped
+        assert s.state is SessionState.STOPPED
+    run(main())
+
+
+def test_two_followers_that_die_together_are_both_logged_and_the_first_is_raised(caplog):
+    """`gather` 는 둘 다 돌려주지만 올라가는 것은 하나다. 나머지를 조용히 버리면 두 대가
+    함께 죽은 사고가 한 대의 사고로 보이고, 운영자는 한 대만 고치러 간다."""
+    async def main():
+        leader, followers, log = _robots(2)
+        followers[0].state_error = ConnectionError("rosy_02 socket gone")
+        followers[1].state_error = ConnectionError("rosy_03 socket gone")
+        s = _session(leader, followers, log=log)
+        with pytest.raises(ArmingFailed) as exc:
+            await s.start()
+        assert exc.value.robot_id == "rosy_02"           # 첫 번째가 올라간다
+        assert s.state is SessionState.STOPPED
+        messages = [r.getMessage() for r in caplog.records]
+        assert any("rosy_03" in m and "state unavailable while planning" in m for m in messages)
+        assert not any("rosy_02" in m for m in messages)  # 올라간 것은 다시 적지 않는다
+    with caplog.at_level("WARNING", logger="rosy_fleet.swarm.session"):
+        run(main())
