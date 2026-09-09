@@ -32,7 +32,7 @@ jobs:
       - name: Lint (flake8)
         run: |
           cd src
-          flake8 rosy_core/rosy_core rosy_fleet/rosy_fleet rosy_gz_sim/launch --count --max-line-length=120 --show-source --statistics || true
+          flake8 rosy_core/rosy_core rosy_fleet/rosy_fleet rosy_fleet/test rosy_gz_sim/launch rosy_gz_sim/scripts rosy_gz_sim/test --count --max-line-length=120 --show-source --statistics || true
 
       - name: Test (rosy_core protocol schemas, P1-19)
         run: |

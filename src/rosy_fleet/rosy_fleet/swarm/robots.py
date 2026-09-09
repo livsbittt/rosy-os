@@ -76,7 +76,13 @@ def load_robots(path: Path) -> list[RobotEndpoint]:
 
 
 def write_robots(path: Path, robots: list[RobotEndpoint]) -> None:
-    """`gz_multi core:=true` 가 시뮬 로봇 목록을 써 주는 데 쓴다. 로더의 규칙을 먼저 통과시킨다."""
+    """로더가 받아들이는 robots.yaml 을 쓰는 기준 구현. 로더의 규칙을 먼저 통과시킨다.
+
+    `gz_multi core:=true` 는 이것을 부르지 않고 같은 모양을 직접 쓴다. 부를 수는 있다 —
+    `rosy_gz_sim` 은 `rosy_fleet` 을 `exec_depend` 로 걸고 있다. 그래도 부르지 않는 것은
+    일부러다: launch 파일이 import 하는 순간 `rosy_fleet` 이 빌드돼 있지 않은 워크스페이스
+    에서는 시뮬 자체가 뜨지 않는다. 그쪽 모양은 `rosy_gz_sim` 의 테스트가 못박아 둔다.
+    """
     if not robots:
         raise RobotsFileError("every robot needs robot_id, base_url and token")
     normalized = [_endpoint(r.robot_id, r.base_url, r.token, f"robots[{i}]") for i, r in enumerate(robots)]

@@ -12,7 +12,9 @@
        rosy_core 를 rosdep 으로 끌어오지 않고 소스 트리를 sys.path 에 얹는다(test/conftest.py). -->
   <exec_depend>rosy_core</exec_depend>
   <exec_depend>python3-httpx</exec_depend>
-  <exec_depend>python3-websockets</exec_depend>
+  <!-- 14 이상이어야 한다: transport.py 가 `websockets.exceptions.InvalidStatus` 와
+       새 asyncio 클라이언트(`connection.respond`)를 쓴다 — 13 에는 둘 다 없다. -->
+  <exec_depend version_gte="14.0">python3-websockets</exec_depend>
   <exec_depend>python3-yaml</exec_depend>
 
   <test_depend>python3-pytest</test_depend>

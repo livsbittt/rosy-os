@@ -10,12 +10,18 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any, AsyncIterator, Optional, Protocol, Sequence, runtime_checkable
 
 import httpx
 
 from rosy_core.protocol.schemas import SwarmFollowParams
 from rosy_fleet.swarm.robots import RobotEndpoint, ws_url
+
+log = logging.getLogger(__name__)
+
+#: `InvalidStatus` 가 없다는 경고는 한 번이면 된다. 소켓마다 찍으면 재연결 로그가 그것뿐이 된다.
+_missing_invalid_status_logged = False
 
 
 class RobotApiError(Exception):
@@ -29,11 +35,32 @@ class RobotApiError(Exception):
         self.message = message
 
 
+def _invalid_status_class():
+    """`websockets.exceptions.InvalidStatus` (v14+) 또는 없으면 None.
+
+    package.xml 은 14 이상을 요구하지만, 배포판이 더 오래된 것을 깔아 놓을 수 있다.
+    그때 `ImportError` 가 예외 처리 **한가운데서** 새어 나가면, 거절 하나가 스트림
+    전체를 죽이고 그 이유는 `InvalidStatus` 라는 엉뚱한 이름으로 남는다. 없으면
+    "조용한 종료"로 떨어뜨리고(재연결은 호출자가 계속한다) 처음 한 번만 경고한다.
+    """
+    global _missing_invalid_status_logged
+    try:
+        from websockets.exceptions import InvalidStatus
+    except ImportError:
+        if not _missing_invalid_status_logged:
+            _missing_invalid_status_logged = True
+            log.warning("websockets has no exceptions.InvalidStatus (needs >= 14): "
+                        "a handshake rejection will look like a quiet close")
+        return None
+    return InvalidStatus
+
+
 def _rejection(robot_id: str, exc: BaseException) -> Optional["RobotApiError"]:
     """4401/4403 (또는 핸드셰이크 거부)만 에러로 올린다. 나머지 종료는 None — 조용히 끝난다."""
-    from websockets.exceptions import ConnectionClosed, InvalidStatus
+    from websockets.exceptions import ConnectionClosed
 
-    if isinstance(exc, InvalidStatus):
+    invalid_status = _invalid_status_class()
+    if invalid_status is not None and isinstance(exc, invalid_status):
         status = exc.response.status_code
         return RobotApiError(robot_id, status, f"WS_{status}", "socket rejected during handshake")
     if isinstance(exc, ConnectionClosed) and exc.rcvd is not None and exc.rcvd.code in (4401, 4403):
@@ -189,12 +216,14 @@ class HttpRobotClient:
             return
 
     async def open_reference_sink(self) -> ReferenceSink:
+        # 거부는 `RobotApiError` 로, 나머지는 날것 그대로 올린다 — 여기서 `InvalidStatus`
+        # 를 직접 import 하지 않는 이유는 `_rejection` 의 것과 같다(오래된 websockets).
         import websockets
-        from websockets.exceptions import InvalidStatus
+        from websockets.exceptions import WebSocketException
 
         try:
             ws = await websockets.connect(self.reference_url())
-        except InvalidStatus as exc:
+        except (OSError, WebSocketException) as exc:
             rejected = _rejection(self.robot_id, exc)
             if rejected is not None:
                 raise rejected from exc

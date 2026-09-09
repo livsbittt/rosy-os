@@ -2,13 +2,21 @@
 
 import asyncio
 import json
+import logging
 
 import httpx
 import pytest
 
 from rosy_core.protocol.schemas import SwarmFollowParams
 from rosy_fleet.swarm.robots import RobotEndpoint
-from rosy_fleet.swarm.transport import HttpRobotClient, RobotApiError, RobotClient, _as_event, _as_text
+from rosy_fleet.swarm.transport import (
+    HttpRobotClient,
+    RobotApiError,
+    RobotClient,
+    _as_event,
+    _as_text,
+    _rejection,
+)
 
 EP = RobotEndpoint("rosy_02", "http://robot:8080", "op-token")
 
@@ -205,3 +213,18 @@ def test_a_handshake_rejected_with_403_raises_ws_403_on_every_socket():
             finally:
                 await client.aclose()
     run(main())
+
+
+def test_a_websockets_without_invalid_status_degrades_to_a_quiet_end(monkeypatch, caplog):
+    """package.xml 은 14 이상을 요구하지만 배포판이 더 오래된 것을 깔아 놓을 수 있다.
+    `ImportError` 가 예외 처리 한가운데서 새어 나가면 거절 하나가 스트림을 죽인다."""
+    ws_exc = pytest.importorskip("websockets.exceptions")
+    import rosy_fleet.swarm.transport as transport
+
+    monkeypatch.delattr(ws_exc, "InvalidStatus", raising=False)
+    monkeypatch.setattr(transport, "_missing_invalid_status_logged", False)
+    with caplog.at_level(logging.WARNING, logger="rosy_fleet.swarm.transport"):
+        assert _rejection("rosy_09", ws_exc.WebSocketException("handshake refused")) is None
+        assert _rejection("rosy_09", OSError("connection refused")) is None
+    # 경고는 처음 한 번뿐이다 — 소켓마다 찍으면 재연결 로그가 그것뿐이 된다.
+    assert caplog.text.count("InvalidStatus") == 1

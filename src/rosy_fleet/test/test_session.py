@@ -661,6 +661,119 @@ def test_a_reform_from_a_hold_carries_only_what_was_already_there():
     run(main())
 
 
+def test_a_reform_does_not_resume_toward_a_robot_that_left_while_it_was_re_arming():
+    """`follow` 가 200 이라는 것과 그 로봇이 아직 따르고 있다는 것은 다르다.
+
+    캐리 몫에 같은 `(사유, id)` 가 들어 있으면, 무장 중에 다시 이탈한 로봇의 이벤트는
+    중복으로 지워지고 그 캐리 몫은 reform 이 잘라낸다. 그러면 떠난 로봇을 향해 대형이
+    다시 달린다 — 재개 직전에 전원에게 직접 묻는 것이 그것을 막는다.
+    """
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        followers[0].event_frames.put_nowait({"type": "nav.blocked", "robot_id": "rosy_02",
+                                              "data": {}})
+        await settle()
+        followers[1].event_frames.put_nowait({"type": "swarm.aborted", "robot_id": "rosy_03",
+                                              "data": {}})
+        await settle()
+        assert s.state is SessionState.HOLDING
+        assert s.pending_triggers == [("swarm.aborted", "rosy_03")]
+        gate = asyncio.Event()
+        followers[1].follow_gate = gate
+        task = asyncio.create_task(s.reform(FormationSpec(Formation.LINE, spacing=0.6)))
+        await settle()
+        # rosy_03 은 follow 를 받아들인다. 그러고도 대형에 없다 — 이벤트는 오지 않는다.
+        followers[1]._swarm_state = {"active": False, "holding": False}
+        gate.set()
+        await task                                        # 예외 없이 돌아온다
+        assert s.state is SessionState.HOLDING
+        assert s.relay.paused                             # 스트림은 멈춘 채다
+        assert s.pending_triggers == [("swarm.aborted", "rosy_03")]
+        assert s.reason == ("swarm.aborted", "rosy_03")
+        await s.stop()
+    run(main())
+
+
+def test_a_reform_stays_holding_when_a_follower_cannot_say_whether_it_is_still_following():
+    """물어볼 수 없으면 따라온다고 볼 수 없다. 재개하지 않는 쪽이 안전하다."""
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        followers[0].event_frames.put_nowait({"type": "nav.blocked", "robot_id": "rosy_02",
+                                              "data": {}})
+        await settle()
+        assert s.state is SessionState.HOLDING
+        followers[1].swarm_state_error = ConnectionError("robot went dark")
+        await s.reform(FormationSpec(Formation.LINE, spacing=0.6))
+        assert s.state is SessionState.HOLDING
+        assert s.relay.paused
+        assert s.pending_triggers == [("swarm.state_unavailable", "rosy_03")]
+        await s.stop()
+    run(main())
+
+
+def test_a_repeat_of_a_carried_trigger_during_re_arming_is_a_new_event():
+    """캐리 몫은 곧 잘려 나간다. 무장 중에 같은 사고가 다시 오면 중복이 아니다 —
+    거기 묻어 사라지면 reform 이 이미 끝난 사고로 알고 재개한다."""
+    async def main():
+        leader, followers, log = _robots(2)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        followers[0].event_frames.put_nowait({"type": "nav.blocked", "robot_id": "rosy_02",
+                                              "data": {}})
+        await settle()
+        followers[1].event_frames.put_nowait({"type": "swarm.aborted", "robot_id": "rosy_03",
+                                              "data": {}})
+        await settle()
+        assert s.pending_triggers == [("swarm.aborted", "rosy_03")]
+        gate = asyncio.Event()
+        followers[0].follow_gate = gate
+        task = asyncio.create_task(s.reform(FormationSpec(Formation.LINE, spacing=0.6)))
+        await settle()
+        followers[1].event_frames.put_nowait({"type": "swarm.aborted", "robot_id": "rosy_03",
+                                              "data": {}})
+        await settle()
+        gate.set()
+        await task
+        assert s.state is SessionState.HOLDING
+        assert s.relay.paused
+        assert s.pending_triggers == [("swarm.aborted", "rosy_03")]   # 다시 온 것만 남는다
+        await s.stop()
+    run(main())
+
+
+def test_a_map_mismatch_hold_is_a_warning_even_while_the_relay_is_paused(caplog):
+    """설계 §6.2. 릴레이가 멈춰 있으면 swarm.hold 는 대개 우리가 만든 것(정보)이지만,
+    맵이 어긋난 것은 우리가 만든 것이 아니다 — 정보로 흘리면 아무도 맵을 고치러 가지 않는다."""
+    async def main():
+        leader, followers, log = _robots(1)
+        s = _session(leader, followers, log=log)
+        await s.start()
+        followers[0].event_frames.put_nowait({"type": "nav.blocked", "robot_id": "rosy_02",
+                                              "data": {}})
+        await settle()
+        assert s.state is SessionState.HOLDING and s.relay.paused
+        caplog.clear()
+        followers[0].event_frames.put_nowait({"type": "swarm.hold", "robot_id": "rosy_02",
+                                              "data": {"reason": "map_mismatch"}})
+        await settle()
+        holds = [r for r in caplog.records if "swarm.hold" in r.getMessage()]
+        assert [r.levelname for r in holds] == ["WARNING"]
+        caplog.clear()
+        followers[0].event_frames.put_nowait({"type": "swarm.hold", "robot_id": "rosy_02",
+                                              "data": {"reason": "reference stream lost"}})
+        await settle()
+        holds = [r for r in caplog.records if "swarm.hold" in r.getMessage()]
+        assert [r.levelname for r in holds] == ["INFO"]   # 이쪽은 우리가 만든 HOLD 다
+        await s.stop()
+
+    with caplog.at_level("INFO", logger="rosy_fleet.swarm.session"):
+        run(main())
+
+
 # --- 사전 점검 거절: 아무것도 만지지 않았으므로 아무것도 달라지지 않는다 ---------------
 
 

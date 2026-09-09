@@ -169,6 +169,59 @@ def test_a_rejected_leader_socket_is_named_in_the_stats_and_still_retried():
     run(main())
 
 
+def test_a_leader_socket_that_fails_for_any_reason_is_named_too():
+    """거부(RobotApiError)만 이름이 붙던 자리다. 리더가 죽으면 팔로워 전원이 굶는다 —
+    연결 거부처럼 평범한 OSError 도 화면에 이유가 붙어야 한다."""
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        leader.pose_error = ConnectionRefusedError("cannot reach the leader pose socket")
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await settle(40)
+        assert "cannot reach the leader pose socket" in (relay.stats().leader_last_error or "")
+        assert leader.pose_opens >= 2                   # 이름을 붙이고도 계속 다시 연다
+        leader.pose_error = None
+        leader.pose_frames.put_nowait(frame(1))
+        await settle(40)
+        assert relay.stats().leader_last_error is None  # 프레임이 오면 지운다
+        await relay.stop()
+    run(main())
+
+
+def test_a_leader_stream_that_ends_without_a_frame_is_named_too():
+    """전송계층은 연결 거부(OSError)를 삼키고 조용히 끝낸다. 그러면 예외도 프레임도
+    없이 0 Hz 다 — 이유 없는 0 Hz 가 이 릴레이의 가장 나쁜 실패다."""
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        leader.pose_frames.put_nowait(END)              # 프레임 하나 없이 끝난다
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await settle(40)
+        assert relay.stats().leader_last_error is not None
+        assert "without frames" in relay.stats().leader_last_error
+        leader.pose_frames.put_nowait(frame(1))
+        await settle(40)
+        assert relay.stats().leader_last_error is None  # 프레임이 오면 지운다
+        assert f1.sinks[0].sent == [frame(1)]
+        await relay.stop()
+    run(main())
+
+
+def test_a_leader_stream_that_delivered_frames_then_closed_is_not_an_error():
+    """정상적인 소켓 종료는 사고가 아니다. 프레임이 왔다 갔으면 이유를 만들지 않는다."""
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await settle()
+        leader.pose_frames.put_nowait(frame(1))
+        leader.pose_frames.put_nowait(END)
+        await settle(40)
+        assert relay.stats().leader_last_error is None
+        await relay.stop()
+    run(main())
+
+
 def test_stop_closes_the_sinks():
     async def main():
         leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
@@ -231,14 +284,21 @@ def test_a_refused_follower_socket_is_named_in_the_stats():
     async def main():
         leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
         f1.sink_error = RobotApiError("rosy_02", 403, "WS_403", "socket rejected during handshake")
+        f1.sink_error_sticky = True                              # 토큰을 고칠 때까지 계속 거부
         relay = Relay(leader, [f1], sleep=_no_sleep())
         await relay.start()
         await settle(40)
         assert "WS_403" in (relay.stats().follower_last_error["rosy_02"] or "")
-        assert relay.is_connected("rosy_02")                     # 한 번 거부, 그 뒤 재연결 성공
+        assert not relay.is_connected("rosy_02")
+        f1.sink_error = None                                     # 토큰이 고쳐졌다
+        await settle(40)
+        assert relay.is_connected("rosy_02")                     # 재연결 성공
+        # 소켓이 다시 열린 것만으로 이유는 지워진다 — 리더가 아직 조용해도. 첫 송신까지
+        # 들고 있으면, 이미 고쳐진 팔로워가 화면에서는 계속 깨져 있다.
+        assert relay.stats().follower_last_error["rosy_02"] is None
         leader.pose_frames.put_nowait(frame(1))
         await settle()
-        assert relay.stats().follower_last_error["rosy_02"] is None
+        assert f1.sinks[-1].sent == [frame(1)]
         await relay.stop()
     run(main())
 
@@ -286,17 +346,27 @@ def test_seq_accounting_ignores_bools_and_accepts_integral_floats_and_resets_on_
 def test_a_follower_failure_without_a_code_is_named_in_the_stats_too():
     """RobotApiError 만 이름이 붙던 자리다. 이름 없는 0 Hz 가 릴레이의 가장 나쁜 실패다."""
     async def main():
+        gate = asyncio.Event()
+
+        async def sleep(_s):
+            # backoff 에서 멈춰 세운다. 소켓이 다시 열리는 순간 이유가 지워지므로,
+            # 이유를 보려면 재연결 직전에서 잡아야 한다.
+            await gate.wait()
+
         leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
         f1.sink_failures = 1                                      # 평범한 ConnectionError
-        relay = Relay(leader, [f1], sleep=_no_sleep())
+        relay = Relay(leader, [f1], sleep=sleep)
         await relay.start()
         await settle(40)
         assert "cannot open reference socket" in (relay.stats().follower_last_error["rosy_02"] or "")
-        leader.pose_frames.put_nowait(frame(1))
+        assert not relay.is_connected("rosy_02")
+        gate.set()
         await settle(40)
-        assert relay.stats().follower_last_error["rosy_02"] is None   # 보내면 지운다
+        assert relay.is_connected("rosy_02")
+        assert relay.stats().follower_last_error["rosy_02"] is None   # 다시 열리면 지운다
+        gate.clear()
         f1.sinks[-1].fail_on_send = True                          # 이번엔 송신이 깨진다
-        leader.pose_frames.put_nowait(frame(2))
+        leader.pose_frames.put_nowait(frame(1))
         await settle(40)
         assert "sink broke" in (relay.stats().follower_last_error["rosy_02"] or "")
         await relay.stop()

@@ -95,6 +95,9 @@ class FakeRobot:
         self.pose_error = None
         #: 설정돼 있으면 open_reference_sink 가 이것을 한 번 raise 한다 (거부된 소켓 흉내).
         self.sink_error = None
+        #: 참이면 `sink_error` 가 지워지지 않는다 — 고쳐질 때까지 계속 거부하는 소켓.
+        #: 소켓이 다시 열리는 순간 이유가 지워지므로, 이유를 보려면 계속 닫혀 있어야 한다.
+        self.sink_error_sticky = False
 
     def _record(self, *call) -> None:
         self.calls.append(call)
@@ -153,7 +156,9 @@ class FakeRobot:
 
     async def open_reference_sink(self) -> FakeSink:
         if self.sink_error is not None:
-            err, self.sink_error = self.sink_error, None
+            err = self.sink_error
+            if not self.sink_error_sticky:
+                self.sink_error = None
             raise err
         if self.sink_failures > 0:
             self.sink_failures -= 1

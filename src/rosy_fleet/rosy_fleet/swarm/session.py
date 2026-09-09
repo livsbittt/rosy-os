@@ -106,6 +106,10 @@ class FormationSession:
         #: 정책이 상태를 바꿀 때마다 오른다. `reform` 이 "무장 중에 무엇인가 걸렸다"를
         #: 이것으로 안다 — 무장은 await 여러 개짜리 구간이고 그 사이에 감시가 돈다.
         self._policy_seq = 0
+        #: 진행 중인 `reform` 이 책임지기로 한 `pending_triggers` 앞부분의 길이. 그 몫은
+        #: reform 이 끝나며 잘라내므로, 무장 중에 같은 `(사유, id)` 가 다시 오면 그것은
+        #: 중복이 아니라 새 사건이다 — 잘려 나갈 항목에 묻어 사라지면 안 된다.
+        self._carried = 0
 
     # --- 운영자 명령 --------------------------------------------------------------
 
@@ -151,6 +155,11 @@ class FormationSession:
           예외만 올라간다. 멀쩡한 대형이 잘못된 명령 한 줄에 무너지지 않는다.
         - **무장 중 실패** (`_arm`): 이미 몇 대가 새 오프셋으로 follow 를 다시 받았다.
           남은 대형은 둘로 갈려 있으므로 정책과 무관하게 `_abort` 다.
+
+        무장이 끝나도 바로 재개하지 않는다. `follow` 가 200 이었다는 것과 그 로봇이
+        아직 따르고 있다는 것은 다르다 — 재개 직전에 전원의 `swarm/state` 를 다시 본다.
+        하나라도 아니면 **예외 없이** HOLDING 으로 남는다(릴레이는 멈춘 채, 그 로봇이
+        `pending_triggers` 에). 대형은 이미 새 배정으로 서 있고 운영자가 다음을 정한다.
         """
         if self.state not in (SessionState.RUNNING, SessionState.HOLDING):
             raise SessionError(f"cannot reform from {self.state.value}")
@@ -159,6 +168,14 @@ class FormationSession:
         # 지워서는 안 되므로, 세대와 몫은 아무것도 하기 전에 잡는다.
         seq = self._policy_seq
         carried = len(self.pending_triggers)
+        self._carried = carried
+        try:
+            await self._reform(spec, seq, carried)
+        finally:
+            self._carried = 0
+
+    async def _reform(self, spec: FormationSpec, seq: int, carried: int) -> None:
+        assert self.relay is not None
         # 계획이 릴레이보다 먼저다. 거절되는 reform 은 아무것도 만지지 않은 채 던진다 —
         # 맵 불일치도, 만들 수 없는 대형도, e-stop 인 리더도, 응답 없는 로봇도 여기서
         # 걸린다. 멈춘 채 남는 대형은 `resume()` 도 듣지 않는다(상태가 HOLDING 이 아니다).
@@ -180,24 +197,55 @@ class FormationSession:
             raise
         self.assignment = assignment
         self.spec = spec
-        if self.state is SessionState.STOPPED:
-            # 무장 도중 ABORT 가 걸렸다. 방금 무장한 팔로워들은 이미 죽은 릴레이를 보고
-            # 있다 — 다시 푼다. 사유는 ABORT 쪽이 옳으므로 덮어쓰지 않는다.
-            await self._disarm(self._followers)
-            raise SessionError(self._interrupted_text())
+        await self._abandon_if_stopped()
+        # 무장이 성공했다는 것은 follow 가 200 이었다는 뜻일 뿐이다. 그 사이에 다시
+        # 이탈한 로봇은 이벤트로 알려지지 않을 수도 있다 — 스트림을 다시 켜기 전에
+        # 전원에게 직접 묻는다. 떠난 로봇을 향해 대형이 달리는 것이 여기서 가장 나쁘다.
+        blocker = await self._verify_still_following()
+        await self._abandon_if_stopped()
         # 이 reform 이 책임지는 몫은 시작 시점에 쌓여 있던 것까지다. 무장하는 동안 새로
         # 들어온 것은 아직 아무도 보지 않았다.
         self.pending_triggers = self.pending_triggers[carried:]
+        if blocker is not None and blocker not in self.pending_triggers:
+            self.pending_triggers.append(blocker)
         if self._policy_seq != seq or self.pending_triggers:
             # 무장 도중 HOLD 가 걸렸다. 새 배정은 살리되 재개하지 않는다 — 운영자가 본다.
             if self.pending_triggers and self._policy_seq == seq:
                 self.reason = self.pending_triggers[0]
             self.state = SessionState.HOLDING
-            log.warning("reform finished but a trigger landed while arming: %s", self.reason)
+            log.warning("reform finished but the formation is not whole: %s", self.reason_text())
             return
         self.relay.resume()
         self.state = SessionState.RUNNING
         self.reason = None
+
+    async def _abandon_if_stopped(self) -> None:
+        """무장 도중 ABORT 가 걸렸으면 방금 무장한 팔로워를 다시 푼다. 그들은 이미 죽은
+        릴레이를 보고 있다. 사유는 ABORT 쪽이 옳으므로 덮어쓰지 않는다."""
+        if self.state is not SessionState.STOPPED:
+            return
+        await self._disarm(self._followers)
+        raise SessionError(self._interrupted_text())
+
+    async def _verify_still_following(self) -> Optional[tuple[str, str]]:
+        """전원이 아직 따라오고 있는지 본다. 아니면 `(사유, robot_id)`, 맞으면 None.
+
+        `resume()` 이 재개 전에 하는 확인과 같은 것이다. reform 에도 필요한 이유는
+        중복 제거 때문이다: 무장 중에 다시 이탈한 로봇의 `swarm.aborted` 는 이미
+        pending 에 같은 `(사유, id)` 가 있으면 지워지고, 그 pending 은 이 reform 의
+        몫으로 잘려 나간다. 그러면 떠난 로봇을 향해 대형이 다시 달린다.
+        """
+        for follower in self._followers:
+            try:
+                swarm_state = await follower.swarm_state()
+            except Exception as exc:
+                # 물어볼 수 없으면 따라온다고 볼 수 없다. 재개하지 않는 쪽이 안전하다.
+                log.warning("%s: swarm/state unavailable after re-arming: %s",
+                            follower.robot_id, exc)
+                return ("swarm.state_unavailable", follower.robot_id)
+            if not swarm_state.get("active"):
+                return ("swarm.aborted", follower.robot_id)
+        return None
 
     async def resume(self) -> None:
         if self.state is not SessionState.HOLDING:
@@ -429,15 +477,22 @@ class FormationSession:
         # 릴레이가 멈춰 있거나 그 팔로워 소켓이 끊겨 있으면 우리가 만든 HOLD 다(정보).
         # 둘 다 아니면 로봇 쪽이 스스로 선 것이고, 그것은 우리가 모르는 이유다(경고).
         reason = (event.get("data") or {}).get("reason")
+        if reason == "map_mismatch":
+            # 설계 §6.2: 맵이 어긋난 것은 우리가 만든 HOLD 가 아니다. 릴레이가 멈춰 있어도
+            # 경고다 — 정보로 흘리면 아무도 맵을 고치러 가지 않는다.
+            log.warning("%s: swarm.hold %s", robot_id, reason)
+            return
         ours = self.relay is None or self.relay.paused or not self.relay.is_connected(robot_id)
         (log.info if ours else log.warning)("%s: swarm.hold %s", robot_id, reason)
 
     async def _trigger(self, type_: str, robot_id: str) -> None:
         if self.state is SessionState.HOLDING:
             # 이미 서 있다고 해서 새 사고가 없던 일이 되지는 않는다. resume 이 이것을 본다.
-            if (type_, robot_id) in self.pending_triggers:
+            if (type_, robot_id) in self.pending_triggers[self._carried:]:
                 # 끊긴 소켓은 2 s 마다 다시 열리고 그때마다 같은 사실을 다시 말한다.
-                # 같은 사고를 두 번 세면 목록만 끝없이 길어진다.
+                # 같은 사고를 두 번 세면 목록만 끝없이 길어진다. 다만 진행 중인 reform 이
+                # 이미 책임지기로 한 앞부분과는 견주지 않는다 — 그 몫은 곧 잘려 나가므로,
+                # 거기 묻으면 무장 중에 새로 일어난 사고가 통째로 사라진다.
                 log.debug("%s: %s while HOLDING (already pending)", robot_id, type_)
                 return
             self.pending_triggers.append((type_, robot_id))

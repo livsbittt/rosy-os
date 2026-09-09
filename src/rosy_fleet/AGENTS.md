@@ -62,7 +62,7 @@ No ROS required — `conftest.py` puts `src/rosy_core` on `sys.path` for the sch
 
 - `robot_id → RobotEndpoint(base_url, token)` loaded from `robots.yaml`; tokens are device-local (D-30).
 - `SlotAssigner` is a `Protocol` so the greedy v1 assigner can be swapped for a Hungarian one without touching callers (FOR-002).
-- `FormationSession` state machine: `RUNNING` / `HOLDING` / `STOPPED`; `pending_triggers` accumulate while holding and block `resume()` until cleared.
+- `FormationSession` state machine: `IDLE` / `ARMING` / `RUNNING` / `HOLDING` / `STOPPED`; `pending_triggers` accumulate while holding and block `resume()` until cleared.
 
 ## Dependencies
 
@@ -73,7 +73,7 @@ No ROS required — `conftest.py` puts `src/rosy_core` on `sys.path` for the sch
 ### External
 
 - httpx
-- websockets ≥13
+- websockets ≥ 14 (`InvalidStatus`, new asyncio client; 17 in dev)
 - PyYAML
 - pydantic
 

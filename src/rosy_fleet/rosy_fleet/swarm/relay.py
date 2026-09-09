@@ -28,6 +28,8 @@ _BACKOFF_FIRST_S = 0.1
 _RATE_WINDOW = 20
 #: 마지막 표본이 이보다 오래됐으면 주기는 0 이다. 10 Hz 스트림에서 5 프레임 분량.
 _RATE_STALE_S = 0.5
+#: 예외 없이, 프레임 하나 없이 끝난 리더 소켓. `leader_last_error` 에 이 문장이 들어간다.
+_QUIET_END = "leader pose stream ended without frames"
 
 
 @dataclass
@@ -35,8 +37,9 @@ class RelayStats:
     leader_frames: int = 0
     leader_dropped: int = 0
     leader_rx_hz: float = 0.0
-    #: 리더 소켓이 마지막으로 **거부**된 이유 (4401/4403 → RobotApiError 문자열). 재연결은
-    #: 계속하지만, "0 Hz 가 영원히" 인 화면에 이유가 붙어야 한다. 프레임이 오면 None 으로 돈다.
+    #: 리더 소켓이 마지막으로 끝난 이유 — 거부(4401/4403), 전송 오류, 그리고 프레임 없이
+    #: 조용히 끝난 연결(`_QUIET_END`)까지. 재연결은 계속하지만, "0 Hz 가 영원히" 인 화면에
+    #: 이유가 붙어야 한다. 프레임이 오면 None 으로 돈다.
     leader_last_error: Optional[str] = None
     leader_age_s: Optional[float] = None
     paused: bool = False
@@ -176,8 +179,10 @@ class Relay:
     async def _read_leader(self) -> None:
         backoff = _BACKOFF_FIRST_S
         while self._running:
+            got_frame = False
             try:
                 async for frame in self._leader.pose_stream():
+                    got_frame = True
                     backoff = _BACKOFF_FIRST_S
                     self._leader_last_error = None
                     self._on_frame(frame)
@@ -189,7 +194,17 @@ class Relay:
                 self._leader_last_error = str(exc)
                 log.warning("%s: leader socket refused: %s", self._leader.robot_id, exc)
             except Exception as exc:
+                # 팔로워 레인과 같은 규칙이다: 이름 없는 0 Hz 는 없다. 리더는 더 나쁜 쪽이다 —
+                # 리더가 죽으면 팔로워 전원이 굶는다.
+                self._leader_last_error = str(exc)
                 log.warning("%s: leader socket failed: %s", self._leader.robot_id, exc)
+            else:
+                if not got_frame:
+                    # 예외 없이, 프레임 하나 없이 끝났다. 전송계층이 연결 거부(OSError)를
+                    # 삼키면 이 모양이 된다 — 이유 없는 0 Hz 로 남기지 않는다.
+                    self._leader_last_error = _QUIET_END
+                    log.warning("%s: leader pose stream ended without frames",
+                                self._leader.robot_id)
             # 연결(성공이든 거절이든)이 끝났다 — 시퀀스 이어붙임은 한 연결 안에서만 유효
             # 하다. 끊긴 동안의 간격을 드롭으로 세면 안 되므로 여기서 리셋한다.
             self._last_seq = None
@@ -241,6 +256,9 @@ class Relay:
                 backoff = min(backoff * 2, self._reconnect_max)
                 continue
             lane.connected = True
+            # 소켓이 다시 열렸다는 것 자체가 지난 이유가 지났다는 뜻이다. 첫 프레임을
+            # 보낼 때까지 기다리면, 리더가 조용한 동안 고쳐진 소켓이 옛 이유를 달고 있다.
+            lane.last_error = None
             try:
                 while self._running:
                     await lane.wake.wait()
