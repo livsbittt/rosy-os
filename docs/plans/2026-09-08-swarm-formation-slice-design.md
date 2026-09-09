@@ -101,6 +101,7 @@ src/rosy_fleet/                              ament_python. rosy_core 스키마�
 │   ├── swarm/
 │   │   ├── robots.py          RobotEndpoint(base_url, token, robot_id), robots.yaml 로더
 │   │   ├── transport.py       RobotClient 프로토콜 (REST + WS) 와 httpx/websockets 구현
+│   │   ├── arming.py          FormationSpec + 순수 사전검사·배정 계획 (릴레이를 만지기 전에 끝난다)
 │   │   ├── relay.py           리더 pose 소켓 1 → 팔로워 reference 소켓 N 팬아웃 (D-31)
 │   │   └── session.py         FormationSession: 무장 → 릴레이 → 감시 → FOR-004
 │   └── cli.py                 `rosy_fleet formation ...`, `rosy_fleet relay ...`
@@ -308,6 +309,17 @@ pause 동안 HOLD 하고 새 오프셋으로 이어간다. 재호출이 하나�
 둘로 갈린다. 절반 대형은 재개할 수 없으므로 종료가 정직하다. 운영자가 새 formation
 명령으로 다시 무장한다.
 
+**reform 의 거절은 두 종류다.** 로봇을 하나도 건드리기 전에 알 수 있는 거절 —
+잘못된 대형 스펙(`slots()` 의 `FormationError`), 맵 불일치, 리더 e-stop, 배정 불가,
+사전 `state()` 읽기의 네트워크 실패 — 은 **세션을 있던 그대로 둔다** (RUNNING 이면
+릴레이를 아예 멈추지 않았고, HOLDING 이면 HOLDING). 이 계산은 순수 함수
+(`swarm/arming.py`) 로 릴레이 `pause()` **앞**에서 끝난다. 불변식: *릴레이를 멈추는
+것은 그것을 다시 켤 수 있는 상태를 함께 세우는 것뿐이다.* 재무장이 시작된 뒤의
+실패(어느 팔로워든 `follow` 를 다시 받은 뒤)만 위의 "절반 대형" 이라 종료한다.
+Task 12 리뷰가 이 구분을 잡았다 — 고치기 전에는 `reform FOLLOW` 오타 하나가 릴레이만
+멈춘 채 RUNNING 으로 남아 `resume` 도 듣지 않았고, 리더 e-stop 뒤의 reform 이 멀쩡한
+대형을 종료시켰다(그런데 `resume` 의 거절 메시지는 reform 을 권했다).
+
 **reform 도중 FOR-004 트리거가 오면 reform 은 그것을 덮어쓰지 않는다.** 재무장은
 로봇 수만큼의 HTTP 왕복이고 그 사이에 감시 태스크가 돈다. 세션은 정책 세대 카운터를
 들고 있어, 재무장이 끝났을 때 세대가 바뀌었으면 (HOLD 가 걸렸으면) 새 오프셋은
@@ -402,10 +414,10 @@ rosy_fleet formation --robots robots.yaml --leader rosy_01 \
 
 | 항목 | 값 |
 |---|---|
-| 네임스페이스 | `rosy_0i` (`PushRosNamespace`). `rosy_core` 의 토픽은 상대 이름이라 그대로 붙는다 |
+| 네임스페이스 | `rosy_0i` (`Node(namespace=ns)` — 노드 하나라 `PushRosNamespace` 그룹과 같다). `rosy_core` 의 토픽은 상대 이름이라 그대로 붙는다 |
 | `ROSY_NAMESPACE` | `rosy_0i` → `frame_prefix = rosy_0i/`. `_tick_state` 가 `map → rosy_0i/base_footprint` 를 찾는다 |
 | `ROSY_CONFIG` | 런치 시 생성한 YAML. `robot.id: rosy_0i`, `robot.name`, `network.api_port: 8080 + i − 1` |
-| `HOME` | `additional_env` 로 로봇별 임시 디렉터리. `~/.rosy/waypoints.json` 과 그 옆의 `audit.jsonl` 이 `Path.home()` 에 고정돼 있어, 갈라 주지 않으면 N대가 한 파일을 쓴다 |
+| `HOME` | `additional_env` 로 로봇별 임시 디렉터리. `~/.rosy/waypoints.json` 과 그 옆의 `audit.jsonl` 이 `Path.home()` 에 고정돼 있어, 갈라 주지 않으면 N대가 한 파일을 쓴다. 각 코어의 `~/.ros/log` 도 그 임시 HOME 아래로 간다 |
 | `use_sim_time` | `True` |
 | capabilities | 기본 `config/capabilities.yaml` 이 이미 `swarm.follow/lead: true` 다. 별도 파일 없음 |
 
@@ -432,6 +444,7 @@ waypoint 를 순서대로 걸고(다음 목표는 `nav.completed` 이벤트로),
 
 | 상황 | 처리 |
 |---|---|
+| 사전검사 거절 (스펙·맵·리더 e-stop·배정, 그리고 사전 `state()` 읽기의 네트워크 실패 → `ArmingFailed(TRANSPORT)`) | 로봇을 건드리지 않았으므로 세션은 있던 그대로. `start` 는 STOPPED, `reform` 은 원래 상태 유지, `resume` 은 HOLDING 유지 |
 | 무장 중 한 대 실패 | 무장된 것 전부 cancel(결과 미상인 그 로봇 포함), `ArmingFailed`. 릴레이 시작 안 함 |
 | 무장은 됐는데 릴레이를 못 만들거나 못 켬 | 팔로워 전원 cancel, `STOPPED`, `SessionError`. 무장된 채 ARMING 에 걸려 있으면 안 된다 |
 | ABORT 뒤 | 감시 태스크도 끝낸다 — 세션이 끝난 로봇의 이벤트 소켓을 계속 열어 두지 않는다 |
