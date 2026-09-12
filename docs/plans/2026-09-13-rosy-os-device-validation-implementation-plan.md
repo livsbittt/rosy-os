@@ -211,3 +211,16 @@ The worker and existing camera tests pass locally (`991 passed, 26 skipped` for
 the full `src/rosy_control/test` suite). This advances SOURCE/LOCAL evidence;
 CSI timing, Picamera2 access, and real frame-quality acceptance remain HOLD at
 the Device/FIELD gates until a Raspberry Pi is available.
+
+## 2026-09-13 implementation checkpoint: module boundary regression
+
+The C6 set-equality guard now includes the fourteen compatibility probes
+introduced by the absorbed sensor adapter and ROS namespace guard. Each probe
+has an explicit accepted verdict in
+`docs/plans/2026-09-06-module-split-criteria.md`; a new probe must update both
+the document and `src/rosy_core/test/test_module_criteria.py`.
+
+The full CORE suite is green: `747 passed, 10 skipped`. This closes the
+source-level boundary regression. It does not advance ARTIFACT, DEVICE, or
+FIELD status: those still require the immutable ARM64 image, Pi installation
+and readback, then real sensor, motor, payload, and OMX evidence.
