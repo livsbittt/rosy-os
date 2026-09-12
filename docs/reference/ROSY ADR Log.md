@@ -54,6 +54,7 @@
 | D-44 | ControlBackend 채택과 OMX 작업 액션 경계 | Proposed |
 | D-45 | 저장소 문서와 자산의 단일 기준 경로 | Accepted |
 | D-46 | Device 설치 후 readback 증거 계약 | Accepted |
+| D-47 | CORE sensor adapter calibration binding | Accepted |
 
 ---
 
