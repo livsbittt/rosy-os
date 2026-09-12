@@ -140,3 +140,23 @@ snapshot을 다시 발행해도 geometry 자체의 시각은 갱신되지 않는
 검증: CORE 전체 717 passed·5 skipped, Control 전체 959 passed·20 skipped.
 이후 확장한 실제 ROS 출력 시험 7개와 만료 보강 후 집중 시험 11개(Control)·41개(CORE)가 통과했다.
 운영 센서 producer의 배선, 보정 record 적용, tracked obstacle/전체 sweep·drive 변환과 Pi 인수는 남아 있다.
+
+### CORE 후보별 tracked obstacle 소비
+
+`TrackedEvidence.capture`는 기존 track/camera packet과 odom pose를 복사하고, 동일 ROS clock의
+원본 stamp를 수신 시점의 monotonic clock으로 변환한다. 원본 dict/list를 이후 수정해도 snapshot은 바뀌지 않는다.
+각 packet은 32KiB 이하, track은 최대 64개로 제한한다. 캡처는 센서 producer에서 수행하고,
+CORE는 고정된 packet을 읽어 기존 `camera_hold`·`observation_risk`·`collision_risk`를 재사용한다.
+
+`GateSnapshot.tracking`과 `update_observations(..., tracking=...)`를 통해 현재 후보의 선속도로 위험을 평가한다.
+정적 장애물의 replan 및 이동/불명 장애물의 wait는 zero limit이며 관리자 e-stop 해제를 요구하지 않는다.
+거리 없는 카메라 장애물도 일시 제한이다. pose·track·camera 누락/만료/잘못된 geometry는 기존 e-stop이다.
+tracking을 한 번 사용한 정책에서 이후 snapshot의 tracking이 빠지면 기존 관측을 폐기한다.
+
+기존 legacy 함수와 동일하게 정적 replan 중 선속도 0인 후보의 회전 여유는 별도의 전방위 형상 gate가 소유한다.
+이 예측은 기존의 선속도 기반 상대 충돌 모델이다. 회전 혼합의 전체 arc sweep나 Nav2 우회 경로 생성을 대체하지 않는다.
+현재는 정책 제한을 CORE에 전달했으며, replan 이유에 따른 backend 재계획·완료 상태 전달은 T4에서 연결해야 한다.
+운영 ROS callback에서 snapshot을 생산하는 배선과 보정 적용·전체 sweep·drive 변환·Pi 인수는 남아 있다.
+
+검증: Control 전체 961 passed·20 skipped, CORE 전체 719 passed·7 skipped.
+이후 확장한 실제 ROS 출력 시험 8개에서 추적 장애물의 zero 출력까지 확인했다.

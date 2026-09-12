@@ -1,5 +1,8 @@
 from rosy_control.control.obstacle_risk import collision_risk, observation_risk
 from rosy_control.control.obstacle_risk import camera_hold
+from rosy_control.control.obstacle_risk import TrackedEvidence
+from dataclasses import replace
+import pytest
 
 
 def test_future_or_malformed_packet_does_not_poison_current_observation():
@@ -52,3 +55,29 @@ def test_camera_near_obstacle_and_missing_observation_require_hold():
     assert camera_hold({'stamp': 0., 'blocked': False}, 1.) == 'camera_observation_unavailable'
     assert camera_hold({'stamp': 1., 'blocked': True}, 1.) == 'camera_obstacle_unranged'
     assert camera_hold({'stamp': 1., 'blocked': False}, 1.) is None
+
+
+def captured(tracks=None, camera=None, pose_stamp=100.):
+    return TrackedEvidence.capture({'stamp': 100., 'frame': 'odom', 'tracks': tracks or []},
+        camera or {'stamp': 100., 'blocked': False}, (0., 0., 0.), pose_stamp,
+        source_now=100., received_at=10., radius=.08, margin=.02)
+
+
+def test_frozen_tracking_preserves_wait_replan_and_camera_hold_distinctions():
+    assert captured([track(.2, 0., state='stationary')]).evaluate(.1, 10.01) == {
+        'action': 'limit', 'reason': 'obstacle_replan'}
+    assert captured([track(.2, 0., vx=-.1)]).evaluate(.1, 10.01) == {
+        'action': 'limit', 'reason': 'obstacle_wait'}
+    assert captured(camera={'stamp': 100., 'blocked': True}).evaluate(.1, 10.01) == {
+        'action': 'limit', 'reason': 'camera_obstacle_unranged'}
+    assert captured(pose_stamp=99.5).evaluate(.1, 10.01)['action'] == 'stop'
+    assert captured(camera={'stamp': 99., 'blocked': False}).evaluate(.1, 10.01)['action'] == 'stop'
+
+
+def test_tracking_copy_is_bounded_and_rejects_invalid_geometry():
+    with pytest.raises(ValueError):
+        captured([track(.2, 0.)] * 65)
+    assert captured([track(5., 0.)] * 64).evaluate(.1, 10.01)['action'] == 'clear'
+    evidence = captured()
+    for changes in ({'pose': [0., 0., 0.]}, {'radius': float('nan')}, {'margin': -.1}):
+        assert replace(evidence, **changes).evaluate(.1, 10.01)['action'] == 'stop'

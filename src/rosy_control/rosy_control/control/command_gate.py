@@ -8,6 +8,7 @@ from dataclasses import dataclass, replace
 from threading import Lock
 from uuid import uuid4
 from .lidar_guard import TranslationEvidence, command_translation_bumpers
+from .obstacle_risk import TrackedEvidence
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,7 @@ class GateSnapshot:
     expires_at: float
     inputs: GateInputs
     translation: TranslationEvidence | None = None
+    tracking: TrackedEvidence | None = None
 
 
 class CommandPolicy:
@@ -65,6 +67,7 @@ class CommandPolicy:
         self._expires_at = None
         self._snapshot = None
         self._translation_required = False
+        self._tracking_required = False
         self._lock = Lock()
 
     @property
@@ -79,7 +82,8 @@ class CommandPolicy:
         with self._lock:
             self._snapshot = None
 
-    def update_observations(self, observations, required, inputs, now, sequence, applied_revision, *, translation=None):
+    def update_observations(self, observations, required, inputs, now, sequence, applied_revision, *, translation=None,
+                            tracking=None):
         """Capture classified state and clocks in one serialized producer callback.
 
         The producer supplies its actually applied revision. Never label sensor
@@ -89,7 +93,7 @@ class CommandPolicy:
         if window is None or applied_revision != self.revision:
             self.invalidate()
             return False
-        return self.update(GateSnapshot(self.session, sequence, applied_revision, *window, inputs, translation))
+        return self.update(GateSnapshot(self.session, sequence, applied_revision, *window, inputs, translation, tracking))
 
     def update(self, snapshot):
         if (not isinstance(snapshot, GateSnapshot) or snapshot.session != self.session or
@@ -112,6 +116,11 @@ class CommandPolicy:
             if snapshot.translation is not None:
                 self._translation_required = True
             elif self._translation_required:
+                self._snapshot = None
+                return False
+            if snapshot.tracking is not None:
+                self._tracking_required = True
+            elif self._tracking_required:
                 self._snapshot = None
                 return False
             self._snapshot = snapshot
@@ -137,6 +146,12 @@ class CommandPolicy:
                 front, rear = command_translation_bumpers(snapshot.translation, linear, angular, now)
                 state = replace(state, obstacle=state.obstacle or front, rear_blocked=state.rear_blocked or rear)
             result = evaluate_command(linear, angular, replace(state, command_age=0.))
+            if snapshot.tracking is not None and result.reason in ('allow', 'motion_limited', 'trajectory_changed'):
+                if not isinstance(snapshot.tracking, TrackedEvidence):
+                    raise ValueError('Invalid tracking evidence')
+                tracking = snapshot.tracking.evaluate(linear, now)
+                if tracking['action'] != 'clear':
+                    result = GateResult(0., 0., tracking['reason'], tracking['action'] == 'stop')
         with self._lock:
             if snapshot is not self._snapshot:
                 return None

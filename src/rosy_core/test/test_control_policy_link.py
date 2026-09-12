@@ -140,6 +140,39 @@ def test_sensor_updates_cannot_silently_drop_required_geometry(linked):
     assert safety.estop
 
 
+def test_tracked_obstacle_uses_current_candidate_direction(linked):
+    from rosy_control.control.obstacle_risk import TrackedEvidence
+    command, safety, modes, policy, snapshot = linked
+    tracks = {'stamp': 100., 'frame': 'odom', 'tracks': [dict(position=[.2, 0.], velocity=[0., 0.],
+              radius=.02, age=0., observed=True, state='stationary')]}
+    camera = {'stamp': 100., 'blocked': False}
+    evidence = TrackedEvidence.capture(tracks, camera, (0., 0., 0.), 100.,
+                                       source_now=100., received_at=10., radius=.076, margin=.02)
+    assert policy.update(replace(snapshot, sequence=2, tracking=evidence))
+    command.set_nav_twist(Twist(.1, 0.), now=10.)
+    assert command.select_output(now=10.01) == Twist()
+    assert not safety.estop
+    command.set_nav_twist(Twist(-.1, 0.), now=10.02)
+    assert command.select_output(now=10.03) == Twist(-.1, 0.)
+    # Mutating the producer's original packet cannot rewrite the snapshot.
+    tracks['tracks'].clear()
+    command.set_nav_twist(Twist(.1, 0.), now=10.04)
+    assert command.select_output(now=10.05) == Twist()
+
+
+def test_tracking_source_delay_and_missing_updates_stop_core(linked):
+    from rosy_control.control.obstacle_risk import TrackedEvidence
+    command, safety, modes, policy, snapshot = linked
+    evidence = TrackedEvidence.capture({'stamp': 99.75, 'frame': 'odom', 'tracks': []},
+        {'stamp': 100., 'blocked': False}, (0., 0., 0.), 100.,
+        source_now=100., received_at=10., radius=.076, margin=.02)
+    assert policy.update(replace(snapshot, sequence=2, tracking=evidence))
+    command.set_nav_twist(Twist(.1, 0.), now=10.1)
+    assert command.select_output(now=10.11) == Twist()
+    assert safety.estop
+    assert not policy.update(replace(snapshot, sequence=3))
+
+
 def test_new_sequence_cannot_refresh_the_same_sensor_sample(linked):
     command, safety, modes, policy, snapshot = linked
     assert not policy.update(replace(snapshot, sequence=2, expires_at=10.4))

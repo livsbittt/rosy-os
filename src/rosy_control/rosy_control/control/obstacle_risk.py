@@ -1,7 +1,67 @@
 """Subject: short-horizon relative collision evidence; never motor authority."""
 import math
+import json
+from dataclasses import dataclass
 
 TRACK_UNCERTAINTY = .03
+
+
+@dataclass(frozen=True)
+class TrackedEvidence:
+    tracks_json: str
+    camera_json: str
+    pose: tuple
+    pose_observed_at: float
+    radius: float
+    margin: float
+
+    @classmethod
+    def capture(cls, tracks, camera, pose, pose_stamp, *, source_now, received_at, radius, margin):
+        """Freeze packets and translate their common ROS clock to monotonic time.
+
+        Capture beside sensor classification, not inside the CORE output loop.
+        Pose must be in the same robot's odom frame as the track packet.
+        """
+        values = (*pose, pose_stamp, source_now, received_at, radius, margin)
+        if (len(pose) != 3 or not all(type(v) in (int, float) and math.isfinite(v) for v in values) or
+                radius <= 0 or margin < 0):
+            raise ValueError('Invalid tracking geometry or clocks')
+        def freeze(packet):
+            stamp = packet['stamp']
+            if type(stamp) not in (int, float) or not math.isfinite(stamp):
+                raise ValueError('Invalid observation stamp')
+            text = json.dumps(dict(packet, stamp=received_at - (source_now - stamp)), allow_nan=False)
+            if len(text.encode('utf-8')) > 32768:
+                raise ValueError('Tracking evidence exceeds size bound')
+            return text
+        if not isinstance(tracks.get('tracks'), list) or len(tracks['tracks']) > 64:
+            raise ValueError('Tracking evidence requires at most 64 tracks')
+        return cls(freeze(tracks), freeze(camera), tuple(pose),
+                   received_at - (source_now - pose_stamp), radius, margin)
+
+    def evaluate(self, speed, now):
+        if (type(self.tracks_json) is not str or type(self.camera_json) is not str or
+                len(self.tracks_json.encode('utf-8')) > 32768 or len(self.camera_json.encode('utf-8')) > 32768 or
+                type(self.pose) is not tuple or len(self.pose) != 3 or
+                not all(type(v) in (int, float) and math.isfinite(v)
+                        for v in (*self.pose, self.pose_observed_at, self.radius, self.margin, speed, now)) or
+                self.radius <= 0 or self.margin < 0):
+            return dict(action='stop', reason='invalid_tracking_evidence')
+        tracks, camera = json.loads(self.tracks_json), json.loads(self.camera_json)
+        if not isinstance(tracks.get('tracks'), list) or len(tracks['tracks']) > 64:
+            return dict(action='stop', reason='invalid_tracking_evidence')
+        hold = camera_hold(camera, now)
+        if hold:
+            return dict(action='limit' if hold == 'camera_obstacle_unranged' else 'stop', reason=hold)
+        if not 0 <= now - self.pose_observed_at <= .3:
+            return dict(action='stop', reason='obstacle_pose_unavailable')
+        result = observation_risk(tracks, now, self.pose, speed, self.radius, self.margin)
+        if result['action'] == 'clear' or (result['action'] == 'replan' and speed == 0.):
+            # The existing full rotation envelope still owns spin clearance.
+            return dict(action='clear', reason='clear')
+        if result['reason'] == 'predicted_obstacle':
+            return dict(action='limit', reason='obstacle_' + result['action'])
+        return dict(action='stop', reason=result['reason'])
 
 
 def accept_observation(value, previous, now, max_age=.5):
