@@ -1,3 +1,5 @@
+> **Historical design baseline.** This 2026-09-12 document preserves the design snapshot. Current source integration and Device status are maintained in the 2026-09-13 Device validation plan and absorption results; D-47 through D-53 record subsequent boundaries. Physical acceptance remains HOLD/PARKED.
+
 # Rosy OS 제어 기능 통합 상세 설계
 
 작성일: 2026-09-12
