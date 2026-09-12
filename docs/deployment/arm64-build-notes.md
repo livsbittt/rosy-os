@@ -57,3 +57,14 @@ ready.
 The old upstream clone-and-delete instructions are retained in
 `legacy-arm64-guide.md` for provenance only and must not be used for a Rosy OS
 deployment.
+
+## 2026-09-13 builder verification
+
+Docker Desktop `desktop-linux` reports `linux/arm64`, but the actual execution
+probe `docker run --rm --platform linux/arm64 alpine:3.20 uname -m` fails with
+`exec format error`. A clean Rosy OS `f0ba2cf` build reaches the base image and
+fails at the first ARM64 `RUN` step with the same error. This is evidence that
+the current builder has no working QEMU/binfmt execution path; it is not an
+ARM64 artifact. Keep ARTIFACT at `HOLD` until a native ARM64 builder or a
+verified binfmt-enabled builder completes the `core`, `io`, manifest, signing,
+and image-digest checks.
