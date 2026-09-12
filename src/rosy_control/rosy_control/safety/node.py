@@ -23,8 +23,8 @@ from ..control.lidar_guard import lidar_blocked, lidar_can_rotate, translation_f
 from ..control.command_gate import GateInputs, evaluate_command
 from ..control.rotation_clearance import rotation_clearance_allowed
 from ..control.rotation_envelope import pivot_clearance, suggest_rotation_translation, straight_translation_limits
-from ..control.motion_sweep import bounded_sweep_clearance, bounded_translation_limits
-from ..control.footprint_sweep import footprint_sweep_clearance, footprint_translation_limits
+from ..control.motion_sweep import command_sweep_clearance, bounded_translation_limits
+from ..control.footprint_sweep import footprint_translation_limits
 from ..control.escape_space import escape_space_plan
 from .bumper import Bumper
 from .gate import Gate
@@ -567,32 +567,11 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
         if bounded_motion and (cmd.linear.x or cmd.angular.z):
             source_age = self.age(getattr(self, 'lidar_measurement_time', None))
             scan_age = max(self.age(self.last_scan_time), source_age)
-            sweep = None
-            if (rotation_estimate is not None and lidar_ok and
-                    getattr(self, 'lidar_rotation_observed', False) and
-                    0 <= source_age <= .2 and 0 <= scan_age <= .2):
-                # Measured rig watchdog + settling <= .575 s. Use .8 s and
-                # account for stale scan motion in every direction, since the
-                # previous command can differ from this command.
-                uncertainty = rotation_estimate['center_uncertainty_m']
-                max_center_speed = .014 + .10*(math.hypot(*rotation_estimate['center_m']) + 2*uncertainty)
-                # Include the old command's possible settling displacement at
-                # a sign change, not only continuation of the requested arc.
-                stale_padding = max_center_speed*(scan_age + .15)
-                if (cmd.linear.x == 0. and abs(cmd.angular.z) <= .1 and can_rotate and
-                        pivot_margin is not None and pivot_margin > .010 + stale_padding):
-                    # The validated full footprint envelope already covers
-                    # every pure-spin pose. A moving body-circle approximation
-                    # is larger and must not veto this stronger geometry proof.
-                    sweep = pivot_margin - .010 - stale_padding
-                elif rotation_estimate.get('footprint_xy'):
-                    sweep=footprint_sweep_clearance(self.lidar_rotation_points,
-                        rotation_estimate['footprint_xy'],rotation_estimate['center_m'],uncertainty,
-                        body_radius,cmd.linear.x,cmd.angular.z,.8,scan_age)
-                else:
-                    sweep = bounded_sweep_clearance(self.lidar_rotation_points,
-                        rotation_estimate['center_m'], uncertainty,
-                        body_radius + stale_padding, cmd.linear.x, cmd.angular.z, .8)
+            sweep = command_sweep_clearance(points=getattr(self, 'lidar_rotation_points', None), estimate=rotation_estimate,
+                body_radius=body_radius, v=cmd.linear.x, w=cmd.angular.z, source_age=source_age,
+                scan_age=scan_age, lidar_fresh=lidar_ok,
+                scan_complete=getattr(self, 'lidar_rotation_observed', False),
+                can_rotate=can_rotate, pivot_margin=pivot_margin)
             if sweep is None or sweep <= 0:
                 self.halt_with_reason('bounded_sweep_unavailable' if sweep is None else 'bounded_sweep_blocked')
                 return

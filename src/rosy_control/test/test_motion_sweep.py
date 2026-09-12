@@ -5,6 +5,21 @@ import pytest
 from rosy_control.control.motion_sweep import bounded_sweep_clearance, bounded_translation_limits
 
 
+def test_final_sweep_preserves_evidence_requirements_and_spin_proof():
+    from rosy_control.control.motion_sweep import command_sweep_clearance
+    values = dict(points=scene((.2, 0.)), estimate={'center_m': (0., 0.), 'center_uncertainty_m': .003},
+                  body_radius=.1, v=.01, w=0., source_age=.1, scan_age=.1,
+                  lidar_fresh=True, scan_complete=True, can_rotate=False, pivot_margin=None)
+    assert command_sweep_clearance(**values) > 0.
+    for changes in ({'estimate': None}, {'scan_complete': False}, {'source_age': -.01},
+                    {'scan_age': .201}, {'lidar_fresh': False}, {'v': .015}):
+        assert command_sweep_clearance(**(values | changes)) is None
+    # A full pivot proof covers every spin pose; a coarse circle must not veto it.
+    spin = values | dict(v=0., w=.1, can_rotate=True, pivot_margin=.04, points=scene((.05, 0.)))
+    assert command_sweep_clearance(**spin) > 0.
+    assert command_sweep_clearance(**(spin | {'can_rotate': False})) < 0.
+
+
 def test_translation_prefilter_uses_body_capsule_not_sector_radius():
     # A return beside the path is inside a 14.9 cm sector threshold, but
     # outside the body, uncertainty, stopping and unchanged 10 mm margins.

@@ -160,3 +160,19 @@ tracking을 한 번 사용한 정책에서 이후 snapshot의 tracking이 빠지
 
 검증: Control 전체 961 passed·20 skipped, CORE 전체 719 passed·7 skipped.
 이후 확장한 실제 ROS 출력 시험 8개에서 추적 장애물의 zero 출력까지 확인했다.
+
+### 최종 sweep 공통 함수와 적용 순서
+
+기존 SafetyNode의 최종 sweep 분기를 `motion_sweep.command_sweep_clearance`로 추출하고 기존 노드가 호출한다.
+complete scan·source/receive age 0~0.2초·회전 중심 추정·양의 차체 반경·선속도 0.014m/s 이하·각속도 0.1rad/s 이하를 요구한다.
+기존 0.8초 horizon과 이전 명령의 정지 잔여 이동 여유를 유지한다. 전체 회전 pivot 증거, 검증된 polygon,
+보수적인 body circle 순서로 기존 계산을 재사용한다. 증거가 없으면 None, 충돌 여유가 없으면 0 이하를 반환한다.
+
+현재 SafetyNode는 `drive gain → angular gain → profile/lease 공통 scale → sweep → drive sign → publish` 순서다.
+CORE의 현 SafetyDecision은 상한을 낮추는 계약이므로, 보정으로 달라진 최종 후보를 검사하기 전에
+단순히 `bounded_motion` 허용을 켜면 기존 경로와 동등하지 않다. CORE 연결 전 실제 발행 후보·보정 revision·허용 환경을
+같이 고정하고 그 후보에 sweep을 적용해야 한다. 기존 domain 227 시뮬레이션 전용 활성 조건은 변경하지 않았다.
+CORE bounded motion은 계속 비활성/정지이며 물리 장치의 정지 거리나 실물 운행을 승인한 변경이 아니다.
+
+검증: 공통 sweep/footprint 집중 시험 52개, Control 전체 962 passed·20 skipped,
+실제 ROS 두 namespace 처리 노드 생성 시험 통과. 실제 모터의 궤적/제동 인수는 남아 있다.

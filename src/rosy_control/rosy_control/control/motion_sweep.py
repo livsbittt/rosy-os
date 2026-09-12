@@ -14,6 +14,38 @@ def _finite_number(value):
     return isinstance(value, Real) and not isinstance(value, bool) and math.isfinite(value)
 
 
+def command_sweep_clearance(*, points, estimate, body_radius, v, w, source_age, scan_age,
+                            lidar_fresh, scan_complete, can_rotate, pivot_margin):
+    """Final calibrated candidate gate from the commissioned simulation path.
+
+    The caller owns matching geometry provenance and complete scan coverage.
+    A successful calculation alone does not authorize physical actuation.
+    """
+    try:
+        if (estimate is None or not lidar_fresh or not scan_complete or
+                not all(_finite_number(value) for value in (body_radius, v, w, source_age, scan_age)) or
+                body_radius <= 0 or abs(v) > .014 or abs(w) > .1 or
+                not 0 <= source_age <= .2 or not 0 <= scan_age <= .2):
+            return None
+        center, uncertainty = estimate['center_m'], estimate['center_uncertainty_m']
+        if (len(center) != 2 or not all(_finite_number(value) for value in (*center, uncertainty)) or
+                not 0 <= uncertainty <= .03):
+            return None
+        # Retain the existing rig's stopping/settling and old-command padding.
+        max_center_speed = .014 + .10 * (math.hypot(*center) + 2 * uncertainty)
+        stale_padding = max_center_speed * (scan_age + .15)
+        if (v == 0. and can_rotate and pivot_margin is not None and
+                _finite_number(pivot_margin) and pivot_margin > .010 + stale_padding):
+            return pivot_margin - .010 - stale_padding
+        if estimate.get('footprint_xy'):
+            from .footprint_sweep import footprint_sweep_clearance
+            return footprint_sweep_clearance(points, estimate['footprint_xy'], center, uncertainty,
+                                             body_radius, v, w, .8, scan_age)
+        return bounded_sweep_clearance(points, center, uncertainty, body_radius + stale_padding, v, w, .8)
+    except (TypeError, ValueError, KeyError, OverflowError):
+        return None
+
+
 def bounded_translation_limits(points, center, uncertainty, body_radius, scan_age):
     """Directional prefilter; the final command still needs its full sweep."""
     try:
