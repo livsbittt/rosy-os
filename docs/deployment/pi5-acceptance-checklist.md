@@ -290,3 +290,12 @@ ROSY_IMAGE_MOUNT=/mnt/rosy ./deploy/image/verify-artifacts.sh dist/<release-id>
 각 게이트마다 남긴다: 날짜, 장비 시리얼, release_id, git revision, 이미지
 digest, 통과/실패, 실패 시 오류 코드와 로그. **증거 없는 게이트는 통과로 표시하지
 않는다.** 통과하지 못한 게이트는 HOLD로 남기고 그 이유를 적는다.
+## 2026-09-13 current Rosy OS source/device checkpoint
+
+The source and ROS-simulation gates are currently GO. An emulated Buildx
+validation produced development candidates for the `core` and `io` targets,
+but this does not satisfy `BUILD_GO`: the images are not signed or published,
+and no Pi OS image has been flashed. `BOOT_GO`, `NETWORK_GO`, `UPDATE_GO`, and
+`FIELD_GO` therefore remain HOLD. The next evidence must be retained from the
+actual Pi installation and JSON readback before enabling motor, camera,
+payload, or OMX capabilities.
