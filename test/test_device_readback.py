@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import importlib.util
+import base64
+import hashlib
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -11,21 +14,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "deploy" / "robot" / "device_readback.py"
 
-_TRUSTED_PUBLIC_KEY = (
-    "-----BEGIN PUBLIC KEY-----\n"
-    "MCowBQYDK2VwAyEA" + "L6hVkPrxqDNolCmMvsuHEw0bEP7vFxHk8I3K3j0LiVY=" +
-    "\n-----END PUBLIC KEY-----\n"
-)
 _UNTRUSTED_PUBLIC_KEY = (
     "-----BEGIN PUBLIC KEY-----\n"
-    "MCowBQYDK2VwAyEA" + "YE9UJoRcaYjFVdGxg8yY6ewbzzZ5ZODOuNXpIFlghOM=" +
+    "MCowBQYDK2VwAyEA" + "rTJ4aW2aFFYUIaaFUW4rcJWQ3aqO+yCy8IYJg4Cg7Ng=" +
     "\n-----END PUBLIC KEY-----\n"
 )
-_VALID_SIGNATURE = "".join((
-    "d6LFNVwb6qpKp2KHaPrfN4MqGliIhqoN",
-    "aLxqcRqt8oHeP4c0GY2qt2x3aGuFiedJDX",
-    "atBSAYaYpabXoXFGoaAA==",
-))
 
 SPEC = importlib.util.spec_from_file_location("device_readback", MODULE_PATH)
 assert SPEC and SPEC.loader
@@ -70,13 +63,7 @@ def _fake_device(tmp_path: Path) -> Path:
     )
     release = install / "releases" / "2026.09.13-001"
     release.mkdir(parents=True)
-    (release / "SHA256SUMS").write_bytes(b"test\n")
-    (release / "SHA256SUMS.sig").write_text(_VALID_SIGNATURE, encoding="utf-8")
-    trusted_keys = root / "etc" / "rosy" / "trusted-release-keys"
-    trusted_keys.mkdir(parents=True)
-    (trusted_keys / "rosy-release-2026-01.pem").write_text(
-        _TRUSTED_PUBLIC_KEY, encoding="utf-8"
-    )
+    (release / "payload").write_bytes(b"test\n")
     (release / "manifest.json").write_text(
         json.dumps(
             {
@@ -93,6 +80,54 @@ def _fake_device(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
+    sums = (
+        f"{hashlib.sha256((release / 'manifest.json').read_bytes()).hexdigest()}  manifest.json\n"
+        f"{hashlib.sha256((release / 'payload').read_bytes()).hexdigest()}  payload\n"
+    ).encode()
+    (release / "SHA256SUMS").write_bytes(sums)
+    openssl = shutil.which("openssl")
+    if openssl is None:
+        raise RuntimeError("openssl is required for the signed readback fixture")
+    private = tmp_path / "readback-signing.key"
+    public = tmp_path / "readback-signing.pub"
+    signature = tmp_path / "readback-signing.sig"
+    subprocess.run(
+        [openssl, "genpkey", "-algorithm", "ed25519", "-out", str(private)],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        [openssl, "pkey", "-in", str(private), "-pubout", "-out", str(public)],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        [
+            openssl,
+            "pkeyutl",
+            "-sign",
+            "-inkey",
+            str(private),
+            "-rawin",
+            "-in",
+            str(release / "SHA256SUMS"),
+            "-out",
+            str(signature),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    (release / "SHA256SUMS.sig").write_text(
+        base64.b64encode(signature.read_bytes()).decode("ascii"), encoding="utf-8"
+    )
+    trusted_keys = root / "etc" / "rosy" / "trusted-release-keys"
+    trusted_keys.mkdir(parents=True)
+    (trusted_keys / "rosy-release-2026-01.pem").write_text(
+        public.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    private.unlink()
+    public.unlink()
+    signature.unlink()
     return root
 
 

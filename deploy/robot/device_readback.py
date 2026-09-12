@@ -169,7 +169,7 @@ def _signature_status(root: Path, release_dir: Path, key_id: Any) -> dict[str, s
     if verifier is None:
         return {"status": "unavailable", "reason": "signature_verifier_missing"}
     try:
-        rejections = verifier.verify_signature(sums, signature, public_key)
+        rejections = verifier.verify_release_files(release_dir, public_key)
     except verifier.SigningToolMissing:
         return {"status": "unavailable", "reason": "openssl_missing"}
     except (OSError, RuntimeError, ValueError):
