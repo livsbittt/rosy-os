@@ -18,6 +18,7 @@ the scanner.
 
 from __future__ import annotations
 
+import csv
 import re
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
@@ -101,6 +102,20 @@ _BARE_TOKEN = re.compile(r"\b(?P<value>[A-Fa-f0-9]{40,}|[A-Za-z0-9+/]{50,}={0,2}
 # Public references, stripped before entropy matching: a long documentation URL
 # is indistinguishable from base64 to a character-class matcher.
 _URL = re.compile(r"\b(?:https?|ftp|git|ssh)://\S+")
+
+# A prose list of public paths can look like a base64 token when several
+# slash-separated words are written without spaces. It is not a credential:
+# release-delivery examples use this shape for the ordered test boundaries.
+_PUBLIC_PATH_TOKEN = re.compile(
+    r"(?i)^[a-z][a-z0-9_.-]*(?:/[a-z][a-z0-9_.-]*)+/?$"
+)
+
+# The absorption inventory intentionally records source and destination
+# SHA-256 values. They are public provenance fields, not device credentials.
+# Scrub only CSV columns 3 and 4 for that one known inventory format; other
+# long hex values remain subject to the normal matcher.
+_ABSORPTION_INVENTORY_SUFFIX = "docs/plans/2026-09-12-control-absorption-inventory.csv"
+_SHA256 = re.compile(r"^[A-Fa-f0-9]{64}$")
 
 # Lines whose long hex is public integrity data rather than a secret.
 #
@@ -305,8 +320,23 @@ def scan_text(path: str, text: str) -> list[Finding]:
         if matched_assignment:
             continue
 
-        for match in _BARE_TOKEN.finditer(_URL.sub(" ", line)):
+        entropy_line = _URL.sub(" ", line)
+        if path.replace("\\", "/").endswith(_ABSORPTION_INVENTORY_SUFFIX):
+            try:
+                fields = next(csv.reader([line]))
+            except (csv.Error, StopIteration):
+                fields = []
+            if len(fields) >= 4:
+                # Keep all non-provenance columns visible to the scanner.
+                for index in (2, 3):
+                    if _SHA256.fullmatch(fields[index] or ""):
+                        fields[index] = ""
+                entropy_line = ",".join(fields)
+
+        for match in _BARE_TOKEN.finditer(entropy_line):
             value = match.group("value")
+            if _PUBLIC_PATH_TOKEN.fullmatch(value):
+                continue
             # sha256 digests and git revisions are public integrity data, not
             # secrets, and the release manifest is full of them. Word-bounded:
             # unanchored, "oid" matched inside avoid/void/android and "hash"

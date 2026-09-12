@@ -379,6 +379,30 @@ def test_scanner_ignores_placeholders_and_public_data():
     )
 
 
+def test_scanner_ignores_public_provenance_paths_and_absorption_hashes():
+    path_line = (
+        "Run manifest/signing/layout/updater/storage/host/runtime boundaries "
+        "and core/Fleet."
+    )
+    assert not scan_text("docs/plans/release.md", path_line)
+
+    digest = "a" * 64
+    inventory_line = (
+        f'"src.py","src/rosy_control/src.py","{digest}","{digest}",'
+        '"package-metadata","copied","provenance","tests"'
+    )
+    assert not scan_text(
+        "docs/plans/2026-09-12-control-absorption-inventory.csv",
+        inventory_line,
+    )
+
+    # The exception is scoped to the inventory's two digest columns.
+    assert scan_text(
+        "docs/plans/other.csv",
+        f'"src.py","dst.py","{digest}","{digest}"',
+    )
+
+
 # --- a call is not a literal, but a literal inside one still is -------------
 
 

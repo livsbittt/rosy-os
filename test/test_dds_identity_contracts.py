@@ -113,19 +113,17 @@ def test_the_readme_quickstart_sets_identity_before_invoking_compose():
     """
     block = None
     for chunk in _text(README).split("```"):
-        if "runtime-mode.sh up" in chunk and "cp .env.example .env" in chunk:
+        if "runtime-mode.sh up" in chunk and "install-pi.sh" in chunk:
             block = chunk
             break
     assert block is not None, "README quickstart block not found"
 
-    copied = block.index("cp .env.example .env")
-    composed = block.index("docker compose")
-    for key in IDENTITY_KEYS:
-        assert key in block, f"README quickstart never sets {key}"
-        assert copied < block.index(key) < composed, (
-            f"{key} must be set after the template copy and before compose runs, "
-            f"or the documented sequence fails at the compose step"
-        )
+    identity = block.index("ROSY_ROBOT_NUMBER=1")
+    installer = block.index("install-pi.sh")
+    runtime = block.index("runtime-mode.sh up")
+    assert identity < installer < runtime, (
+        "the Device number must be supplied to install-pi.sh before runtime startup"
+    )
 
 
 # --- (c) 설치 스크립트 ----------------------------------------------------
@@ -193,7 +191,23 @@ def test_the_dev_script_also_exports_the_namespace():
 
 # --- 실제 동작 (bash 가 있을 때만) -----------------------------------------
 
-BASH = shutil.which("bash")
+def _find_usable_bash():
+    candidate = shutil.which("bash")
+    if not candidate:
+        return None
+    try:
+        probe = subprocess.run(
+            [candidate, "-c", "true"],
+            capture_output=True,
+            timeout=2,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return candidate if probe.returncode == 0 else None
+
+
+BASH = _find_usable_bash()
 
 
 def _drive_installer(robot_number, preset=None):

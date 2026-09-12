@@ -224,3 +224,24 @@ The full CORE suite is green: `747 passed, 10 skipped`. This closes the
 source-level boundary regression. It does not advance ARTIFACT, DEVICE, or
 FIELD status: those still require the immutable ARM64 image, Pi installation
 and readback, then real sensor, motor, payload, and OMX evidence.
+
+## 2026-09-13 implementation checkpoint: host-contract and release-scan regression
+
+The Device contract tests now probe for an executable Bash implementation
+before invoking shell scripts. This distinguishes a usable Git/MSYS Bash from
+the Windows `System32\bash.exe` WSL stub, so unsupported host tooling is
+reported as a skip instead of a false runtime failure. The README contract
+also follows the canonical Device sequence: pass `ROSY_ROBOT_NUMBER` to
+`install-pi.sh`, then start `runtime-mode.sh`.
+
+The shared release scanner now ignores only two documented public-data cases:
+slash-separated provenance paths in release prose and the source/destination
+SHA-256 columns of the dated Control absorption inventory. A regression test
+keeps those exceptions scoped; the same digest-shaped value in another CSV is
+still reported.
+
+Fresh root contract evidence with the Git-provided Bash/OpenSSL path available:
+`800 passed, 24 skipped`; Pi deployment contracts alone: `30 passed`; release
+boundary guards: `62 passed`. This is host/source evidence. It does not create
+an ARM64 artifact, a Pi readback, or physical camera, motor, payload, or OMX
+evidence.

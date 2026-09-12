@@ -21,9 +21,25 @@ UART_CONFIG = DEPLOY / "configure-uart-pi5.sh"
 MOTOR_VERIFY = DEPLOY / "verify-motors.sh"
 RESOLVE_MODE = DEPLOY / "config" / "resolve-mode.sh"
 
+def _find_usable_bash():
+    candidate = shutil.which("bash")
+    if not candidate:
+        return None
+    try:
+        probe = subprocess.run(
+            [candidate, "-c", "true"],
+            capture_output=True,
+            timeout=2,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return candidate if probe.returncode == 0 else None
+
+
+BASH = _find_usable_bash()
 bash_only = pytest.mark.skipif(
-    subprocess.run(["bash", "-c", "true"], capture_output=True,
-                   check=False).returncode != 0,
+    BASH is None,
     reason="bash is required to exercise the runtime-mode resolver",
 )
 
@@ -144,7 +160,7 @@ def _resolve(mode: str) -> subprocess.CompletedProcess:
     # is not something Git Bash can `source`, and this is also how the wrapper
     # uses it — beside its own board.yaml.
     return subprocess.run(
-        ["bash", "-c",
+        [BASH, "-c",
          f'source ./resolve-mode.sh; resolve_runtime_mode "{mode}" ./board.yaml'],
         cwd=str(RESOLVE_MODE.parent), capture_output=True, text=True,
         # text=True decodes with the locale codec, which is cp949 here and
@@ -335,6 +351,7 @@ def test_motor_preflight_checks_uart_and_runs_torque_free_dynamixel_probe():
     assert "write4ByteTxRx" not in probe
 
 
+@bash_only
 def test_the_motor_runtime_gate_fails_closed_when_compose_cannot_answer(tmp_path):
     """이 게이트는 살아 있는 모터 런타임 위로 UART 프로브가 겹치는 것을 막는다.
 
@@ -350,9 +367,6 @@ def test_the_motor_runtime_gate_fails_closed_when_compose_cannot_answer(tmp_path
     assert 'if ! running="$(' in script, (
         "the gate must branch on compose's exit status, not only on empty output"
     )
-
-    if shutil.which("bash") is None:
-        pytest.skip("bash is required to exercise the gate")
 
     stub = tmp_path / "bin"
     stub.mkdir()
@@ -380,7 +394,7 @@ def test_the_motor_runtime_gate_fails_closed_when_compose_cannot_answer(tmp_path
     # 여기 bash 는 Windows 드라이브 경로도 그 MSYS 형태도 풀지 못한다 —
     # test_image_pipeline.py 가 같은 이유로 상대이름 + 명시적 cwd 를 쓴다.
     result = subprocess.run(
-        ["bash", "gate.sh"],
+        [BASH, "gate.sh"],
         cwd=str(tmp_path),
         capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
