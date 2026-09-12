@@ -13,13 +13,14 @@
 - T3 단일 명령권·안전 정책: 진행 중. Control 정책·후보별 geometry/tracking과 시뮬레이션 한정 보정/sweep을 CORE 출력에 연결했다. sensor-only producer가 observation deadline과 profile revision을 CORE policy에 전달하며, 운영 활성화는 미완료다.
 - T4 주행 backend 연결, T5 웹·정비·진단, T6 이미지·기동·CI, T7 Pi 인수, T8 유지보수 전환: 후속 단계. T6의 generation 전달 일부는 T2 선행 작업으로 구현했으며 T6 완료를 뜻하지 않는다.
 
-현재 코드 기준은 `78ce44e`다. 최신 Control 회귀는 983 passed·23 skipped,
+현재 코드 기준은 센서 handoff 변경까지 포함한 작업 브랜치다. 최신 Control 회귀는 983 passed·25 skipped,
 CORE 회귀는 725 passed·10 skipped다. 격리된 실제 ROS graph/parameter 시험 5개와
 기존 두 namespace 처리 노드 생성 시험을 확인했다.
 아래 기록은 작업 당시의 검증 이력이다. 최신 안전 경계와 남은 조건은
 [단일 안전 중재 구현 기록](2026-09-13-control-safety-boundary.md)을 함께 읽는다.
 후속 보정 snapshot reader와 비교용 SafetyNode의 생성자 적용/readback을 구현했다.
-Control 전체 979 passed·21 skipped, 실제 ROS 파라미터 시험 3개와 두 namespace 생성 시험을 통과했다.
+이전 snapshot 단계에서 Control 전체 979 passed·21 skipped였고, 이번 handoff 단계의 최신 결과는
+Control 983 passed·25 skipped, 실제 ROS 파라미터/graph 시험 7개와 두 namespace 생성 시험 통과다.
 이제 센서 전용 producer가 적용 revision과 source/receive deadline을 CORE policy에 공급한다.
 파일 저장이나 ROS parameter 응답만으로 이 경로가 완성됐다고 판정하지 않는다.
 

@@ -19,7 +19,8 @@ from ..sensing.filt import IrMedian, MedianLp
 from ..sensing.body import URDF_RADIUS, use_radius
 from ..sensing.lidar import NOSE_YAW
 from ..sensing.localization import lease_ready
-from ..control.lidar_guard import lidar_blocked, lidar_can_rotate, translation_footprint_eligible
+from ..control.lidar_guard import (lidar_blocked, lidar_can_rotate,
+                                   translation_footprint_eligible, TranslationEvidence)
 from ..control.command_gate import GateInputs, evaluate_command
 from ..control.policy_handoff import ControlPolicyProducer
 from ..control.actuation import prepare_command
@@ -384,6 +385,8 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
         self.rear_blocked = lidar_blocked(
             self.rear_distance(), rear_d, self.rear_blocked,
             self.rear_stop_d, self.rear_clear_d, lidar_ok)
+        self._policy_previous_front = previous_front
+        self._policy_previous_rear = previous_rear
         can_rev = lidar_ok and not self.rear_blocked and rear_d > self.rear_stop_d
         travel = getattr(self, 'translation_clearance', None)
         footprint = translation_footprint_eligible(
@@ -570,9 +573,13 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
         self.block_pub.publish(Bool(data=obstacle))
 
         if self._sensor_only:
+            handoff_now = time.monotonic()
+            translation_evidence = self._translation_policy_evidence(handoff_now)
             failure = self.required_observation_failure()
             if (self.get_parameter('obstacle_tracking_enabled').value or
-                    self.get_parameter('simulation_motion_sweep_enabled').value):
+                    self.get_parameter('simulation_motion_sweep_enabled').value or
+                    (self.get_parameter('footprint_guard_enabled').value and
+                     translation_evidence is None)):
                 failure = 'candidate_evidence_handoff_required'
             self.sensor_state = GateInputs(
                 profile_valid=self.profile_valid, observation_failure=failure,
@@ -582,7 +589,7 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
                 obstacle=obstacle, cliff=self.cliff, can_rotate=can_rotate)
             if self._policy_producer is not None:
                 self.sensor_policy_published = self._policy_producer.publish(
-                    self.sensor_state, now=time.monotonic())
+                    self.sensor_state, now=handoff_now, translation=translation_evidence)
             return
 
         if self.estop:
@@ -648,6 +655,43 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
 
     def on_drive_ready(self, msg):
         self.drive_ready = bool(msg.data)
+
+    def _translation_policy_evidence(self, now):
+        """Freeze the current LiDAR footprint result for candidate re-checking."""
+        if not self._sensor_only or not self.get_parameter('footprint_guard_enabled').value:
+            return None
+        row = self.observations.rows.get('lidar')
+        travel = getattr(self, 'translation_clearance', None)
+        mount = getattr(self, 'lidar_mount', None)
+        ranges = (self.lidar_front, self.lidar_rear, self.lidar_left,
+                  self.lidar_right, self.lidar_rear_left, self.lidar_rear_right)
+        if row is None or row.received is None or not self.observations.fresh('lidar', now):
+            return None
+        if not translation_footprint_eligible(
+                0., 0., enabled=True, lidar_fresh=True,
+                scan_age=now - row.received, source_age=row.source_age,
+                mount=mount, travel=travel, radius=self.robot_r,
+                ranges=ranges):
+            return None
+        try:
+            gains = self.calibration_lease.gains(now)
+        except (TypeError, ValueError):
+            return None
+        return TranslationEvidence(
+            scan_received_at=row.received,
+            scan_source_at=row.received - row.source_age,
+            enabled=True,
+            lidar_fresh=True,
+            mount=tuple(mount),
+            travel=tuple(travel),
+            radius=self.robot_r,
+            ranges=tuple(ranges),
+            radial_front=bool(self.blocked),
+            radial_rear=bool(self.rear_blocked),
+            previous_front=bool(getattr(self, '_policy_previous_front', False)),
+            previous_rear=bool(getattr(self, '_policy_previous_rear', False)),
+            linear_gains=tuple(gains),
+        )
 
     def on_localization(self, msg):
         try:

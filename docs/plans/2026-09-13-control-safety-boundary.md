@@ -271,11 +271,13 @@ clock 기준으로 fresh일 때만 snapshot을 생성하고, 누락·stale·잘�
 
 `SafetyNode.bind_policy_handoff`는 sensor-only 생성자에서만 허용하고, 실제 profile revision과
 CORE policy revision이 같은지 확인한다. 이후 각 sensor tick에서 producer를 호출한다.
-현재 handoff는 radial `GateInputs`만 전달한다. tracking/translation/bounded sweep가 활성화된
-sensor profile은 후보별 증거를 공급하지 못하므로 `candidate_evidence_handoff_required`로
-무효화된다. 따라서 해당 evidence의 실제 producer를 추가하기 전에는 CORE의 제한된 경로를
-운영 profile에 켜지 않는다.
+현재 handoff는 기본적으로 radial `GateInputs`를 전달한다. sensor-only LiDAR가 검증된 mount,
+translation clearance, 여섯 방향 range와 source/receive clock을 보유하면 immutable
+`TranslationEvidence`도 함께 전달하고 CORE가 현재 후보마다 재평가한다. footprint가 설정됐는데
+그 증거가 없으면 `candidate_evidence_handoff_required`로 무효화된다. tracking과 bounded sweep는
+아직 같은 방식의 실제 producer가 없으므로 운영 profile에 켜지 않는다.
 
-검증: 순수 handoff 시험 4개와 실제 ROS parameter/graph 시험 5개에서 fresh window,
+검증: 순수 handoff 시험 4개와 실제 ROS parameter/graph 시험 7개에서 fresh window,
 deadline expiry, required stream 손실, revision mismatch 및 sensor-only node의 endpoint
-부재를 확인했다. 기존 Control 전체 회귀 결과는 979 passed·22 skipped이다.
+부재를 확인했고, translation evidence가 snapshot에 포함되는 것도 확인했다. 기존 Control 전체
+회귀 결과는 983 passed·25 skipped이다.

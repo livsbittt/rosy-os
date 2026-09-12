@@ -17,6 +17,60 @@ if rclpy is not None:
 
 @unittest.skipIf(rclpy is None, 'Requires isolated ROS Jazzy graph')
 class ParameterGraphTests(unittest.TestCase):
+    def test_sensor_only_handoff_carries_translation_evidence_to_core(self):
+        from rosy_control.control.command_gate import CommandPolicy
+        from rosy_control.safety.node import SafetyNode
+        from rclpy.parameter import Parameter
+        rclpy.init(args=['--ros-args', '-r', '__ns:=/rosy_01'])
+        node = None
+        try:
+            node = SafetyNode(sensor_only=True, parameter_overrides=[
+                Parameter('footprint_guard_enabled', value=True)])
+            node._refresh_distances()
+            node.lidar_mount = (-.017, 0.)
+            node.translation_clearance = (.02, .02)
+            node.lidar_front = node.lidar_rear = .2
+            node.lidar_left = node.lidar_right = node.lidar_rear_left = node.lidar_rear_right = .2
+            node.refresh_profile()
+            policy = CommandPolicy(node.profile.revision)
+            node.bind_policy_handoff(policy, ('lidar',), node.profile.revision)
+            received = time.monotonic()
+            node.observations.add('lidar', received)
+            node.tick()
+            self.assertTrue(node.sensor_policy_published)
+            result = policy.evaluate(.01, 0., time.monotonic())
+            self.assertIsNotNone(result)
+            self.assertIsNotNone(result[0].translation)
+        finally:
+            if node is not None:
+                node.destroy_node()
+            rclpy.shutdown()
+
+    def test_sensor_only_builds_translation_evidence_from_current_lidar_sample(self):
+        from rosy_control.safety.node import SafetyNode
+        from rosy_control.control.lidar_guard import TranslationEvidence
+        from rclpy.parameter import Parameter
+        rclpy.init(args=['--ros-args', '-r', '__ns:=/rosy_01'])
+        node = None
+        try:
+            node = SafetyNode(sensor_only=True, parameter_overrides=[
+                Parameter('footprint_guard_enabled', value=True)])
+            node._refresh_distances()
+            received = time.monotonic()
+            node.observations.add('lidar', received)
+            node.lidar_mount = (-.017, 0.)
+            node.translation_clearance = (.02, .02)
+            node.lidar_front = node.lidar_rear = .2
+            node.lidar_left = node.lidar_right = node.lidar_rear_left = node.lidar_rear_right = .2
+            evidence = node._translation_policy_evidence(received + .01)
+            self.assertIsInstance(evidence, TranslationEvidence)
+            self.assertEqual(evidence.travel, (.02, .02))
+            self.assertEqual(evidence.ranges, (.2,) * 6)
+        finally:
+            if node is not None:
+                node.destroy_node()
+            rclpy.shutdown()
+
     def test_sensor_only_handoff_consumes_real_observation_window(self):
         from rosy_control.control.command_gate import CommandPolicy
         from rosy_control.safety.node import SafetyNode
