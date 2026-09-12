@@ -21,6 +21,7 @@ from ..sensing.lidar import NOSE_YAW
 from ..sensing.localization import lease_ready
 from ..control.lidar_guard import lidar_blocked, lidar_can_rotate, translation_footprint_eligible
 from ..control.command_gate import GateInputs, evaluate_command
+from ..control.actuation import prepare_command
 from ..control.rotation_clearance import rotation_clearance_allowed
 from ..control.rotation_envelope import pivot_clearance, suggest_rotation_translation, straight_translation_limits
 from ..control.motion_sweep import command_sweep_clearance, bounded_translation_limits
@@ -551,19 +552,19 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
             self._sign_t = None
             self._sign_front0 = None
             self._sign_hits = 0
-        # Apply after semantic halt: +raw means nose-forward.
-        cmd.linear.x = self.corrected_drive_speed(cmd.linear.x)
-        if abs(cmd.linear.x) < 1e-4 and abs(cmd.angular.z) <= .06:
-            gains = self.calibration_lease.angular_gains(time.monotonic())
-            cmd.angular.z *= gains[0 if cmd.angular.z >= 0 else 1]
-        scale = min(1., self.profile.max_linear / max(abs(cmd.linear.x), 1e-12),
-                    self.profile.max_angular / max(abs(cmd.angular.z), 1e-12))
-        limited_caps = self.calibration_lease.motion_limits(time.monotonic())
-        if limited_caps is not None:
-            scale = min(scale, limited_caps[0] / max(abs(cmd.linear.x), 1e-12),
-                        limited_caps[1] / max(abs(cmd.angular.z), 1e-12))
-        cmd.linear.x *= scale
-        cmd.angular.z *= scale
+        # Pin one lease time and one prepared candidate through sweep/publication.
+        lease_now = time.monotonic()
+        try:
+            prepared = prepare_command(cmd.linear.x, cmd.angular.z,
+                requested_angular=self.last_cmd.angular.z,
+                linear_gains=self.calibration_lease.gains(lease_now),
+                angular_gains=self.calibration_lease.angular_gains(lease_now),
+                profile_caps=(self.profile.max_linear, self.profile.max_angular),
+                limited_caps=self.calibration_lease.motion_limits(lease_now), linear_sign=self.cmd_linear_sign)
+        except ValueError:
+            self.halt_with_reason('invalid_actuation')
+            return
+        cmd.linear.x, cmd.angular.z = prepared.linear, prepared.angular
         if bounded_motion and (cmd.linear.x or cmd.angular.z):
             source_age = self.age(getattr(self, 'lidar_measurement_time', None))
             scan_age = max(self.age(self.last_scan_time), source_age)
@@ -578,7 +579,7 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
         self.record_decision(cmd.linear.x, cmd.angular.z,
                              'allow' if (cmd.linear.x == self.last_cmd.linear.x and
                                          cmd.angular.z == self.last_cmd.angular.z) else 'motion_limited')
-        cmd.linear.x *= self.cmd_linear_sign
+        cmd.linear.x = prepared.motor_linear
         self.pub.publish(cmd)
 
     def on_drive_ready(self, msg):

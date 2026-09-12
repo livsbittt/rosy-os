@@ -176,3 +176,20 @@ CORE bounded motion은 계속 비활성/정지이며 물리 장치의 정지 거
 
 검증: 공통 sweep/footprint 집중 시험 52개, Control 전체 962 passed·20 skipped,
 실제 ROS 두 namespace 처리 노드 생성 시험 통과. 실제 모터의 궤적/제동 인수는 남아 있다.
+
+### 보정 이후 최종 발행 후보 준비
+
+`control/actuation.py`의 `prepare_command`가 방향별 linear/angular gain과 profile/limited-sensor 상한을
+기존 순서로 적용한다. 선속도·각속도에 동일한 scale을 적용해 혼합 명령의 비율을 유지한다.
+gain의 적용 영역은 원래 요청의 angular 값도 사용한다. 이전 gate에서 회전을 제거했다고 해서
+legacy 틸트 복구 후보를 새 직진 보정 영역으로 재분류하지 않는다.
+
+결과 `PreparedCommand`는 sweep에 사용할 `linear/angular`와 방향 부호를 반영한 `motor_linear`를 고정한다.
+기존 SafetyNode는 한 lease 시각으로 gains/caps를 읽고, 준비된 후보로 sweep과 decision 기록을 수행한 뒤
+고정된 motor 값을 발행한다. 검사와 발행 사이에 방향 값을 다시 읽지 않는다. 잘못된 gain/cap/sign은 정지한다.
+이 변경은 보정 데이터의 출처나 적용 권한을 새로 인증하는 기능이 아니며, CORE에는 아직 자동 연결하지 않았다.
+
+검증: 기존 유한 입력 수식 960개 조합 일치, Control 전체 973 passed·20 skipped.
+이후 추가한 실제 노드 발행 구간 시험을 포함한 actuation 집중 시험 12개와 실제 ROS 노드 생성 시험이 통과했다.
+CORE에서 정책 제한과 보정 변환의 역할을 분리하고, 같은 보정 revision의 PreparedCommand를
+최종 sweep·발행·보정 acknowledgement에 연결하는 작업이 남아 있다.
