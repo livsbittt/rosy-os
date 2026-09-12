@@ -3,9 +3,14 @@
 
 # plan
 
+> **Status:** Historical planning area. The current Rosy OS implementation and
+> Device execution source of truth is under `docs/plans/`; this directory keeps
+> the upstream WBS and Flask parity evidence for traceability only.
+
 ## Purpose
 
-Durable WBS and Flask-parity tracker. Dated working plans live in `docs/plans/`, not here.
+Historical WBS and Flask-parity evidence. Dated working plans live in
+`docs/plans/`, not here.
 
 ## Key Files
 
@@ -21,6 +26,9 @@ None.
 ## For AI Agents
 
 ### Working In This Directory
+
+- Do not add new implementation tasks here. Update the dated Rosy OS plan in
+  `docs/plans/` instead.
 
 - Phases: P0 rename/multi-robot → P1 rosy_core → P2 rosy_web → P3 two-robot → P4 rosy_fleet → P5 formation → P6 expand.
 - Task IDs look like `P1-9`. Prefer updating the matrix when you finish work.

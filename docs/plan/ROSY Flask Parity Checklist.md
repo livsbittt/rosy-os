@@ -1,5 +1,10 @@
 # ROSY Flask 동등성 체크리스트 (P0-7, D-3)
 
+> **Status: Historical parity baseline.** Flask was replaced by the Rosy OS
+> FastAPI surface under D-3. Keep this checklist for migration traceability;
+> current implementation and Device validation are tracked in
+> `docs/plans/2026-09-13-rosy-os-device-validation-implementation-plan.md`.
+
 **Document ID:** ROSY-PLN-CHK-001
 **기준:** 구 Flask `rosy_navigation/scripts/nav2_web_server.py` (560줄) vs 신규 `rosy_core` FastAPI `/api/v1` (ROSY-API-REF-001)
 **완료 기준:** 아래 전 항목 PASS 시 P1-13 (Flask 런치 제거) 착수 가능.

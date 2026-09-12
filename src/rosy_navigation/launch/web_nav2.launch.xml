@@ -1,6 +1,6 @@
 <?xml version='1.0'?>
 <launch>
-    <!-- D-3: Flask nav2_web_server 대신 rosy_core FastAPI (:8080). -->
+    <!-- D-3: Rosy OS FastAPI (:8080) owns the web surface. -->
     <arg name="map" default=""/>
     <arg name="use_sim_time" default="False"/>
     <arg name="params_file" default="$(find-pkg-share rosy_navigation)/params/nav2_params.yaml"/>
