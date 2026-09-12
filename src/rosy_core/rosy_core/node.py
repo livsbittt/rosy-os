@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import threading
 from pathlib import Path
 from typing import Any, Optional
@@ -53,6 +54,22 @@ class RosyCoreNode(Node):
         if not isinstance(control_cfg, dict):
             raise ValueError("control configuration must be a mapping")
         sensor_cfg = control_cfg.get("sensor_adapter", {}) or {}
+        if isinstance(sensor_cfg, dict):
+            # The release generation belongs to the mounted Device runtime,
+            # not to a baked image. Fill it from Compose only when the
+            # calibration block did not already pin one; the loader then
+            # rejects a context/generation mismatch before creating a worker.
+            sensor_cfg = dict(sensor_cfg)
+            calibration_cfg = sensor_cfg.get("calibration")
+            if isinstance(calibration_cfg, dict):
+                calibration_cfg = dict(calibration_cfg)
+                active_generation = os.environ.get("ROSY_DATA_GENERATION", "").strip()
+                data_root = os.environ.get("ROSY_DATA_PATH", "").strip()
+                if active_generation and not calibration_cfg.get("active_generation"):
+                    calibration_cfg["active_generation"] = active_generation
+                if data_root and not calibration_cfg.get("data_root"):
+                    calibration_cfg["data_root"] = data_root
+                sensor_cfg["calibration"] = calibration_cfg
         namespace = self.get_namespace() if callable(getattr(self, "get_namespace", None)) else None
         self.control_adapter = ControlSensorAdapter(sensor_cfg, namespace=namespace)
         self.core.control_adapter = self.control_adapter

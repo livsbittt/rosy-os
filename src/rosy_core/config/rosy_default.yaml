@@ -23,6 +23,12 @@ control:
     required: [lidar, imu, ir]
     max_age: 0.5                   # policy evidence lease, seconds
     parameters: {}                 # validated ROS SafetyNode overrides
+    calibration:
+      required: false              # enable only after Device generation/readback is GO
+      path: ""                     # /var/lib/rosy/data-working/<generation>/calibration/...
+      data_root: /var/lib/rosy
+      active_generation: ""        # supplied by the mounted Device runtime
+      context: {}                   # exact robot/model/geometry/sensor/generation identity
 
 auth:                         # SEC-101 정적 토큰 (운용 시 교체 필수)
   tokens:

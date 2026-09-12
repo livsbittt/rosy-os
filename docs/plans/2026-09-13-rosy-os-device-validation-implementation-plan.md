@@ -175,3 +175,16 @@ OMX는 robot-local action capability로만 둔다. 모델(신형 OMX-F/OMX-AI �
 6. 문서·ADR·runbook이 실제 경로와 일치하며, 미완료 실물 항목은 `HOLD` 또는 `PARKED`로 남는다.
 
 현재 전체 상태는 **IN_PROGRESS**다. SOURCE/일부 LOCAL·ROS-SIM은 GO이고, ARTIFACT/DEVICE/FIELD는 아직 HOLD 또는 PARKED다.
+
+---
+
+## 2026-09-13 implementation checkpoint: calibration and Device handoff
+
+The current software slice now has a concrete startup path for Device-local calibration:
+
+1. The packaged `src/rosy_core/config/rosy_default.yaml` keeps the sensor adapter and calibration loader disabled. A Device overlay may set `control.sensor_adapter.enabled: true` and provide `calibration.required: true`, an exact record path, `data_root`, active generation, and the five-field identity context.
+2. `RosyCoreNode` fills missing `active_generation` and `data_root` from `ROSY_DATA_GENERATION` and `ROSY_DATA_PATH`. The adapter loads and validates the snapshot before constructing a ROS worker, so a stale generation, bad digest, selector error, or path escape fails closed without creating the worker.
+3. Only the seven measured SafetyNode values are admitted. An explicit override must equal the snapshot value. The worker is still `sensor_only`; `SafetyManager` and the existing CORE bridge retain final command ownership. The loaded snapshot revision and digest are available for administrator diagnostics.
+4. Focused tests cover pre-construction load, conflict rejection, generation mismatch, disabled non-access, node environment binding, and packaged default opt-in. This is LOCAL/ROS-SIM evidence only; it does not certify sensors, motors, or arm motion.
+
+Device enablement remains a staged operation. Publish an immutable signed ARM64 image and manifest first; install Raspberry Pi OS Lite 64-bit and `/opt/rosy`; run `verify-pi.sh`; capture `device-readback.sh --json`; then enable calibration only after the stationary graph and sensor gates pass. Keep the previous generation active on any mismatch and record the new readback before moving to motor, box/pallet, or OMX commissioning. OMX model, mount, payload, power, hand-eye, collision interlock, and recovery remain PARKED until measured on the Pinky Pro.

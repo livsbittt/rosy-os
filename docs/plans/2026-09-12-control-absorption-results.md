@@ -259,3 +259,13 @@ runtime 없이 Pi가 동작한다고 주장할 수 없다. 특히 기존 SafetyN
 다음 작업은 T2의 namespace·설정·보정 경계와 T3의 단일 명령권·안전 정책
 흡수다. 이 두 단계를 통과하기 전에는 편입된 legacy launch를 OS 기본 모드에
 추가하지 않는다.
+
+---
+
+### T2 follow-up: CORE calibration snapshot binding (2026-09-13)
+
+The absorbed sensor adapter now has a Device-safe calibration startup contract. The packaged default adds an explicit disabled calibration block. When both adapter enablement and `calibration.required` are true, `RosyCoreNode` takes the active generation and data root from the Device environment when the overlay does not pin them, and `ControlSensorAdapter` loads the context-bound snapshot before constructing the sensor worker.
+
+The loader validates the generation-bound path, record digest, exact robot/model/geometry/sensor/generation context, and the allowed measured SafetyNode parameter set. Explicit overrides that disagree with the snapshot fail closed. A failed load therefore creates no ROS worker. The worker remains `sensor_only`; CORE still owns `SafetyManager` and the single final `cmd_vel` publisher. The adapter exposes the calibration revision and digest for administrator diagnostics, but this is not a motor-policy acknowledgement.
+
+Focused evidence: `src/rosy_core/test/test_control_sensor_adapter.py` now passes 19 tests, including pre-construction load, conflict rejection, generation mismatch, disabled-path non-access, and environment binding. `src/rosy_core/test/test_runtime_config.py` verifies the packaged default remains opt-in. `py_compile` and `git diff --check` pass. This closes a LOCAL/ROS-SIM software gate only. ARM64 publication, Pi readback, real sensor wiring, motor motion, box/pallet handling, and OMX commissioning remain HOLD or PARKED.

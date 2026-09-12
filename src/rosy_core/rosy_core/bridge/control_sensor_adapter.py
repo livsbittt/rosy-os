@@ -17,6 +17,13 @@ from typing import Any, Callable, Optional
 
 _DEFAULT_REQUIRED = ("lidar", "imu", "ir")
 _COMMAND_AUTHORITY_FIELDS = ("pub", "raw_zero_pub", "estop_pub", "decision_pub")
+_CALIBRATION_CONTEXT_FIELDS = frozenset({
+    "robot_id", "hardware_model", "geometry_revision", "sensor_revision", "data_generation",
+})
+_CALIBRATION_PARAMETER_FIELDS = frozenset({
+    "cliff_raw_max", "cliff_clear_raw", "cliff_mode", "cmd_linear_sign",
+    "imu_roll0", "imu_pitch0", "lidar_yaw_offset",
+})
 
 
 @dataclass(frozen=True)
@@ -32,6 +39,7 @@ class ControlSensorConfig:
     required: tuple[str, ...] = _DEFAULT_REQUIRED
     max_age: float = 0.5
     parameters: tuple[tuple[str, Any], ...] = ()
+    calibration: tuple[tuple[str, Any], ...] = ()
 
     @classmethod
     def from_mapping(cls, raw: Mapping[str, Any] | None) -> "ControlSensorConfig":
@@ -64,12 +72,65 @@ class ControlSensorConfig:
         if any(type(name) is not str or not name.strip() for name, _ in parameters):
             raise ValueError("control sensor adapter parameter names must be non-empty")
 
+        calibration_raw = raw.get("calibration", {})
+        if calibration_raw is None:
+            calibration_raw = {}
+        if not isinstance(calibration_raw, Mapping):
+            raise ValueError("control sensor adapter calibration must be a mapping")
+        calibration_required = calibration_raw.get("required", False)
+        if type(calibration_required) is not bool:
+            raise ValueError("control sensor adapter calibration required must be a boolean")
+        path = calibration_raw.get("path")
+        data_root = calibration_raw.get("data_root", "/var/lib/rosy")
+        active_generation = calibration_raw.get("active_generation")
+        context = calibration_raw.get("context")
+        if calibration_required:
+            if (type(path) is not str or not path.strip() or
+                    type(data_root) is not str or not data_root.strip() or
+                    type(active_generation) is not str or not active_generation.strip() or
+                    not isinstance(context, Mapping) or
+                    set(context) != _CALIBRATION_CONTEXT_FIELDS or
+                    any(type(value) is not str or not value.strip() or value != value.strip()
+                        or len(value) > 128 for value in context.values())):
+                raise ValueError(
+                    "required calibration needs path, data_root, active_generation and complete context"
+                )
+        elif path is not None and type(path) is not str:
+            raise ValueError("control sensor adapter calibration path must be a string")
+        calibration = tuple(calibration_raw.items())
+
         return cls(enabled=enabled, required=required, max_age=float(max_age),
-                   parameters=parameters)
+                   parameters=parameters, calibration=calibration)
 
     @property
     def parameter_overrides(self) -> dict[str, Any]:
         return dict(self.parameters)
+
+    @property
+    def calibration_config(self) -> dict[str, Any]:
+        return dict(self.calibration)
+
+
+def _load_required_calibration(config: ControlSensorConfig):
+    """Load only a context-bound, generation-bound calibration snapshot."""
+
+    calibration = config.calibration_config
+    from rosy_control.calibration_snapshot import load_calibration_snapshot
+
+    snapshot = load_calibration_snapshot(
+        calibration["path"],
+        calibration["context"],
+        calibration["active_generation"],
+        calibration["data_root"],
+    )
+    parameters = snapshot.node_parameters("safety_node")
+    unknown = set(parameters) - _CALIBRATION_PARAMETER_FIELDS
+    if unknown:
+        raise ValueError(
+            "calibration contains parameters outside the safety measured set: "
+            + ", ".join(sorted(unknown))
+        )
+    return snapshot, parameters
 
 
 def _default_sensor_node_factory(*, parameter_overrides: Mapping[str, Any], sensor_only: bool,
@@ -104,13 +165,28 @@ class ControlSensorAdapter:
         self.policy = None
         self._executor = None
         self._closed = False
+        self._calibration_snapshot = None
 
         if not self.config.enabled:
             return
 
         factory = sensor_node_factory or _default_sensor_node_factory
+        parameters = self.config.parameter_overrides
+        if self.config.calibration_config.get("required", False):
+            snapshot, calibrated = _load_required_calibration(self.config)
+            conflicts = {
+                key for key in calibrated.keys() & parameters.keys()
+                if calibrated[key] != parameters[key]
+            }
+            if conflicts:
+                raise ValueError(
+                    "explicit sensor parameters conflict with required calibration: "
+                    + ", ".join(sorted(conflicts))
+                )
+            parameters = {**calibrated, **parameters}
+            self._calibration_snapshot = snapshot
         kwargs = {
-            "parameter_overrides": self.config.parameter_overrides,
+            "parameter_overrides": parameters,
             "sensor_only": True,
         }
         if namespace is not None:
@@ -159,6 +235,14 @@ class ControlSensorAdapter:
     @property
     def revision(self) -> str | None:
         return None if self.policy is None else self.policy.revision
+
+    @property
+    def calibration_revision(self) -> int | None:
+        return None if self._calibration_snapshot is None else self._calibration_snapshot.revision
+
+    @property
+    def calibration_digest(self) -> str | None:
+        return None if self._calibration_snapshot is None else self._calibration_snapshot.digest
 
     def bind_safety(self, safety: Any) -> bool:
         """Bind the worker policy to CORE's safety consumer when enabled."""

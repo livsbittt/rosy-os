@@ -22,6 +22,18 @@ def test_runtime_mode_env_overrides_config(tmp_path, monkeypatch):
     assert config["runtime"]["mode"] == "hardware"
 
 
+def test_packaged_default_keeps_sensor_adapter_and_calibration_opt_in():
+    config = yaml.safe_load(
+        (Path(__file__).parents[1] / "config" / "rosy_default.yaml")
+        .read_text(encoding="utf-8")
+    )
+    sensor = config["control"]["sensor_adapter"]
+
+    assert sensor["enabled"] is False
+    assert sensor["calibration"]["required"] is False
+    assert sensor["calibration"]["data_root"] == "/var/lib/rosy"
+
+
 def test_unknown_runtime_mode_env_is_rejected(tmp_path, monkeypatch):
     config_path = tmp_path / "rosy.yaml"
     config_path.write_text("robot:\n  id: rosy_01\n", encoding="utf-8")

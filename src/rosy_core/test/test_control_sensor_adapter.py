@@ -10,6 +10,7 @@ from rosy_core.bridge.control_sensor_adapter import (
     ControlSensorAdapter,
     ControlSensorConfig,
 )
+from rosy_control.calibration_storage import merge_calibration
 
 
 class FakeSensorNode:
@@ -170,6 +171,15 @@ def test_core_node_owns_adapter_before_bridge_and_closes_it_with_executor():
     assert "self.control_adapter.close()" in shutdown_source
 
 
+def test_core_node_binds_calibration_to_the_runtime_data_generation():
+    path = Path(__file__).parents[1] / "rosy_core" / "node.py"
+    source = path.read_text(encoding="utf-8")
+
+    assert "ROSY_DATA_GENERATION" in source
+    assert "active_generation" in source
+    assert "sensor_cfg" in source
+
+
 @pytest.mark.parametrize(
     "raw",
     [
@@ -185,3 +195,105 @@ def test_core_node_owns_adapter_before_bridge_and_closes_it_with_executor():
 def test_configuration_rejects_unsafe_values(raw):
     with pytest.raises(ValueError):
         ControlSensorConfig.from_mapping(raw)
+
+
+CALIBRATION_CONTEXT = {
+    "robot_id": "rosy_01",
+    "hardware_model": "Pinky Pro",
+    "geometry_revision": "geometry-1",
+    "sensor_revision": "sensors-1",
+    "data_generation": "release-1",
+}
+
+
+def _calibrated_adapter_config(tmp_path):
+    path = tmp_path / "calibration" / "rosy_01" / "calibration.yaml"
+    merge_calibration(
+        str(path),
+        "safety_node: {ros__parameters: {imu_roll0: 1.0, lidar_yaw_offset: 3.1}}",
+        context=CALIBRATION_CONTEXT,
+        actor="maintainer",
+    )
+    return {
+        "enabled": True,
+        "calibration": {
+            "required": True,
+            "path": str(path),
+            "data_root": str(tmp_path),
+            "active_generation": "release-1",
+            "context": CALIBRATION_CONTEXT,
+        },
+    }
+
+
+def test_required_calibration_is_loaded_before_sensor_worker_creation(tmp_path):
+    created = []
+
+    def factory(**kwargs):
+        node = FakeSensorNode(**kwargs)
+        created.append(node)
+        return node
+
+    adapter = ControlSensorAdapter(_calibrated_adapter_config(tmp_path), sensor_node_factory=factory)
+
+    assert created[0].factory_kwargs["parameter_overrides"] == {
+        "imu_roll0": 1.0,
+        "lidar_yaw_offset": 3.1,
+    }
+    assert adapter.calibration_revision == 1
+    assert len(adapter.calibration_digest) == 64
+
+
+def test_calibration_parameter_conflict_is_rejected_before_worker_creation(tmp_path):
+    config = _calibrated_adapter_config(tmp_path)
+    config["parameters"] = {"imu_roll0": 2.0}
+    calls = []
+
+    with pytest.raises(ValueError, match="conflict"):
+        ControlSensorAdapter(config, sensor_node_factory=lambda **kwargs: calls.append(kwargs))
+
+    assert calls == []
+
+
+def test_invalid_required_calibration_fails_closed_before_worker_creation(tmp_path):
+    config = _calibrated_adapter_config(tmp_path)
+    config["calibration"]["active_generation"] = "release-2"
+    calls = []
+
+    with pytest.raises(ValueError, match="generation"):
+        ControlSensorAdapter(config, sensor_node_factory=lambda **kwargs: calls.append(kwargs))
+
+    assert calls == []
+
+
+def test_calibration_rejects_parameters_outside_the_measured_safety_set(tmp_path):
+    config = _calibrated_adapter_config(tmp_path)
+    path = Path(config["calibration"]["path"])
+    merge_calibration(
+        str(path),
+        "safety_node: {ros__parameters: {imu_roll0: 1.0, unsafe_motor_limit: 0.1}}",
+        context=CALIBRATION_CONTEXT,
+        actor="maintainer",
+    )
+    calls = []
+
+    with pytest.raises(ValueError, match="measured set"):
+        ControlSensorAdapter(config, sensor_node_factory=lambda **kwargs: calls.append(kwargs))
+
+    assert calls == []
+
+
+def test_disabled_adapter_does_not_touch_an_invalid_calibration_path():
+    adapter = ControlSensorAdapter({
+        "enabled": False,
+        "calibration": {
+            "required": True,
+            "path": "/does/not/exist",
+            "data_root": "/does/not/exist",
+            "active_generation": "release-1",
+            "context": CALIBRATION_CONTEXT,
+        },
+    }, sensor_node_factory=lambda **kwargs: pytest.fail("disabled adapter created worker"))
+
+    assert adapter.enabled is False
+    assert adapter.calibration_revision is None
