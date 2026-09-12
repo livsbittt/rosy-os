@@ -2,6 +2,8 @@
 
 > 후속 저장소 경로 정리는 ADR D-45와
 > [폴더 구조 정리 결과](2026-09-13-folder-structure-governance.md)에 기록했다.
+> 기능 구현·자동화 시험·ARM64 Device 설치·Pinky Pro 인수 순서는
+> [Rosy OS 기능·Device 검증 통합 구현 계획](2026-09-13-rosy-os-device-validation-implementation-plan.md)을 따른다.
 
 작성일: 2026-09-12. 브랜치: `feat/rosy-control-absorption`.
 
