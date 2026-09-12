@@ -6,7 +6,8 @@
 
 - T0 원본과 목적지 기준선: 완료.
 - T1 OS 내부 패키지와 테스트 편입: 완료.
-- T2–T8 ROS 연결·명령권·웹·배포·Pi 인수: 미착수.
+- T2 ROS 연결·설정·보정: 진행 중. 보정 노드의 상대 ROS 이름과 명시적 저장 경로를 반영했다.
+- T3–T8 명령권·웹·배포·Pi 인수: 미착수.
 
 후속 구현의 소유권·안전·주행·카메라·보정·배포·평가·OMX 확장점은 [통합 상세 설계](2026-09-12-rosy-os-control-integrated-design.md)에 기록했다. [ROSY ADR Log](../reference/ROSY%20ADR%20Log.md)에 D-37~D-40 Accepted와 D-41~D-44 Proposed로 등록했다. 미검증 기술 선택은 확정하거나 구현 완료로 표시하지 않는다.
 
@@ -21,6 +22,22 @@ launch, 웹 자원, 테스트가 직접 참조하는 도구·지도·검증 fixt
 무시된 장치 증거 32개는 범용 소스 fixture로 간주하지 않고 제외했다.
 
 ## 기준선과 검증
+
+### T2 첫 구현 묶음: 보정 노드 경계
+
+- `calib_node`의 publisher/subscriber와 safety parameter service를 상대 이름으로 변경했다.
+- `calib.launch.py`에 namespace, save_path, sign_path 인자를 추가했다.
+- 원본 개발 checkout을 가리키는 쓰기 기본값을 제거했다. 두 경로를 지정하지 않으면 자동 보정·lidar nudge·저장·적용 요청을 거부하며 abort는 계속 허용한다.
+- ROS 없는 `calibration_storage.merge_calibration`로 기존 YAML 갱신을 분리했다. 측정하지 않은 값은 보존하고 손상 mapping·nonfinite 값·교체 실패 시 기존 파일을 유지한다.
+- Control 전체 회귀: 907 passed, 10 skipped. pytest cache 쓰기 경고 1건은 캐시 디렉터리 권한 영향이다. 제한 환경의 서버 fixture 실패 후 정상 권한으로 재실행한 결과다.
+- ROS Jazzy clean build: 1 package finished, 설치 overlay의 새 storage module import 통과.
+- 격리 ROS graph 시험: 실제 생성자를 두 namespace로 실행해 topic 분리와 최종 cmd_vel 부재를 확인했다. 하드웨어 callback은 대체했으며 물리 구동 검증이 아니다.
+
+운영 launch에는 아직 활성화하지 않는다. 기존 보정 YAML의 node selector를 namespace에 맞춰 소비하는 경로, 전체 노드 namespace/TF, 장치 identity/schema, generation 경로 강제, 저장 권한 사전 점검, 다중 파일 transaction 및 적용 acknowledgement는 후속 T2/T3 작업이다. D-41~D-44는 Proposed를 유지한다.
+
+명시한 경로만 사용하므로 기존 calibrator 사용자는 save_path/sign_path를 전달해야 한다. OS 배포에서는 D-36 활성 working generation에 대응하는 경로를 전달해야 하며, 현재 helper 자체는 임의 경로의 generation 소속을 검증하지 않는다. 원본 이전 대장의 hash는 T1 snapshot으로 보존하고 이후 변경은 Git 이력으로 추적한다.
+
+### T0·T1 기준선
 
 | 범위 | 결과 | 의미 |
 |---|---:|---|

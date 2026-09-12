@@ -12,9 +12,7 @@ Lidar:   /calib/step  lidar
 Abort:   /calib/step  abort
 """
 import math
-import os
 import statistics
-import tempfile
 import yaml
 
 import rclpy
@@ -30,6 +28,7 @@ from std_msgs.msg import String, UInt16MultiArray
 from rosy_control.sensing.body import URDF_RADIUS, use_radius
 from rosy_control.sensing.lidar import NOSE_YAW, is_robot_scan, sector_range
 from rosy_control.safety_node import parse_us_range, roll_pitch
+from rosy_control.calibration_storage import merge_calibration
 
 
 def yaw_from_quat(q) -> float:
@@ -105,13 +104,13 @@ class CalibNode(Node):
         super().__init__('calib_node')
         self.declare_parameter(
             'save_path',
-            '/home/pinky/dev_ws/wj/src/rosy_control/config/cliff_calib.yaml',
+            '',
         )
         self.declare_parameter(
             'sign_path',
-            '/home/pinky/dev_ws/wj/src/rosy_control/config/auto_calib.yaml',
+            '',
         )
-        self.declare_parameter('ir_topic', '/ir_sensor/range')
+        self.declare_parameter('ir_topic', 'ir_sensor/range')
         self.declare_parameter('samples', 30)
         self.declare_parameter('stable_hits', 8)
         self.declare_parameter('nudge_sec', 1.20)
@@ -121,20 +120,20 @@ class CalibNode(Node):
         self.declare_parameter('robot_radius', URDF_RADIUS)
         self.need = int(self.get_parameter('samples').value)
 
-        self.pub_status = self.create_publisher(String, '/calib/status', 10)
-        self.pub_phase = self.create_publisher(String, '/calib/phase', 10)
-        self.raw_pub = self.create_publisher(Twist, '/cmd_vel_raw', 10)
-        self.wander_cmd = self.create_publisher(String, '/wander/cmd', 10)
+        self.pub_status = self.create_publisher(String, 'calib/status', 10)
+        self.pub_phase = self.create_publisher(String, 'calib/phase', 10)
+        self.raw_pub = self.create_publisher(Twist, 'cmd_vel_raw', 10)
+        self.wander_cmd = self.create_publisher(String, 'wander/cmd', 10)
         self.create_subscription(
             UInt16MultiArray, self.get_parameter('ir_topic').value, self.on_ir, 10
         )
-        self.create_subscription(String, '/calib/step', self.on_step, 10)
-        self.create_subscription(Odometry, '/odom', self.on_odom, 10)
+        self.create_subscription(String, 'calib/step', self.on_step, 10)
+        self.create_subscription(Odometry, 'odom', self.on_odom, 10)
         self.create_subscription(
-            LaserScan, '/scan', self.on_scan, qos_profile_sensor_data
+            LaserScan, 'scan', self.on_scan, qos_profile_sensor_data
         )
-        self.create_subscription(Range, '/us_sensor/range', self.on_us, 10)
-        self.create_subscription(Imu, '/imu_raw', self.on_imu, qos_profile_sensor_data)
+        self.create_subscription(Range, 'us_sensor/range', self.on_us, 10)
+        self.create_subscription(Imu, 'imu_raw', self.on_imu, qos_profile_sensor_data)
         self.create_timer(1.0, self._heartbeat)
         self.create_timer(0.05, self._tick)
 
@@ -290,6 +289,11 @@ class CalibNode(Node):
         if step in ('abort',):
             self._abort('취소')
             return
+        if step in ('auto', 'lidar', 'lidar_yaw', 'scan', 'compute', 'save', 'apply'):
+            if any(not str(self.get_parameter(key).value).strip()
+                   for key in ('save_path', 'sign_path')):
+                self._status('보정 저장 경로 미설정 — save_path와 sign_path를 지정하세요')
+                return
         if step == 'auto':
             self._start_auto()
             return
@@ -525,44 +529,16 @@ class CalibNode(Node):
         self._status('AUTO 완료')
 
     def _write(self, path, text):
-        temporary = None
         try:
-            directory = os.path.dirname(path) or '.'
-            os.makedirs(directory, exist_ok=True)
-            existing = {}
-            if os.path.exists(path):
-                with open(path, encoding='utf-8') as stream:
-                    existing = yaml.safe_load(stream)
-                if existing is None:
-                    existing = {}
-            if not isinstance(existing, dict):
-                raise ValueError('Existing calibration must be a mapping')
-            updates = yaml.safe_load(text)
-            for name, content in updates.items():
-                owner = existing.setdefault(name, {})
-                if not isinstance(owner, dict):
-                    raise ValueError('Existing node settings must be a mapping')
-                parameters = owner.setdefault('ros__parameters', {})
-                if not isinstance(parameters, dict):
-                    raise ValueError('Existing parameters must be a mapping')
-                parameters.update(content['ros__parameters'])
-            with tempfile.NamedTemporaryFile('w', dir=directory, encoding='utf-8', delete=False) as stream:
-                temporary = stream.name
-                yaml.safe_dump(existing, stream, sort_keys=False, allow_unicode=True)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(temporary, path)
+            merge_calibration(path, text)
             self._status(f'saved {path}')
             return True
         except (OSError, ValueError, yaml.YAMLError) as exc:
             self._status(f'save fail {exc}')
             return False
-        finally:
-            if temporary and os.path.exists(temporary):
-                os.unlink(temporary)
 
     def _apply_safety(self, pairs):
-        client = self.create_client(SetParameters, '/safety_node/set_parameters')
+        client = self.create_client(SetParameters, 'safety_node/set_parameters')
         if not client.wait_for_service(timeout_sec=0.5):
             self._status('safety_node 없음 — yaml만 저장됨')
             return

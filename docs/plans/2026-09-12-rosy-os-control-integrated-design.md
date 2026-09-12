@@ -2,7 +2,7 @@
 
 작성일: 2026-09-12
 
-상태: D-37~D-40 Accepted, D-41~D-44 Proposed. 소스 흡수 T0·T1 완료, 런타임 통합 T2~T8 예정
+상태: D-37~D-40 Accepted, D-41~D-44 Proposed. 소스 흡수 T0·T1 완료, T2 진행 중, T3~T8 예정
 
 대상: Rosy OS, Pinky Pro, 향후 OMX 계열 로봇암
 

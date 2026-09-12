@@ -6,7 +6,7 @@
 **Architecture:** Rosy OS/src/rosy_control로 먼저 편입하여 기존 import와 테스트를 보존한다. 최종 외부 API·웹·명령 중재는 rosy_core, 하드웨어 실행은 OS 내부 노드와 bringup, 배포·복구는 기존 deploy가 소유한다.
 **Tech Stack:** 현재 ROS 2 Jazzy, ament_python/colcon, FastAPI+rclpy, OpenCV/NumPy, Docker/systemd 기반. 카메라 Picamera2/libcamera의 실제 ARM64 실행 위치는 배포 검증에서 결정한다.
 
-작성일: 2026-09-12. 상태: T0·T1 완료, T2~T8 미착수. 소스 편입 결과와 검증 근거는 [흡수 실행 결과](2026-09-12-control-absorption-results.md)에 기록했다. 장치 배포와 실물 인수는 아직 수행하지 않았다.
+작성일: 2026-09-12. 상태: T0·T1 완료, T2 진행 중, T3~T8 미착수. 구현 범위와 검증 근거는 [흡수 실행 결과](2026-09-12-control-absorption-results.md)에 기록했다. 장치 배포와 실물 인수는 아직 수행하지 않았다.
 
 ## 1. 범위와 설계 결정
 
@@ -77,6 +77,7 @@ T5의 웹 기능 대조표는 T1부터 작성 가능하다. 하드웨어 의존�
 **복구:** OS의 추가 패키지 변경만 되돌릴 수 있는 단위로 유지한다.
 
 ### T2. ROS 그래프·설정·보정 경계 정리
+**상태:** 진행 중. calib_node의 상대 ROS 이름, 명시적 저장 경로, 원자적 YAML 갱신과 격리 ROS 시험을 반영했다. 전체 그래프·TF·identity/schema·generation 연결은 남아 있다.
 **수정:** D/src/rosy_control/launch/, config/, *_node.py, safety/node.py, calibration_atomic.py, calib_node.py.
 **생성:** D/test/test_control_absorption_graph.py, D/src/rosy_control/test/test_os_calibration_storage.py.
 1. 절대 토픽·frame·파라미터 이름을 조사하고 OS namespace·frame_prefix 규칙에 매핑한다.
