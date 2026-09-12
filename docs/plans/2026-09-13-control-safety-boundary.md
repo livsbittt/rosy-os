@@ -84,3 +84,16 @@ revision은 아직 호출자가 제공하는 적용 식별자다. 파일 digest 
 서비스의 자동 구성과 운영 profile 활성화는 미완료이며, 이 연결은 전체 운용 동등성을 증명하지 않는다.
 격리 ROS 출력 시험 5개에서 기존 차단/제한과 Control 전방 정지·명시적 후진 출력을 검증했다.
 실제 센서 스트림, 모터 deadman, Pi 물리 동작과 관리자 UI 인수는 별도 남아 있다.
+
+### 센서 관측 기록의 유효기간 연결
+
+기존 `Observations`에 `policy_window`를 추가하고 `CommandPolicy.update_observations`에서 사용한다.
+필수 stream이 하나라도 누락·invalid·stale이면 snapshot을 폐기한다. 원본 stamp가 있는 stream은
+수신 시각에서 전송 지연을 빼서 유효기간을 계산하며, 가장 오래된 필수 관측을 기준으로 최대 0.5초만 허용한다.
+반복 timer 조회는 수신 시각을 갱신하지 않는다. 실제 적용 revision이 정책 revision과 달라도 snapshot을 폐기한다.
+
+이 메서드는 센서 기록 갱신 및 분류와 같은 직렬 callback group에서 호출해야 한다.
+관측 수집/분류의 원자성을 다른 thread에서 임의 호출해 보장하는 API는 아니다.
+CORE 시험에서는 실제 Observations → CommandPolicy → CommandManager 경로의 전송 지연/만료를 확인했다.
+운영 SafetyNode 콜백과의 배선, 필수 stream 목록의 장치 profile 연결과 보정 파일 적용은 아직 남아 있다.
+검증: Control 전체 957 passed·20 skipped, CORE 정책 연결/안전 집중 시험 38 passed.

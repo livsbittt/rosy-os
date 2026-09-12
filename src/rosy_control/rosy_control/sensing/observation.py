@@ -63,3 +63,20 @@ class Observations:
             'clock': 'source_and_receive' if row.source is not None else 'receive_only',
             'age_s': max(0., now-row.received+row.source_age) if row.received is not None and math.isfinite(now) else None,
         } for name, row in self.rows.items()}
+
+    def policy_window(self, required, now):
+        """Use from the same serialized sensor callback group as add().
+
+        Source transport delay spends the lease before receipt. Reading the
+        records again cannot create a new acquisition or extend its deadline.
+        """
+        if (not isinstance(required, (tuple, list)) or not required or
+                any(not isinstance(name, str) or not name for name in required) or
+                type(self.max_age) not in (int, float) or not math.isfinite(self.max_age) or
+                self.max_age <= 0.):
+            return None
+        max_age = min(self.max_age, .5)
+        if not all(self.fresh(name, now, max_age=max_age) for name in required):
+            return None
+        oldest = min(self.rows[name].received - self.rows[name].source_age for name in required)
+        return oldest, oldest + max_age

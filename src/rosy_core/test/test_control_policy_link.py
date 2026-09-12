@@ -74,6 +74,21 @@ def test_rebinding_policy_discards_old_candidate(linked):
     assert command.select_output(now=10.01) == Twist()
 
 
+def test_sensor_receive_and_source_clocks_reach_core_expiry(linked):
+    from rosy_control.sensing.observation import Observations
+    command, safety, modes, policy, snapshot = linked
+    samples = Observations(max_age=.5)
+    samples.add('lidar', 10.1, source=100., source_now=100.1)
+    samples.add('imu', 10.1)
+    assert policy.update_observations(samples, ('lidar', 'imu'), snapshot.inputs, 10.1, 2, policy.revision)
+    command.set_nav_twist(Twist(.1, 0.), now=10.1)
+    assert command.select_output(now=10.2) == Twist(.1, 0.)
+    # A fresh command does not make the old scan fresh.
+    command.set_nav_twist(Twist(.1, 0.), now=10.51)
+    assert command.select_output(now=10.52) == Twist()
+    assert safety.estop
+
+
 def test_new_sequence_cannot_refresh_the_same_sensor_sample(linked):
     command, safety, modes, policy, snapshot = linked
     assert not policy.update(replace(snapshot, sequence=2, expires_at=10.4))

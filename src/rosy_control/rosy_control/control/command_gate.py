@@ -76,6 +76,18 @@ class CommandPolicy:
         with self._lock:
             self._snapshot = None
 
+    def update_observations(self, observations, required, inputs, now, sequence, applied_revision):
+        """Capture classified state and clocks in one serialized producer callback.
+
+        The producer supplies its actually applied revision. Never label sensor
+        state with a requested revision merely because CORE has bound it.
+        """
+        window = observations.policy_window(required, now)
+        if window is None or applied_revision != self.revision:
+            self.invalidate()
+            return False
+        return self.update(GateSnapshot(self.session, sequence, applied_revision, *window, inputs))
+
     def update(self, snapshot):
         if (not isinstance(snapshot, GateSnapshot) or snapshot.session != self.session or
                 snapshot.calibration_revision != self.revision or type(snapshot.sequence) is not int or
