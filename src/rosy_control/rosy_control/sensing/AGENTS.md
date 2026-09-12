@@ -13,6 +13,7 @@ Pure logic (no ROS) turning raw sensor data into robot-frame geometry one subjec
 | `filt.py` | Median + 1st-order low-pass filters for jumpy sensors |
 | `body.py` | Robot circumradius from URDF (calib param wins if sane); `ignore_m` drops chassis hits; `turn_clear_m` for spin clearance |
 | `camera.py` | HSV floor/void/obstacle classification (`classify_frame`) behind `camera_detect_node` |
+| `camera_worker.py` | ROS-free frame validation, rotation, drop/latency accounting and profile telemetry |
 
 ## For AI Agents
 

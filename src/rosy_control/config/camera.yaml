@@ -4,6 +4,10 @@
     height: 240
     fps: 8.0
     rotate_deg: 180
+    # Captured frames must match this profile; the worker reports a mismatch
+    # as unavailable evidence instead of silently classifying a wrong stream.
+    camera_profile_revision: camera-profile-v1
+    camera_max_latency_ms: 125.0
     # One source for these three: the node's declare_parameter defaults and the
     # classify_frame signature defaults match these, so a caller that omits them
     # behaves like the robot instead of like a third setting.

@@ -188,3 +188,26 @@ The current software slice now has a concrete startup path for Device-local cali
 4. Focused tests cover pre-construction load, conflict rejection, generation mismatch, disabled non-access, node environment binding, and packaged default opt-in. This is LOCAL/ROS-SIM evidence only; it does not certify sensors, motors, or arm motion.
 
 Device enablement remains a staged operation. Publish an immutable signed ARM64 image and manifest first; install Raspberry Pi OS Lite 64-bit and `/opt/rosy`; run `verify-pi.sh`; capture `device-readback.sh --json`; then enable calibration only after the stationary graph and sensor gates pass. Keep the previous generation active on any mismatch and record the new readback before moving to motor, box/pallet, or OMX commissioning. OMX model, mount, payload, power, hand-eye, collision interlock, and recovery remain PARKED until measured on the Pinky Pro.
+
+## 2026-09-13 implementation checkpoint: bounded OpenCV worker
+
+The optional camera path now has a reusable ROS-free preprocessing boundary in
+`src/rosy_control/rosy_control/sensing/camera_worker.py`:
+
+1. `CameraPreprocessProfile` fixes width, height, FPS, quarter-turn rotation,
+   profile revision and the maximum processing latency.
+2. `CameraPreprocessWorker` validates BGR8 frames, rejects wrong resolution,
+   rotates only after validation, counts frame gaps and out-of-order IDs, and
+   marks corrupt or over-budget frames as unavailable evidence.
+3. `CameraTelemetry` is JSON-safe and secret-free. It carries frame identity,
+   profile revision, dimensions, drop count, processing/capture age, CPU time,
+   memory high-water mark and quality reason.
+4. `camera_detect_node` keeps its existing HSV evidence and camera policy, but
+   routes frames through the worker and publishes `camera/telemetry`. No camera
+   output becomes a command or safety authority; semantic box/grasp detection
+   is still not implemented.
+
+The worker and existing camera tests pass locally (`990 passed, 26 skipped` for
+the full `src/rosy_control/test` suite). This advances SOURCE/LOCAL evidence;
+CSI timing, Picamera2 access, and real frame-quality acceptance remain HOLD at
+the Device/FIELD gates until a Raspberry Pi is available.
