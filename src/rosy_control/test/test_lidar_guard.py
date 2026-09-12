@@ -7,6 +7,20 @@ from rosy_control.sensing.lidar import NOSE_YAW, sector_range
 
 
 class LidarGuardTest(unittest.TestCase):
+    def test_footprint_permission_is_specific_to_the_selected_motion(self):
+        from rosy_control.control.lidar_guard import translation_footprint_eligible
+        geometry = dict(enabled=True, lidar_fresh=True, scan_age=.1, source_age=.1,
+                        mount=(-.017, 0.), travel=(.02, .03), radius=.076, ranges=(.2,) * 6)
+        self.assertTrue(translation_footprint_eligible(.014, 0., **geometry))
+        self.assertTrue(translation_footprint_eligible(-.014, 0., **geometry))
+        self.assertFalse(translation_footprint_eligible(.0141, 0., **geometry))
+        self.assertFalse(translation_footprint_eligible(.01, .001, **geometry))
+        for changes in ({'scan_age': .21}, {'source_age': .21}, {'source_age': -.06},
+                        {'scan_age': -.1}, {'mount': None}, {'travel': None},
+                        {'ranges': (.2, float('inf'))}, {'radius': .084}, {'lidar_fresh': False}):
+            with self.subTest(changes=changes):
+                self.assertFalse(translation_footprint_eligible(.01, 0., **(geometry | changes)))
+
     def test_measured_swept_radius_expands_without_legacy_radius_clamping(self):
         self.assertFalse(lidar_can_rotate([.3]*6, .076, True, .2, sweep_radius=.21))
         self.assertTrue(lidar_can_rotate([.3]*6, .076, True, .23, sweep_radius=.21))

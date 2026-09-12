@@ -19,7 +19,7 @@ from ..sensing.filt import IrMedian, MedianLp
 from ..sensing.body import URDF_RADIUS, use_radius
 from ..sensing.lidar import NOSE_YAW
 from ..sensing.localization import lease_ready
-from ..control.lidar_guard import lidar_blocked, lidar_can_rotate
+from ..control.lidar_guard import lidar_blocked, lidar_can_rotate, translation_footprint_eligible
 from ..control.command_gate import GateInputs, evaluate_command
 from ..control.rotation_clearance import rotation_clearance_allowed
 from ..control.rotation_envelope import pivot_clearance, suggest_rotation_translation, straight_translation_limits
@@ -340,16 +340,14 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
             self.rear_stop_d, self.rear_clear_d, lidar_ok)
         can_rev = lidar_ok and not self.rear_blocked and rear_d > self.rear_stop_d
         travel = getattr(self, 'translation_clearance', None)
-        straight = (abs(self.corrected_drive_speed(self.last_cmd.linear.x)) <= .014 and
-                    abs(self.last_cmd.angular.z) < 1e-4)
-        footprint = bool(self.get_parameter('footprint_guard_enabled').value and
-                         lidar_ok and self.age(self.last_scan_time) <= .2 and
-                         -.05 <= self.age(getattr(self, 'lidar_measurement_time', None)) <= .2 and
-                         getattr(self, 'lidar_mount', None) is not None and
-                         travel is not None and straight and self.robot_r <= .083 and
-                         all(math.isfinite(v) and v > 0 for v in
-                             (self.lidar_front, self.lidar_rear, self.lidar_left,
-                              self.lidar_right, self.lidar_rear_left, self.lidar_rear_right)))
+        footprint = translation_footprint_eligible(
+            self.corrected_drive_speed(self.last_cmd.linear.x), self.last_cmd.angular.z,
+            enabled=self.get_parameter('footprint_guard_enabled').value, lidar_fresh=lidar_ok,
+            scan_age=self.age(self.last_scan_time),
+            source_age=self.age(getattr(self, 'lidar_measurement_time', None)),
+            mount=getattr(self, 'lidar_mount', None), travel=travel, radius=self.robot_r,
+            ranges=(self.lidar_front, self.lidar_rear, self.lidar_left,
+                    self.lidar_right, self.lidar_rear_left, self.lidar_rear_right))
         if footprint:
             # Distances already exclude the verified box and 10mm stand-off.
             self.blocked = lidar_blocked(travel[0], travel[0], previous_front, 0., .010, True)

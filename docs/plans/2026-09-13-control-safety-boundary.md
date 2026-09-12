@@ -97,3 +97,24 @@ revision은 아직 호출자가 제공하는 적용 식별자다. 파일 digest 
 CORE 시험에서는 실제 Observations → CommandPolicy → CommandManager 경로의 전송 지연/만료를 확인했다.
 운영 SafetyNode 콜백과의 배선, 필수 stream 목록의 장치 profile 연결과 보정 파일 적용은 아직 남아 있다.
 검증: Control 전체 957 passed·20 skipped, CORE 정책 연결/안전 집중 시험 38 passed.
+
+### 후보 명령에 종속되는 차체 형상 판단
+
+SafetyNode의 narrow-footprint 허용은 센서 공통 boolean이 아니다. 보정된 속도가 0.014m/s 이하이고
+각속도가 0.0001rad/s 미만인 직진 후보에만 적용된다. 이 조건을 `lidar_guard.translation_footprint_eligible`로
+추출하고 기존 노드가 직접 호출하도록 연결했다. 정상 입력 8,640개 조합은 기존 조건식과 일치했다.
+음수 스캔 나이와 양수가 아닌 차체 반경은 명시적으로 거절하도록 보강했다.
+
+CORE용 생산 snapshot에 현재 노드의 `blocked` 값만 복사하면, 이전 저속 직진에 허용된 차체 형상을
+다른 고속/회전 명령에 잘못 적용할 수 있다. 운영 연결 전 다음 계산을 후보 명령별로 이전해야 한다.
+
+| 계산 | 현재 위치 | CORE 연결 요구 |
+|---|---|---|
+| narrow-footprint 선택 | 순수 함수 + 기존 SafetyNode 호출 | 후보 속도·보정 gain·원시 geometry를 함께 평가 |
+| tracked obstacle hold | `safety/obstacles.py` | 현재 후보의 진행 방향과 같은 pose/track snapshot 사용 |
+| bounded swept clearance | SafetyNode 최종 gate | 보정된 실제 후보와 관측 나이로 sweep 재계산 |
+| drive gain/sign | SafetyNode 최종 gate | 제한·궤적 검사·실제 발행 순서와 보정 revision 일치 |
+
+따라서 이 단계에서 운영 센서 노드의 기존 boolean 출력을 CORE에 자동 배선하지 않는다.
+필요한 명령별 geometry 경계를 구현한 뒤 단일 최종 publisher graph로 전환한다.
+검증: Control 전체 958 passed·20 skipped, 실제 ROS 두 namespace의 처리 노드 생성 시험 통과.

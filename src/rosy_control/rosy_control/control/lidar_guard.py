@@ -51,6 +51,21 @@ def lidar_blocked(raw, filtered, was_blocked, stop, clear, fresh):
     return was_blocked
 
 
+def translation_footprint_eligible(corrected_linear, angular, *, enabled, lidar_fresh,
+                                   scan_age, source_age, mount, travel, radius, ranges):
+    """Measured narrow-body clearance is valid only for slow straight motion.
+
+    Inputs are geometry evidence and the selected candidate, not a permission
+    cached from a previous command. Negative scan age is a clock fault.
+    """
+    return bool(enabled and lidar_fresh and mount is not None and travel is not None and
+                all(type(v) in (int, float) and math.isfinite(v)
+                    for v in (corrected_linear, angular, scan_age, source_age, radius)) and
+                0 <= scan_age <= .2 and -.05 <= source_age <= .2 and 0 < radius <= .083 and
+                abs(corrected_linear) <= .014 and abs(angular) < 1e-4 and
+                len(ranges) == 6 and all(math.isfinite(v) and v > 0 for v in ranges))
+
+
 def lidar_can_rotate(ranges, radius, fresh, base_clearance=None, *, sweep_radius=None):
     # The body sweeps its circumradius when spinning. Unknown flank/rear
     # space is not permission to swing a corner into a wall.
