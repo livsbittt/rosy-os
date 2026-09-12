@@ -17,6 +17,13 @@ capabilities: capabilities.yaml
 runtime:
   mode: core                      # ROSY_RUNTIME_MODE overrides on the robot
 
+control:
+  sensor_adapter:
+    enabled: false                # explicit opt-in; CORE remains stationary until enabled
+    required: [lidar, imu, ir]
+    max_age: 0.5                   # policy evidence lease, seconds
+    parameters: {}                 # validated ROS SafetyNode overrides
+
 auth:                         # SEC-101 정적 토큰 (운용 시 교체 필수)
   tokens:
     - token: rosy-dev-admin

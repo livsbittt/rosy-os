@@ -48,6 +48,17 @@ class RosyCoreNode(Node):
         waypoints_path = Path.home() / ".rosy" / "waypoints.json"
         self.core = CoreServices.build(config, profile, capability_data, waypoints_path)
 
+        from rosy_core.bridge.control_sensor_adapter import ControlSensorAdapter
+        control_cfg = config.get("control", {}) or {}
+        if not isinstance(control_cfg, dict):
+            raise ValueError("control configuration must be a mapping")
+        sensor_cfg = control_cfg.get("sensor_adapter", {}) or {}
+        namespace = self.get_namespace() if callable(getattr(self, "get_namespace", None)) else None
+        self.control_adapter = ControlSensorAdapter(sensor_cfg, namespace=namespace)
+        self.core.control_adapter = self.control_adapter
+        if self.control_adapter.enabled:
+            self.control_adapter.bind_safety(self.core.safety)
+
         from rosy_core.system.ros_graph import RosGraphMonitor
         self.ros_graph_monitor = RosGraphMonitor(self)
         self.core.runtime_probe.attach_ros_graph_provider(
@@ -90,12 +101,15 @@ class RosyCoreNode(Node):
         executor = MultiThreadedExecutor()
         executor.add_node(self)
         try:
+            self.control_adapter.attach(executor)
             executor.spin()
         finally:
+            self.control_adapter.detach(executor)
             executor.remove_node(self)
 
     def shutdown(self) -> None:
         if self._api_server is not None:
             self._api_server.should_exit = True
         self.core.events.publish("system.shutdown", severity="warning", source="rosy_core")
+        self.control_adapter.close()
         self.get_logger().info("rosy_core shutting down")

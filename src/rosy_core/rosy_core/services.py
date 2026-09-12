@@ -141,6 +141,9 @@ class CoreServices:
     maps: MapSnapshotStore
     audit: FileAuditLog
     started_at: float = field(default_factory=time.time)
+    # Optional absorbed Control worker, owned by the RosyCoreNode lifecycle.
+    # It is populated only when the explicit sensor adapter profile is enabled.
+    control_adapter: Any = field(default=None, repr=False)
 
     @classmethod
     def build(cls, config: dict[str, Any], profile: RobotProfile,

@@ -71,14 +71,19 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
             node.destroy_node()
             raise
 
-    def __init__(self, *, parameter_overrides=None, sensor_only=False):
+    def __init__(self, *, parameter_overrides=None, sensor_only=False, namespace=None):
         if type(sensor_only) is not bool:
             raise ValueError('sensor_only must be a boolean constructor choice')
+        if namespace is not None and (not isinstance(namespace, str) or not namespace.strip()):
+            raise ValueError('namespace must be a non-empty string when provided')
         self._sensor_only = sensor_only
         self.sensor_state = None
         self._policy_producer = None
         self.sensor_policy_published = None
-        super().__init__('safety_node', parameter_overrides=parameter_overrides)
+        node_kwargs = {'parameter_overrides': parameter_overrides}
+        if namespace is not None:
+            node_kwargs['namespace'] = namespace
+        super().__init__('safety_node', **node_kwargs)
         self.declare_parameter('cmd_in', 'cmd_vel_raw')
         self.declare_parameter('cmd_out', 'cmd_vel')
         self.declare_parameter('start_estopped', True)
