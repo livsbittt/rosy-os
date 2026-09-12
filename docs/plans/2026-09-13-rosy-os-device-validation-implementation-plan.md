@@ -55,6 +55,7 @@
 시험은 정상 후보, missing/stale/non-finite, revision 변경, immutable evidence, sequence 역전, stop/zero candidate, 멱등 재평가를 포함한다.
 
 ```powershell
+$env:PYTHONPATH = "$PWD/src/rosy_control;$PWD/src"
 python -m pytest src/rosy_control/test -q --basetemp .pytest-tmp-control
 ```
 
@@ -207,7 +208,7 @@ The optional camera path now has a reusable ROS-free preprocessing boundary in
    output becomes a command or safety authority; semantic box/grasp detection
    is still not implemented.
 
-The worker and existing camera tests pass locally (`991 passed, 26 skipped` for
+The worker and existing camera tests pass locally (`995 passed, 26 skipped` for
 the full `src/rosy_control/test` suite). This advances SOURCE/LOCAL evidence;
 CSI timing, Picamera2 access, and real frame-quality acceptance remain HOLD at
 the Device/FIELD gates until a Raspberry Pi is available.

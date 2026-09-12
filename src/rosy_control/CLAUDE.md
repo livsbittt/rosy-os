@@ -8,12 +8,17 @@ runtime dependency.
 
 ## Canonical development commands
 
-Run pure logic and package tests from the Rosy OS repository root:
+Run pure logic and package tests from the Rosy OS repository root. For a
+source-only host, expose the package roots explicitly:
 
 ```bash
-python3 -m pytest src/rosy_control/test/ -q
-python3 -m pytest src/rosy_core/test/ -q
+PYTHONPATH=src/rosy_control:src python3 -m pytest src/rosy_control/test/ -q
+PYTHONPATH=src/rosy_core:src/rosy_control:src python3 -m pytest src/rosy_core/test/ -q
 ```
+
+PowerShell equivalent: set `$env:PYTHONPATH` to the semicolon-separated
+`src/rosy_core;src/rosy_control;src` paths before the CORE command. A sourced
+colcon install overlay provides these imports as well.
 
 Build the package in a ROS 2 Jazzy environment:
 

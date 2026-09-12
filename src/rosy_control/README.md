@@ -8,12 +8,18 @@ a runtime dependency.
 
 ## Canonical development checks
 
-Run the package and CORE tests from the Rosy OS repository root:
+Run the package and CORE tests from the Rosy OS repository root. The source
+tree is not installed on a plain host, so include both package roots when
+running without a colcon overlay:
 
 ```bash
-python3 -m pytest src/rosy_control/test/ -q
-python3 -m pytest src/rosy_core/test/ -q
+PYTHONPATH=src/rosy_control:src python3 -m pytest src/rosy_control/test/ -q
+PYTHONPATH=src/rosy_core:src/rosy_control:src python3 -m pytest src/rosy_core/test/ -q
 ```
+
+On PowerShell, use `$env:PYTHONPATH="$PWD/src/rosy_core;$PWD/src/rosy_control;$PWD/src"`
+before the CORE command (and omit the first entry for the Control-only
+command). A sourced colcon install overlay provides the same imports.
 
 Build in a ROS 2 Jazzy environment:
 

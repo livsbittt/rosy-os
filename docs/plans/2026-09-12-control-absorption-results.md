@@ -289,3 +289,16 @@ These are Buildx/binfmt development candidates, not signed release artifacts.
 No registry digest, Pi installation/readback, serial access, motor movement,
 camera capture, or physical acceptance is implied. ARTIFACT and DEVICE remain
 HOLD until the native release pipeline and Device gates pass.
+
+### Source-only package suite recheck (2026-09-13)
+
+The package guides now include the source roots required when tests run before
+the colcon install overlay is sourced. With
+`PYTHONPATH=src/rosy_control:src`, the absorbed Control suite passed
+`995 passed, 26 skipped`. With
+`PYTHONPATH=src/rosy_core:src/rosy_control:src`, the CORE suite passed
+`747 passed, 10 skipped`. A bare host invocation without those roots failed
+only during import/subprocess startup; it did not expose a product assertion
+failure. The canonical commands in `src/rosy_control/README.md`,
+`CLAUDE.md`, `STEPS.txt`, and the Device plan now make the import contract
+explicit.

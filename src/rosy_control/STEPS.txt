@@ -6,8 +6,9 @@ The historical standalone Control runbook is preserved in the workspace archive
 and must not be used to install or start a robot.
 
 Development checks (from the Rosy OS repository root):
-  python3 -m pytest src/rosy_control/test/ -q
-  python3 -m pytest src/rosy_core/test/ -q
+  PYTHONPATH=src/rosy_control:src python3 -m pytest src/rosy_control/test/ -q
+  PYTHONPATH=src/rosy_core:src/rosy_control:src python3 -m pytest src/rosy_core/test/ -q
+  (PowerShell: set $env:PYTHONPATH to the semicolon-separated equivalent.)
 
 Device prerequisites:
   - Raspberry Pi OS Lite 64-bit
