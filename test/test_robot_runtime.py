@@ -229,6 +229,7 @@ def test_board_catalog_lists_every_runtime_overlay():
 def test_core_container_receives_runtime_mode():
     env = compose()["services"]["rosy-core"]["environment"]
     assert env["ROSY_RUNTIME_MODE"] == "${ROSY_RUNTIME_MODE:-core}"
+    assert env["ROSY_DATA_PATH"] == "/var/lib/rosy"
 
 
 def test_runtime_mode_wrapper_requires_overlay_files():
