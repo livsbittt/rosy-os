@@ -95,3 +95,25 @@ OpenCV `4.6.0`, `serial`, and `dynamixel_sdk`; and both
 The IO image includes the full Nav2/LiDAR userland, but these checks do not
 claim serial-device access, motor movement, map availability, or camera
 capture. Those remain Device/FIELD gates.
+
+## Compose and installer syntax verification
+
+On 2026-09-13, the deployment shell scripts passed `bash -n` as a complete
+set:
+
+```text
+C:\Program Files\Git\bin\bash.exe -n deploy/robot/*.sh
+=> exit 0
+```
+
+With the required identity variables (`ROS_DOMAIN_ID=41`,
+`ROSY_NAMESPACE=rosy_01`, `ROSY_ROBOT_NUMBER=1`, and a data generation),
+`docker compose -f deploy/robot/compose.yaml config --profiles` reported the
+declared `hardware` and `motor` profiles. Rendering both profiles with the
+Compose global options (`--profile motor --profile hardware`) resolved all
+three services, preserved the identity values, and mapped the configured
+devices as `/dev/ttyAMA4 -> /dev/rosy-motor` and `/dev/ttyAMA0 -> /dev/ttyAMA0`.
+
+This is configuration-rendering evidence only. It does not prove that those
+device nodes exist on a Pi, that a serial driver opens them, or that a motor,
+LiDAR, camera, or OMX arm moves safely.
