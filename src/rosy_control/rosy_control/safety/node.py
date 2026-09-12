@@ -10,7 +10,8 @@ from rcl_interfaces.msg import ParameterDescriptor
 from geometry_msgs.msg import Twist
 from ..tf_buffer import RobotTransformBuffer
 from rclpy.node import Node
-from tf2_ros import TransformListener
+from rclpy.time import Time
+from tf2_ros import TransformException, TransformListener
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from sensor_msgs.msg import Imu, LaserScan, Range
 from std_msgs.msg import Bool, Float32, String, UInt16MultiArray, Float32MultiArray
@@ -19,10 +20,12 @@ from ..sensing.filt import IrMedian, MedianLp
 from ..sensing.body import URDF_RADIUS, use_radius
 from ..sensing.lidar import NOSE_YAW
 from ..sensing.localization import lease_ready
+from ..sensing.pose import planar_pose
 from ..control.lidar_guard import (lidar_blocked, lidar_can_rotate,
                                    translation_footprint_eligible, TranslationEvidence)
 from ..control.command_gate import GateInputs, evaluate_command
 from ..control.policy_handoff import ControlPolicyProducer
+from ..control.obstacle_risk import TrackedEvidence
 from ..control.actuation import prepare_command
 from ..control.rotation_clearance import rotation_clearance_allowed
 from ..control.rotation_envelope import pivot_clearance, suggest_rotation_translation, straight_translation_limits
@@ -575,8 +578,10 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
         if self._sensor_only:
             handoff_now = time.monotonic()
             translation_evidence = self._translation_policy_evidence(handoff_now)
+            tracking_evidence = self._tracking_policy_evidence(handoff_now)
             failure = self.required_observation_failure()
-            if (self.get_parameter('obstacle_tracking_enabled').value or
+            if ((self.get_parameter('obstacle_tracking_enabled').value and
+                 tracking_evidence is None) or
                     self.get_parameter('simulation_motion_sweep_enabled').value or
                     (self.get_parameter('footprint_guard_enabled').value and
                      translation_evidence is None)):
@@ -589,7 +594,8 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
                 obstacle=obstacle, cliff=self.cliff, can_rotate=can_rotate)
             if self._policy_producer is not None:
                 self.sensor_policy_published = self._policy_producer.publish(
-                    self.sensor_state, now=handoff_now, translation=translation_evidence)
+                    self.sensor_state, now=handoff_now, translation=translation_evidence,
+                    tracking=tracking_evidence)
             return
 
         if self.estop:
@@ -692,6 +698,30 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
             previous_rear=bool(getattr(self, '_policy_previous_rear', False)),
             linear_gains=tuple(gains),
         )
+
+    def _tracking_policy_evidence(self, now):
+        """Freeze camera/tracks/odom at one receive time for CORE."""
+        if not self._sensor_only or not self.get_parameter('obstacle_tracking_enabled').value:
+            return None
+        tracks = self.obstacle_observation
+        camera = self.camera_observation
+        if (not isinstance(tracks, dict) or tracks.get('frame') != 'odom' or
+                not isinstance(camera, dict)):
+            return None
+        try:
+            ros_now = self.now().nanoseconds * 1e-9
+            transform = self.lidar_tf.lookup_transform('odom', 'base_link', Time())
+            stamp = transform.header.stamp.sec + transform.header.stamp.nanosec * 1e-9
+            t, q = transform.transform.translation, transform.transform.rotation
+            pose = planar_pose(t.x, t.y, (q.x, q.y, q.z, q.w))
+            if pose is None or not math.isfinite(ros_now) or ros_now <= 0.:
+                return None
+            return TrackedEvidence.capture(
+                tracks, camera, pose, stamp, source_now=ros_now,
+                received_at=now, radius=self.robot_r,
+                margin=float(self.get_parameter('obstacle_tracking_margin').value))
+        except (AttributeError, KeyError, TypeError, ValueError, TransformException):
+            return None
 
     def on_localization(self, msg):
         try:

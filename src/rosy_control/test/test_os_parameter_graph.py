@@ -46,6 +46,33 @@ class ParameterGraphTests(unittest.TestCase):
                 node.destroy_node()
             rclpy.shutdown()
 
+    def test_sensor_only_builds_tracking_evidence_from_camera_tracks_and_odom(self):
+        from rosy_control.safety.node import SafetyNode
+        from rclpy.parameter import Parameter
+        from geometry_msgs.msg import TransformStamped
+        from unittest.mock import patch
+        rclpy.init(args=['--ros-args', '-r', '__ns:=/rosy_01'])
+        node = None
+        try:
+            node = SafetyNode(sensor_only=True, parameter_overrides=[
+                Parameter('obstacle_tracking_enabled', value=True)])
+            ros_now = node.get_clock().now().nanoseconds * 1e-9
+            node.camera_observation = {'stamp': ros_now, 'blocked': False,
+                                       'quality': {'valid': True}}
+            node.obstacle_observation = {
+                'stamp': ros_now, 'frame': 'odom', 'tracks': []}
+            transform = TransformStamped()
+            transform.header.stamp = node.get_clock().now().to_msg()
+            transform.transform.rotation.w = 1.0
+            with patch.object(node.lidar_tf, 'lookup_transform', return_value=transform):
+                evidence = node._tracking_policy_evidence(time.monotonic())
+            self.assertIsNotNone(evidence)
+            self.assertEqual(evidence.pose, (0.0, 0.0, 0.0))
+        finally:
+            if node is not None:
+                node.destroy_node()
+            rclpy.shutdown()
+
     def test_sensor_only_builds_translation_evidence_from_current_lidar_sample(self):
         from rosy_control.safety.node import SafetyNode
         from rosy_control.control.lidar_guard import TranslationEvidence

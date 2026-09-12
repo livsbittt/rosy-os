@@ -18,7 +18,7 @@ Robot-frame geometry → motion policy. Pure logic, **no ROS imports** — the u
 
 ### Working In This Directory
 - Functions take floats/bools and return strings/floats/bools — no `rclpy`, no topics, no node state. If you need node state, the caller passes it in.
-- `ControlPolicyProducer` is the one in-process boundary that may hold an `Observations` source and a `CommandPolicy`; call it from the sensor producer's serialized callback/timer group. It never publishes motor commands.
+- `ControlPolicyProducer` is the one in-process boundary that may hold an `Observations` source and a `CommandPolicy`; call it from the sensor producer's serialized callback/timer group. It carries receive/source deadlines plus candidate-specific translation/tracking evidence and never publishes motor commands.
 - `hazard_action` is the only cliff/tilt decision home: **do not re-branch on `self.cliff`/`self.tilt` in FSM code** — call the policy.
 - Label list lives once in `modes.MODES`; `WANDER_TO_MODE` maps FSM state names → labels.
 - New labels must keep the taxonomy: hazard > action > contact > idle, subjects do not overlap.

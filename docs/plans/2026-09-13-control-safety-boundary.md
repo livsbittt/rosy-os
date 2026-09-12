@@ -253,8 +253,8 @@ localization 손실 callback도 센서 전용 모드에서 zero 명령을 발행
 
 `sensor_state`는 현재 tick의 감지 결과이며 독립적인 명령 허가나 만료 계약이 아니다.
 CORE에 공급할 때는 Observations의 실제 source/receive 만료와 calibration revision을 함께 묶어야 한다.
-후보별 translation/tracking/sweep 증거 전달은 다음 작업이다. 이 단계에서는 radial 감지를 유지하고,
-tracking 또는 bounded sweep 설정을 요청하면 `candidate_evidence_handoff_required`로 사용할 수 없음을 표시한다.
+후보별 translation/tracking 증거 전달은 sensor-only producer에 연결했다. bounded sweep 증거는
+아직 실제 producer가 없으므로 해당 설정을 요청하면 `candidate_evidence_handoff_required`로 사용할 수 없음을 표시한다.
 현재 운영 launch에는 이 모드를 자동 활성화하지 않는다.
 
 검증: Control 전체 979 passed·22 skipped. 실제 ROS 파라미터/graph 시험 4개에서
@@ -274,10 +274,13 @@ CORE policy revision이 같은지 확인한다. 이후 각 sensor tick에서 pro
 현재 handoff는 기본적으로 radial `GateInputs`를 전달한다. sensor-only LiDAR가 검증된 mount,
 translation clearance, 여섯 방향 range와 source/receive clock을 보유하면 immutable
 `TranslationEvidence`도 함께 전달하고 CORE가 현재 후보마다 재평가한다. footprint가 설정됐는데
-그 증거가 없으면 `candidate_evidence_handoff_required`로 무효화된다. tracking과 bounded sweep는
-아직 같은 방식의 실제 producer가 없으므로 운영 profile에 켜지 않는다.
+그 증거가 없으면 `candidate_evidence_handoff_required`로 무효화된다. obstacle tracking을 켜면
+sensor-only node가 camera observation, odom frame track packet, `odom→base_link` pose를 같은
+receive 시각의 immutable `TrackedEvidence`로 묶어 전달한다. 세 입력 중 하나라도 없거나 pose가
+유효하지 않으면 fail closed한다. bounded sweep는 아직 같은 방식의 실제 producer가 없으므로
+운영 profile에 켜지 않는다.
 
-검증: 순수 handoff 시험 4개와 실제 ROS parameter/graph 시험 7개에서 fresh window,
+검증: 순수 handoff 시험 5개와 실제 ROS parameter/graph 시험 8개에서 fresh window,
 deadline expiry, required stream 손실, revision mismatch 및 sensor-only node의 endpoint
-부재를 확인했고, translation evidence가 snapshot에 포함되는 것도 확인했다. 기존 Control 전체
-회귀 결과는 983 passed·25 skipped이다.
+부재를 확인했고, translation·tracking evidence가 snapshot에 포함되는 것도 확인했다. Control 전체
+회귀 결과는 984 passed·26 skipped이다.

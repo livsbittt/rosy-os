@@ -2,6 +2,7 @@
 import unittest
 
 from rosy_control.control.command_gate import CommandPolicy, GateInputs
+from rosy_control.control.obstacle_risk import TrackedEvidence
 from rosy_control.control.policy_handoff import ControlPolicyProducer
 from rosy_control.sensing.observation import Observations
 
@@ -42,3 +43,15 @@ class ControlPolicyProducerTests(unittest.TestCase):
         self.assertFalse(self.producer.publish(GateInputs(), now=10.60))
         self.assertIsNone(self.policy.evaluate(.01, 0., 10.60))
         self.assertEqual(self.observations.generation('lidar'), 1)
+
+    def test_producer_carries_candidate_tracking_evidence_into_snapshot(self):
+        evidence = TrackedEvidence.capture(
+            {'stamp': 100., 'frame': 'odom', 'tracks': []},
+            {'stamp': 100., 'blocked': False},
+            (0., 0., 0.), 100., source_now=100., received_at=10.,
+            radius=.08, margin=.02)
+        self.assertTrue(self.producer.publish(GateInputs(), now=10.01,
+                                               tracking=evidence))
+        result = self.policy.evaluate(.01, 0., 10.02)
+        self.assertIsNotNone(result)
+        self.assertIs(result[0].tracking, evidence)
