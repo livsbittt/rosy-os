@@ -21,6 +21,12 @@
 현재 코드 기준은 센서 handoff 변경까지 포함한 작업 브랜치다. 최신 Control 회귀는 984 passed·26 skipped,
 CORE 회귀는 725 passed·10 skipped다. 격리된 실제 ROS graph/parameter 시험 8개와
 기존 두 namespace 처리 노드 생성 시험을 확인했다.
+2026-09-13에는 명시적 `control.sensor_adapter` 경계와 lifecycle을 `RosyCoreNode`에 연결했다
+(`4640c67`). 기본값은 disabled이며, opt-in 시 sensor-only worker만 같은 namespace/executor에 붙고
+applied profile revision을 `SafetyManager`에 바인딩한다. command/raw/e-stop/decision publisher를 가진
+worker는 시작 단계에서 거부한다. adapter/관련 회귀 78개가 통과했다.
+CORE 이미지도 `rosy_control` 소스와 sensor runtime 의존성을 포함하도록 갱신했다(`74c32c4`).
+Dockerfile/Compose 계약 30개는 통과했지만 native linux/arm64 이미지 digest와 Device readback은 아직 없다.
 아래 기록은 작업 당시의 검증 이력이다. 최신 안전 경계와 남은 조건은
 [단일 안전 중재 구현 기록](2026-09-13-control-safety-boundary.md)을 함께 읽는다.
 후속 보정 snapshot reader와 비교용 SafetyNode의 생성자 적용/readback을 구현했다.
