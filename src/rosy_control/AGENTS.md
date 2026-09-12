@@ -27,7 +27,7 @@ ROS 2 Jazzy package absorbed into the **Rosy OS** workspace for the Pinky Pro de
 ## For AI Agents
 
 ### Working In This Directory
-- Treat this directory as part of Rosy OS. Do not add dependencies on the legacy `Rogic/Rosy Control` checkout.
+- Treat this directory as part of Rosy OS. The original checkout is archived for provenance; no runtime, build, or test may require it.
 - Preserve pure-logic behavior and its tests before changing ROS wiring. The target runtime must not activate this package's legacy final `/cmd_vel` publisher beside `rosy_core`.
 - Keep new **decision logic in the pure-logic subjects** (`rosy_control/control/`, `rosy_control/planning/`, `rosy_control/sensing/`, `rosy_control/watch.py`) — no ROS imports there, that is what the tests cover.
 - `config/robot.yaml` is the single shared parameter source; per-node yamls override after it.
@@ -41,7 +41,7 @@ ROS 2 Jazzy package absorbed into the **Rosy OS** workspace for the Pinky Pro de
 
 ### Common Patterns
 - Subject mixins: each node = `rclpy.Node` + one-concern mixins (wander = Senses/Judge/Contact/Motion; safety = Bumper/Hazard/Gate/Scale).
-- Command chain: wander → `/cmd_vel_raw` → **safety gate (only `/cmd_vel` publisher)** → motors. Never publish `/cmd_vel` directly.
+- Legacy comparison chain: wander → raw command → safety_node → motors. The OS target owns final command selection in CORE and publication in RosBridge (D-38); do not start both final publishers.
 - One fused status label (`control/modes.pick_mode`) on `/robot/mode`; `/safety/mode` is a deprecated same-value alias.
 
 ## Dependencies

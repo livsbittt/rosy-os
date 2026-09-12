@@ -7,11 +7,18 @@
 
 ## 구조
 
+Rosy Control의 개발 기준은 이 저장소의 `src/rosy_control`로 통합했다.
+별도 Control 저장소·웹 서버를 새 운영 구성으로 사용하지 않는다.
+현재 소스 편입과 보정 노드 경계 정리는 완료했으며, 전체 runtime·안전 중재·이미지·Pi 인수는 진행 중이다.
+현황은 [흡수 실행 결과](docs/plans/2026-09-12-control-absorption-results.md),
+결정은 [ADR D-37~D-44](docs/reference/ROSY%20ADR%20Log.md)를 따른다.
+
 ```text
 rosy/ (이 리포지토리)
 ├── docs/                     # 문서 5종 (spec / reference / plan)
 ├── src/                      # ROS 2 패키지 (colcon workspace)
 │   ├── rosy_core/            # 핵심 미들웨어 (API·Safety·Event·Waypoint·...)
+│   ├── rosy_control/         # 흡수한 감지·보정·주행 로직 (runtime 통합 진행 중)
 │   ├── rosy_bringup/         # 모터·오도메트리·배터리
 │   ├── rosy_navigation/      # Nav2/SLAM 설정·런치
 │   ├── rosy_description/     # URDF
@@ -27,7 +34,7 @@ rosy/ (이 리포지토리)
 | `docs/spec/ROSY CORE SRS.md` | 로봇(엣지) 요구사항 |
 | `docs/spec/ROSY FLEET SRS.md` | 중앙 서버 요구사항 |
 | `docs/reference/ROSY API & Protocol Reference.md` | 공유 API/프로토콜 계약 |
-| `docs/reference/ROSY ADR Log.md` | 의사결정 기록 (D-1~D-23) |
+| `docs/reference/ROSY ADR Log.md` | 의사결정 기록 (Control 흡수: D-37~D-44) |
 | `docs/plan/ROSY Implementation Plan.md` | 실행 계획·추적 매트릭스 |
 
 ## 빌드

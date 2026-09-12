@@ -1,12 +1,25 @@
-# Rosy Control (Pinky Pro)
+# Rosy OS 내부 rosy_control 패키지
 
-Rosy Control은 맵·위치 추정·주행·안전 제어를 개발하는 프로젝트입니다.
-상위 `ROS/Rosy`의 OS 개발, `ROS/Rosy Fleet`의 관제 개발과 독립적으로 유지합니다.
-로컬 저장소 폴더명은 `Rosy Control`, ROS/Python 패키지명은 `rosy_control`입니다.
-이전 이름 `move_control`에서 전환했습니다(2026-09-09). 로봇에 이미 배포된 장비는
-`tools/deploy/migrate_to_rosy_control.sh`를 한 번 실행한 뒤 새 릴리스를 설치해야 합니다.
-전환 배경과 절차는 `docs/plans/2026-09-09-rosy-control-package-rename.md`를 보십시오.
-공백이 있는 로컬 경로를 쉘에서 사용할 때는 따옴표로 감쌉니다.
+감지·카메라/OpenCV·보정·주행·안전 판단 로직을 Rosy OS로 흡수한 패키지입니다.
+개발·빌드 기준은 Rosy OS 저장소이며 별도 Control 저장소나 설치 절차를 요구하지 않습니다.
+외부 API·웹·최종 명령은 rosy_core, 하드웨어는 IO/bringup, 배포·복구는 OS deploy가 소유합니다.
+
+Rosy OS 저장소에서 ROS 2 Jazzy 환경을 준비한 뒤 실행합니다.
+
+```bash
+colcon build --base-paths src --packages-select rosy_control
+source install/setup.bash
+cd src/rosy_control
+python3 -m pytest test/ -q
+```
+
+소스 편입과 보정 노드 경계 정리는 완료했습니다. 전체 namespace/TF·안전 중재·이미지·Pi 인수는 남아 있습니다.
+`calib.launch.py`는 namespace, save_path, sign_path를 받습니다. 저장 경로가 없으면 이동 보정·저장·적용을 시작하지 않습니다.
+OS 배포에서는 활성 data generation에 대응하는 경로를 전달해야 합니다(D-43 Proposed).
+
+아래는 편입한 기존 기능 설명입니다. legacy `robot.launch.py`와 `safety_node`를
+현재 CORE와 함께 운영 기동하지 않습니다. 상세 상태는
+[흡수 실행 결과](../../docs/plans/2026-09-12-control-absorption-results.md)를 따릅니다.
 
 - `calib_node` — 자동 캘리브 `/calib/step auto`: 안정 바닥 IR(4095 무시) → 느린 전진 부호+라이다 요 → 절벽 IR. 상태 `/calib/status` `/calib/phase`.
 - `camera_detect_node` — 전면 OV5647. 바닥색 기준 전경 분리로 장애물. 시작 시 AE/AWB를
@@ -21,4 +34,5 @@ Rosy Control은 맵·위치 추정·주행·안전 제어를 개발하는 프로
 
 LCD / LED 화면은 별 패키지 `lcd_control` (`ros2 launch lcd_control lcd.launch.py`).
 
-자세한 실행은 `STEPS.txt`.
+`STEPS.txt`와 CLAUDE.md의 기존 전체 스택 명령은 이전 동작 비교용 자료입니다.
+현재 OS 기동·배포 절차는 저장소 루트 README와 deploy 문서를 따릅니다.

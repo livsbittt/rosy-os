@@ -1,5 +1,11 @@
 # CLAUDE.md
 
+> OS absorption (2026-09-13): this is an internal package at Rosy OS/src/rosy_control.
+> The command chains and old deployment commands below describe the legacy comparison
+> baseline, not the current OS launch procedure. Use README.md and OS ADR D-37~D-44
+> for ownership and integration status. Never activate legacy safety_node beside
+> CORE's final cmd_vel publisher. There is no dependency on the archived checkout.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project
