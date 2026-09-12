@@ -134,7 +134,7 @@ OMX는 robot-local action capability로만 둔다. 모델(신형 OMX-F/OMX-AI �
 2. `deploy/robot/deploy-from-windows.ps1 -RobotNumber 1 -PiHost <pinky-host> -PiUser rosy`로 immutable `/opt/rosy`를 배포한다. `ROSY_ROBOT_NUMBER`가 없거나 충돌하면 설치를 중단한다.
 3. Pi에서 `deploy/robot/verify-pi.sh`와 `deploy/robot/runtime-mode.sh up`을 실행하여 identity, config generation, unit, container health를 확인한다.
 4. `rosy-core`를 stationary 상태로 올리고 readback한다: robot ID, profile, capabilities, image digest, source revision, config generation/digest, container ID, ROS graph, 최종 `cmd_vel` publisher 수.
-5. readback 결과와 설치 전 manifest를 함께 보관한다. SSH 성공이나 HTTP 200만으로 설치 성공을 선언하지 않는다.
+5. `/opt/rosy/deploy/robot/device-readback.sh --json` 결과와 설치 전 manifest를 함께 보관한다. SSH 성공이나 HTTP 200만으로 설치 성공을 선언하지 않으며 credential은 readback에 포함하지 않는다.
 
 ### Task 9 — Device commissioning을 위험도 순서로 진행한다
 

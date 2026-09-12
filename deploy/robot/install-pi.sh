@@ -158,7 +158,8 @@ install_release() {
         "$INSTALL_ROOT/deploy/robot/install-pi.sh" \
         "$INSTALL_ROOT/deploy/robot/verify-pi.sh" \
         "$INSTALL_ROOT/deploy/robot/configure-uart-pi5.sh" \
-        "$INSTALL_ROOT/deploy/robot/verify-motors.sh"
+        "$INSTALL_ROOT/deploy/robot/verify-motors.sh" \
+        "$INSTALL_ROOT/deploy/robot/device-readback.sh"
 }
 
 write_initial_config() {

@@ -28,7 +28,15 @@ worker는 시작 단계에서 거부한다. adapter/관련 회귀 78개가 통�
 CORE 이미지도 `rosy_control` 소스와 sensor runtime 의존성을 포함하도록 갱신했다(`74c32c4`).
 Dockerfile/Compose 계약 30개는 통과했다. Buildx 후보 실행은 현재 Docker Desktop의 linux/amd64
 호스트에 ARM64 binfmt가 없어 `exec format error`로 중단되었으므로, native linux/arm64 이미지 digest와
-Device readback은 아직 없다.
+Device readback은 아직 없다. AMD64 host packaging smoke는 이후 완료됐지만 ARM64
+artifact와 Pi readback의 상태는 계속 별도 HOLD다.
+`docker buildx build --platform linux/amd64 --target core --tag rosy-core:control-adapter-amd64 --file deploy/robot/Dockerfile --load .`가 통과했고 image digest는
+`sha256:bcf9cd648abeff29ac600eb6c436bbba017df89c5b98ee5053522576395156ae`다.
+entrypoint를 거친 `ros2 pkg prefix rosy_control`/`rosy_core`와 absorbed worker executable 목록을
+확인했다. `deploy/robot/device_readback.py`와 `device-readback.sh`는 OS identity,
+activation/manifest, core health, ROS graph, 최종 `cmd_vel` publisher를 credential 없이
+JSON으로 남긴다. fake Device filesystem의 GO/HOLD·manifest missing 시험은 통과했으며,
+실제 Pi readback은 ARM64 artifact와 SSH 가능한 Device가 생길 때까지 HOLD다.
 아래 기록은 작업 당시의 검증 이력이다. 최신 안전 경계와 남은 조건은
 [단일 안전 중재 구현 기록](2026-09-13-control-safety-boundary.md)을 함께 읽는다.
 후속 보정 snapshot reader와 비교용 SafetyNode의 생성자 적용/readback을 구현했다.

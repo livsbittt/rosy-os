@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DEPLOY = ROOT / "deploy" / "robot"
 INSTALLER = DEPLOY / "install-pi.sh"
 VERIFIER = DEPLOY / "verify-pi.sh"
+READBACK = DEPLOY / "device-readback.sh"
+READBACK_PY = DEPLOY / "device_readback.py"
 RUNTIME_MODE = DEPLOY / "runtime-mode.sh"
 WINDOWS_DEPLOY = DEPLOY / "deploy-from-windows.ps1"
 WINDOWS_VERIFY = DEPLOY / "verify-from-windows.ps1"
@@ -36,6 +38,8 @@ def test_deployment_kit_files_exist():
     for path in (
         INSTALLER,
         VERIFIER,
+        READBACK,
+        READBACK_PY,
         RUNTIME_MODE,
         WINDOWS_DEPLOY,
         WINDOWS_VERIFY,
