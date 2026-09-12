@@ -46,7 +46,7 @@ Rosy OS/
 
 - 완료: 루트 `doc/` 제거, 자산·ARM64 문서 이동, README/AGENTS 경로 갱신,
   ADR D-45 기록, 옛 경로 참조 검색.
-- 잔여: `rosy_control`을 운영 image/launch에 연결하는 T3/T6, 실제 ARM64
+- 잔여: `rosy_control`을 운영 launch에 연결하는 T6 (package image absorption은 완료), 실제 ARM64
   build와 Pi 설치·readback, 카메라/OpenCV G2, Pinky Pro 물리 인수 G3/T7,
   OMX 모델·하중·hand-eye 결정. 폴더 정리만으로 이 게이트들은 통과하지 않는다.
 

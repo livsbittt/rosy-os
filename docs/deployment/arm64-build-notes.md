@@ -34,10 +34,11 @@ select a mode rather than starting containers by hand.
 The absorbed `src/rosy_control` package is part of the Rosy OS source tree and
 is covered by the host and ROS graph tests. Its pure sensing, OpenCV, planning,
 calibration, and safety-policy code is reusable from the workspace. The current
-device Dockerfile does not yet copy that package into the `rosy-core` or
-`rosy-io` image; operational sensor handoff and launch wiring are tracked as a
-separate transition gate. Do not enable the legacy `rosy_control` launch beside
-CORE because it can publish a competing final `cmd_vel`.
+device Dockerfile copies it into the `rosy-core` build for the explicitly
+opt-in sensor adapter; the legacy full-stack launch is still not an operational
+Compose mode. Do not enable that launch beside CORE because it can publish a
+competing final `cmd_vel`. Camera/Picamera2 access and hardware launch wiring
+remain separate transition gates.
 
 The wiringPi/ws2811 based IMU, ADC, LCD, LED, and lamp drivers also remain
 outside the first accepted device image until their Pi 5 compatibility and
