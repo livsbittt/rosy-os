@@ -42,6 +42,7 @@ class CommandManager:
         self._policy_ids = count(1)
         self._input_epoch = 0
         self._safety.estop_listeners.append(self._clear_for_stop)
+        self._safety.policy_listeners.append(self._clear_for_stop)
 
     def _reject(self, source: str, reason: str) -> None:
         if self._events is not None:

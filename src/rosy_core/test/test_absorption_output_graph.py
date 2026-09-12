@@ -33,7 +33,13 @@ class OutputGraphTests(unittest.TestCase):
                                   request.now, request.now + .1, .04, .06, 'limit')
         self.exercise(.1, True, limit, (.04, .06))
 
-    def exercise(self, linear, required, provider, expected):
+    def test_control_obstacle_gate_reaches_motor_topic(self):
+        self.exercise(.1, True, None, (0., 0.), control_obstacle=True)
+
+    def test_control_allows_explicit_reverse_past_front_obstacle(self):
+        self.exercise(-.1, True, None, (-.1, .1), control_obstacle=True)
+
+    def exercise(self, linear, required, provider, expected, control_obstacle=False):
         path = Path(__file__).parents[1] / 'rosy_core/bridge/ros_bridge.py'
         cls = next(n for n in ast.parse(path.read_text(encoding='utf-8')).body
                    if isinstance(n, ast.ClassDef) and n.name == 'RosBridge')
@@ -53,6 +59,13 @@ class OutputGraphTests(unittest.TestCase):
         bridge = SimpleNamespace(_svc=SimpleNamespace(command=command, power=Mock()),
                                  cmd_vel_pub=node.create_publisher(Twist, 'cmd_vel', 10))
         try:
+            if control_obstacle:
+                from rosy_control.control.command_gate import CommandPolicy, GateInputs, GateSnapshot
+                policy = CommandPolicy('applied-revision')
+                safety.bind_control_policy(policy)
+                now = time.monotonic()
+                self.assertTrue(policy.update(GateSnapshot(policy.session, 1, policy.revision,
+                    now, now + .5, GateInputs(obstacle=True))))
             command.set_nav_twist(CoreTwist(linear, .1))
             deadline = time.monotonic() + 5.
             while not observed and time.monotonic() < deadline:
@@ -60,6 +73,8 @@ class OutputGraphTests(unittest.TestCase):
                 rclpy.spin_once(node, timeout_sec=.05)
             self.assertTrue(observed)
             self.assertEqual((observed[-1].linear.x, observed[-1].angular.z), expected)
+            if control_obstacle:
+                self.assertFalse(safety.estop)
             if expected == (0., 0.):
                 bridge._svc.power.on_activity.assert_not_called()
         finally:

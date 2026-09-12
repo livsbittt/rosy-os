@@ -188,6 +188,14 @@ T3 순수 판단 추출 후속(2026-09-13): 기존 SafetyNode의 semantic 명령
 센서 snapshot·보정·swept footprint의 CORE 연결은 아직 미완료이며, 자세한 범위는
 [안전 판단 경계](2026-09-13-control-safety-boundary.md)에 기록했다.
 
+### T3 내부 연결
+
+후속 T3 내부 연결(2026-09-13): `CommandPolicy`의 관측 session/sequence/revision/만료 경계를
+`SafetyManager.bind_control_policy`에서 실제 호출한다. 정책 재등록은 후보 명령을 폐기한다.
+CORE 713 passed·5 skipped, Control 953 passed·20 skipped, 실제 ROS 출력 시험 5개 통과.
+`rosy_control`·`rosy_core` 두 패키지를 colcon으로 빌드하고 설치 overlay만으로 연결했다.
+센서 콜백 공급·보정 loader/적용·calibrated sweep·drive 변환·운영 활성화는 남아 있다.
+
 ### T0·T1 기준선
 
 | 범위 | 결과 | 의미 |

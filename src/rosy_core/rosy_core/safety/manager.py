@@ -93,6 +93,7 @@ class SafetyManager:
         #: E-Stop 이 실제로 걸릴 때 한 번 불린다. API·배터리·어느 경로로
         #: 들어오든 같은 자리를 지나므로, 중단해야 할 활동은 여기에 붙는다.
         self.estop_listeners: list = []
+        self.policy_listeners: list = []
 
     def bind_policy(self, evaluator, calibration_revision: str) -> None:
         """Bind a bounded, synchronous in-process evaluator; no ROS transport."""
@@ -101,6 +102,27 @@ class SafetyManager:
         self._policy = evaluator
         self._policy_revision = calibration_revision
         self.policy_required = True
+        for listener in list(self.policy_listeners):
+            listener()
+
+    def bind_control_policy(self, policy) -> None:
+        """Consume absorbed Control decisions without importing ROS or publishing."""
+        from rosy_control.control.command_gate import CommandPolicy
+        if not isinstance(policy, CommandPolicy):
+            raise ValueError('A Control CommandPolicy is required')
+
+        def evaluate(request):
+            output = policy.evaluate(request.linear, request.angular, request.now)
+            if output is None:
+                raise ValueError('Control observation unavailable')
+            snapshot, result = output
+            disposition = ('limit' if result.reason in ('allow', 'motion_limited', 'trajectory_changed')
+                           else 'stop')
+            return SafetyDecision(request.command_id, request.source, snapshot.calibration_revision,
+                                  snapshot.observed_at, snapshot.expires_at,
+                                  abs(result.linear), abs(result.angular), disposition, result.reason)
+
+        self.bind_policy(evaluate, policy.revision)
 
     def evaluate_candidate(self, command_id: int, source: str, linear: float,
                            angular: float, now: float) -> Optional[tuple[float, float]]:

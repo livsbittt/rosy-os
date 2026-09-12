@@ -4,7 +4,9 @@ This layer consumes already classified sensor state. It neither establishes
 sensor freshness nor replaces the downstream calibrated swept-footprint check.
 """
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from threading import Lock
+from uuid import uuid4
 
 
 @dataclass(frozen=True)
@@ -33,6 +35,89 @@ class GateResult:
     angular: float
     reason: str
     discard: bool = False
+
+
+@dataclass(frozen=True)
+class GateSnapshot:
+    session: str
+    sequence: int
+    calibration_revision: str
+    observed_at: float
+    expires_at: float
+    inputs: GateInputs
+
+
+class CommandPolicy:
+    """In-process handoff of classified sensor state, never a motor publisher.
+
+    A producer must use the oldest required sensor deadline, not its publish
+    time. Revision identifies the applied calibration; it is not a file loader.
+    """
+    def __init__(self, calibration_revision):
+        if not isinstance(calibration_revision, str) or not calibration_revision.strip():
+            raise ValueError('Applied calibration revision is required')
+        self._revision = calibration_revision
+        self._session = uuid4().hex
+        self._sequence = 0
+        self._observed_at = None
+        self._expires_at = None
+        self._snapshot = None
+        self._lock = Lock()
+
+    @property
+    def revision(self):
+        return self._revision
+
+    @property
+    def session(self):
+        return self._session
+
+    def invalidate(self):
+        with self._lock:
+            self._snapshot = None
+
+    def update(self, snapshot):
+        if (not isinstance(snapshot, GateSnapshot) or snapshot.session != self.session or
+                snapshot.calibration_revision != self.revision or type(snapshot.sequence) is not int or
+                not isinstance(snapshot.inputs, GateInputs) or
+                not all(type(v) in (int, float) and math.isfinite(v)
+                        for v in (snapshot.observed_at, snapshot.expires_at)) or
+                not 0 < snapshot.expires_at - snapshot.observed_at <= .5):
+            return False
+        with self._lock:
+            if snapshot.sequence <= self._sequence:
+                return False
+            if self._observed_at is not None and (
+                    snapshot.observed_at < self._observed_at or
+                    (snapshot.observed_at == self._observed_at and snapshot.expires_at > self._expires_at)):
+                return False
+            self._sequence = snapshot.sequence
+            self._observed_at = snapshot.observed_at
+            self._expires_at = snapshot.expires_at
+            self._snapshot = snapshot
+        return True
+
+    def evaluate(self, linear, angular, now):
+        with self._lock:
+            snapshot = self._snapshot
+        if snapshot is None or not snapshot.observed_at <= now <= snapshot.expires_at:
+            return None
+        state = snapshot.inputs
+        flags = (state.estop, state.profile_valid, state.localization_ready, state.pickup,
+                 state.rotation_trial, state.translation_trial, state.tilt, state.rear_blocked,
+                 state.obstacle, state.cliff, state.can_rotate, state.bounded_motion, state.legacy_tilt_recovery)
+        if any(type(flag) is not bool for flag in flags):
+            result = GateResult(0., 0., 'invalid_sensor_state', True)
+        elif state.legacy_tilt_recovery or state.bounded_motion:
+            # These paths require explicit recovery arbitration / calibrated
+            # swept-footprint integration before CORE may activate them.
+            result = GateResult(0., 0., 'actuation_policy_unavailable', True)
+        else:
+            result = evaluate_command(linear, angular, replace(state, command_age=0.))
+        with self._lock:
+            if snapshot is not self._snapshot:
+                return None
+        return snapshot, result
 
 
 def evaluate_command(linear: float, angular: float, state: GateInputs) -> GateResult:

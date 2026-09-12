@@ -40,8 +40,8 @@ safety.control_policy_required는 명시적인 boolean이며 기본 false다. tr
 정지로 처리한다. bind_policy를 호출해도 필수 검증이 켜진다. 현재 운영 profile은 이 기능을 켜지 않는다.
 외부 API·DDS message schema는 추가하지 않았다.
 
-다음은 기존 Control의 cliff/tilt/pickup/obstacle/localization 결과를 순수 정책 입력으로 추출하고,
-검증된 보정 record와 sensor revision을 evaluator에 묶는 작업이다. 이후 센서 단절·재시작·재보정 시
+기존 Control의 순수 판단과 CORE 내부 소비 경계는 아래와 같이 연결했다. 다음은 실제 센서 콜백의 관측 공급과
+검증된 보정 record 적용을 sensor revision에 묶는 작업이다. 이후 센서 단절·재시작·재보정 시
 이전 관측과 후보를 무효화하고, legacy 최종 publisher를 제거한 운영 graph에서 검증해야 한다.
 API 권한 검증은 수행했지만 새 UI의 브라우저 검증이나 Pi 물리 인수는 수행하지 않았다.
 
@@ -63,3 +63,24 @@ Control 전체 회귀 시험은 953 passed·20 skipped이며, 격리 ROS에서 8
 보정 gain·상한·실제 swept footprint 검사, drive-sign 변환은 기존 노드에 남아 있다.
 CORE는 이 결과와 검증된 보정 record를 하나의 관측 snapshot에 묶어 소비해야 하며,
 현재 운영 profile은 여전히 통합 정책을 활성화하지 않는다.
+
+## Control → CORE 내부 연결
+
+`SafetyManager.bind_control_policy(CommandPolicy)`가 실제 Control 판단을 호출하고 그 결과를
+기존 `SafetyDecision`으로 변환한다. 새 ROS publisher나 외부 API는 추가하지 않는다.
+CORE의 ROS 패키지 의존성에 `rosy_control`을 명시했고 두 패키지의 colcon build 및 설치 overlay import/연결을 확인했다.
+
+- `GateSnapshot`은 변경 불가능한 입력 묶음이며 session·sequence·적용 revision·관측 시각·만료 시각을 함께 가진다.
+- 정책 인스턴스는 새 session을 만들고 비어 있는 상태에서 시작한다. 다른 session/revision, 역순 sequence는 거절한다.
+  반복 조회나 같은 관측 시각의 새 sequence로 유효기간을 늘릴 수 없다. 재전송은 센서 heartbeat가 아니다.
+- snapshot의 시각은 같은 프로세스의 monotonic 기준이다. 실제 공급자는 필요한 센서 중 가장 오래된 관측과
+  가장 이른 만료를 사용해야 한다. 현재 이 공급자는 실제 ROS 센서 콜백에 연결하지 않았다.
+- CommandManager가 후보 명령의 freshness를 소유한다. snapshot은 센서 상태이며 과거 명령 나이를 새 명령에 전파하지 않는다.
+- 일반 obstacle/trajectory 제한은 zero limit으로 재계획 여지를 보존한다. pickup·localization 상실·필수 관측 실패는 e-stop이다.
+- bounded sweep과 legacy 틸트 역방향 생성은 CORE 어댑터에서 정지한다. 필요한 보정·궤적 검사를 생략한 채 허용하지 않는다.
+- 정책 재등록 시 manual/navigation 후보를 폐기한다. 새로운 정책이나 보정 revision으로 과거 명령을 재실행하지 않는다.
+
+revision은 아직 호출자가 제공하는 적용 식별자다. 파일 digest 검증/loader나 실제 센서 보정 적용의 증거로 취급하지 않는다.
+서비스의 자동 구성과 운영 profile 활성화는 미완료이며, 이 연결은 전체 운용 동등성을 증명하지 않는다.
+격리 ROS 출력 시험 5개에서 기존 차단/제한과 Control 전방 정지·명시적 후진 출력을 검증했다.
+실제 센서 스트림, 모터 deadman, Pi 물리 동작과 관리자 UI 인수는 별도 남아 있다.

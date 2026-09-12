@@ -90,7 +90,7 @@ T5의 웹 기능 대조표는 T1부터 작성 가능하다. 하드웨어 의존�
 **복구:** 이전 설정/보정 원본을 보존한다. 다운그레이드 불가 schema는 적용 전에 거절한다.
 
 ### T3. 명령 중재와 안전 정책 흡수
-**상태:** 진행 중. CORE의 nonfinite 차단과 ID/source/revision/freshness를 검증하는 동기 정책 소비 경계를 구현했다. 실제 Control 센서 evaluator와 검증된 calibration record 공급, 운영 활성화는 미완료다.
+**상태:** 진행 중. CORE의 nonfinite 차단과 ID/source/revision/freshness 검증, Control 순수 판단의 실제 호출과 session/sequence 관측 handoff를 구현했다. 실제 센서 콜백 공급, 검증된 calibration record 적용, calibrated sweep/drive 변환과 운영 활성화는 미완료다.
 **수정:** D/src/rosy_core/rosy_core/command/manager.py, safety/manager.py, bridge/ros_bridge.py; D/src/rosy_control/rosy_control/safety/, calibration_atomic.py와 명령 발행 노드.
 **생성:** D/src/rosy_core/test/test_control_absorption_safety.py; 내부 제어 계약 문서.
 1. CORE manual/navigation/Fleet/estop과 Control cliff/tilt/pickup/obstacle/localization/보정 제한을 비교한다.

@@ -75,14 +75,16 @@ def test_policy_over_budget_cannot_authorize_delayed_output():
 
 
 def test_new_input_during_evaluation_discards_old_result():
-    command, safety, modes = setup()
+    first = True
     def superseded(request):
-        command.set_nav_twist(Twist(.02, .03), now=10.02)
+        nonlocal first
+        if first:
+            first = False
+            command.set_nav_twist(Twist(.02, .03), now=10.02)
         return decision(request)
-    safety.bind_policy(superseded, 'calibration-1')
+    command, safety, modes = setup(superseded)
     assert command.select_output(now=10.01) == Twist()
     assert not safety.estop
-    safety.bind_policy(decision, 'calibration-1')
     assert command.select_output(now=10.03) == Twist(.02, .03)
 
 
@@ -100,7 +102,9 @@ def test_estop_during_evaluation_cannot_leak_prior_candidate():
         safety.trigger_estop('external')
         return decision(request)
     safety.bind_policy(stop, 'calibration-1')
+    command.set_nav_twist(Twist(.1, .2), now=10.)
     assert command.select_output(now=10.01) == Twist()
+    assert safety.estop
 
 
 def test_e_stop_does_not_buffer_navigation_commands_for_release():
