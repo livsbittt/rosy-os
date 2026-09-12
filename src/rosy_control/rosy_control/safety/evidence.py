@@ -22,8 +22,10 @@ class Evidence:
         self.profile_valid = True
         self.profile_error = None
         self.calibration_lease = ProfileLease()
-        self.calibration_applied_pub = self.create_publisher(String, 'calibration/applied', latched)
-        self.create_subscription(String, 'calibration/profile', self.on_calibration_profile, latched)
+        self.calibration_applied_pub = None
+        if not getattr(self, '_sensor_only', False):
+            self.calibration_applied_pub = self.create_publisher(String, 'calibration/applied', latched)
+            self.create_subscription(String, 'calibration/profile', self.on_calibration_profile, latched)
         self._filtered_generations = {}
         self._filtered_values = {}
         self._corr_generation = -1
@@ -34,7 +36,8 @@ class Evidence:
         self.observation_session = uuid.uuid4().hex
         self.profile_pub = self.create_publisher(String, 'safety/profile', latched)
         self.observation_pub = self.create_publisher(String, 'safety/observation', 10)
-        self.decision_pub = self.create_publisher(String, 'safety/decision', 10)
+        self.decision_pub = (None if getattr(self, '_sensor_only', False) else
+                             self.create_publisher(String, 'safety/decision', 10))
 
     def observe(self, name, msg=None, valid=True):
         args = {}
@@ -54,6 +57,8 @@ class Evidence:
         self.publish_calibration_applied()
 
     def publish_calibration_applied(self):
+        if getattr(self, '_sensor_only', False):
+            return
         if (self.calibration_lease.active and (not self.profile_valid or
                 self.calibration_lease.active['geometry_revision'] != self.profile.revision)):
             self.calibration_lease.active = None

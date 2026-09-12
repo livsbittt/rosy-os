@@ -38,7 +38,7 @@ from .evidence import Evidence
 class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
 
     @classmethod
-    def from_calibration(cls, snapshot):
+    def from_calibration(cls, snapshot, *, sensor_only=False):
         """Construct a stopped comparison consumer; never activate beside CORE.
 
         The digest records constructor readback only, not continuing policy
@@ -55,7 +55,7 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
             raise ValueError('Calibration cannot override unrelated operating parameters')
         overrides = [Parameter(name, value=value) for name, value in values.items()]
         overrides.append(Parameter('start_estopped', value=True))
-        node = cls(parameter_overrides=overrides)
+        node = cls(parameter_overrides=overrides, sensor_only=sensor_only)
         try:
             snapshot.verify_parameters(node)
             if node.get_parameter('start_estopped').value is not True:
@@ -66,7 +66,11 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
             node.destroy_node()
             raise
 
-    def __init__(self, *, parameter_overrides=None):
+    def __init__(self, *, parameter_overrides=None, sensor_only=False):
+        if type(sensor_only) is not bool:
+            raise ValueError('sensor_only must be a boolean constructor choice')
+        self._sensor_only = sensor_only
+        self.sensor_state = None
         super().__init__('safety_node', parameter_overrides=parameter_overrides)
         self.declare_parameter('cmd_in', 'cmd_vel_raw')
         self.declare_parameter('cmd_out', 'cmd_vel')
@@ -151,8 +155,9 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
         }
         self._ir_f = IrMedian(nmed)
 
-        self.pub = self.create_publisher(Twist, self.cmd_out, 10)
-        self.raw_zero_pub = self.create_publisher(Twist, self.get_parameter('cmd_in').value, 10)
+        self.pub = None if sensor_only else self.create_publisher(Twist, self.cmd_out, 10)
+        self.raw_zero_pub = (None if sensor_only else
+                             self.create_publisher(Twist, self.get_parameter('cmd_in').value, 10))
         self.block_pub = self.create_publisher(Bool, 'safety/blocked', 10)
         self.cliff_pub = self.create_publisher(Bool, 'safety/cliff', 10)
         self.tilt_pub = self.create_publisher(Bool, 'safety/tilt', 10)
@@ -180,23 +185,24 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
         self.exit_pub = self.create_publisher(Float32, 'safety/exit_range', 10)
         self.radius_pub = self.create_publisher(Float32, 'safety/robot_radius', 10)
         self.motion_limits_pub = self.create_publisher(String, 'safety/motion_limits', 10)
-        self.wander_cmd = self.create_publisher(String, 'wander/cmd', 10)
-        self.calib_step = self.create_publisher(String, 'calib/step', 10)
+        self.wander_cmd = None if sensor_only else self.create_publisher(String, 'wander/cmd', 10)
+        self.calib_step = None if sensor_only else self.create_publisher(String, 'calib/step', 10)
         latched = QoSProfile(
             depth=1,
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
         )
         self.init_evidence(latched)
-        self.estop_pub = self.create_publisher(Bool, 'estop/state', latched)
+        self.estop_pub = None if sensor_only else self.create_publisher(Bool, 'estop/state', latched)
         self.drive_scales = [1., 1.]
         self.drive_scale_time = 0.
         self.drive_ready = False
-        self.create_subscription(Float32MultiArray, 'calibration/drive_scale', self.on_drive_scale, latched)
-        self.create_subscription(Bool, 'calibration/ready', self.on_drive_ready, latched)
-        self.create_subscription(Twist, self.get_parameter('cmd_in').value, self.on_cmd, 10)
-        self.create_subscription(Bool, 'estop', self.on_estop, latched)
-        self.create_subscription(String, 'estop/cmd', self.on_estop_cmd, 10)
+        if not sensor_only:
+            self.create_subscription(Float32MultiArray, 'calibration/drive_scale', self.on_drive_scale, latched)
+            self.create_subscription(Bool, 'calibration/ready', self.on_drive_ready, latched)
+            self.create_subscription(Twist, self.get_parameter('cmd_in').value, self.on_cmd, 10)
+            self.create_subscription(Bool, 'estop', self.on_estop, latched)
+            self.create_subscription(String, 'estop/cmd', self.on_estop_cmd, 10)
         self.create_subscription(
             LaserScan, self.get_parameter('scan_topic').value, self.on_scan, qos_profile_sensor_data
         )
@@ -289,7 +295,9 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
             f'{float(self.get_parameter("filt_hz").value):.1f}Hz | '
             'E-STOP /estop Bool or /estop/cmd stop|release'
         )
-        if self.estop:
+        if sensor_only:
+            self.get_logger().info('sensor-only mode: no command or legacy calibration authority')
+        elif self.estop:
             self.engage_estop('startup')
         else:
             self.estop_pub.publish(Bool(data=False))
@@ -303,17 +311,21 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
         return (self.now() - stamp).nanoseconds / 1e9
 
     def tick(self):
+        self.sensor_state = None
         try:
             self._refresh_distances()
             self.refresh_profile()
         except (ValueError, TypeError, OverflowError):
             self.profile_valid = False
         if not self.profile_valid:
+            if self._sensor_only:
+                self.sensor_state = GateInputs(profile_valid=False, observation_failure='invalid_geometry')
+                return
             self.halt_with_reason('invalid_geometry')
             self.last_cmd = Twist()
             self.last_cmd_time = None
             return
-        if self.estop:
+        if self.estop and not self._sensor_only:
             self.raw_zero_pub.publish(Twist())
             self._publish_zero()
             self.estop_pub.publish(Bool(data=True))
@@ -378,6 +390,9 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
             mount=getattr(self, 'lidar_mount', None), travel=travel, radius=self.robot_r,
             ranges=(self.lidar_front, self.lidar_rear, self.lidar_left,
                     self.lidar_right, self.lidar_rear_left, self.lidar_rear_right))
+        # Sensor-only observations must retain radial state. The CORE policy
+        # evaluates a translation override against its own selected candidate.
+        footprint = footprint and not self._sensor_only
         if footprint:
             # Distances already exclude the verified box and 10mm stand-off.
             self.blocked = lidar_blocked(travel[0], travel[0], previous_front, 0., .010, True)
@@ -407,7 +422,7 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
             can_rotate = False
         rotation_trial = self.calibration_lease.rotation_trial_live(time.monotonic())
         translation_trial = self.calibration_lease.translation_trial_live(time.monotonic())
-        bounded_motion = bool(self.get_parameter('simulation_motion_sweep_enabled').value and
+        bounded_motion = bool(not self._sensor_only and self.get_parameter('simulation_motion_sweep_enabled').value and
             self.get_parameter('use_sim_time').value and os.environ.get('ROS_DOMAIN_ID') == '227' and
             os.environ.get('GZ_PARTITION') == 'pinky_calmap227' and not rotation_trial and
             (rotation_estimate is not None or self.calibration_lease.rotation_estimate_required()))
@@ -550,6 +565,19 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
         obstacle = self.blocked or self.us_blocked
         self.block_pub.publish(Bool(data=obstacle))
 
+        if self._sensor_only:
+            failure = self.required_observation_failure()
+            if (self.get_parameter('obstacle_tracking_enabled').value or
+                    self.get_parameter('simulation_motion_sweep_enabled').value):
+                failure = 'candidate_evidence_handoff_required'
+            self.sensor_state = GateInputs(
+                profile_valid=self.profile_valid, observation_failure=failure,
+                localization_ready=(not self.get_parameter('localization_required').value or
+                                    lease_ready(self.localization_status, self.now().nanoseconds * 1e-9)),
+                pickup=pickup, tilt=tilt, rear_blocked=self.rear_blocked,
+                obstacle=obstacle, cliff=self.cliff, can_rotate=can_rotate)
+            return
+
         if self.estop:
             self.record_decision(0., 0., 'estop')
             return
@@ -624,7 +652,8 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
             # Loss and recovery callbacks can both precede the next timer tick.
             self.last_cmd = Twist()
             self.last_cmd_time = None
-            self._publish_zero()
+            if not self._sensor_only:
+                self._publish_zero()
 
     def corrected_drive_speed(self, speed):
         # Atomic lease binds both gains to the current geometry and expiry.

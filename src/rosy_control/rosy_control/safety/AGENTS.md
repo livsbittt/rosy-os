@@ -6,6 +6,8 @@
 ## Purpose
 The legacy safety velocity gate fuses lidar sectors, US, IR, IMU and camera, applies drive calibration, and publishes comparison-runtime commands. In the Rosy OS target runtime CORE owns final commands (D-38). This node must not publish motor commands beside RosBridge. Hardware deadman behavior requires separate verification.
 
+`SafetyNode(sensor_only=True)` omits command/estop/legacy calibration authority endpoints and returns from tick after sensing. It is an internal constructor mode, not an operational launch selection yet. `sensor_state` alone has no freshness lease; bind the observation clocks, revision and candidate-specific evidence before feeding CORE. Never treat it as a complete safety decision.
+
 ## Key Files
 | File | Description |
 |------|-------------|

@@ -16,6 +16,40 @@ if rclpy is not None:
 
 @unittest.skipIf(rclpy is None, 'Requires isolated ROS Jazzy graph')
 class ParameterGraphTests(unittest.TestCase):
+    def test_sensor_only_node_has_no_command_or_legacy_ack_endpoints(self):
+        from rosy_control.safety.node import SafetyNode
+        rclpy.init(args=['--ros-args', '-r', '__ns:=/rosy_01'])
+        node = None
+        try:
+            node = SafetyNode(sensor_only=True)
+            forbidden = {'/rosy_01/cmd_vel', '/rosy_01/cmd_vel_raw', '/rosy_01/wander/cmd',
+                         '/rosy_01/calib/step', '/rosy_01/estop/state', '/rosy_01/calibration/applied',
+                         '/rosy_01/safety/decision'}
+            publishers = {name for name, _ in node.get_publisher_names_and_types_by_node(
+                node.get_name(), node.get_namespace())}
+            self.assertFalse(publishers & forbidden)
+            subscriptions = {name for name, _ in node.get_subscriber_names_and_types_by_node(
+                node.get_name(), node.get_namespace())}
+            self.assertFalse(subscriptions & {'/rosy_01/cmd_vel_raw', '/rosy_01/estop',
+                                             '/rosy_01/estop/cmd', '/rosy_01/calibration/profile'})
+            self.assertIn('/rosy_01/scan', subscriptions)
+            node.tick()
+            self.assertIsNotNone(node.sensor_state)
+            self.assertIsNotNone(node.sensor_state.observation_failure)
+            self.assertTrue(node.sensor_state.legacy_tilt_recovery is False)
+            node.set_parameters([rclpy.parameter.Parameter('localization_required', value=True)])
+            from std_msgs.msg import String
+            node.on_localization(String(data='{}'))
+            node.tick()
+            self.assertFalse(node.sensor_state.localization_ready)
+            publishers = {name for name, _ in node.get_publisher_names_and_types_by_node(
+                node.get_name(), node.get_namespace())}
+            self.assertFalse(publishers & forbidden)
+        finally:
+            if node is not None:
+                node.destroy_node()
+            rclpy.shutdown()
+
     def test_verified_record_reaches_actual_stopped_safety_consumer(self):
         from rosy_control.calibration_record import encode_record
         from rosy_control.calibration_snapshot import load_calibration_snapshot

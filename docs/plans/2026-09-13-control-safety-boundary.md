@@ -238,3 +238,25 @@ digest는 위변조 인증이 아니며 snapshot 자체를 인증 토큰으로 �
 검증: Control 전체 979 passed·21 skipped. 실제 ROS Jazzy 파라미터 시험 3개에서
 파일→namespaced SafetyNode 생성→값 확인, 후속 값 변경 탐지, 운영 파라미터 거절을 확인했다.
 기존 8개 처리 노드의 두 namespace 생성 시험도 통과했다. timer/모터 드라이버는 실행하지 않았다.
+
+### 센서 전용 노드의 명령권 제거
+
+`SafetyNode(sensor_only=True)`는 Python 생성자에서 고정하는 내부 모드다.
+이 모드에서는 `cmd_vel`, `cmd_vel_raw`, `wander/cmd`, `calib/step`, `estop/state`,
+`calibration/applied`, `safety/decision` publisher를 생성하지 않는다.
+원시 명령·e-stop 조작·기존 calibration profile/drive 입력 subscription도 생성하지 않는다.
+ROS 파라미터 변경으로 이 모드를 운전 gate로 전환할 수 없다. 기존 비교용 생성자의 기본 동작은 유지한다.
+
+실제 센서 callback과 상태 발행·필터·위험 분류는 공유하고, tick은 감지 이후 최종 명령 처리 전에 반환한다.
+localization 손실 callback도 센서 전용 모드에서 zero 명령을 발행하지 않는다.
+보정 snapshot factory에도 `sensor_only=True`를 전달할 수 있다.
+
+`sensor_state`는 현재 tick의 감지 결과이며 독립적인 명령 허가나 만료 계약이 아니다.
+CORE에 공급할 때는 Observations의 실제 source/receive 만료와 calibration revision을 함께 묶어야 한다.
+후보별 translation/tracking/sweep 증거 전달은 다음 작업이다. 이 단계에서는 radial 감지를 유지하고,
+tracking 또는 bounded sweep 설정을 요청하면 `candidate_evidence_handoff_required`로 사용할 수 없음을 표시한다.
+현재 운영 launch에는 이 모드를 자동 활성화하지 않는다.
+
+검증: Control 전체 979 passed·22 skipped. 실제 ROS 파라미터/graph 시험 4개에서
+생성 및 tick/localization callback 이후 명령 endpoint 부재와 센서 누락 상태를 확인했다.
+기존 8개 노드의 두 namespace 생성 회귀도 통과했다. 하드웨어·모터는 연결하지 않았다.
