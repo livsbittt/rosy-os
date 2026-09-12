@@ -42,6 +42,9 @@ class CameraDetectNode(Node):
         self.declare_parameter('width', 320)
         self.declare_parameter('height', 240)
         self.declare_parameter('fps', 8.0)
+        # Frame IDs are not ROS topic names: namespace does not prefix them.
+        # The OS hardware profile supplies the actual mounted camera frame.
+        self.declare_parameter('camera_frame', 'camera_link')
         # A pixel is dark below this fraction of the floor's own brightness.
         self.declare_parameter('void_v_ratio', 0.50)
         self.declare_parameter('obst_frac', 0.45)
@@ -65,13 +68,13 @@ class CameraDetectNode(Node):
         self.declare_parameter('camera_principal_y', 0.0)
         self.declare_parameter('camera_max_range_m', 0.0)
 
-        self.cliff_pub = self.create_publisher(Bool, '/camera/cliff', 10)
-        self.block_pub = self.create_publisher(Bool, '/camera/blocked', 10)
-        self.side_pub = self.create_publisher(Float32, '/camera/side', 10)
-        self.dbg_pub = self.create_publisher(String, '/camera/debug', 10)
-        self.img_pub = self.create_publisher(Image, '/camera/front', 10)
-        self.observation_pub = self.create_publisher(String, '/camera/observation', 10)
-        self.controls_pub = self.create_publisher(String, '/camera/controls', 10)
+        self.cliff_pub = self.create_publisher(Bool, 'camera/cliff', 10)
+        self.block_pub = self.create_publisher(Bool, 'camera/blocked', 10)
+        self.side_pub = self.create_publisher(Float32, 'camera/side', 10)
+        self.dbg_pub = self.create_publisher(String, 'camera/debug', 10)
+        self.img_pub = self.create_publisher(Image, 'camera/front', 10)
+        self.observation_pub = self.create_publisher(String, 'camera/observation', 10)
+        self.controls_pub = self.create_publisher(String, 'camera/controls', 10)
 
         self._settle_deadline = None
         self._locked = None
@@ -253,7 +256,7 @@ class CameraDetectNode(Node):
     def _publish_front(self, bgr):
         msg = Image()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = 'camera_link'
+        msg.header.frame_id = str(self.get_parameter('camera_frame').value)
         msg.height = int(bgr.shape[0])
         msg.width = int(bgr.shape[1])
         msg.encoding = 'bgr8'

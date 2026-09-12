@@ -12,9 +12,9 @@ class WatchNode(Node):
         super().__init__('watch_node')
         self.declare_parameter('hz', 1.0)
         self.declare_parameter('once', False)
-        self.ok_pub = self.create_publisher(Bool, '/robot/ok', 10)
-        self.health_pub = self.create_publisher(String, '/robot/health', 10)
-        self.int_pub = self.create_publisher(String, '/robot/interrupt', 10)
+        self.ok_pub = self.create_publisher(Bool, 'robot/ok', 10)
+        self.health_pub = self.create_publisher(String, 'robot/health', 10)
+        self.int_pub = self.create_publisher(String, 'robot/interrupt', 10)
         self._last = None
         self._ready = False
         hz = max(0.2, float(self.get_parameter('hz').value))
@@ -22,16 +22,18 @@ class WatchNode(Node):
         self.get_logger().info('watch_node ready | /robot/ok /robot/health /robot/interrupt')
 
     def _snapshot(self):
-        names = list(self.get_node_names())
+        names = [namespace.rstrip('/') + '/' + name
+                 for name, namespace in self.get_node_names_and_namespaces()]
         pubs = {}
         for topic in EXCLUSIVE:
-            info = self.get_publishers_info_by_topic(topic)
-            pubs[topic] = [p.node_name for p in info]
+            resolved = self.resolve_topic_name(topic.lstrip('/'))
+            info = self.get_publishers_info_by_topic(resolved)
+            pubs[topic] = [p.node_namespace.rstrip('/') + '/' + p.node_name for p in info]
         return names, pubs
 
     def tick(self):
         names, pubs = self._snapshot()
-        report = inspect(names, pubs)
+        report = inspect(names, pubs, namespace=self.get_namespace())
         line = report.line()
         self.ok_pub.publish(Bool(data=report.ok))
         self.health_pub.publish(String(data=line))

@@ -77,11 +77,20 @@ def _bare(name: str) -> str:
     return n
 
 
-def inspect(node_names, pubs_by_topic) -> Report:
+def inspect(node_names, pubs_by_topic, *, namespace=None) -> Report:
     """node_names: iterable of node name strings.
-    pubs_by_topic: {topic: [publisher node names]}.
+    pubs_by_topic: {logical topic: [publisher node names]}.
+    With namespace set, names must be fully qualified. Nodes from another
+    robot are irrelevant, but their publishers on our topics are violations.
     """
-    counts = Counter(_bare(n) for n in node_names if _bare(n) not in IGNORE_NODES)
+    scope = '/' + namespace.strip('/') if namespace is not None else None
+
+    def local(name):
+        if scope is None:
+            return True
+        return name.startswith('/') and (name.rsplit('/', 1)[0] or '/') == scope
+
+    counts = Counter(_bare(n) for n in node_names if local(n) and _bare(n) not in IGNORE_NODES)
     issues = []
     for name in REQUIRED:
         n = counts.get(name, 0)
@@ -94,18 +103,23 @@ def inspect(node_names, pubs_by_topic) -> Report:
         if n > 1:
             issues.append(Issue('duplicate', '', name, f'duplicate {name} x{n}'))
     for topic, owner in EXCLUSIVE.items():
-        pubs = [_bare(p) for p in (pubs_by_topic.get(topic) or [])]
-        local = [p for p in pubs if p == owner]
+        endpoints = pubs_by_topic.get(topic) or []
+        outside = [p for p in endpoints if not local(p)]
+        if outside:
+            who = ','.join(sorted(set(outside)))
+            issues.append(Issue('foreign_namespace', topic, who, f'{topic} outside namespace: {who}'))
+        pubs = [_bare(p) for p in endpoints if local(p)]
+        owners = [p for p in pubs if p == owner]
         foreign = [p for p in pubs if p in FOREIGN]
         allow = ALLOWED.get(topic, frozenset())
         extra = [
             p for p in pubs
             if p not in FOREIGN and p != owner and p not in IGNORE_NODES and p not in allow
         ]
-        if not local:
+        if not owners:
             issues.append(Issue('missing_pub', topic, owner, f'{topic} has no {owner}'))
-        if len(local) > 1:
-            issues.append(Issue('duplicate', topic, owner, f'{topic} {owner} x{len(local)}'))
+        if len(owners) > 1:
+            issues.append(Issue('duplicate', topic, owner, f'{topic} {owner} x{len(owners)}'))
         if foreign:
             who = ','.join(sorted(set(foreign)))
             issues.append(Issue('foreign', topic, who, f'{topic} interrupted by {who}'))

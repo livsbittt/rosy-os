@@ -40,6 +40,22 @@ launch, 웹 자원, 테스트가 직접 참조하는 도구·지도·검증 fixt
 
 명시한 경로만 사용하므로 기존 calibrator 사용자는 save_path/sign_path를 전달해야 한다. OS 배포에서는 D-36 활성 working generation에 대응하는 경로를 전달해야 하며, 현재 helper 자체는 임의 경로의 generation 소속을 검증하지 않는다. 원본 이전 대장의 hash는 T1 snapshot으로 보존하고 이후 변경은 Git 이력으로 추적한다.
 
+### T2 후속 구현: 카메라·graph 감시 (2026-09-13)
+
+- camera_detect_node의 7개 출력 토픽과 watch_node의 3개 상태 토픽을 상대 이름으로 변경했다.
+- 이미지 frame은 camera_frame 파라미터로 장치 profile에서 지정한다. 기본 camera_link는 기존 root 구성과 같다.
+- watch는 node namespace를 포함해 조사한다. 다른 로봇의 동명 노드는 local 필수 노드로 계산하지 않으며,
+  우리 토픽의 외부 namespace publisher는 별도 오류로 기록한다.
+- watch의 기존 legacy 필수 노드·owner 규칙은 보존했다. OS 운영 graph profile로의 전환은 T3/T5에 남아 있다.
+- Control 전체: 911 passed, 13 skipped. ROS 없는 Windows에서 graph 시험 3개는 skip이다.
+- 외부 네트워크 없는 ROS Jazzy 컨테이너에서 실제 camera/calibration 생성자와 watch DDS endpoint 시험 각각 통과.
+  카메라 캡처·하드웨어 callback·속도 발행은 실행하지 않았다. DDS 접근 제어 또는 물리 안전 인증의 증거가 아니다.
+
+전체 namespace/TF·설정 소비 경로와 G2 실물 카메라 결정은 계속 진행 중이다.
+
+실물 접속 확인: 2026-09-13, 이전 주소 pinky@192.168.4.1의 SSH 연결이 timeout으로 실패했다.
+장치를 변경하거나 구동하지 않았으며 현재 접속 정보를 요청했다.
+
 ### T0·T1 기준선
 
 | 범위 | 결과 | 의미 |

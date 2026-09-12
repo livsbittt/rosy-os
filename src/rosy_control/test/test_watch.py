@@ -15,6 +15,38 @@ def healthy():
 
 
 class WatchTest(unittest.TestCase):
+    def scoped(self, namespace):
+        nodes, pubs = healthy()
+        return ([namespace + '/' + name for name in nodes],
+                {topic: [namespace + '/' + name for name in names] for topic, names in pubs.items()})
+
+    def test_other_robot_nodes_do_not_create_local_duplicates(self):
+        nodes, pubs = self.scoped('/rosy_01')
+        other_nodes, _ = self.scoped('/rosy_02')
+        report = inspect(nodes + other_nodes, pubs, namespace='/rosy_01')
+        self.assertTrue(report.ok, report.line())
+
+    def test_remote_same_name_cannot_satisfy_local_publisher(self):
+        nodes, pubs = self.scoped('/rosy_01')
+        pubs['/cmd_vel'] = ['/rosy_02/safety_node']
+        report = inspect(nodes, pubs, namespace='/rosy_01')
+        self.assertFalse(report.ok)
+        self.assertTrue(any(i.kind == 'missing_pub' for i in report.issues))
+        self.assertTrue(any(i.kind == 'foreign_namespace' for i in report.issues))
+
+    def test_foreign_publisher_is_reported_even_when_local_owner_exists(self):
+        nodes, pubs = self.scoped('/rosy_01')
+        pubs['/scan'].append('/rosy_02/sllidar_node')
+        report = inspect(nodes, pubs, namespace='/rosy_01')
+        self.assertFalse(report.ok)
+        self.assertTrue(any(i.kind == 'foreign_namespace' for i in report.issues))
+
+    def test_namespace_prefix_collision_is_not_local(self):
+        nodes, pubs = self.scoped('/rosy_010')
+        report = inspect(nodes, pubs, namespace='/rosy_01')
+        self.assertFalse(report.ok)
+        self.assertTrue(any(i.kind == 'missing' for i in report.issues))
+
     def test_ok(self):
         r = inspect(*healthy())
         self.assertTrue(r.ok, r.line())
