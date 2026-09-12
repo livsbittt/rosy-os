@@ -1,0 +1,197 @@
+Pinky Pro rosy_control
+======================
+
+zip 위치 (핑키):
+  /home/pinky/dev_ws/wj/src/rosy_control.zip
+
+풀기 (지우지 말고 덮기):
+  cd /home/pinky/dev_ws/wj/src
+  unzip -o rosy_control.zip
+  ls rosy_control/rosy_control/calib_node.py
+
+구조 문서: AGENTS.md (폴더별) · CLAUDE.md (아키텍처) · STEPS.txt (운영)
+
+공유 파라미터 (하나만):
+  src/rosy_control/config/robot.yaml
+  모드/정책 정의: rosy_control/control/modes.py (라벨) · rosy_control/control/recover.py (hazard_action 등 정책) — ROS 없는 순수 로직.
+  wander 가 /robot/mode 발행 (정본). /safety/mode 는 같은 값의 LCD 하위호환 별칭.
+  ESTOP 은 wander 가 /estop/state (latched) 를 구독해 라벨에 반영. LCD 는 표시만.
+
+클래스 (SRP, subject 하나):
+  sensing/  lidar(스캔 기하·코=190°) | filt | body
+            camera(분류) camera_policy(히스테리시스) camera_controls(AE/AWB 고정)
+            camera_evidence(관측 직렬화) camera_ground(행→미터, 캘리브 전엔 None)
+  control/  modes(라벨) | recover(hazard_action·wall_first_move·side_sign/ratio_sign) | route
+  planning/ gridmap | astar | frontier | zigzag | goals(GoalBrain FSM)
+  wander/  Senses | Judge | Contact | Motion | Node(idle)
+  safety/  Bumper | Hazard | Gate | Scale | Node
+  camera_detect_node  capture + AE/AWB 고정 (분류는 sensing/camera.py)
+  lcd_control  LcdIO | LcdHud | StatusView | Battery | LedRing
+  watch.py  graph interrupt   watch_node
+
+런:
+  ros2 launch rosy_control robot.launch.py
+  (bringup+ADC+LED 이미 켜진 뒤. IMU→safety→wander→LCD/web/watch)
+  좁은 맵: safety 가 L+R 로 /safety/map_range /safety/open_max 자동.
+  감시: ros2 topic echo /robot/health
+
+빌드:
+  cd /home/pinky/dev_ws/wj
+  colcon build --packages-select rosy_control lcd_control
+
+테스트 (개발 PC, ROS 불필요):
+  python3 -m pytest test/ -q   # 89개
+
+매 터미널:
+  source /opt/ros/jazzy/setup.bash
+  source /home/pinky/pinky_pro/install/setup.bash
+  source /home/pinky/dev_ws/wj/install/setup.bash
+
+확인:
+  ros2 pkg executables rosy_control
+  → calib_node  camera_detect_node  control_node  goal_node  safety_node  watch_node  wander_node  web_node
+  ros2 pkg executables lcd_control
+  → lcd_node
+  ros2 pkg executables pinky_web
+  → web_node
+
+웹 + SQLite WAL:
+  ros2 launch pinky_web web.launch.py
+  브라우저  http://<핑키IP>:8090
+  DB        /home/pinky/dev_ws/wj/pinky.db  (journal_mode=WAL)
+
+
+웹 대시보드 (rosy_control web_node — 지도+제어 한 페이지):
+  ros2 launch rosy_control web.launch.py        # 또는: ros2 run rosy_control web_node
+  브라우저  http://<핑키IP>:28161
+  백엔드 API  :28162 (/state.json · /map.png · 버튼/teleop POST)
+  지도: /map → PNG, 궤적(trail) + 로봇/목표/경로/frontier 대안 오버레이
+        휠 줌(1–8x, 커서 기준) · 드래그 팬 · fit 버튼/f 키
+        카메라: /camera/front → JPEG 스트림 + HSV 장애물 판정 칩
+                (절벽 판정은 카메라가 하지 않음 — 바닥 IR 담당)
+  제어 상태: /robot/mode · /wander/state · estop 래치 · /goal_node/state
+            · /goal/eta · /robot/ok·health · /cmd_vel
+  버튼: goal explore|coverage|stop → /goal/cmd
+        지도 클릭 = x,y 핀 → "send robot here" → /goal/cmd "x,y"
+          (goal_node 가 manual goal 로 래치; 도착/불가/TTL/모드변경 시 해제)
+        wander start|stop → /wander/cmd
+        estop STOP|release → /estop/cmd
+        teleop (패드 누르기 or 키보드 u i o / j k l / m , . — k 정지) → auto:
+          safety 살아있으면 /cmd_vel_raw (safety 게이트 통과),
+          gz 리그( safety 없음, /cmd_vel 구독 있음)는 /cmd_vel 로 직행.
+          지도 클릭 = 그 x, y 핀 표시.
+  메모: 옛 tools/dashboard.py 는 web_node(:28161) 로 통합·제거됨. robot.launch 도 pinky_web 대신 web_node 를 띄움.
+
+
+1) 자동 캘리브 (wander 끄고, 책상 가운데)
+  창1  ros2 launch pinky_bringup bringup_robot.launch.xml
+  창2  ros2 run pinky_sensor_adc main_node
+  창3  ros2 run rosy_control calib_node
+
+  ros2 topic pub --once /calib/step std_msgs/msg/String "{data: auto}"
+  상태: ros2 topic echo /calib/status
+         ros2 topic echo /calib/phase
+  1) 바닥 IR 안정될 때까지 대기 (4095 들어올림은 건너뜀)
+  2) 느린 +x 로 전진/후진 부호 + 라이다 요 (줄어드는 빔 = 전방)
+  3) 코만 책상 밖 — 절벽 IR이 몇 번 연속이면 자동 샘플
+  라이다만: ros2 topic pub --once /calib/step std_msgs/msg/String "{data: lidar}"
+  정지 거리(3cm)는 맵 크기가 아니라 센서 클리어런스. 카메라 look-ahead 벽은 끔.
+  OK mode=low 와 cmd_linear_sign=+1 (전진=+x). 후진으로 나가면 safety 가 부호를 자동 반전.
+  취소: ros2 topic pub --once /calib/step std_msgs/msg/String "{data: abort}"
+
+  수동이 필요하면:
+    ros2 topic pub --once /calib/step std_msgs/msg/String "{data: floor}"
+    ros2 topic pub --once /calib/step std_msgs/msg/String "{data: cliff}"
+    ros2 topic pub --once /calib/step std_msgs/msg/String "{data: compute}"
+
+
+2) 자율 주행
+  창1 bringup
+  창2 adc
+  창3 ros2 launch rosy_control wander.launch.py
+      (robot.yaml + wander/safety yaml)
+  창4 LCD/LED (별 패키지, 모터와 무관):
+      ros2 run pinky_led led_server
+      ros2 launch lcd_control lcd.launch.py
+      (robot.yaml + lcd.yaml)
+      emotion_server 가 켜져 있으면 LCD 맵 대신 얼굴 GIF.
+
+  라이다 1.8cm / 초음파 2.0cm / 전방 콘 8도 / 라이다 요 190도 (스캔 0=뒤, 코=π+10°)
+  원격 gazebo /scan 은 버림 (sim stamp / 640빔). 섹터는 10% 분위수.
+  카메라 화면 180도 회전
+  IR 절벽 / IMU 기울기·들어올림
+  속도: odom 남은 간격 / 0.50s, 생각 3mm/s, 크루즈 1.4cm/s
+  센서 필터: 메디안 5 + 푸리에 저역통과 1.5Hz (민감 스파이크 제거).
+  후진: 뒤 라이다가 비어야 함. 거리는 뒤 여유 전체(캡 12cm). 꼬리 스윙도 회전 여유에 포함.
+  좁은 미로+코너: 막히면 pause → look(0.8s 정지, L/R/F 평균) → 방향 잠금.
+  WALL (F/US ≤8cm 또는 bumper): look → wall → 뒤가 비면 backup, 아니면 escape. 벽에 붙어 있으면 전진 없음.
+  회전 중 부호를 다시 고르지 않음. 옆이 열려도 전방이 넓으면 조향만.
+  카메라 코너 벽 → 그 반대로 회전(후진 없음). 초음파가 라이다보다 가까우면 전방.
+  후진 2.5cm odom, 회전 최대 70도 또는 전방이 열릴 때까지
+  후진은 라이다 뒤쪽이 비어 있을 때만. 뒤가 막히면 후진 대신 회전.
+  기울기면 뒤 경로가 비어 있으면 후진, 아니면 제자리 회전. 들어올림이면 즉시 정지.
+  IR 절벽(코가 허공): 잠깐 정지 → IR이 바닥으로 돌아올 때까지만 후진 → 회전 → 전진
+  벽 / 카메라 허공·장애물(아직 바닥): 잠깐 정지 → 제자리 회전 → 전진
+  상태 /wander/state 와 모드 /robot/mode (정본; /safety/mode 는 같은 값의 별칭):
+        ESTOP PICK CLIFF TILT
+        WALL   코가 벽 (F 또는 US ≤8cm, 또는 bumper). look → 뒤 비면 backup, 아니면 escape. 붙어 있으면 전진 없음.
+        LOOK   정지, L/R/F 샘플
+        CALC   샘플로 점수 매겨 전진/후진/회전 결정. L≈R 이면 LOOK 다시
+        RECON  회전 중 반대가 더 열리면 멈추고 LOOK 다시 (최대 2번)
+        BACK   후진
+        ESCAPE 잠근 쪽으로 느린 회전 (미로/코너). 카메라 장애물은 WALL 이 아니라 ESCAPE.
+        TURN   절벽 후 회전
+        PAUSE  절벽 vs 벽 구분
+        WARN   8–11cm, 아직 전진 (크롤)
+        FWD WAIT STOP
+        ros2 topic echo /wander/state
+        ros2 topic echo /robot/mode
+        ros2 topic echo /safety/mode   # 별칭 (같은 값)
+  카메라: ros2 topic echo /camera/debug
+  LCD 맵이 안 나오면 emotion_server 를 끄고 lcd_control 을 다시.
+  LCD 보기: ros2 topic pub --once /lcd/view std_msgs/msg/String "{data: map}"
+            ros2 topic pub --once /lcd/view std_msgs/msg/String "{data: camera}"
+
+  맵 만들기 (wander 켠 채로, 이 로봇 SLAM):
+      ros2 launch rosy_control map.launch.py
+      웹 http://<핑키IP>:8090  의 Map 그림이 커져야 함
+      (실시간 지도+제어 뷰: ros2 launch rosy_control web.launch.py → :28161)
+      저장:
+        mkdir -p /home/pinky/dev_ws/wj/maps
+        ros2 run nav2_map_server map_saver_cli -f /home/pinky/dev_ws/wj/maps/pinky
+      LCD 맵은 라이다 폴라 HUD. 점유격자 맵은 /map + 웹.
+
+맵 기반 목표 (goal_node — 조언 전용, 모터는 wander/control 소관):
+  ros2 launch rosy_control goal.launch.py
+  상태:      ros2 topic echo /goal_node/state
+  목표/경로: ros2 topic echo /goal_point  /route
+  도착 예상: ros2 topic echo /goal/eta   (초. 0 = 추정 없음)
+  모드:      /goal/cmd explore|coverage|stop  (frontier 목표 → 없으면 zigzag 커버리지)
+  정체 감시: 같은 목표로 stall_plans(기본 6회) 계획 동안 진전 3cm 미만이면
+    그 목표를 제외(bench)하고 대안 목표로 전환. 막힌 자리 근처에서는 넓은 경로 우선.
+
+정지 (노드는 살리고 모터만 멈춤):
+  ros2 topic pub --once /wander/cmd std_msgs/msg/String "{data: stop}"
+재시작:
+  ros2 topic pub --once /wander/cmd std_msgs/msg/String "{data: start}"
+
+비상정지 (latch — safety 가 /cmd_vel 을 0 으로 강제):
+  ros2 topic pub --once /estop/cmd std_msgs/msg/String "{data: stop}"
+비상정지 해제 (모터는 0 유지, 새 명령 전까지):
+  ros2 topic pub --once /estop/cmd std_msgs/msg/String "{data: release}"
+  라벨: /robot/mode = ESTOP (wander 가 latched /estop/state 를 구독해 표시)
+
+
+3) 20cm / 90도 (wander 끄고, safety+control)
+  ros2 run rosy_control safety_node --ros-args \
+    --params-file /home/pinky/dev_ws/wj/src/rosy_control/config/safety.yaml
+  ros2 run rosy_control control_node --ros-args \
+    --params-file /home/pinky/dev_ws/wj/src/rosy_control/config/control.yaml
+  ros2 topic pub --once /goal_distance std_msgs/msg/Float64 "{data: 0.2}"
+  ros2 topic pub --once /goal_rotate std_msgs/msg/Float64 "{data: 90.0}"
+
+
+wander 정지: Ctrl+C 또는
+  ros2 topic pub --once /wander/cmd std_msgs/msg/String "{data: stop}"
+모터만 0:
+  ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0}, angular: {z: 0.0}}"

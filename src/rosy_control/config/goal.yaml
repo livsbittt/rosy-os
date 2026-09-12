@@ -1,0 +1,43 @@
+goal_node:
+  ros__parameters:
+    map_topic: /map
+    odom_topic: /odom
+    # Replan rate (Hz). slam map_update_interval is 2 s; faster is waste.
+    rate: 0.5
+    # explore -> frontier point to go; coverage -> zigzag waypoints.
+    mode: stop
+    map_timeout: 10.0
+    pose_timeout: 1.0
+    # Real SLAM maps have noise specks; 6 keeps phantom edges out. The sim
+    # (tools/explore_sim.py) uses 1 because its raycast reveal is noise-free.
+    min_size: 6
+    # Routes and footprint are centred on base_link, not the lidar origin.
+    # 76mm circumradius + 20mm margin is measured in metres, without cell rounding.
+    # Adding the lidar offset here sealed the robot's own maze start cell.
+    clear_m: 0.12
+    retry_clear_m: 0.12
+    # Hard footprint margin for a bounded escape or a verified narrow route.
+    start_escape_clear_m: 0.096
+    start_escape_distance_m: 0.08
+    # Robot swath ~15 cm; 12 cm lanes overlap. Waypoint every 20 cm.
+    lane_width: 0.12
+    lane_step: 0.20
+    # Arrival tolerance comes from the shared reach_tol in robot.yaml.
+    # Show at most this many frontier alternatives on /goal/options.
+    max_options: 3
+    # Stall watchdog: after this many plan calls (2 s each) with under
+    # progress_m of approach, the frontier is benched and the next-best
+    # option becomes the goal. stall_min_dist exempts nearly-reached goals.
+    stall_plans: 6
+    progress_m: 0.03
+    stall_min_dist: 0.15
+    # Benched cells are retried after this many plan calls (~2 min).
+    blacklist_plans: 20
+    # After a stall, routes are planned with this clearance (2-cell
+    # inflation seals 15 cm gaps) until the robot leaves the stuck area.
+    escape_clear_m: 0.16
+    # Explicit coverage completion must not silently start repeated probes.
+    # Exploration retries newly visible frontiers on every fresh-map plan.
+    probe_when_done: false
+    # Nominal cruise (m/s) for the ETA until odom speed is available.
+    speed_mps: 0.014
