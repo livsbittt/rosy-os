@@ -50,8 +50,8 @@ def grid_clearance(distance, resolution):
 class GoalNode(Node, GoalEscape):
     def __init__(self):
         super().__init__('goal_node')
-        self.declare_parameter('map_topic', '/map')
-        self.declare_parameter('odom_topic', '/odom')
+        self.declare_parameter('map_topic', 'map')
+        self.declare_parameter('odom_topic', 'odom')
         self.declare_parameter('rate', 1.0)
         self.declare_parameter('mode', 'stop')
         self.declare_parameter('map_timeout', 10.0)
@@ -60,10 +60,10 @@ class GoalNode(Node, GoalEscape):
         self.declare_parameter('obstacle_tracking_enabled', False)
         self.declare_parameter('obstacle_tracking_margin', .02)
         self.obstacle_observation = None
-        self.create_subscription(String, '/obstacles/tracks', self.on_obstacle_tracks, 10)
+        self.create_subscription(String, 'obstacles/tracks', self.on_obstacle_tracks, 10)
         self.localization_status = None
         self.localization_was_ready = False
-        self.create_subscription(String, '/localization/status', self.on_localization, 10)
+        self.create_subscription(String, 'localization/status', self.on_localization, 10)
         self.declare_parameter('pose_timeout', 1.0)
         self.declare_parameter('min_size', 6)
         self.declare_parameter('clear_m', 0.12)
@@ -74,7 +74,7 @@ class GoalNode(Node, GoalEscape):
         self.init_escape()
         self.navigation_profile = None
         self.navigation_profile_received = None
-        self.create_subscription(String, '/calibration/status', self.on_calibration_profile, 10)
+        self.create_subscription(String, 'calibration/status', self.on_calibration_profile, 10)
         self.declare_parameter('lane_width', 0.12)
         self.declare_parameter('lane_step', 0.20)
         self.declare_parameter('reach_tol', GOAL_TOLERANCE_M)
@@ -101,17 +101,17 @@ class GoalNode(Node, GoalEscape):
             if self.get_parameter('static_map').value else qos_profile_sensor_data)
         self.create_subscription(
             Odometry, self.get_parameter('odom_topic').value, self.on_odom, 10)
-        self.create_subscription(String, '/goal/cmd', self.on_cmd, 10)
-        self.create_subscription(String, '/goal/arrival', self.on_arrival, 10)
+        self.create_subscription(String, 'goal/cmd', self.on_cmd, 10)
+        self.create_subscription(String, 'goal/arrival', self.on_arrival, 10)
         self.issued_routes = []
-        self.goal_pub = self.create_publisher(PoseStamped, '/goal_point', 10)
-        self.manual_result_pub = self.create_publisher(String, '/goal/manual_result', 10)
+        self.goal_pub = self.create_publisher(PoseStamped, 'goal_point', 10)
+        self.manual_result_pub = self.create_publisher(String, 'goal/manual_result', 10)
         self.manual_started_ns = None
         self.manual_target = None
-        self.route_pub = self.create_publisher(Path, '/route', 10)
-        self.state_pub = self.create_publisher(String, '/goal_node/state', 10)
-        self.options_pub = self.create_publisher(MarkerArray, '/goal/options', 10)
-        self.eta_pub = self.create_publisher(Float32, '/goal/eta', 10)
+        self.route_pub = self.create_publisher(Path, 'route', 10)
+        self.state_pub = self.create_publisher(String, 'goal_node/state', 10)
+        self.options_pub = self.create_publisher(MarkerArray, 'goal/options', 10)
+        self.eta_pub = self.create_publisher(Float32, 'goal/eta', 10)
         self.tf = TfBuffer()
         self.tf_listener = TransformListener(self.tf, self)
         self.map_obj = None
@@ -123,7 +123,7 @@ class GoalNode(Node, GoalEscape):
         self.last_executable_goal = None
         self.last_executable_exit = None
         self.navigation_feedback_received = None
-        self.create_subscription(String, "/wander/state", self.on_navigation_feedback, 10)
+        self.create_subscription(String, 'wander/state', self.on_navigation_feedback, 10)
         self.ox = self.oy = 0.0
         self.have_odom = False
         self._hist = []  # (t, x, y) odom ring for the effective speed

@@ -16,7 +16,7 @@ from .sensing.obstacle_tracks import ObstacleTracker, scan_clusters, transform_p
 class ObstacleObserver(Node):
     def __init__(self):
         super().__init__('obstacle_observer_node')
-        self.declare_parameter('scan_topic', '/scan')
+        self.declare_parameter('scan_topic', 'scan')
         self.declare_parameter('tracking_frame', 'odom')
         self.declare_parameter('tracking_max_range', 2.)
         self.declare_parameter('tracking_max_extent', .15)
@@ -32,8 +32,8 @@ class ObstacleObserver(Node):
             stationary_speed=float(self.get_parameter('tracking_stationary_speed').value))
         self.tf = Buffer()
         self.listener = TransformListener(self.tf, self)
-        self.output = self.create_publisher(String, '/obstacles/tracks', 10)
-        self.mapping_scan = self.create_publisher(LaserScan, '/mapping/scan', 10)
+        self.output = self.create_publisher(String, 'obstacles/tracks', 10)
+        self.mapping_scan = self.create_publisher(LaserScan, 'mapping/scan', 10)
         self.pending = None
         self.processed_stamp = None
         self.extents = {}

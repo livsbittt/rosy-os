@@ -9,8 +9,8 @@ class ObstacleWait:
         self.declare_parameter('obstacle_tracking_enabled', False)
         self.declare_parameter('obstacle_tracking_margin', .02)
         self.navigation_obstacles = self.navigation_camera = None
-        self.create_subscription(String, '/obstacles/tracks', self._on_obstacle_tracks, 10)
-        self.create_subscription(String, '/camera/observation', self._on_obstacle_camera, 10)
+        self.create_subscription(String, 'obstacles/tracks', self._on_obstacle_tracks, 10)
+        self.create_subscription(String, 'camera/observation', self._on_obstacle_camera, 10)
 
     def _on_obstacle_tracks(self, msg):
         try:

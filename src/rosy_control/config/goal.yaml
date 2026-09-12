@@ -1,7 +1,7 @@
 goal_node:
   ros__parameters:
-    map_topic: /map
-    odom_topic: /odom
+    map_topic: map
+    odom_topic: odom
     # Replan rate (Hz). slam map_update_interval is 2 s; faster is waste.
     rate: 0.5
     # explore -> frontier point to go; coverage -> zigzag waypoints.

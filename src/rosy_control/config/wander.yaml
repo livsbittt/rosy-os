@@ -1,7 +1,7 @@
 wander_node:
   ros__parameters:
-    cmd_topic: /cmd_vel_raw
-    odom_topic: /odom
+    cmd_topic: cmd_vel_raw
+    odom_topic: odom
     # Narrow path: cruise 1.4cm/s, think 3mm/s. v = min(blend, gap/think_horizon, odom-safe).
     vmax: 0.014
     vmax_think: 0.003

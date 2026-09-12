@@ -22,8 +22,8 @@ class Evidence:
         self.profile_valid = True
         self.profile_error = None
         self.calibration_lease = ProfileLease()
-        self.calibration_applied_pub = self.create_publisher(String, '/calibration/applied', latched)
-        self.create_subscription(String, '/calibration/profile', self.on_calibration_profile, latched)
+        self.calibration_applied_pub = self.create_publisher(String, 'calibration/applied', latched)
+        self.create_subscription(String, 'calibration/profile', self.on_calibration_profile, latched)
         self._filtered_generations = {}
         self._filtered_values = {}
         self._corr_generation = -1
@@ -32,9 +32,9 @@ class Evidence:
         self._ir_filtered = ()
         self.last_decision = {'action': 'stop', 'reason': 'startup'}
         self.observation_session = uuid.uuid4().hex
-        self.profile_pub = self.create_publisher(String, '/safety/profile', latched)
-        self.observation_pub = self.create_publisher(String, '/safety/observation', 10)
-        self.decision_pub = self.create_publisher(String, '/safety/decision', 10)
+        self.profile_pub = self.create_publisher(String, 'safety/profile', latched)
+        self.observation_pub = self.create_publisher(String, 'safety/observation', 10)
+        self.decision_pub = self.create_publisher(String, 'safety/decision', 10)
 
     def observe(self, name, msg=None, valid=True):
         args = {}

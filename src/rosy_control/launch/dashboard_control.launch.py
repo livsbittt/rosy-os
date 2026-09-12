@@ -31,6 +31,6 @@ def generate_launch_description():
         TimerAction(period=3.0, actions=[node('wander_node', ('wander.yaml',),
             {'auto_start': False, 'calibration_required': True})]),
         TimerAction(period=3.5, actions=[node('goal_node', ('goal.yaml',), {'mode': 'stop'}),
-            node('web_node', ('web.yaml',), {'teleop_topic': '/cmd_vel_raw'})]),
+            node('web_node', ('web.yaml',), {'teleop_topic': 'cmd_vel_raw'})]),
         TimerAction(period=4.0, actions=[node('startup_calibration_node')]),
     ])

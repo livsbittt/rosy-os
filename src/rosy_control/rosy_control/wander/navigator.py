@@ -51,14 +51,14 @@ class Navigator(ObstacleWait):
         self.straight_escape_seen=None
         self.straight_escape_reported=None
         self.straight_escape_reported_at=-math.inf
-        self.straight_escape_result_pub=self.create_publisher(String,'/goal/straight_escape_result',10)
-        self.create_subscription(String,'/goal/straight_escape',self._on_straight_escape,10)
+        self.straight_escape_result_pub=self.create_publisher(String,'goal/straight_escape_result',10)
+        self.create_subscription(String,'goal/straight_escape',self._on_straight_escape,10)
         self.navigation_tf = Buffer()
         self.navigation_listener = TransformListener(self.navigation_tf, self)
-        self.navigation_goal_pub = self.create_publisher(String, '/goal/cmd', 10)
-        self.navigation_arrival_pub = self.create_publisher(String, '/goal/arrival', 10)
-        self.create_subscription(Path, '/route', self._on_navigation_route, 10)
-        self.create_subscription(String, '/goal/manual_result', self._on_manual_result, 10)
+        self.navigation_goal_pub = self.create_publisher(String, 'goal/cmd', 10)
+        self.navigation_arrival_pub = self.create_publisher(String, 'goal/arrival', 10)
+        self.create_subscription(Path, 'route', self._on_navigation_route, 10)
+        self.create_subscription(String, 'goal/manual_result', self._on_manual_result, 10)
 
     def _cancel_navigation(self):
         if self.navigation_mode:

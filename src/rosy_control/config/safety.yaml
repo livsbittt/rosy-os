@@ -1,10 +1,10 @@
 safety_node:
   ros__parameters:
-    cmd_in: /cmd_vel_raw
-    cmd_out: /cmd_vel
-    scan_topic: /scan
-    us_topic: /us_sensor/range
-    ir_topic: /ir_sensor/range
+    cmd_in: cmd_vel_raw
+    cmd_out: cmd_vel
+    scan_topic: scan
+    us_topic: us_sensor/range
+    ir_topic: ir_sensor/range
     # Distances, yaw, drive sign: robot.yaml (load first).
     us_scale: 1.0
     us_invalid_hold: 5
@@ -16,14 +16,14 @@ safety_node:
     # permanently false -- a monocular camera cannot separate a dark wall from
     # a dark hole, so floor IR owns cliff. Leave it false.
     camera_block_as_wall: false
-    imu_topic: /imu_raw
+    imu_topic: imu_raw
     tilt_deg: 20.0
     gyro_dps: 90.0
     pickup_acc: 3.5
     imu_roll0: 0.0
     imu_pitch0: 0.0
-    camera_cliff_topic: /camera/cliff
-    camera_block_topic: /camera/blocked
+    camera_cliff_topic: camera/cliff
+    camera_block_topic: camera/blocked
     cliff_enable: true
     cliff_hits: 2
     # Median spike kill + Fourier low-pass (fc Hz) so ranges are not twitchy.

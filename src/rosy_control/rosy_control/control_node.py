@@ -21,8 +21,8 @@ def wrap_pi(a: float) -> float:
 class ControlNode(Node):
     def __init__(self):
         super().__init__('control_node')
-        self.declare_parameter('cmd_vel_topic', '/cmd_vel_raw')
-        self.declare_parameter('odom_topic', '/odom')
+        self.declare_parameter('cmd_vel_topic', 'cmd_vel_raw')
+        self.declare_parameter('odom_topic', 'odom')
         self.declare_parameter('vmax', 0.014)
         self.declare_parameter('vmax_think', 0.003)
         self.declare_parameter('vmin', 0.003)
@@ -36,8 +36,8 @@ class ControlNode(Node):
         cmd_topic = self.get_parameter('cmd_vel_topic').value
         self.pub = self.create_publisher(Twist, cmd_topic, 10)
         self.create_subscription(Odometry, self.get_parameter('odom_topic').value, self.on_odom, 10)
-        self.create_subscription(Float64, '/goal_distance', self.on_goal, 10)
-        self.create_subscription(Float64, '/goal_rotate', self.on_rotate, 10)
+        self.create_subscription(Float64, 'goal_distance', self.on_goal, 10)
+        self.create_subscription(Float64, 'goal_rotate', self.on_rotate, 10)
         self.create_timer(0.05, self.tick)
         self.have_odom = False
         self.last_odom_time = self.get_clock().now()

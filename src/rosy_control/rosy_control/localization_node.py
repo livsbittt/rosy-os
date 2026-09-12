@@ -34,15 +34,15 @@ class LocalizationNode(Node):
         self.confidence = Confidence(self.p('stable_scans'))
         self.tf = Buffer()
         self.listener = TransformListener(self.tf, self)
-        self.status = self.create_publisher(String, '/localization/status', 10)
-        self.initial_pose = self.create_publisher(PoseWithCovarianceStamped, '/initialpose', 10)
+        self.status = self.create_publisher(String, 'localization/status', 10)
+        self.initial_pose = self.create_publisher(PoseWithCovarianceStamped, 'initialpose', 10)
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
-        self.create_subscription(OccupancyGrid, '/map', self.on_map, latched)
-        self.create_subscription(LaserScan, '/scan', self.on_scan, qos_profile_sensor_data)
-        self.create_subscription(PoseWithCovarianceStamped, '/amcl_pose', self.on_pose, latched)
-        self.create_subscription(Bool, '/safety/pickup', self.on_pickup, 10)
-        self.global_client = self.create_client(Empty, '/reinitialize_global_localization')
-        self.update_client = self.create_client(Empty, '/request_nomotion_update')
+        self.create_subscription(OccupancyGrid, 'map', self.on_map, latched)
+        self.create_subscription(LaserScan, 'scan', self.on_scan, qos_profile_sensor_data)
+        self.create_subscription(PoseWithCovarianceStamped, 'amcl_pose', self.on_pose, latched)
+        self.create_subscription(Bool, 'safety/pickup', self.on_pickup, 10)
+        self.global_client = self.create_client(Empty, 'reinitialize_global_localization')
+        self.update_client = self.create_client(Empty, 'request_nomotion_update')
         self.pending = None
         self.last_recovery = -math.inf
         self.last_update = -math.inf

@@ -56,6 +56,22 @@ launch, 웹 자원, 테스트가 직접 참조하는 도구·지도·검증 fixt
 실물 접속 확인: 2026-09-13, 이전 주소 pinky@192.168.4.1의 SSH 연결이 timeout으로 실패했다.
 장치를 변경하거나 구동하지 않았으며 현재 접속 정보를 요청했다.
 
+### T2 후속 구현: 전체 endpoint 기본값 (2026-09-13)
+
+- 주행·안전·localization·startup·web 노드와 YAML의 endpoint 기본값을 상대 이름으로 변경했다.
+- web teleop는 현재 namespace의 cmd_vel_raw로 고정한다. 상태 dictionary의 기존 키는 보존한다.
+- 소스 조사 도구 `tools/audit_ros_names.py`와 [조사 CSV](2026-09-13-control-ros-name-inventory.csv)를 추가했다.
+  265개 표현식 중 endpoint는 204개이며, 정적으로 확인되는 198개는 상대 이름이다.
+  나머지 6개는 parameter·loop·resolver 경로로 수동 확인했다. 이 조사만으로 launch override까지 보장하지 않는다.
+- Control 패키지 디렉터리에서 `python -m pytest test -q -p no:cacheprovider`: 913 passed, 14 skipped.
+  저장소 루트 실행 시 보조 CLI subprocess import 1건이 실패했으며, 패키지 기준 재실행으로 확인했다.
+- 네트워크 없는 ROS Jazzy에서 주요 처리 노드 8개의 실제 생성자를 rosy_01/rosy_02로 각각 실행했다.
+  topic/service 해석과 legacy graph의 유일한 cmd_vel publisher(safety_node)를 확인했다.
+  TF topic remap은 시험에서 명시했으며 timer·하드웨어 드라이버·실제 구동은 실행하지 않았다.
+
+T2 완료는 아니다. namespace별 YAML node selector, frame prefix와 base frame 계약,
+보정 schema·generation, OS launch 연결은 남아 있다. CORE와 legacy SafetyNode 동시 활성화도 허용하지 않는다.
+
 ### T0·T1 기준선
 
 | 범위 | 결과 | 의미 |

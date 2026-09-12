@@ -15,8 +15,8 @@ class Obstacles:
         self.declare_parameter('obstacle_tracking_margin', .02)
         self.obstacle_observation = None
         self.camera_observation = None
-        self.create_subscription(String, '/obstacles/tracks', self.on_obstacle_tracks, 10)
-        self.create_subscription(String, '/camera/observation', self.on_camera_observation, 10)
+        self.create_subscription(String, 'obstacles/tracks', self.on_obstacle_tracks, 10)
+        self.create_subscription(String, 'camera/observation', self.on_camera_observation, 10)
 
     def on_camera_observation(self, msg):
         try:

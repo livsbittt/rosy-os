@@ -98,9 +98,9 @@ class MapControl:
         self.lock = threading.Lock()
         self.pending = None
         self.map_after_ns = 0
-        self.reset = node.create_client(Reset, '/slam_toolbox/reset') if Reset else None
-        self.pause = node.create_client(Pause, '/slam_toolbox/pause_new_measurements') if Pause else None
-        self.params = node.create_client(GetParameters, '/slam_toolbox/get_parameters')
+        self.reset = node.create_client(Reset, 'slam_toolbox/reset') if Reset else None
+        self.pause = node.create_client(Pause, 'slam_toolbox/pause_new_measurements') if Pause else None
+        self.params = node.create_client(GetParameters, 'slam_toolbox/get_parameters')
         self.update(available=False, paused=None, busy=False, error='', epoch=0)
         threading.Thread(target=self.poll, daemon=True).start()
 
@@ -345,7 +345,7 @@ class WebNode(Node):
         super().__init__('web_node')
         self.declare_parameter('port', 28161)
         self.declare_parameter('backend_port', 28162)
-        self.declare_parameter('battery_topic', '/battery_state')
+        self.declare_parameter('battery_topic', 'battery_state')
         self.battery_stamp_ns = None
         self.create_subscription(BatteryState, str(self.get_parameter('battery_topic').value), self.on_battery, qos_profile_sensor_data)
         self.declare_parameter('teleop_topic', 'auto')
@@ -364,10 +364,10 @@ class WebNode(Node):
         self.teleop_target = None
         self.teleop_pub = None
         self.resolve_teleop()
-        self.goal_pub = self.create_publisher(String, '/goal/cmd', 10)
-        self.wander_pub = self.create_publisher(String, '/wander/cmd', 10)
-        self.estop_pub = self.create_publisher(String, '/estop/cmd', 10)
-        self.calibration_pub = self.create_publisher(String, '/calibration/cmd', 10)
+        self.goal_pub = self.create_publisher(String, 'goal/cmd', 10)
+        self.wander_pub = self.create_publisher(String, 'wander/cmd', 10)
+        self.estop_pub = self.create_publisher(String, 'estop/cmd', 10)
+        self.calibration_pub = self.create_publisher(String, 'calibration/cmd', 10)
         with LOCK:
             STATE['calibration_ready'] = False
             STATE.pop('calibration_received', None)
@@ -385,28 +385,28 @@ class WebNode(Node):
         self.create_timer(.2, self.refresh_pose, clock=self.pose_clock)
 
         self.create_subscription(
-            OccupancyGrid, '/map', self.on_map, qos_profile_sensor_data)
-        self.create_subscription(Odometry, '/odom', self.on_odom, 10)
+            OccupancyGrid, 'map', self.on_map, qos_profile_sensor_data)
+        self.create_subscription(Odometry, 'odom', self.on_odom, 10)
         self.create_subscription(
-            PoseStamped, '/goal_point', self.on_goal, 10)
-        self.create_subscription(Path, '/route', self.on_route, 10)
+            PoseStamped, 'goal_point', self.on_goal, 10)
+        self.create_subscription(Path, 'route', self.on_route, 10)
         self.create_subscription(
-            MarkerArray, '/goal/options', self.on_options, 10)
+            MarkerArray, 'goal/options', self.on_options, 10)
         self.create_subscription(
-            LaserScan, '/scan', self.on_scan, qos_profile_sensor_data)
+            LaserScan, 'scan', self.on_scan, qos_profile_sensor_data)
         self.create_subscription(
-            Image, '/camera/front', render_cam, qos_profile_sensor_data)
+            Image, 'camera/front', render_cam, qos_profile_sensor_data)
         for topic, typ, key in SENSOR_TOPICS:
             self.create_subscription(
-                typ, topic, sensor_cb(key), 10)
+                typ, topic.lstrip('/'), sensor_cb(key), 10)
         self.create_timer(1.0, self.resolve_teleop)
-        self.create_subscription(String, '/robot/mode', self.on_mode, 10)
-        self.create_subscription(String, '/wander/state', self.on_wander, 10)
-        self.create_subscription(String, '/navigation/session', self.on_navigation_session, 10)
-        self.create_subscription(String, '/safety/motion_limits', self.on_motion_limits, 10)
+        self.create_subscription(String, 'robot/mode', self.on_mode, 10)
+        self.create_subscription(String, 'wander/state', self.on_wander, 10)
+        self.create_subscription(String, 'navigation/session', self.on_navigation_session, 10)
+        self.create_subscription(String, 'safety/motion_limits', self.on_motion_limits, 10)
         self.create_subscription(
-            String, '/goal_node/state', self.on_gstate, 10)
-        self.create_subscription(Float32, '/goal/eta', self.on_eta, 10)
+            String, 'goal_node/state', self.on_gstate, 10)
+        self.create_subscription(Float32, 'goal/eta', self.on_eta, 10)
         # Same latched profile wander uses: safety publishes /estop/state
         # transient_local, so a volatile sub would never see the latch.
         latched = QoSProfile(
@@ -414,15 +414,15 @@ class WebNode(Node):
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
         )
-        self.create_subscription(Bool, '/estop/state', self.on_estop, latched)
-        self.create_subscription(Bool, '/calibration/ready', self.on_calibration_ready, latched)
-        self.create_subscription(String, '/calibration/status', self.on_calibration_status, 10)
-        self.create_subscription(String, '/safety/profile', self.on_safety_profile, latched)
-        self.create_subscription(String, '/safety/decision', self.on_safety_decision, 10)
-        self.create_subscription(Bool, '/robot/ok', self.on_ok, 10)
-        self.create_subscription(String, '/robot/health', self.on_health, 10)
-        self.create_subscription(String, '/robot/evidence_scope', self.on_evidence_scope, latched)
-        self.create_subscription(Twist, '/cmd_vel', self.on_vel, 10)
+        self.create_subscription(Bool, 'estop/state', self.on_estop, latched)
+        self.create_subscription(Bool, 'calibration/ready', self.on_calibration_ready, latched)
+        self.create_subscription(String, 'calibration/status', self.on_calibration_status, 10)
+        self.create_subscription(String, 'safety/profile', self.on_safety_profile, latched)
+        self.create_subscription(String, 'safety/decision', self.on_safety_decision, 10)
+        self.create_subscription(Bool, 'robot/ok', self.on_ok, 10)
+        self.create_subscription(String, 'robot/health', self.on_health, 10)
+        self.create_subscription(String, 'robot/evidence_scope', self.on_evidence_scope, latched)
+        self.create_subscription(Twist, 'cmd_vel', self.on_vel, 10)
 
         html_path = self.html_path()
         with open(html_path, 'rb') as f:
@@ -724,7 +724,7 @@ class WebNode(Node):
         """Discovery delays must never create a path around the safety gate."""
         # Keep the legacy parameter accepted for launch compatibility, but
         # neither configuration nor a missing safety node grants motor output.
-        want = '/cmd_vel_raw'
+        want = self.resolve_topic_name('cmd_vel_raw')
         if want == self.teleop_target:
             return
         if self.teleop_pub is not None:
