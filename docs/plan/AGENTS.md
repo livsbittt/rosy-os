@@ -31,7 +31,8 @@ None.
   `docs/plans/` instead.
 
 - Phases: P0 rename/multi-robot → P1 rosy_core → P2 rosy_web → P3 two-robot → P4 rosy_fleet → P5 formation → P6 expand.
-- Task IDs look like `P1-9`. Prefer updating the matrix when you finish work.
+- Historical task IDs such as `P1-9` describe the upstream baseline; update
+  the current dated plan instead of extending this matrix.
 - The legacy Flask UI (`src/rosy_navigation/scripts/`) was deleted; `rosy_core` FastAPI `/api/v1/*` is the only web surface (D-3).
 
 ### Testing Requirements
