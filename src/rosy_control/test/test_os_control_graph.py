@@ -30,6 +30,10 @@ class ProcessingGraphTests(unittest.TestCase):
                                     LocalizationNode, ObstacleObserver):
                     node = constructor()
                     nodes.append(node)
+                    for attribute in ('tf', 'lidar_tf', 'navigation_tf'):
+                        buffer = getattr(node, attribute, None)
+                        if buffer is not None:
+                            self.assertEqual(buffer.frame_prefix, namespace + '/')
                     topics = {p.topic_name for p in node.publishers}
                     topics.update(s.topic_name for s in node.subscriptions)
                     topics -= {'/rosout', '/parameter_events'}

@@ -23,10 +23,10 @@ import rclpy
 from geometry_msgs.msg import Point, PoseStamped
 from nav_msgs.msg import Odometry, OccupancyGrid, Path
 from visualization_msgs.msg import Marker, MarkerArray
+from .tf_buffer import RobotTransformBuffer
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data, QoSProfile, DurabilityPolicy
 from std_msgs.msg import Float32, String
-from tf2_ros import Buffer as TfBuffer
 from tf2_ros import TransformListener
 from tf2_ros import TransformException
 
@@ -112,7 +112,7 @@ class GoalNode(Node, GoalEscape):
         self.state_pub = self.create_publisher(String, 'goal_node/state', 10)
         self.options_pub = self.create_publisher(MarkerArray, 'goal/options', 10)
         self.eta_pub = self.create_publisher(Float32, 'goal/eta', 10)
-        self.tf = TfBuffer()
+        self.tf = RobotTransformBuffer(self)
         self.tf_listener = TransformListener(self.tf, self)
         self.map_obj = None
         self._map_received = None

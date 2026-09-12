@@ -84,6 +84,20 @@ T2 완료는 아니다. namespace별 YAML node selector, frame prefix와 base fr
 - wildcard는 장치 identity 경계가 아니다. 보정 파일은 장치별 working generation으로 분리해야 한다.
   schema·generation 강제와 TF frame 계약·OS launch 적용은 계속 미완료다.
 
+### T2 후속 구현: OS TF prefix 어댑터 (2026-09-13)
+
+- OS navigation/CORE의 D-4 구현을 대조했다. map은 공통이며 odom·base_footprint·base_link만 로봇 prefix를 갖는다.
+- Control의 7개 TF 소비 경로에 RobotTransformBuffer를 연결했다. 기본 prefix는 ROS namespace에서 얻으며,
+  frame_prefix 파라미터로 기존 장치 설정을 명시할 수 있다. 이미 한정된 센서 frame과 map은 변경하지 않는다.
+- 내부 정책·obstacle packet의 odom/base_link 이름은 로봇 로컬 별칭이다. 어댑터가 실제 TF 이름으로 해석한다.
+  base_link와 base_footprint 사이의 변환은 실제 URDF/TF가 제공해야 하며 서로 치환하지 않는다.
+- ROS Jazzy 시험: 두 로봇 트리가 공존하는 실제 TF Buffer에서 각 로봇의 map→base 위치를 검증했다.
+  root·명시 prefix·없는 변환의 실패도 확인했다. 처리 노드 생성자 시험은 각 Buffer의 namespace 연결을 확인한다.
+- TF topic remap은 여전히 격리 시험에서 명시한다. 실제 OS 운영 launch·카메라 장치 frame 설정·
+  보정 generation 강제·D-38 단일 명령권 연결과 실물 인수는 남아 있다.
+- 검증: Control 915 passed·18 skipped, ROS TF 시험 2개와 처리 노드 연결 시험 1개 통과.
+  조사 CSV는 268개 표현식으로 갱신했으며 endpoint 204개의 분류는 동일하다.
+
 ### T0·T1 기준선
 
 | 범위 | 결과 | 의미 |

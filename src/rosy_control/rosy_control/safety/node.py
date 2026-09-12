@@ -8,8 +8,9 @@ import os
 import rclpy
 from rcl_interfaces.msg import ParameterDescriptor
 from geometry_msgs.msg import Twist
+from ..tf_buffer import RobotTransformBuffer
 from rclpy.node import Node
-from tf2_ros import Buffer, TransformListener
+from tf2_ros import TransformListener
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from sensor_msgs.msg import Imu, LaserScan, Range
 from std_msgs.msg import Bool, Float32, String, UInt16MultiArray, Float32MultiArray
@@ -102,7 +103,7 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
         self.us_clear = float(self.get_parameter('us_clear_distance').value)
         self.half_w = math.radians(float(self.get_parameter('front_half_width_deg').value))
         self.lidar_yaw = float(self.get_parameter('lidar_yaw_offset').value)
-        self.lidar_tf = Buffer()
+        self.lidar_tf = RobotTransformBuffer(self)
         self.lidar_tf_listener = TransformListener(self.lidar_tf, self)
         self.lidar_yaw_source = 'waiting_tf'
         self.timeout = float(self.get_parameter('sensor_timeout').value)

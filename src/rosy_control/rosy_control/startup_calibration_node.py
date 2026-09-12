@@ -12,13 +12,14 @@ from types import SimpleNamespace
 import numpy as np
 import rclpy
 from rcl_interfaces.msg import ParameterDescriptor
+from .tf_buffer import RobotTransformBuffer
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy, qos_profile_sensor_data
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry, OccupancyGrid
 from sensor_msgs.msg import LaserScan, Range, Imu, Image
 from std_msgs.msg import Bool, String, UInt16MultiArray, Float32MultiArray
-from tf2_ros import Buffer, TransformListener
+from tf2_ros import TransformListener
 
 from .control.calibration import (StationaryBaseline, MOTION_SPEED, MOTION_SECONDS,
                                   MOTION_LIMIT, motion_evidence, motion_result, wrap)
@@ -97,7 +98,7 @@ class StartupCalibrationNode(Node, CalibrationRotation, CalibrationAtomic, Calib
         for topic in ('/safety/blocked', '/safety/cliff', '/safety/tilt', '/safety/pickup'):
             self.create_subscription(Bool, topic.lstrip('/'),
                 lambda msg, key=topic: self.hazards.__setitem__(key, (time.monotonic(), msg.data)), 10)
-        self.tf = Buffer()
+        self.tf = RobotTransformBuffer(self)
         self.listener = TransformListener(self.tf, self)
         self.scan_frame = None
         self.lidar_nose = None

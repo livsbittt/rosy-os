@@ -5,6 +5,7 @@ import math
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import rclpy
+from .tf_buffer import RobotTransformBuffer
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy, qos_profile_sensor_data
 from geometry_msgs.msg import PoseWithCovarianceStamped
@@ -12,7 +13,7 @@ from nav_msgs.msg import OccupancyGrid
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import String, Bool
 from std_srvs.srv import Empty
-from tf2_ros import Buffer, TransformListener
+from tf2_ros import TransformListener
 from .sensing.localization import MapAgreement, Confidence, planar_yaw
 
 
@@ -32,7 +33,7 @@ class LocalizationNode(Node):
             self.declare_parameter(name, value)
         self.field = self.scan = self.pose = None
         self.confidence = Confidence(self.p('stable_scans'))
-        self.tf = Buffer()
+        self.tf = RobotTransformBuffer(self)
         self.listener = TransformListener(self.tf, self)
         self.status = self.create_publisher(String, 'localization/status', 10)
         self.initial_pose = self.create_publisher(PoseWithCovarianceStamped, 'initialpose', 10)

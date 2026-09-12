@@ -3,12 +3,13 @@ import json
 import math
 
 import rclpy
+from .tf_buffer import RobotTransformBuffer
 from rclpy.node import Node
 from rclpy.time import Time
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import String
-from tf2_ros import Buffer, TransformListener, TransformException
+from tf2_ros import TransformListener, TransformException
 
 from .sensing.obstacle_tracks import ObstacleTracker, scan_clusters, transform_points, observed_free, scan_plane_pose
 
@@ -30,7 +31,7 @@ class ObstacleObserver(Node):
             evidence_time=float(self.get_parameter('tracking_evidence_time').value),
             moving_speed=float(self.get_parameter('tracking_moving_speed').value),
             stationary_speed=float(self.get_parameter('tracking_stationary_speed').value))
-        self.tf = Buffer()
+        self.tf = RobotTransformBuffer(self)
         self.listener = TransformListener(self.tf, self)
         self.output = self.create_publisher(String, 'obstacles/tracks', 10)
         self.mapping_scan = self.create_publisher(LaserScan, 'mapping/scan', 10)

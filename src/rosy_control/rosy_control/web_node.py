@@ -35,11 +35,12 @@ import http.server
 import uuid
 
 import rclpy
+from .tf_buffer import RobotTransformBuffer
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.time import Time
-from tf2_ros import Buffer, TransformListener, TransformException
+from tf2_ros import TransformListener, TransformException
 from rclpy.clock import Clock, ClockType
 from rosy_control.sensing.map_pose import record_odom, display_pose
 from rosy_control.sensing.lidar_mount import nose_from_quaternion
@@ -379,7 +380,7 @@ class WebNode(Node):
         self.odom_received = None
         self.odom_stamp = None
         self.odom_frame = 'odom'
-        self.tf = Buffer()
+        self.tf = RobotTransformBuffer(self)
         self.tf_listener = TransformListener(self.tf, self)
         self.pose_clock = Clock(clock_type=ClockType.STEADY_TIME)
         self.create_timer(.2, self.refresh_pose, clock=self.pose_clock)

@@ -8,7 +8,8 @@ from geometry_msgs.msg import Twist
 from nav_msgs.msg import Path
 from rclpy.time import Time
 from std_msgs.msg import String
-from tf2_ros import Buffer, TransformException, TransformListener
+from ..tf_buffer import RobotTransformBuffer
+from tf2_ros import TransformException, TransformListener
 
 from ..control.path_follow import ProgressGuard, PathFollower, GOAL_TOLERANCE_M
 from ..control.recover import hazard_action
@@ -53,7 +54,7 @@ class Navigator(ObstacleWait):
         self.straight_escape_reported_at=-math.inf
         self.straight_escape_result_pub=self.create_publisher(String,'goal/straight_escape_result',10)
         self.create_subscription(String,'goal/straight_escape',self._on_straight_escape,10)
-        self.navigation_tf = Buffer()
+        self.navigation_tf = RobotTransformBuffer(self)
         self.navigation_listener = TransformListener(self.navigation_tf, self)
         self.navigation_goal_pub = self.create_publisher(String, 'goal/cmd', 10)
         self.navigation_arrival_pub = self.create_publisher(String, 'goal/arrival', 10)
