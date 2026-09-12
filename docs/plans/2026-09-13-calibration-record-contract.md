@@ -36,7 +36,10 @@ calib.launch.py의 calibration_context_json, calibration_actor를 명시하면 C
 
 ## 운영 승격 전에 필요한 조건
 
-1. Host activation의 data-working 경로와 실제 data_generation을 공급한다. 현재 문자열 비교는 mount 경로 증명이 아니다.
+1. Host activation에서 data-working 경로와 ROSY_DATA_GENERATION을 같은 activation record로 공급하는 소스 연결은 구현했다.
+   Compose는 generation을 CORE 환경으로 전달한다. bound 보정은 환경값 일치와
+   /var/lib/rosy/calibration/<robot-id>/calibration.yaml 경로를 시작 전·쓰기 전에 확인하며 링크 우회를 거절한다.
+   실제 Pi의 mount/설치 인수는 남아 있고 수동으로 설정한 환경변수 자체가 신원 인증은 아니다.
 2. CORE의 인증된 정비 작업자와 승인된 장치·기구·센서 profile에서 context를 전달한다.
 3. 측정 항목별 단위·범위·품질·실측 시각과 적용 revision acknowledgement를 기록한다.
 4. 배포 소비자가 raw YAML 대신 검증된 레코드만 전달하도록 하고 단일 writer·revision 충돌 검사를 보장한다.
@@ -45,4 +48,4 @@ calib.launch.py의 calibration_context_json, calibration_actor를 명시하면 C
 6. 전원 차단 복구, 이전 runtime의 schema 호환과 ARM64/Pi 재부팅을 검증한다.
 
 현재 시험은 재읽기·revision 연결·5개 context 불일치·손상·자동 귀속/메타데이터 제거 거절과 파일 보존을 확인한다.
-실물 장치 신원, 실제 mount, 물리 보정값의 정확성, 인증된 actor와 동시 writer는 아직 이 증거에 포함하지 않는다.
+실물 장치 신원, 실제 장치 mount, 물리 보정값의 정확성, 인증된 actor와 동시 writer는 아직 이 증거에 포함하지 않는다.

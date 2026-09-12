@@ -135,6 +135,17 @@ T2 완료는 아니다. namespace별 YAML node selector, frame prefix와 base fr
 - D-43은 Proposed다. 활성 generation mount·인증 actor 공급, 범위/품질 schema, 단일 writer와 실제 정책 revision
   적용·rollback 호환·Pi 인수가 남아 있다. 현재 context 일치는 호출자 제공 값 비교이며 실물 신원 인증이 아니다.
 
+### T2 후속 구현: runtime generation과 저장 위치 연결 (2026-09-13)
+
+- Host DockerRuntime이 activation record의 data_generation을 working mount 경로와 함께 환경에 전달한다.
+  runtime.env의 오래된 generation 값은 activation 값으로 대체한다. Compose가 이를 CORE 환경에 전달한다.
+- bound CalibNode는 시작 전과 저장 전에 환경 generation과 context가 일치하는지 확인한다.
+  /var/lib/rosy/calibration/<robot-id>/calibration.yaml 이외의 경로, 다른 로봇 디렉터리와 링크 우회를 거절한다.
+- 배포·delivery·runtime 시험 42 passed·1 skipped, Control 전체 939 passed·19 skipped.
+  이후 추가 검증: activation override 5 passed, 저장/경로 16 passed·1 skipped, Linux 경로·symlink 시험 4 passed.
+- 실제 Docker Compose config 렌더링에서 generation 전달을 확인했다. 서비스·모터는 시작하지 않았다.
+  설치된 Pi의 mount readback·인증 actor/profile 공급·단일 writer·정책 revision 적용은 계속 미완료다.
+
 ### T0·T1 기준선
 
 | 범위 | 결과 | 의미 |

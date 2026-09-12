@@ -41,6 +41,7 @@ services:
       ROSY_CONFIG: /etc/rosy/rosy.yaml
       ROSY_HOST_ROOT: "${ROSY_HOST_ROOT:-/host}"
       ROSY_RUNTIME_MODE: "${ROSY_RUNTIME_MODE:-core}"
+      ROSY_DATA_GENERATION: "${ROSY_DATA_GENERATION:-}"
     command:
       - ros2
       - run

@@ -52,7 +52,7 @@ def test_start_selects_activation_paths_and_never_builds(tmp_path):
     root, _, _ = signed_tree(layout.releases)
     version = root.name
     layout.etc.mkdir(parents=True)
-    (layout.etc / "runtime.env").write_text("ROS_DOMAIN_ID=41\nROSY_NAMESPACE=rosy_01\nROSY_UID=960\nROSY_GID=960\n")
+    (layout.etc / "runtime.env").write_text("ROS_DOMAIN_ID=41\nROSY_NAMESPACE=rosy_01\nROSY_UID=960\nROSY_GID=960\nROSY_DATA_GENERATION=stale\n")
     config = layout.config_generation(version)
     config.mkdir(parents=True)
     (config / "rosy.yaml").write_text("robot: {}")
@@ -73,4 +73,5 @@ def test_start_selects_activation_paths_and_never_builds(tmp_path):
     assert kwargs["env"]["ROSY_CORE_IMAGE"] == "sha256:" + "a" * 64
     assert kwargs["env"]["ROSY_CONFIG_PATH"] == str(config / "rosy.yaml")
     assert kwargs["env"]["ROSY_DATA_PATH"] == str(working)
+    assert kwargs["env"]["ROSY_DATA_GENERATION"] == version
     assert kwargs["env"]["ROSY_RUNTIME_MODE"] == "core"

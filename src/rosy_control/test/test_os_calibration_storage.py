@@ -9,6 +9,7 @@ from unittest.mock import patch
 import yaml
 
 from rosy_control.calibration_storage import merge_calibration, single_calibration_path
+from rosy_control.calibration_record import runtime_calibration_path
 
 
 def node_method(name):
@@ -18,6 +19,7 @@ def node_method(name):
     method = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == name)
     namespace = {'String': SimpleNamespace, 'merge_calibration': merge_calibration, 'yaml': yaml,
                  'single_calibration_path': single_calibration_path}
+    namespace['runtime_calibration_path'] = runtime_calibration_path
     exec(compile(ast.Module(body=[method], type_ignores=[]), str(path), 'exec'), namespace)
     return namespace[name]
 
@@ -111,6 +113,18 @@ class CalibrationStorageTests(unittest.TestCase):
         calls = []
         node = SimpleNamespace(
             get_parameter=lambda key: SimpleNamespace(value=str(self.path.parent / (key + '.yaml'))),
+            _status=lambda message: calls.append('status'),
+            _start_auto=lambda: calls.append('motion'))
+        node_method('on_step')(node, SimpleNamespace(data='auto'))
+        self.assertEqual(calls, ['status'])
+
+    def test_bound_generation_mismatch_cannot_start_motion(self):
+        calls = []
+        node = SimpleNamespace(
+            calibration_context=dict(robot_id='rosy_01', hardware_model='Pinky Pro',
+                                     geometry_revision='g1', sensor_revision='s1', data_generation='new'),
+            calibration_generation='previous',
+            get_parameter=lambda key: SimpleNamespace(value=str(self.path)),
             _status=lambda message: calls.append('status'),
             _start_auto=lambda: calls.append('motion'))
         node_method('on_step')(node, SimpleNamespace(data='auto'))

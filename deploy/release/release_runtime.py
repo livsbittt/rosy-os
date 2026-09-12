@@ -94,7 +94,7 @@ class DockerRuntime:
             config.chmod(0o440)
         env.update(ROSY_RUNTIME_MODE="core", ROSY_CORE_IMAGE=manifest["containers"]["rosy_core"],
                    ROSY_IO_IMAGE=manifest["containers"]["rosy_io"], ROSY_CONFIG_PATH=str(config),
-                   ROSY_DATA_PATH=str(working))
+                   ROSY_DATA_PATH=str(working), ROSY_DATA_GENERATION=record.data_generation)
         self.run(["docker", "compose", "--project-name", "rosy-runtime", "--env-file",
                   str(self.layout.etc / "runtime.env"), "-f", str(root / "runtime/compose.yaml"),
                   "up", "-d", "--no-build", "--pull", "never", "--remove-orphans", "rosy-core"], env=env)

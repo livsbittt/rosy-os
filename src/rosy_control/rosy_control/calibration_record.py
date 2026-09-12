@@ -6,12 +6,33 @@ passing parameters to ROS; the digest detects corruption, not hostile forgery.
 from datetime import datetime, timezone
 import hashlib
 import json
+from pathlib import Path
+import re
 
 import yaml
 
 HEADER = '# rosy-calibration-record: '
 CONTEXT_FIELDS = {'robot_id', 'hardware_model', 'geometry_revision', 'sensor_revision', 'data_generation'}
 MAX_BYTES = 1024 * 1024
+
+
+def runtime_calibration_path(destination, context, active_generation, data_root='/var/lib/rosy'):
+    """Constrain an OS writer to its robot file in the mounted working tree."""
+    context = validate_context(context)
+    if not active_generation or active_generation != context['data_generation']:
+        raise ValueError('Calibration must match the active runtime data generation')
+    robot_id = context['robot_id']
+    if not re.fullmatch(r'[a-z0-9][a-z0-9_-]{0,63}', robot_id):
+        raise ValueError('Invalid calibration robot identity')
+    root = Path(data_root).resolve()
+    expected = root / 'calibration' / robot_id / 'calibration.yaml'
+    for path in (root / 'calibration', expected.parent, expected):
+        if path.is_symlink() or getattr(path, 'is_junction', lambda: False)():
+            raise ValueError('Calibration path must not redirect through a link')
+    resolved = Path(destination).resolve()
+    if resolved != expected or not resolved.is_relative_to(root):
+        raise ValueError('Calibration path is outside the robot working-data location')
+    return str(resolved)
 
 
 def validate_context(context):

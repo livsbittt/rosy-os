@@ -5,10 +5,10 @@ import tempfile
 from pathlib import Path
 
 import yaml
-from .calibration_record import HEADER, MAX_BYTES, decode_record, encode_record, validate_context
+from .calibration_record import HEADER, MAX_BYTES, decode_record, encode_record, validate_context, runtime_calibration_path
 
 
-def single_calibration_path(save_path, sign_path, context=None):
+def single_calibration_path(save_path, sign_path, context=None, runtime_generation=None):
     """Compatibility inputs must identify one commit, never two files."""
     if any(not isinstance(value, str) or not value.strip() for value in (save_path, sign_path)):
         raise ValueError('Calibration destination is not configured')
@@ -17,6 +17,8 @@ def single_calibration_path(save_path, sign_path, context=None):
         raise ValueError('Cliff and drive calibration must use one calibration_path')
     if context is not None:
         validate_context(context)
+        if runtime_generation is not None:
+            runtime_calibration_path(str(destination), context, runtime_generation)
         if destination.exists():
             if destination.stat().st_size > MAX_BYTES:
                 raise ValueError('Calibration file exceeds size limit')
