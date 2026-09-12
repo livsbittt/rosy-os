@@ -5,15 +5,23 @@ import tempfile
 from pathlib import Path
 
 import yaml
+from .calibration_record import HEADER, MAX_BYTES, decode_record, encode_record, validate_context
 
 
-def single_calibration_path(save_path, sign_path):
+def single_calibration_path(save_path, sign_path, context=None):
     """Compatibility inputs must identify one commit, never two files."""
     if any(not isinstance(value, str) or not value.strip() for value in (save_path, sign_path)):
         raise ValueError('Calibration destination is not configured')
     destination = Path(save_path).resolve()
     if destination != Path(sign_path).resolve():
         raise ValueError('Cliff and drive calibration must use one calibration_path')
+    if context is not None:
+        validate_context(context)
+        if destination.exists():
+            if destination.stat().st_size > MAX_BYTES:
+                raise ValueError('Calibration file exceeds size limit')
+            _, parameters = decode_record(destination.read_text(encoding='utf-8'), context)
+            _parameters(parameters)
     return str(destination)
 
 
@@ -39,11 +47,11 @@ def _parameters(document):
     _finite(document)
 
 
-def merge_calibration(destination, updates):
+def merge_calibration(destination, updates, *, context=None, actor=None):
     """Merge measured fields only; the caller selects the active generation path.
 
-    This preserves the existing ROS parameter YAML format. Device/schema
-    envelopes and activation acknowledgements remain separate migration work.
+    A supplied context requires matching versioned provenance. The caller still
+    owns activation-path authorization and policy adoption acknowledgement.
     """
     if not isinstance(destination, str) or not destination.strip():
         raise ValueError('Calibration destination is not configured')
@@ -51,8 +59,19 @@ def merge_calibration(destination, updates):
     incoming = yaml.safe_load(updates)
     _parameters(incoming)
     existing = {}
+    previous = None
+    if context is not None:
+        validate_context(context)
     if path.exists():
-        existing = yaml.safe_load(path.read_text(encoding='utf-8'))
+        if path.stat().st_size > MAX_BYTES:
+            raise ValueError('Calibration file exceeds size limit')
+        original = path.read_text(encoding='utf-8')
+        if context is not None:
+            previous, existing = decode_record(original, context)
+        else:
+            if original.startswith(HEADER):
+                raise ValueError('Bound calibration requires matching writer context')
+            existing = yaml.safe_load(original)
         _parameters(existing)
     # A bare ROS selector only matches the root namespace. Keep the file
     # device-local, but let its node settings survive a robot namespace.
@@ -70,13 +89,15 @@ def merge_calibration(destination, updates):
     for name, content in incoming.items():
         owner = existing.setdefault(name, {'ros__parameters': {}})
         owner['ros__parameters'].update(content['ros__parameters'])
+    payload = (encode_record(existing, context, actor, previous) if context is not None else
+               yaml.safe_dump(existing, sort_keys=False, allow_unicode=True))
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(
                 mode='w', dir=path.parent, encoding='utf-8', delete=False) as stream:
             temporary = stream.name
-            yaml.safe_dump(existing, stream, sort_keys=False, allow_unicode=True)
+            stream.write(payload)
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)

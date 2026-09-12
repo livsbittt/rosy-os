@@ -12,6 +12,7 @@ Lidar:   /calib/step  lidar
 Abort:   /calib/step  abort
 """
 import math
+import json
 import statistics
 import yaml
 
@@ -30,6 +31,7 @@ from rosy_control.sensing.body import URDF_RADIUS, use_radius
 from rosy_control.sensing.lidar import NOSE_YAW, is_robot_scan, sector_range
 from rosy_control.safety_node import parse_us_range, roll_pitch
 from rosy_control.calibration_storage import merge_calibration, single_calibration_path
+from rosy_control.calibration_record import validate_context
 
 
 def yaw_from_quat(q) -> float:
@@ -103,6 +105,13 @@ def snap_lidar_yaw(ang: float) -> float:
 class CalibNode(Node):
     def __init__(self):
         super().__init__('calib_node')
+        self.declare_parameter('calibration_context_json', '')
+        self.declare_parameter('calibration_actor', '')
+        context_text = self.get_parameter('calibration_context_json').value
+        self.calibration_context = validate_context(json.loads(context_text)) if context_text else None
+        self.calibration_actor = self.get_parameter('calibration_actor').value
+        if self.calibration_context is not None and not str(self.calibration_actor).strip():
+            raise ValueError('Bound calibration requires a writer identity')
         self.declare_parameter(
             'save_path',
             '',
@@ -293,7 +302,8 @@ class CalibNode(Node):
         if step in ('auto', 'lidar', 'lidar_yaw', 'scan', 'compute', 'save', 'apply'):
             try:
                 single_calibration_path(self.get_parameter('save_path').value,
-                                        self.get_parameter('sign_path').value)
+                                        self.get_parameter('sign_path').value,
+                                        getattr(self, 'calibration_context', None))
             except (ValueError, OSError) as exc:
                 self._status(f'보정 저장 경로 거절 — {exc}')
                 return
@@ -460,7 +470,8 @@ class CalibNode(Node):
     def compute(self):
         try:
             destination = single_calibration_path(self.get_parameter('save_path').value,
-                                                  self.get_parameter('sign_path').value)
+                                                  self.get_parameter('sign_path').value,
+                                                  getattr(self, 'calibration_context', None))
         except (ValueError, OSError) as exc:
             self._status(f'보정 저장 경로 거절 — {exc}')
             return
@@ -526,7 +537,8 @@ class CalibNode(Node):
 
     def _write(self, path, text):
         try:
-            merge_calibration(path, text)
+            merge_calibration(path, text, context=getattr(self, 'calibration_context', None),
+                              actor=getattr(self, 'calibration_actor', None))
             self._status(f'saved {path}')
             return True
         except (OSError, ValueError, yaml.YAMLError) as exc:

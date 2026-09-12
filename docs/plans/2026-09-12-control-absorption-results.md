@@ -123,6 +123,18 @@ T2 완료는 아니다. namespace별 YAML node selector, frame prefix와 base fr
 - 격리 ROS Jazzy clean colcon build: 1 package finished. 설치 overlay의 calib.launch.py --show-args에서
   namespace와 calibration_path를 확인했다. 노드 기동·이동은 하지 않았다.
 
+### T2 후속 구현: 장치·generation 보정 레코드 후보 (2026-09-13)
+
+- [보정 레코드 v1](2026-09-13-calibration-record-contract.md)의 context와 digest를 같은 YAML에 기록한다.
+- CalibNode의 명시 context 경로에 시작 전 검증과 저장 검증을 연결했다. 일반 YAML 자동 귀속·
+  불일치 writer·bound record의 메타데이터 제거 이관을 거절한다.
+- 전체 회귀 935 passed·19 skipped, 이후 preflight/이관 차단을 포함한 집중 시험 24 passed.
+  실제 ROS 보정 생성자·처리 노드 graph 시험도 각각 통과했다.
+- 최종 전체 회귀 936 passed·19 skipped. ROS Jazzy clean build 1 package finished 및 설치 launch의
+  calibration_context_json/calibration_actor 인자 노출을 확인했다.
+- D-43은 Proposed다. 활성 generation mount·인증 actor 공급, 범위/품질 schema, 단일 writer와 실제 정책 revision
+  적용·rollback 호환·Pi 인수가 남아 있다. 현재 context 일치는 호출자 제공 값 비교이며 실물 신원 인증이 아니다.
+
 ### T0·T1 기준선
 
 | 범위 | 결과 | 의미 |

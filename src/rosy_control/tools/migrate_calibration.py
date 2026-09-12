@@ -9,6 +9,7 @@ from pathlib import Path
 import yaml
 
 from rosy_control.calibration_storage import _parameters, merge_calibration
+from rosy_control.calibration_record import HEADER
 
 
 def migrate(sources, destination):
@@ -17,7 +18,10 @@ def migrate(sources, destination):
         raise ValueError('Destination already exists; choose a new calibration file')
     combined = {}
     for source in sources:
-        document = yaml.safe_load(Path(source).read_text(encoding='utf-8'))
+        text = Path(source).read_text(encoding='utf-8')
+        if text.startswith(HEADER):
+            raise ValueError('Bound records require an explicit identity-aware migration')
+        document = yaml.safe_load(text)
         _parameters(document)
         for name, content in document.items():
             selector = '/**/' + name if '/' not in name else name
