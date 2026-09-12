@@ -7,6 +7,10 @@
 
 작성일: 2026-09-12. 브랜치: `feat/rosy-control-absorption`.
 
+> This is an append-only migration evidence log. Its per-task counts and
+> `진행 중` labels describe historical checkpoints; the current gate state is
+> maintained in `2026-09-13-rosy-os-device-validation-implementation-plan.md`.
+
 ## 현재 단계
 
 2026-09-13: 흡수 변경을 실제 Rosy OS/main에 통합하고 원본 Rogic을 workspace archive로 옮겼다.

@@ -1,6 +1,10 @@
 # Rosy Control → Rosy OS 흡수 실행 계획
 > Status update (2026-09-13): T0-T8 source integration and Rosy OS boundary work are recorded in the absorption results. Use this document for the original migration rationale; current Device installation, ARM64, readback, and physical gates are tracked in the Device validation implementation plan.
 
+> The per-task `진행 중` labels below are historical checkpoints from the
+> migration sequence. They do not reopen source work already recorded as
+> absorbed; use the current Device plan and its gate table for present status.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** 기존 Rosy Control 기능을 Rosy OS 내부 패키지·API·명령·배포·정비 체계로 흡수하여 OS 단독 설치로 운영한다.
