@@ -4,7 +4,7 @@
 
 ## Purpose
 
-ROSY is a robot middleware and fleet-control platform (ROS 2 Jazzy, first hardware Pinky Pro). This repository is the robot-side workspace: `rosy_core` is the only external API gateway (FastAPI + rclpy in one process), plus hardware bringup, Nav2/SLAM, Gazebo, Raspberry Pi 5 deploy/release tooling, and charging-dock ESP32 firmware. Fleet server is specified but not implemented here. Upstream was pinky_pro; the tree was fully renamed (ADR D-16). License: Apache-2.0.
+ROSY is a robot middleware and fleet-control platform (ROS 2 Jazzy, first hardware Pinky Pro). This repository is the robot-side workspace: `rosy_core` is the only external API gateway (FastAPI + rclpy in one process), plus hardware bringup, Nav2/SLAM, Gazebo, Raspberry Pi 5 deploy/release tooling, and charging-dock ESP32 firmware. `src/rosy_control` contains the absorbed Control package; its legacy final publisher must not run beside CORE. `src/rosy_fleet` contains formation/relay/CLI seed code; the central Fleet server remains unimplemented. Upstream was pinky_pro; the tree was fully renamed (ADR D-16). License: Apache-2.0.
 
 ## Key Files
 

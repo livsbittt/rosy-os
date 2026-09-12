@@ -15,10 +15,15 @@ Rosy Control의 개발 기준은 이 저장소의 `src/rosy_control`로 통합�
 
 ```text
 rosy/ (이 리포지토리)
-├── docs/                     # 문서 5종 (spec / reference / plan)
+├── docs/                     # 요구사항·ADR·계획·조사·배포·검증 기록
+├── doc/                      # 기존 아키텍처 그림·ARM64 참고 자료
+├── deploy/                   # OS 이미지·릴리스·장치 운영
+├── dock/                     # 충전 도크 펌웨어
+├── test/                     # 호스트 배포·소유권 계약 시험
 ├── src/                      # ROS 2 패키지 (colcon workspace)
 │   ├── rosy_core/            # 핵심 미들웨어 (API·Safety·Event·Waypoint·...)
 │   ├── rosy_control/         # 흡수한 감지·보정·주행 로직 (runtime 통합 진행 중)
+│   ├── rosy_fleet/           # 편대·relay·CLI seed (중앙 Fleet 서버는 미구현)
 │   ├── rosy_bringup/         # 모터·오도메트리·배터리
 │   ├── rosy_navigation/      # Nav2/SLAM 설정·런치
 │   ├── rosy_description/     # URDF

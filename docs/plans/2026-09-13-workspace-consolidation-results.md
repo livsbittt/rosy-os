@@ -39,3 +39,18 @@ OS runtime·빌드·테스트의 의존 대상이 아니다. 원본 자격 증�
 다른 작업자의 IMU 변경은 별도 WIP로 유지한다. 원격 push, artifact 발행,
 장치 설치와 실물 안전 인수는 이 폴더 정리 결과에 포함하지 않는다.
 T2~T8 상태는 [흡수 실행 결과](2026-09-12-control-absorption-results.md)를 따른다.
+
+## 폴더 안내 후속 점검
+
+2026-09-13 재검사에서 archive 5,838개 파일의 SHA-256이 이동 전 manifest와 모두 일치했다.
+main에 남아 있는 기존 IMU WIP 10개 파일도 원본 해시와 일치하며, workspace의 옛 `Rogic/` 경로는 없다.
+`.worktrees/`는 검증용 Git checkout, `archive/`는 원본 보존용이므로 중복 제품 폴더로 취급해 삭제하지 않는다.
+
+README 구조도에 실제 `doc/`, `deploy/`, `dock/`, `test/`, `src/rosy_fleet`를 반영했다.
+`doc/`는 기존 그림·ARM64 자료, `docs/`는 요구사항·ADR·계획을 소유한다.
+Control 개발 안내의 존재하지 않는 `tools/AGENTS.md` 참조와 고정 보정 저장 경로 설명을 수정했다.
+옛 `lcd_control` 기동 안내는 현재 OS의 `rosy_emotion`·`rosy_led` 소유권으로 정정했다.
+흡수 결과 문서의 첫 상태 표도 현재 구현과 후속 T4~T8 범위로 갱신했다.
+
+이번 후속은 문서 변경이며 패키지 소유권 시험 4개와 `git diff --check`를 통과했다.
+보정 파일의 실제 정책 적용, 운영 센서 배선, Pi 설치·실물 인수는 이 점검에서 실행하지 않았다.

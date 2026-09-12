@@ -11,7 +11,8 @@ The package's Python code: executable ROS node wrappers at the top level and the
 |------|-------------|
 | `wander_node.py` | Entry wrapper — re-exports `WanderNode`/`main` from `wander/` |
 | `safety_node.py` | Entry wrapper for the safety gate node |
-| `calib_node.py` | `/calib/step` FSM: floor IR → nudge to solve drive sign + lidar nose yaw → real IR cliff; writes `config/auto_calib.yaml` and pushes params into the running safety node |
+| `calib_node.py` | Relative `calib/step` FSM; saves one explicitly configured calibration file and requests safety parameters. Bound records validate device/generation context. Parameter acknowledgement does not prove policy adoption |
+| `calibration_record.py` / `calibration_storage.py` / `calibration_lock.py` | Versioned context/digest envelope, fixed runtime path, revision checks and locked atomic save; verified runtime consumer and authenticated identity source remain pending |
 | `camera_detect_node.py` | OV5647 capture (BGR8, rotated 180°), AE/AWB frozen after settle (`sensing/camera_controls`) → `camera.classify_frame` → `sensing/camera_policy` hysteresis → `/camera/blocked|side|observation|controls`. `/camera/cliff` is always false: a monocular camera cannot separate a dark wall from a dark hole, so floor IR owns that decision |
 | `control_node.py` | odom-P straight/rotate controller driven by `/goal_distance`, `/goal_rotate` |
 | `goal_node.py` | Map point-to-go: `/map`+TF → `/goal_point`, `/route`; thin I/O over `planning.GoalBrain`; advisory only, never touches `/cmd_vel_raw` |

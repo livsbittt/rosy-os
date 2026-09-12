@@ -20,7 +20,8 @@ ROS 2 Jazzy package absorbed into the **Rosy OS** workspace for the Pinky Pro de
 | `config/` | Shared and per-node ROS parameters (see `config/AGENTS.md`) |
 | `launch/` | Launch files; bringup order matters (see `launch/AGENTS.md`) |
 | `test/` | Pure-logic unittest suite, no ROS needed (see `test/AGENTS.md`) |
-| `tools/` | Offline ASCII simulator (see `tools/AGENTS.md`) |
+| `tools/` | ROS-name audit, calibration migration, Gazebo and validation helpers; inspect the selected tool before use |
+| `docs/` | Camera ground calibration, localization and narrow-passage behavior references |
 | `web/` | web_node dashboard UI — served from share/rosy_control/web (see `web/AGENTS.md`) |
 | `map/` | Gazebo world asset for the desk maze |
 

@@ -37,7 +37,8 @@ OS 배포에서는 활성 data generation에 대응하는 경로를 전달해야
 - `wander_node` — 전진 / IR 절벽이면 정지→IR이 풀릴 때까지만 후진→회전 / 벽·카메라 허공·장애물이면 정지→회전. `/wander/cmd` stop|start
 - `control_node` — `/goal_distance`, `/goal_rotate`
 
-LCD / LED 화면은 별 패키지 `lcd_control` (`ros2 launch lcd_control lcd.launch.py`).
+OS의 LCD 표정은 `src/rosy_emotion`, LED는 `src/rosy_led`에서 관리합니다.
+기존 자료의 `lcd_control`은 현재 OS 패키지가 아니므로 운영 기동 명령으로 사용하지 않습니다.
 
 `STEPS.txt`와 CLAUDE.md의 기존 전체 스택 명령은 이전 동작 비교용 자료입니다.
 현재 OS 기동·배포 절차는 저장소 루트 README와 deploy 문서를 따릅니다.
