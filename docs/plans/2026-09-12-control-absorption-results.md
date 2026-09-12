@@ -26,10 +26,10 @@ CORE 회귀는 725 passed·10 skipped다. 격리된 실제 ROS graph/parameter �
 applied profile revision을 `SafetyManager`에 바인딩한다. command/raw/e-stop/decision publisher를 가진
 worker는 시작 단계에서 거부한다. adapter/관련 회귀 78개가 통과했다.
 CORE 이미지도 `rosy_control` 소스와 sensor runtime 의존성을 포함하도록 갱신했다(`74c32c4`).
-Dockerfile/Compose 계약 30개는 통과했다. Buildx 후보 실행은 현재 Docker Desktop의 linux/amd64
-호스트에 ARM64 binfmt가 없어 `exec format error`로 중단되었으므로, native linux/arm64 이미지 digest와
-Device readback은 아직 없다. AMD64 host packaging smoke는 이후 완료됐지만 ARM64
-artifact와 Pi readback의 상태는 계속 별도 HOLD다.
+Dockerfile/Compose 계약 30개는 통과했다. 당시 첫 Buildx 후보 실행은 Docker Desktop의
+linux/amd64 호스트에 ARM64 binfmt가 없어 `exec format error`로 중단됐다. 이후 binfmt를
+등록해 ARM64 Core/IO 개발 후보를 만들었지만, native release digest와 Device readback은
+아직 없다. 따라서 ARM64 artifact와 Pi readback의 상태는 계속 별도 HOLD다.
 `docker buildx build --platform linux/amd64 --target core --tag rosy-core:control-adapter-amd64 --file deploy/robot/Dockerfile --load .`가 통과했고 image digest는
 `sha256:bcf9cd648abeff29ac600eb6c436bbba017df89c5b98ee5053522576395156ae`다.
 entrypoint를 거친 `ros2 pkg prefix rosy_control`/`rosy_core`와 absorbed worker executable 목록을
@@ -269,3 +269,19 @@ The absorbed sensor adapter now has a Device-safe calibration startup contract. 
 The loader validates the generation-bound path, record digest, exact robot/model/geometry/sensor/generation context, and the allowed measured SafetyNode parameter set. Explicit overrides that disagree with the snapshot fail closed. A failed load therefore creates no ROS worker. The worker remains `sensor_only`; CORE still owns `SafetyManager` and the single final `cmd_vel` publisher. The adapter exposes the calibration revision and digest for administrator diagnostics, but this is not a motor-policy acknowledgement.
 
 Focused evidence: `src/rosy_core/test/test_control_sensor_adapter.py` now passes 19 tests, including pre-construction load, conflict rejection, generation mismatch, disabled-path non-access, and environment binding. `src/rosy_core/test/test_runtime_config.py` verifies the packaged default remains opt-in. `py_compile` and `git diff --check` pass. This closes a LOCAL/ROS-SIM software gate only. ARM64 publication, Pi readback, real sensor wiring, motor motion, box/pallet handling, and OMX commissioning remain HOLD or PARKED.
+
+### Latest Device build checkpoint (2026-09-13)
+
+The first Docker Desktop ARM64 attempt failed with `exec format error` because
+the builder had no registered emulator. After installing the `arm64` binfmt
+handler, a clean `ac81f2f` workspace produced both development candidates:
+
+| Target | Image ID | Metadata | Runtime smoke |
+| --- | --- | --- | --- |
+| `core` | `sha256:8aea3a0eaf9b20e0af27e70acc1e923c1830ac0577c2191a4ad9955637c02bd5` | `arm64/linux`, ~1.63 GB | entrypoint import of `rclpy`, OpenCV 4.6.0, `rosy_core`, `rosy_control` on `aarch64` |
+| `io` | `sha256:fcee5a58f657460f6b470cde94ada9c13692a48d38df4be51ec0083caa1f0622` | `arm64/linux`, ~3.50 GB | ROS package index, `serial`, `dynamixel_sdk`, bringup and Nav2 launch `--show-args` |
+
+These are Buildx/binfmt development candidates, not signed release artifacts.
+No registry digest, Pi installation/readback, serial access, motor movement,
+camera capture, or physical acceptance is implied. ARTIFACT and DEVICE remain
+HOLD until the native release pipeline and Device gates pass.
