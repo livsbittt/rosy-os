@@ -111,6 +111,18 @@ T2 완료는 아니다. namespace별 YAML node selector, frame prefix와 base fr
 - D-43의 generation-bound record·장치/geometry identity·다중 파일 transaction·실제 정책 revision acknowledgement는 남아 있다.
   D-36의 data-working mount를 확인했지만 이번 변경에 새로운 저장 schema나 배포 mount를 추가하지 않았다.
 
+### T2 후속 구현: 한 측정의 단일 저장 (2026-09-13)
+
+- compute가 절벽값·구동값을 두 번 저장하던 RED 시험을 확인했다. 이제 한 YAML에 적용 요청과 같은 정밀도의 값을 한 번만 교체한다.
+- calib.launch.py의 저장 입력은 calibration_path 하나다. 기존 노드의 save_path/sign_path 직접 설정은 같은 파일을 가리킬 때만 허용한다.
+  다른 경로·빈 경로는 이동 보정 시작과 저장 전에 거절하며 abort는 유지한다.
+- 정지된 정비 환경에서 사용하는 `python -m tools.migrate_calibration`을 추가했다.
+  기존 cliff/drive 원문과 미측정 값을 보존하며, 충돌 또는 기존 출력 파일이 있으면 이관하지 않는다.
+- 전체 회귀 925 passed·19 skipped, 이후 추가된 이관 시험 2 passed. 두 파일 중 일부만 저장되는 경로를 제거했으며
+  장치 identity·geometry revision·generation envelope와 실제 안전 정책 적용 확인은 계속 미완료다.
+- 격리 ROS Jazzy clean colcon build: 1 package finished. 설치 overlay의 calib.launch.py --show-args에서
+  namespace와 calibration_path를 확인했다. 노드 기동·이동은 하지 않았다.
+
 ### T0·T1 기준선
 
 | 범위 | 결과 | 의미 |

@@ -14,7 +14,12 @@ python3 -m pytest test/ -q
 ```
 
 소스 편입과 보정 노드 경계 정리는 완료했습니다. 전체 namespace/TF·안전 중재·이미지·Pi 인수는 남아 있습니다.
-`calib.launch.py`는 namespace, save_path, sign_path를 받습니다. 저장 경로가 없으면 이동 보정·저장·적용을 시작하지 않습니다.
+`calib.launch.py`는 namespace, calibration_path를 받습니다. 한 번의 측정은 이 파일에 한 번만 저장합니다.
+저장 경로가 없으면 이동 보정·저장·적용을 시작하지 않습니다. 노드를 직접 실행하는 기존 호출의 save_path와 sign_path는 같은 파일이어야 합니다.
+기존 두 파일은 원문을 보존하고 충돌값을 검토한 뒤 하나로 이관해야 합니다. 운영 안전 노드도 통합 파일을 마지막 parameter overlay로 읽어야 하며, 저장 성공만으로 실제 정책 적용을 주장하지 않습니다.
+
+정지된 정비 환경에서 이 패키지 디렉터리를 기준으로 `python -m tools.migrate_calibration --source /path/cliff.yaml --source /path/drive.yaml --output /active-working/calibration.yaml`을 실행할 수 있습니다.
+기존 출력 파일 또는 충돌하는 값은 거절하며, 이 명령은 측정의 유효성이나 장치 identity를 새로 인증하지 않습니다. generation 경로는 운영 배포가 지정해야 합니다.
 OS 배포에서는 활성 data generation에 대응하는 경로를 전달해야 합니다(D-43 Proposed).
 
 아래는 편입한 기존 기능 설명입니다. legacy `robot.launch.py`와 `safety_node`를

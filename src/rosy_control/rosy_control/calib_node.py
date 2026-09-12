@@ -29,7 +29,7 @@ from std_msgs.msg import String, UInt16MultiArray
 from rosy_control.sensing.body import URDF_RADIUS, use_radius
 from rosy_control.sensing.lidar import NOSE_YAW, is_robot_scan, sector_range
 from rosy_control.safety_node import parse_us_range, roll_pitch
-from rosy_control.calibration_storage import merge_calibration
+from rosy_control.calibration_storage import merge_calibration, single_calibration_path
 
 
 def yaw_from_quat(q) -> float:
@@ -291,9 +291,11 @@ class CalibNode(Node):
             self._abort('취소')
             return
         if step in ('auto', 'lidar', 'lidar_yaw', 'scan', 'compute', 'save', 'apply'):
-            if any(not str(self.get_parameter(key).value).strip()
-                   for key in ('save_path', 'sign_path')):
-                self._status('보정 저장 경로 미설정 — save_path와 sign_path를 지정하세요')
+            try:
+                single_calibration_path(self.get_parameter('save_path').value,
+                                        self.get_parameter('sign_path').value)
+            except (ValueError, OSError) as exc:
+                self._status(f'보정 저장 경로 거절 — {exc}')
                 return
         if step == 'auto':
             self._start_auto()
@@ -456,6 +458,12 @@ class CalibNode(Node):
         self._status(f'AUTO cliff 안정 IR={self.last_ir} 샘플링')
 
     def compute(self):
+        try:
+            destination = single_calibration_path(self.get_parameter('save_path').value,
+                                                  self.get_parameter('sign_path').value)
+        except (ValueError, OSError) as exc:
+            self._status(f'보정 저장 경로 거절 — {exc}')
+            return
         if not self.sets['floor'] or not self.sets['cliff']:
             miss = [p for p in ('floor', 'cliff') if not self.sets[p]]
             self._status(f'필수 없음: {miss}')
@@ -484,13 +492,6 @@ class CalibNode(Node):
             f'OK mode=low cliff_raw_max={th} clear={clear} '
             f'floor={floor_m:.0f} cliff={cliff_m:.0f} gap={gap:.0f}'
         )
-        yaml_text = (
-            'safety_node:\n  ros__parameters:\n'
-            f'    cliff_raw_max: {th}\n    cliff_clear_raw: {clear}\n'
-            '    cliff_mode: low\n'
-        )
-        if not self._write(self.get_parameter('save_path').value, yaml_text):
-            return
         apply_params = [
             ('cliff_raw_max', th),
             ('cliff_clear_raw', clear),
@@ -516,15 +517,10 @@ class CalibNode(Node):
             extra['lidar_yaw_offset'] = float(self.lidar_yaw)
             apply_params.append(('lidar_yaw_offset', float(self.lidar_yaw)))
             self._status(f'lidar_yaw_offset={math.degrees(self.lidar_yaw):.0f}deg 저장')
-        lines = ['safety_node:\n  ros__parameters:\n']
-        for k, v in extra.items():
-            if isinstance(v, bool):
-                lines.append(f'    {k}: {str(v).lower()}\n')
-            elif isinstance(v, float):
-                lines.append(f'    {k}: {v:.4f}\n')
-            else:
-                lines.append(f'    {k}: {v}\n')
-        if extra and not self._write(self.get_parameter('sign_path').value, ''.join(lines)):
+        # Persist exactly the same values as the application request in one
+        # replacement; separate cliff/drive commits can leave a mixed trial.
+        document = {'safety_node': {'ros__parameters': dict(apply_params)}}
+        if not self._write(destination, yaml.safe_dump(document, sort_keys=False)):
             return
         self._apply_safety(apply_params)
 

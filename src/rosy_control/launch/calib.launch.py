@@ -13,18 +13,16 @@ def generate_launch_description():
     )
     return LaunchDescription([
         DeclareLaunchArgument('namespace', default_value=''),
-        DeclareLaunchArgument('save_path', default_value='',
-                              description='Cliff calibration in the active writable data generation'),
-        DeclareLaunchArgument('sign_path', default_value='',
-                              description='Drive calibration in the active writable data generation'),
+        DeclareLaunchArgument('calibration_path', default_value='',
+                              description='One calibration file in the active writable data generation'),
         Node(
             package='rosy_control',
             executable='calib_node',
             output='screen',
             namespace=LaunchConfiguration('namespace'),
             parameters=[robot, {
-                'save_path': LaunchConfiguration('save_path'),
-                'sign_path': LaunchConfiguration('sign_path'),
+                'save_path': LaunchConfiguration('calibration_path'),
+                'sign_path': LaunchConfiguration('calibration_path'),
             }],
         ),
     ])

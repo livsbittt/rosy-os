@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import yaml
 
-from rosy_control.calibration_storage import merge_calibration
+from rosy_control.calibration_storage import merge_calibration, single_calibration_path
 
 
 def node_method(name):
@@ -16,7 +16,8 @@ def node_method(name):
     tree = ast.parse(path.read_text(encoding='utf-8'))
     cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'CalibNode')
     method = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == name)
-    namespace = {'String': SimpleNamespace, 'merge_calibration': merge_calibration, 'yaml': yaml}
+    namespace = {'String': SimpleNamespace, 'merge_calibration': merge_calibration, 'yaml': yaml,
+                 'single_calibration_path': single_calibration_path}
     exec(compile(ast.Module(body=[method], type_ignores=[]), str(path), 'exec'), namespace)
     return namespace[name]
 
@@ -105,6 +106,15 @@ class CalibrationStorageTests(unittest.TestCase):
         node = SimpleNamespace(_abort=lambda reason: calls.append('abort'))
         node_method('on_step')(node, SimpleNamespace(data='abort'))
         self.assertEqual(calls, ['abort'])
+
+    def test_split_destinations_cannot_start_motion(self):
+        calls = []
+        node = SimpleNamespace(
+            get_parameter=lambda key: SimpleNamespace(value=str(self.path.parent / (key + '.yaml'))),
+            _status=lambda message: calls.append('status'),
+            _start_auto=lambda: calls.append('motion'))
+        node_method('on_step')(node, SimpleNamespace(data='auto'))
+        self.assertEqual(calls, ['status'])
 
     def test_node_reports_failed_write_without_claiming_success(self):
         calls = []

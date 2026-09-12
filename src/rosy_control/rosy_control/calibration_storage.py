@@ -7,6 +7,16 @@ from pathlib import Path
 import yaml
 
 
+def single_calibration_path(save_path, sign_path):
+    """Compatibility inputs must identify one commit, never two files."""
+    if any(not isinstance(value, str) or not value.strip() for value in (save_path, sign_path)):
+        raise ValueError('Calibration destination is not configured')
+    destination = Path(save_path).resolve()
+    if destination != Path(sign_path).resolve():
+        raise ValueError('Cliff and drive calibration must use one calibration_path')
+    return str(destination)
+
+
 def _finite(value):
     if isinstance(value, float) and not math.isfinite(value):
         raise ValueError('Calibration contains a non-finite value')
