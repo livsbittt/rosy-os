@@ -21,7 +21,7 @@ setup(
     zip_safe=True,
     maintainer='livsbittt',
     maintainer_email='56295815+livsbittt@users.noreply.github.com',
-    description='Pinky Pro forward/back control node using odom and cmd_vel',
+    description='Rosy OS absorbed sensing, OpenCV, calibration, planning, and safety subjects',
     license='Apache-2.0',
     entry_points={
         'console_scripts': [

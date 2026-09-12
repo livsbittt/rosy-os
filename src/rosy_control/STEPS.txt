@@ -1,6 +1,11 @@
 Pinky Pro rosy_control
 ======================
 
+LEGACY COMPARISON RUNBOOK - do not use this file to install or start Rosy OS.
+The canonical Device path is `/opt/rosy/deploy/robot/install-pi.sh`, followed
+by `verify-pi.sh` and `device-readback.sh --json`. This file remains only for
+parity/reference checks; never start its legacy full stack beside `rosy_core`.
+
 zip 위치 (핑키):
   /home/pinky/dev_ws/wj/src/rosy_control.zip
 

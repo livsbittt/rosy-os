@@ -33,3 +33,14 @@ def test_control_tests_are_owned_by_the_os_workspace() -> None:
 def test_os_source_catalog_owns_the_absorbed_package() -> None:
     catalog = (REPO / "src" / "AGENTS.md").read_text(encoding="utf-8")
     assert "`rosy_control/`" in catalog
+
+
+def test_absorbed_metadata_and_device_guide_keep_core_command_authority() -> None:
+    package_xml = (PACKAGE / "package.xml").read_text(encoding="utf-8")
+    setup_py = (PACKAGE / "setup.py").read_text(encoding="utf-8")
+    root_readme = (REPO / "README.md").read_text(encoding="utf-8")
+
+    assert "rosy_core owns the final cmd_vel publisher" in package_xml
+    assert "forward/back control node" not in setup_py
+    assert "install-pi.sh" in root_readme
+    assert "echo 'ROS_DOMAIN_ID=" not in root_readme
