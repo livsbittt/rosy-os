@@ -1,4 +1,4 @@
-goal_node:
+/**/goal_node:
   ros__parameters:
     map_topic: map
     odom_topic: odom

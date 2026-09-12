@@ -1,5 +1,5 @@
 # Written by calib_node auto.
-safety_node:
+/**/safety_node:
   ros__parameters:
     cmd_linear_sign: 1.0
     stop_distance: 0.018

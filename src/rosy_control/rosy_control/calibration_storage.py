@@ -44,6 +44,19 @@ def merge_calibration(destination, updates):
     if path.exists():
         existing = yaml.safe_load(path.read_text(encoding='utf-8'))
         _parameters(existing)
+    # A bare ROS selector only matches the root namespace. Keep the file
+    # device-local, but let its node settings survive a robot namespace.
+    def scoped(document):
+        result = {}
+        for name, content in document.items():
+            selector = '/**/' + name if '/' not in name else name
+            if selector in result:
+                raise ValueError('Ambiguous calibration node selectors')
+            result[selector] = content
+        return result
+
+    existing = scoped(existing)
+    incoming = scoped(incoming)
     for name, content in incoming.items():
         owner = existing.setdefault(name, {'ros__parameters': {}})
         owner['ros__parameters'].update(content['ros__parameters'])

@@ -19,10 +19,11 @@ All ROS parameters. `robot.yaml` is the **single shared source** loaded first by
 ### Working In This Directory
 - Changing a shared number: edit `robot.yaml`, not a per-node yaml, unless the node must differ.
 - Speeds are deliberately tiny (cruise 1.4 cm/s, think 3 mm/s) for a desk maze; stop distances (1.8–2 cm) are **sensor clearance, not map size**.
-- Machine-written files (`auto_calib.yaml`) carry timestamps from real calibration runs.
+- Machine-written files (`auto_calib.yaml`) carry timestamps from real calibration runs. The namespace migration changes selectors only; it does not renew measured values or timestamps.
+- Per-node files use `/**/<node_name>` selectors. These files belong to one robot's configuration generation; do not share measured calibration files between robots.
 
 ### Testing Requirements
-- No unit tests cover yaml; after param changes, rebuild (`colcon build --packages-select rosy_control lcd_control`) and re-run the on-robot smoke echo checks.
+- `test_os_endpoint_defaults.py` checks topic defaults; `test_os_parameter_graph.py` verifies real ROS parameter loading at root and robot namespaces. Run the latter in isolated ROS Jazzy; host skips are not ROS evidence. Device validation remains separate.
 
 ### Common Patterns
 - Launch order: `robot.yaml` first (`/**`), then per-node yaml.

@@ -1,4 +1,4 @@
-camera_detect_node:
+/**/camera_detect_node:
   ros__parameters:
     width: 320
     height: 240

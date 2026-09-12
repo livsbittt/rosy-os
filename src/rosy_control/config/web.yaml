@@ -2,7 +2,7 @@
 # teleop_topic is accepted for launch compatibility, but web_node always
 # publishes /cmd_vel_raw. Missing safety never grants a path around the
 # gate. Isolated Gazebo uses the same topic and the same /safety/* gauges.
-web_node:
+/**/web_node:
   ros__parameters:
     port: 28161
     backend_port: 28162

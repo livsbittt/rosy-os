@@ -72,6 +72,18 @@ launch, 웹 자원, 테스트가 직접 참조하는 도구·지도·검증 fixt
 T2 완료는 아니다. namespace별 YAML node selector, frame prefix와 base frame 계약,
 보정 schema·generation, OS launch 연결은 남아 있다. CORE와 legacy SafetyNode 동시 활성화도 허용하지 않는다.
 
+### T2 후속 구현: YAML selector와 보정 재소비 (2026-09-13)
+
+- 실제 ROS에서 기존 `safety_node:` selector가 rosy_01 아래에 적용되지 않는 RED 시험을 확인했다.
+- 장치 로컬 per-node YAML selector를 `/**/<node_name>`으로 옮겼다. 수치와 실측 timestamp는 변경하지 않았다.
+- 보정 저장 시 기존 bare node selector와 업데이트를 같은 wildcard selector로 합친다.
+  측정하지 않은 값은 보존하며 중복 bare/wildcard selector가 모호하면 저장을 거부한다.
+- ROS Jazzy 시험 2개 통과: 배포된 모든 per-node YAML을 root·rosy_01·rosy_02에서 읽어 값 비교,
+  기존 보정 저장→namespaced owner 재소비 및 unrelated node 미적용 확인.
+- Control 패키지 전체 회귀: 915 passed, 16 skipped. Windows의 ROS graph skip은 위 컨테이너 증거와 구분한다.
+- wildcard는 장치 identity 경계가 아니다. 보정 파일은 장치별 working generation으로 분리해야 한다.
+  schema·generation 강제와 TF frame 계약·OS launch 적용은 계속 미완료다.
+
 ### T0·T1 기준선
 
 | 범위 | 결과 | 의미 |

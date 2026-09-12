@@ -17,7 +17,7 @@ def corridor():
 
 def test_robot_profile_can_plan_from_six_cells_off_maze_wall():
     root = Path(__file__).resolve().parents[1]
-    cfg = yaml.safe_load((root / 'config/goal.yaml').read_text(encoding='utf-8'))['goal_node']['ros__parameters']
+    cfg = yaml.safe_load((root / 'config/goal.yaml').read_text(encoding='utf-8'))['/**/goal_node']['ros__parameters']
     robot = yaml.safe_load((root / 'config/robot.yaml').read_text(encoding='utf-8'))
     radius = robot['/**']['ros__parameters']['robot_radius']
     assert cfg['start_escape_clear_m'] >= radius + .02

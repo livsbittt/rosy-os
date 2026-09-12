@@ -32,12 +32,27 @@ class CalibrationStorageTests(unittest.TestCase):
     def test_preserves_unmeasured_settings(self):
         self.path.write_text(self.original, encoding='utf-8')
         merge_calibration(str(self.path), self.update)
-        parameters = yaml.safe_load(self.path.read_text())['safety_node']['ros__parameters']
+        parameters = yaml.safe_load(self.path.read_text())['/**/safety_node']['ros__parameters']
         self.assertEqual(parameters, {'robot_radius': 0.08, 'imu_roll0': 1.0})
 
     def test_unconfigured_destination_is_rejected(self):
         with self.assertRaises(ValueError):
             merge_calibration('', self.update)
+
+    def test_legacy_update_merges_into_scoped_file(self):
+        self.path.write_text(self.original.replace('safety_node:', '/**/safety_node:'), encoding='utf-8')
+        merge_calibration(str(self.path), self.update)
+        document = yaml.safe_load(self.path.read_text())
+        self.assertEqual(list(document), ['/**/safety_node'])
+        self.assertEqual(document['/**/safety_node']['ros__parameters'],
+                         {'robot_radius': 0.08, 'imu_roll0': 1.0})
+
+    def test_ambiguous_legacy_and_scoped_selectors_preserve_file(self):
+        original = self.original + self.original.replace('safety_node:', '/**/safety_node:')
+        self.path.write_text(original, encoding='utf-8')
+        with self.assertRaisesRegex(ValueError, 'Ambiguous'):
+            merge_calibration(str(self.path), self.update)
+        self.assertEqual(self.path.read_text(), original)
 
     def test_corrupt_existing_file_is_never_replaced(self):
         for original in ['[broken', '[]', 'safety_node: []', 'safety_node: {ros__parameters: []}']:

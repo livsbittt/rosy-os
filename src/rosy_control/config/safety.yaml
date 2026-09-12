@@ -1,4 +1,4 @@
-safety_node:
+/**/safety_node:
   ros__parameters:
     cmd_in: cmd_vel_raw
     cmd_out: cmd_vel
