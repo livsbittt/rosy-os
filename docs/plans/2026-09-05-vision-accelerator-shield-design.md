@@ -1,3 +1,5 @@
+> **Historical camera draft.** This 2026-09-05 accelerator proposal is retained for design rationale. The proposed vision profile is not the current Compose baseline; camera placement and handoff remain governed by D-52 and the 2026-09-13 Device validation plan.
+
 # Raspberry Pi 5 비전 가속 쉴드 설계
 
 | 항목 | 값 |

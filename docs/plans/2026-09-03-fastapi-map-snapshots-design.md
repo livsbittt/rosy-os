@@ -1,3 +1,5 @@
+> **Historical design baseline.** This 2026-09-03 proposal preserves the Flask parity migration snapshot. The Flask node has since been removed; current source ownership and Device status are maintained by rosy_core and the 2026-09-13 Device validation plan.
+
 # FastAPI 맵 스냅샷 (MAP-003) + Flask 런치 제거
 
 **Date:** 2026-09-03
