@@ -82,3 +82,16 @@ probe is invalid because it bypasses the ROS environment setup.
 This is a reproducible Core image candidate, not a release artifact. Keep
 ARTIFACT at `HOLD` until the `io` image, manifest, signing, registry digest,
 Pi install/readback, and physical checklist gates also pass.
+
+The same clean workspace also built
+`rosy-io:arm64-validation-ac81f2f` successfully. Its image ID is
+`sha256:fcee5a58f657460f6b470cde94ada9c13692a48d38df4be51ec0083caa1f0622`
+(`arm64/linux`, approximately 3.50 GB). The supported entrypoint path
+registered `rclpy`, `sllidar_ros2`, and `rosy_bringup`; Python imported
+OpenCV `4.6.0`, `serial`, and `dynamixel_sdk`; and both
+`rosy_bringup/bringup_robot.launch.py --show-args` and
+`rosy_navigation/hardware.launch.py --show-args` resolved successfully.
+
+The IO image includes the full Nav2/LiDAR userland, but these checks do not
+claim serial-device access, motor movement, map availability, or camera
+capture. Those remain Device/FIELD gates.
