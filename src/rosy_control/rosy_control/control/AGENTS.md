@@ -12,11 +12,13 @@ Robot-frame geometry → motion policy. Pure logic, **no ROS imports** — the u
 | `modes.py` | The one canonical `/robot/mode` label: 16 labels, precedence hazard > wander action > contact bands; `pick_mode()` fuses hazard bools + FSM state + `nose_on_wall()`; `NON_FORWARD_STATES` single-sources the state list; `US_NOSE_MAX_M`/`LIDAR_NOSE_MAX_M` hold the hardware cutoffs |
 | `recover.py` | Stuck/backup/escape policy + `hazard_action` (the one cliff/tilt answer: tilt always trusted, cliff only after first forward drive, rear clear → backup else spin) + `wall_first_move` + turn-sign rules `side_sign`/`ratio_sign` + `ExitSteer`/`turn_toward_sign` (escape spins the shortest way to the full-circle exit, benches failed bearings) |
 | `route.py` | Longest free straight line through sector ranges (line route, not circular) |
+| `policy_handoff.py` | `ControlPolicyProducer`: serialized sensor-state → CORE `CommandPolicy` handoff with receive/source deadlines and applied revision |
 
 ## For AI Agents
 
 ### Working In This Directory
 - Functions take floats/bools and return strings/floats/bools — no `rclpy`, no topics, no node state. If you need node state, the caller passes it in.
+- `ControlPolicyProducer` is the one in-process boundary that may hold an `Observations` source and a `CommandPolicy`; call it from the sensor producer's serialized callback/timer group. It never publishes motor commands.
 - `hazard_action` is the only cliff/tilt decision home: **do not re-branch on `self.cliff`/`self.tilt` in FSM code** — call the policy.
 - Label list lives once in `modes.MODES`; `WANDER_TO_MODE` maps FSM state names → labels.
 - New labels must keep the taxonomy: hazard > action > contact > idle, subjects do not overlap.

@@ -67,6 +67,9 @@ class Evidence:
             self.calibration_lease.report(time.monotonic()), allow_nan=False)))
 
     def refresh_profile(self):
+        # Keep direct profile/readback consumers safe before the first timer
+        # tick; the legacy tick also refreshes distances before calling here.
+        self._refresh_distances()
         try:
             mount = getattr(self, 'lidar_mount', None)
             radius = max(self.robot_r, .083) if self.get_parameter('footprint_guard_enabled').value else self.robot_r

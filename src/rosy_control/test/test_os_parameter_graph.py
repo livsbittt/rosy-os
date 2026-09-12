@@ -2,6 +2,7 @@
 from pathlib import Path
 import unittest
 import tempfile
+import time
 
 try:
     import rclpy
@@ -16,6 +17,32 @@ if rclpy is not None:
 
 @unittest.skipIf(rclpy is None, 'Requires isolated ROS Jazzy graph')
 class ParameterGraphTests(unittest.TestCase):
+    def test_sensor_only_handoff_consumes_real_observation_window(self):
+        from rosy_control.control.command_gate import CommandPolicy
+        from rosy_control.safety.node import SafetyNode
+        rclpy.init(args=['--ros-args', '-r', '__ns:=/rosy_01'])
+        node = None
+        try:
+            node = SafetyNode(sensor_only=True)
+            node.refresh_profile()
+            policy = CommandPolicy(node.profile.revision)
+            self.assertEqual(node.bind_policy_handoff(policy, ('lidar', 'imu')),
+                             node.profile.revision)
+            received = time.monotonic()
+            node.observations.add('lidar', received)
+            node.observations.add('imu', received)
+            node.tick()
+            self.assertTrue(node.sensor_policy_published)
+            self.assertIsNotNone(policy.evaluate(.01, 0., time.monotonic()))
+            node.observations.rows['imu'].valid = False
+            node.tick()
+            self.assertFalse(node.sensor_policy_published)
+            self.assertIsNone(policy.evaluate(.01, 0., time.monotonic()))
+        finally:
+            if node is not None:
+                node.destroy_node()
+            rclpy.shutdown()
+
     def test_sensor_only_node_has_no_command_or_legacy_ack_endpoints(self):
         from rosy_control.safety.node import SafetyNode
         rclpy.init(args=['--ros-args', '-r', '__ns:=/rosy_01'])

@@ -260,3 +260,22 @@ tracking 또는 bounded sweep 설정을 요청하면 `candidate_evidence_handoff
 검증: Control 전체 979 passed·22 skipped. 실제 ROS 파라미터/graph 시험 4개에서
 생성 및 tick/localization callback 이후 명령 endpoint 부재와 센서 누락 상태를 확인했다.
 기존 8개 노드의 두 namespace 생성 회귀도 통과했다. 하드웨어·모터는 연결하지 않았다.
+
+### 센서 관측의 CORE handoff
+
+`ControlPolicyProducer`는 sensor-only node의 `GateInputs`와 같은 `Observations` 객체를
+묶어 `CommandPolicy.update_observations`를 호출한다. required stream 전부가 receive/source
+clock 기준으로 fresh일 때만 snapshot을 생성하고, 누락·stale·잘못된 applied revision이면
+기존 snapshot을 즉시 무효화한다. 시도마다 sequence를 소비하므로 재시도나 새 명령이 센서
+샘플의 deadline을 연장하지 않는다. producer에는 ROS publisher와 모터 권한이 없다.
+
+`SafetyNode.bind_policy_handoff`는 sensor-only 생성자에서만 허용하고, 실제 profile revision과
+CORE policy revision이 같은지 확인한다. 이후 각 sensor tick에서 producer를 호출한다.
+현재 handoff는 radial `GateInputs`만 전달한다. tracking/translation/bounded sweep가 활성화된
+sensor profile은 후보별 증거를 공급하지 못하므로 `candidate_evidence_handoff_required`로
+무효화된다. 따라서 해당 evidence의 실제 producer를 추가하기 전에는 CORE의 제한된 경로를
+운영 profile에 켜지 않는다.
+
+검증: 순수 handoff 시험 4개와 실제 ROS parameter/graph 시험 5개에서 fresh window,
+deadline expiry, required stream 손실, revision mismatch 및 sensor-only node의 endpoint
+부재를 확인했다. 기존 Control 전체 회귀 결과는 979 passed·22 skipped이다.

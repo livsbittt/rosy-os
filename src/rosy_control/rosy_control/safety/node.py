@@ -21,6 +21,7 @@ from ..sensing.lidar import NOSE_YAW
 from ..sensing.localization import lease_ready
 from ..control.lidar_guard import lidar_blocked, lidar_can_rotate, translation_footprint_eligible
 from ..control.command_gate import GateInputs, evaluate_command
+from ..control.policy_handoff import ControlPolicyProducer
 from ..control.actuation import prepare_command
 from ..control.rotation_clearance import rotation_clearance_allowed
 from ..control.rotation_envelope import pivot_clearance, suggest_rotation_translation, straight_translation_limits
@@ -71,6 +72,8 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
             raise ValueError('sensor_only must be a boolean constructor choice')
         self._sensor_only = sensor_only
         self.sensor_state = None
+        self._policy_producer = None
+        self.sensor_policy_published = None
         super().__init__('safety_node', parameter_overrides=parameter_overrides)
         self.declare_parameter('cmd_in', 'cmd_vel_raw')
         self.declare_parameter('cmd_out', 'cmd_vel')
@@ -312,6 +315,7 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
 
     def tick(self):
         self.sensor_state = None
+        self.sensor_policy_published = None
         try:
             self._refresh_distances()
             self.refresh_profile()
@@ -576,6 +580,9 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
                                     lease_ready(self.localization_status, self.now().nanoseconds * 1e-9)),
                 pickup=pickup, tilt=tilt, rear_blocked=self.rear_blocked,
                 obstacle=obstacle, cliff=self.cliff, can_rotate=can_rotate)
+            if self._policy_producer is not None:
+                self.sensor_policy_published = self._policy_producer.publish(
+                    self.sensor_state, now=time.monotonic())
             return
 
         if self.estop:
@@ -654,6 +661,25 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
             self.last_cmd_time = None
             if not self._sensor_only:
                 self._publish_zero()
+
+    def bind_policy_handoff(self, policy, required, applied_revision=None):
+        """Bind the sensor-only node to CORE's in-process policy consumer.
+
+        Binding is explicit and requires the revision computed from the current
+        ROS parameter readback. It never creates a command publisher.
+        """
+        if not self._sensor_only:
+            raise ValueError('Policy handoff requires sensor_only mode')
+        if applied_revision is None:
+            self._refresh_distances()
+            self.refresh_profile()
+            applied_revision = self.profile.revision
+        if applied_revision != self.profile.revision:
+            raise ValueError('Applied revision does not match the sensor profile')
+        self._policy_producer = ControlPolicyProducer(
+            policy, self.observations, required, applied_revision)
+        self.sensor_policy_published = False
+        return applied_revision
 
     def corrected_drive_speed(self, speed):
         # Atomic lease binds both gains to the current geometry and expiry.
