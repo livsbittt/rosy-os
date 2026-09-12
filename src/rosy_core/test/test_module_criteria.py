@@ -53,6 +53,23 @@ ALLOWED = Counter({
 
     # Platform guard, not a seam — AF_UNIX is absent on the Windows dev host.
     ("system/host_agent_client.py", "hasattr", "socket", '"AF_UNIX"'): 1,
+
+    # Accepted: optional ControlSensorAdapter diagnostics/lifecycle probes on
+    # injected ROS/test doubles. These do not cross into private ownership.
+    ("api/v1/observability.py", "getattr", "adapter", '"calibration_digest"'): 1,
+    ("api/v1/observability.py", "getattr", "adapter", '"calibration_revision"'): 1,
+    ("api/v1/observability.py", "getattr", "adapter", '"enabled"'): 1,
+    ("api/v1/observability.py", "getattr", "adapter", '"revision"'): 1,
+    ("bridge/control_sensor_adapter.py", "getattr", "node", '"_sensor_only"'): 1,
+    ("bridge/control_sensor_adapter.py", "getattr", "node", '"bind_policy_handoff"'): 1,
+    ("bridge/control_sensor_adapter.py", "getattr", "node", '"destroy_node"'): 1,
+    ("bridge/control_sensor_adapter.py", "getattr", "node", '"observations"'): 1,
+    ("bridge/control_sensor_adapter.py", "getattr", "node", '"profile"'): 1,
+    ("bridge/control_sensor_adapter.py", "getattr", "node", '"refresh_profile"'): 1,
+    ("bridge/control_sensor_adapter.py", "getattr", "node", "name"): 1,
+    ("bridge/control_sensor_adapter.py", "getattr", "safety", '"bind_control_policy"'): 1,
+    ("bridge/control_sensor_adapter.py", "hasattr", "observations", '"max_age"'): 1,
+    ("node.py", "getattr", "self", '"get_namespace"'): 1,
 })
 
 

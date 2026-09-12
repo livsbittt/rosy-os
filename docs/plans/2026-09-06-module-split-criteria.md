@@ -124,7 +124,10 @@ they were both treated as authoritative — the test lost the `navigation/manage
 when Step 2 removed that reach, and this section did not notice, because the test compares
 the code against its own allowlist and has no opinion about prose.
 
-Nine reaches, three verdicts:
+The original nine reaches above remain the historical triage. The absorbed
+ControlSensorAdapter and ROS node compatibility layer add fourteen reaches;
+they are also published here so the set-equality test and this document stay
+in lockstep:
 
 | Reach | Verdict |
 |---|---|
@@ -132,6 +135,13 @@ Nine reaches, three verdicts:
 | `docking/manager.py` ×5 | **Accepted.** None-tolerance for optional injections whose attribute is part of the injected type's public surface. |
 | `power/manager.py` | **Accepted.** Mode → attribute dispatch over the module's own config object. |
 | `system/host_agent_client.py` | **Platform guard, not a seam.** `AF_UNIX` is absent on the Windows dev host. |
+
+| Reach | Verdict |
+|---|---|
+| `api/v1/observability.py` — `adapter` → `calibration_digest`, `calibration_revision`, `enabled`, `revision` | **Accepted.** Admin diagnostics reads the optional adapter's public metadata through a compatibility-safe probe; it does not read a private implementation field or grant command authority. |
+| `bridge/control_sensor_adapter.py` — `node` → `_sensor_only`, `bind_policy_handoff`, `destroy_node`, `observations`, `profile`, `refresh_profile`, and dynamic `name` | **Accepted.** The adapter validates and cleans up an injected ROS worker/test double and checks its sensor-only lifecycle surface. The dynamic `name` probe is the command-authority deny-list check. |
+| `bridge/control_sensor_adapter.py` — `safety` → `bind_control_policy`; `observations` → `max_age` | **Accepted.** These are optional public hooks on injected CORE safety/observation objects used to bind policy and its lease; missing hooks fail closed. |
+| `node.py` — `self` → `get_namespace` | **Accepted.** ROS namespace compatibility guard for the host test stub and the real `rclpy` node. |
 
 **Resolved — the criterion earned its keep on first application.** `navigation/manager.py`
 reached the executor through `hasattr(self.executor, "reset_mapping")`, a member no contract
