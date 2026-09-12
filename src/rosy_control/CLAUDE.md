@@ -12,7 +12,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `rosy_control` — a ROS 2 Jazzy ament_python package for the **Pinky Pro** robot: a ~11 cm desk-maze robot (Raspberry Pi, RPLidar C1, US-016 ultrasonic, 3-channel IR cliff sensors, BNO055 IMU, OV5647 camera). It provides the wander autonomy, the safety velocity gate, camera look-ahead, auto-calibration, SLAM mapping, and a node-graph health monitor.
 
-This repo is deployed to the robot at `/home/pinky/dev_ws/wj/src/rosy_control` (see `STEPS.txt`). Production rejects remote gazebo `/scan` (`lidar.is_robot_scan` — beam count + range_max + wall-clock stamp). Isolated Gazebo rigs call `enable_simulation_scans()` so the same predicate feeds bumper, frontiers, routes and the dashboard.
+The current Device deploys the Rosy OS release at `/opt/rosy`; the historical
+`/home/pinky/dev_ws/wj` paths below are comparison-only (see the banner above).
+Production rejects remote gazebo `/scan` (`lidar.is_robot_scan` — beam count +
+range_max + wall-clock stamp). Isolated Gazebo rigs call
+`enable_simulation_scans()` so the same predicate feeds bumper, frontiers,
+routes and the dashboard.
 
 ## Commands
 

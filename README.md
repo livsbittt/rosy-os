@@ -22,7 +22,7 @@ rosy/ (이 리포지토리)
 ├── test/                     # 호스트 배포·소유권 계약 시험
 ├── src/                      # ROS 2 패키지 (colcon workspace)
 │   ├── rosy_core/            # 핵심 미들웨어 (API·Safety·Event·Waypoint·...)
-│   ├── rosy_control/         # 흡수한 감지·보정·주행 로직 (runtime 통합 진행 중)
+│   ├── rosy_control/         # 흡수한 감지·보정·주행 로직 (CORE sensor adapter 연동, Device 단계 진행 중)
 │   ├── rosy_fleet/           # 편대·relay·CLI seed (중앙 Fleet 서버는 미구현)
 │   ├── rosy_bringup/         # 모터·오도메트리·배터리
 │   ├── rosy_navigation/      # Nav2/SLAM 설정·런치
