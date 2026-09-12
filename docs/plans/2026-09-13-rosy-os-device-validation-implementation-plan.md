@@ -207,7 +207,7 @@ The optional camera path now has a reusable ROS-free preprocessing boundary in
    output becomes a command or safety authority; semantic box/grasp detection
    is still not implemented.
 
-The worker and existing camera tests pass locally (`990 passed, 26 skipped` for
+The worker and existing camera tests pass locally (`991 passed, 26 skipped` for
 the full `src/rosy_control/test` suite). This advances SOURCE/LOCAL evidence;
 CSI timing, Picamera2 access, and real frame-quality acceptance remain HOLD at
 the Device/FIELD gates until a Raspberry Pi is available.

@@ -55,6 +55,7 @@
 | D-45 | 저장소 문서와 자산의 단일 기준 경로 | Accepted |
 | D-46 | Device 설치 후 readback 증거 계약 | Accepted |
 | D-47 | CORE sensor adapter calibration binding | Accepted |
+| D-48 | Optional camera preprocessing worker telemetry | Accepted |
 
 ---
 
