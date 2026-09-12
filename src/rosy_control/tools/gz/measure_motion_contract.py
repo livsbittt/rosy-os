@@ -8,6 +8,29 @@ from pathlib import Path
 import time
 
 
+def _source_root() -> Path:
+    """Return the absorbed package root used for runtime provenance hashes.
+
+    The tool may run from a checkout or from a copied package tree on a
+    measurement host.  An explicit ``ROSY_SOURCE_ROOT`` keeps that latter
+    case deterministic; the source file location is the safe default.  The
+    old Control checkout path was never part of Rosy OS and made the evidence
+    silently empty on a clean Device.
+    """
+    configured = os.environ.get("ROSY_SOURCE_ROOT")
+    root = Path(configured).expanduser() if configured else Path(__file__).resolve().parents[2]
+    try:
+        root = root.resolve()
+    except OSError as exc:
+        raise RuntimeError(f"ROSY_SOURCE_ROOT cannot be resolved: {root}") from exc
+    if not root.is_dir():
+        label = "ROSY_SOURCE_ROOT" if configured else "absorbed rosy_control package"
+        raise RuntimeError(f"{label} does not exist: {root}")
+    if not (root / "package.xml").is_file() or not (root / "rosy_control").is_dir():
+        raise RuntimeError(f"ROSY_SOURCE_ROOT must contain package.xml and rosy_control/: {root}")
+    return root
+
+
 def analyze_trace(result):
     """Separate command latency from geometry using observed yaw excitation."""
     if not result.get('limits_at_start'):
@@ -46,6 +69,13 @@ def main():
     manifest = json.loads((folder/'run_manifest.json').read_text())
     assert manifest['run_id'] == 'c8cde754db8042a8aa56a0a649e729db'
     assert manifest['plant'] == 'wheel' and manifest['ros_domain'] == 227
+    source_root = _source_root()
+    runtime_root = source_root / 'rosy_control'
+    runtime_source_sha256 = {
+        str(p.relative_to(source_root)).replace('\\', '/'):
+        hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in sorted(runtime_root.rglob('*.py'))
+    }
     import rclpy
     from rclpy.node import Node
     from rclpy.parameter import Parameter
@@ -98,9 +128,8 @@ def main():
             cap=lim.get('rotation_translation_limits_m')
             if not cap or cap[0 if v>0 else 1] < remaining:
                 raise RuntimeError('translation capsule insufficient')
-    result={'manifest':manifest,'physical_robot_verified':False,'trials':[]}
-    result['runtime_source_sha256']={str(p):hashlib.sha256(p.read_bytes()).hexdigest()
-        for p in Path('/tmp/pinky-navigation-fix/rosy_control').rglob('*.py')}
+    result={'manifest':manifest,'physical_robot_verified':False,'trials':[],
+            'runtime_source_sha256':runtime_source_sha256}
     try:
         pump(3.)
         assert [p.node_name for p in node.get_publishers_info_by_topic('/cmd_vel')]==['safety_node']

@@ -245,3 +245,18 @@ Fresh root contract evidence with the Git-provided Bash/OpenSSL path available:
 boundary guards: `62 passed`. This is host/source evidence. It does not create
 an ARM64 artifact, a Pi readback, or physical camera, motor, payload, or OMX
 evidence.
+
+## 2026-09-13 implementation checkpoint: motion provenance after consolidation
+
+The Gazebo motion contract now hashes the absorbed package under the current
+Rosy OS source tree. It discovers `src/rosy_control` from the tool location by
+default, accepts an explicit `ROSY_SOURCE_ROOT` only when that package root
+contains `package.xml` and `rosy_control/`, and fails before ROS initialization
+when the source root is missing or malformed. Hash keys are stable paths
+relative to the package root. The retired temporary Control checkout is no
+longer a runtime or evidence dependency.
+
+Four pure tests cover default discovery, explicit override, missing-root
+failure, and the retired-reference guard. ADR D-49 records this maintenance
+boundary. The full absorbed Control suite remains the local gate; this change
+does not advance ARM64, Device, or FIELD evidence.

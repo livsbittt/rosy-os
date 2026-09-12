@@ -53,3 +53,12 @@ Rosy OS/
 검증 시에는 경로 존재·부재와 Markdown 링크를 확인하고 `git diff --check`를
 실행한다. 이 문서의 구조 결정은 D-45에 기록했으며, 새 폴더를 추가할 때도
 해당 책임 경계를 먼저 갱신한다.
+
+
+## 2026-09-13 provenance follow-up
+
+The consolidated source tree is now also the provenance source for Gazebo
+motion evidence. measure_motion_contract.py discovers the local absorbed
+package or a validated ROSY_SOURCE_ROOT; no runtime tool may depend on the
+archived checkout or a historical temporary path. ADR D-49 and its four pure
+tests record this rule. Archive files remain historical evidence only.
