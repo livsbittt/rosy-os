@@ -44,3 +44,22 @@ safety.control_policy_required는 명시적인 boolean이며 기본 false다. tr
 검증된 보정 record와 sensor revision을 evaluator에 묶는 작업이다. 이후 센서 단절·재시작·재보정 시
 이전 관측과 후보를 무효화하고, legacy 최종 publisher를 제거한 운영 graph에서 검증해야 한다.
 API 권한 검증은 수행했지만 새 UI의 브라우저 검증이나 Pi 물리 인수는 수행하지 않았다.
+
+## 기존 Control 판단의 순수 함수 추출
+
+`rosy_control.control.command_gate.evaluate_command`를 추출하고 기존 SafetyNode가 이를 사용하도록 연결했다.
+입력은 센서 분류 결과·관측 실패·localization 준비 여부·명령 나이·보정 trial 영역이며,
+출력은 semantic 속도·사유·후보 폐기 여부다. 전방 장애물은 명시적인 후진/회전을 일괄 차단하지 않는다.
+혼합 이동 명령의 일부 축만 제거되어 경로가 바뀌면 전체를 정지시킨다.
+
+기존 틸트 역방향 생성은 `legacy_tilt_recovery=True`로 비교 노드에서만 보존했다.
+기본 함수는 전진 후보를 역방향 명령으로 바꾸지 않는다. CORE의 복구 동작은 별도 후보로 중재되어야 한다.
+음수·nonfinite 명령 나이는 새롭게 거절한다. 정상 시각/유한 명령의 비교는 이전 `90f4d7f` 실제 tick 코드와
+13,824개 조합에서 출력 및 기존 정지 사유가 일치했다. 새 경계 시험과 노드 어댑터 집중 시험은 28개 통과했다.
+Control 전체 회귀 시험은 953 passed·20 skipped이며, 격리 ROS에서 8개 노드의 두 namespace 생성 시험도 통과했다.
+이 ROS 시험은 센서 입력과 모터 동작을 수행하지 않는 생성·이름 경계 검증이다.
+
+이 함수만으로 센서 evaluator 연결이 완료되지는 않는다. 원시 센서의 freshness/geometry 검증,
+보정 gain·상한·실제 swept footprint 검사, drive-sign 변환은 기존 노드에 남아 있다.
+CORE는 이 결과와 검증된 보정 record를 하나의 관측 snapshot에 묶어 소비해야 하며,
+현재 운영 profile은 여전히 통합 정책을 활성화하지 않는다.

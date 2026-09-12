@@ -20,6 +20,7 @@ from ..sensing.body import URDF_RADIUS, use_radius
 from ..sensing.lidar import NOSE_YAW
 from ..sensing.localization import lease_ready
 from ..control.lidar_guard import lidar_blocked, lidar_can_rotate
+from ..control.command_gate import GateInputs, evaluate_command
 from ..control.rotation_clearance import rotation_clearance_allowed
 from ..control.rotation_envelope import pivot_clearance, suggest_rotation_translation, straight_translation_limits
 from ..control.motion_sweep import bounded_sweep_clearance, bounded_translation_limits
@@ -526,62 +527,26 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
             return
 
         failure = self.required_observation_failure()
-        if not self.profile_valid or failure:
-            self.halt_with_reason(failure or 'invalid_geometry')
-            self.last_cmd = Twist()
-            self.last_cmd_time = None
+        localized = (not self.get_parameter('localization_required').value or
+                     lease_ready(self.localization_status, self.now().nanoseconds * 1e-9))
+        obstacle_hold = (self.obstacle_tracking_hold()
+                         if self.profile_valid and not failure and localized and not pickup else None)
+        result = evaluate_command(self.last_cmd.linear.x, self.last_cmd.angular.z, GateInputs(
+            profile_valid=self.profile_valid, observation_failure=failure,
+            localization_ready=localized, pickup=pickup, obstacle_hold=obstacle_hold,
+            command_age=self.age(self.last_cmd_time), rotation_trial=rotation_trial,
+            translation_trial=translation_trial, tilt=tilt, rear_blocked=self.rear_blocked,
+            obstacle=obstacle, cliff=self.cliff, can_rotate=can_rotate,
+            bounded_motion=bounded_motion, legacy_tilt_recovery=True))
+        if result.reason not in ('allow', 'motion_limited'):
+            self.halt_with_reason(result.reason)
+            if result.discard:
+                self.last_cmd = Twist()
+                self.last_cmd_time = None
             return
-
-        if (self.get_parameter('localization_required').value and
-                not lease_ready(self.localization_status, self.now().nanoseconds * 1e-9)):
-            self.halt_with_reason('localization_unavailable')
-            # Commands issued against a lost pose cannot be replayed on recovery.
-            self.last_cmd = Twist()
-            self.last_cmd_time = None
-            return
-
-        if pickup:
-            self.halt_with_reason('pickup')
-            return
-        obstacle_hold = self.obstacle_tracking_hold()
-        if obstacle_hold:
-            self.halt_with_reason(obstacle_hold)
-            return
-        if self.age(self.last_cmd_time) > 0.5 and not tilt:
-            self.halt_with_reason('command_stale')
-            return
-
-        if rotation_trial and (self.last_cmd.linear.x != 0. or abs(self.last_cmd.angular.z) > .06):
-            self.halt_with_reason('rotation_trial_domain')
-            return
-        if translation_trial and (self.last_cmd.angular.z != 0. or abs(self.last_cmd.linear.x) > .014):
-            self.halt_with_reason('translation_trial_domain')
-            return
-
         cmd = Twist()
-        cmd.linear.x = self.last_cmd.linear.x
-        cmd.angular.z = self.last_cmd.angular.z
-        if tilt and not self.rear_blocked:
-            if cmd.linear.x >= 0.0:
-                cmd.linear.x = -0.003
-        elif tilt and self.rear_blocked:
-            cmd.linear.x = 0.0
-
-        # No fresh valid clearance means stop, including an unobserved spin.
-        halt_fwd = obstacle or self.cliff or tilt
-        if halt_fwd and cmd.linear.x > 0.0:
-            cmd.linear.x = 0.0
-        if cmd.linear.x < 0.0 and self.rear_blocked:
-            cmd.linear.x = 0.0
-        if not can_rotate and not bounded_motion:
-            cmd.angular.z = 0.0
-        # Removing one component changes the requested swept trajectory.
-        # Stop so the planner can issue an explicit straight or spin command.
-        if (self.last_cmd.linear.x != 0. and self.last_cmd.angular.z != 0. and
-                (cmd.linear.x != self.last_cmd.linear.x or
-                 cmd.angular.z != self.last_cmd.angular.z)):
-            self.halt_with_reason('trajectory_changed')
-            return
+        cmd.linear.x = result.linear
+        cmd.angular.z = result.angular
         if abs(cmd.linear.x) >= 0.004:
             self._auto_linear_sign(us, lidar_d, self.last_cmd.linear.x, self.last_cmd.angular.z)
         else:

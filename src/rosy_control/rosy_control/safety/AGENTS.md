@@ -1,10 +1,10 @@
 <!-- Parent: ../AGENTS.md -->
 <!-- Generated: 2026-09-06 | Updated: 2026-09-06 -->
 
-# safety/ (the only /cmd_vel publisher)
+# safety/ (legacy comparison node and reusable sensing)
 
 ## Purpose
-The safety velocity gate: fuses lidar sectors, US, IR, IMU, camera into ~20 `/safety/*` topics, halts/reverses `/cmd_vel` on hazard, applies the physical drive-sign flip, and auto-scales the narrow-maze HUD. If this node dies, nobody publishes `/cmd_vel` — the robot stops.
+The legacy safety velocity gate fuses lidar sectors, US, IR, IMU and camera, applies drive calibration, and publishes comparison-runtime commands. In the Rosy OS target runtime CORE owns final commands (D-38). This node must not publish motor commands beside RosBridge. Hardware deadman behavior requires separate verification.
 
 ## Key Files
 | File | Description |
@@ -18,13 +18,15 @@ The safety velocity gate: fuses lidar sectors, US, IR, IMU, camera into ~20 `/sa
 ## For AI Agents
 
 ### Working In This Directory
-- Safety is the **only** publisher of `/cmd_vel`; wander/control publish semantic `/cmd_vel_raw`. Never add another `/cmd_vel` publisher.
+- SafetyNode is the sole final publisher only in the legacy comparison graph; wander/control publish semantic candidates. The OS target uses CommandManager/RosBridge instead. Do not enable both final publishers.
+- Shared semantic command restriction lives in `control/command_gate.py`, without ROS. Keep sensor geometry, evidence freshness, calibrated sweep checks and drive-sign conversion distinct; this function alone does not prove a safe motor command.
+- Legacy tilt reverse synthesis is explicitly opted into by SafetyNode. A CORE safety evaluator may restrict a selected candidate, but recovery must submit a separate candidate through CORE arbitration.
 - Hazard *detection* lives here; hazard *response policy* lives in `control/recover.hazard_action` — don't duplicate.
 - The e-stop chain crosses nodes by design (engage → wander stop + calib abort); keep it intact when touching `hazard.py`.
 - Latched QoS (TRANSIENT_LOCAL depth 1) is required on `/estop/state` so late joiners see the latch.
 
 ### Testing Requirements
-- `python3 -m pytest test/test_scale.py -q` covers `scale.py`; the gate/hazard logic is hardware-coupled and verified on-robot.
+- `python3 -m pytest test/test_command_gate.py test/test_configured_operation.py test/test_scale.py -q` covers semantic restrictions and their node adapter. Sensor geometry and physical stopping still require device acceptance.
 - Thresholds come from `config/robot.yaml` + `config/cliff_calib.yaml` (4095 = ADC saturation, never a cliff).
 
 ### Common Patterns

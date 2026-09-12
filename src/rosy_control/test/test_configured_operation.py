@@ -169,15 +169,31 @@ class ConfiguredAdapterTests(unittest.TestCase):
         tree = ast.parse(source.read_text(encoding='utf-8'))
         cls = next(n for n in tree.body if isinstance(n, ast.ClassDef))
         tick = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == 'tick')
+        from rosy_control.control.command_gate import GateInputs, evaluate_command
         start = next(i for i, stmt in enumerate(tick.body) if isinstance(stmt, ast.Assign)
-                     and any(isinstance(target, ast.Name) and target.id == 'halt_fwd' for target in stmt.targets))
-        # Execute the real forward/reverse gate statements without ROS hardware.
-        code = compile(ast.Module(body=tick.body[start:start+3], type_ignores=[]), str(source), 'exec')
+                     and any(isinstance(target, ast.Name) and target.id == 'failure' for target in stmt.targets))
+        end = next(i for i, stmt in enumerate(tick.body[start:], start)
+                   if isinstance(stmt, ast.Assign) and ast.unparse(stmt.targets[0]) == 'cmd.angular.z')
+        # Execute the production adapter through its shared pure policy, including
+        # early-return handling and copying the selected output back into Twist.
+        wrapper = ast.parse('def run():\n    pass').body[0]
+        wrapper.body = tick.body[start:end+1] + [ast.Return(value=ast.Name(id='cmd', ctx=ast.Load()))]
+        code = compile(ast.fix_missing_locations(ast.Module(body=[wrapper], type_ignores=[])), str(source), 'exec')
         for velocity, rear_blocked, expected in ((.005, False, 0.), (-.005, False, -.005), (-.005, True, 0.)):
-            cmd = SimpleNamespace(linear=SimpleNamespace(x=velocity))
-            scope = dict(cmd=cmd, self=SimpleNamespace(cliff=False, rear_blocked=rear_blocked), obstacle=True, tilt=False)
+            def twist():
+                return SimpleNamespace(linear=SimpleNamespace(x=0.), angular=SimpleNamespace(z=0.))
+            candidate = twist()
+            candidate.linear.x = velocity
+            node = SimpleNamespace(cliff=False, rear_blocked=rear_blocked, profile_valid=True,
+                required_observation_failure=lambda: None,
+                get_parameter=lambda name: SimpleNamespace(value=False),
+                obstacle_tracking_hold=lambda: None, age=lambda stamp: 0.,
+                last_cmd=candidate, last_cmd_time=0.)
+            scope = dict(self=node, obstacle=True, tilt=False, pickup=False, rotation_trial=False,
+                         translation_trial=False, can_rotate=True, bounded_motion=False,
+                         GateInputs=GateInputs, evaluate_command=evaluate_command, Twist=twist)
             exec(code, scope)
-            self.assertEqual(cmd.linear.x, expected)
+            self.assertEqual(scope['run']().linear.x, expected)
 
     def test_explicit_limited_mode_accepts_missing_imu_without_motion_command(self):
         node, calls = self.tick_node(missing_imu=True, limited_sensors=True)

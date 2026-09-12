@@ -180,6 +180,14 @@ T2 완료는 아니다. namespace별 YAML node selector, frame prefix와 base fr
 - 실제 Control 센서 evaluator, 검증된 calibration loader, 재시작 epoch·장치 성능·운영 profile 연결은 미완료다.
   control_policy_required는 현재 기본 false이며 별도 센서 worker를 기동하거나 기존 최종 publisher와 병행하지 않는다.
 
+### T3 순수 판단 추출
+
+T3 순수 판단 추출 후속(2026-09-13): 기존 SafetyNode의 semantic 명령 제한을
+`control/command_gate.py`로 추출하고 기존 노드에서 재사용한다. 정상 입력 13,824개 조합을
+직전 커밋의 실제 코드와 비교했다. Control 953 passed·20 skipped, ROS 두 namespace 노드 생성 시험 통과.
+센서 snapshot·보정·swept footprint의 CORE 연결은 아직 미완료이며, 자세한 범위는
+[안전 판단 경계](2026-09-13-control-safety-boundary.md)에 기록했다.
+
 ### T0·T1 기준선
 
 | 범위 | 결과 | 의미 |
