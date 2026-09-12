@@ -111,7 +111,7 @@ OMX는 robot-local action capability로만 둔다. 모델(신형 OMX-F/OMX-AI �
 
 ### Task 7 — linux/arm64 artifact를 재현 가능하게 만든다
 
-`deploy/robot/Dockerfile`의 core/io build stage에 필요한 `rosy_control` 패키지와 worker 의존성을 추가하되, 기본 core/motor/hardware profile의 경계를 유지한다. `deploy/robot/compose.yaml`에는 vision/arm capability를 별도 profile로 둔다.
+deploy/robot/Dockerfile builds the absorbed package and worker dependencies while the core/motor/hardware profiles remain the accepted baseline. Vision and arm profiles are intentionally deferred until the camera placement and OMX capability gates produce Device evidence.
 
 - `inputs.lock.yaml`, package manifest, source revision을 artifact metadata에 넣는다.
 - build 후 이미지 안에 accepted worker가 있고 legacy publisher가 없으며 CORE에 device binding이 없음을 검사한다.
