@@ -26,7 +26,9 @@ CORE 회귀는 725 passed·10 skipped다. 격리된 실제 ROS graph/parameter �
 applied profile revision을 `SafetyManager`에 바인딩한다. command/raw/e-stop/decision publisher를 가진
 worker는 시작 단계에서 거부한다. adapter/관련 회귀 78개가 통과했다.
 CORE 이미지도 `rosy_control` 소스와 sensor runtime 의존성을 포함하도록 갱신했다(`74c32c4`).
-Dockerfile/Compose 계약 30개는 통과했지만 native linux/arm64 이미지 digest와 Device readback은 아직 없다.
+Dockerfile/Compose 계약 30개는 통과했다. Buildx 후보 실행은 현재 Docker Desktop의 linux/amd64
+호스트에 ARM64 binfmt가 없어 `exec format error`로 중단되었으므로, native linux/arm64 이미지 digest와
+Device readback은 아직 없다.
 아래 기록은 작업 당시의 검증 이력이다. 최신 안전 경계와 남은 조건은
 [단일 안전 중재 구현 기록](2026-09-13-control-safety-boundary.md)을 함께 읽는다.
 후속 보정 snapshot reader와 비교용 SafetyNode의 생성자 적용/readback을 구현했다.

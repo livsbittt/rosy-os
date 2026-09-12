@@ -118,11 +118,13 @@ OMX는 robot-local action capability로만 둔다. 모델(신형 OMX-F/OMX-AI �
 - Buildx 실행 예:
 
   ```powershell
-  docker buildx build --platform linux/arm64 --target core -t <registry>/rosy-core:<sha> --load deploy/robot
+  docker buildx build --platform linux/arm64 --target core -t <registry>/rosy-core:<sha> --file deploy/robot/Dockerfile --load .
   docker image inspect <registry>/rosy-core:<sha>
   ```
 
 - registry digest, manifest, 서명과 검증 결과를 기록한다. 이미지 존재만으로 Device 설치나 현장 운용을 GO로 만들지 않는다.
+- x86 Docker Desktop에서 ARM64 binfmt가 없으면 `exec format error`가 발생한다. 이 경우
+  native ARM64 Pi/build host 또는 승인된 binfmt builder를 준비하기 전까지 ARTIFACT는 HOLD다.
 
 ### Task 8 — Raspberry Pi OS Device 설치와 readback을 구현한다
 
