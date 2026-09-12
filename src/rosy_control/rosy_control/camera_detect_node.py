@@ -27,13 +27,7 @@ from .sensing.camera_controls import (
 from .sensing.camera_evidence import observation_payload
 from .sensing.camera_ground import ground_plane
 from .sensing.camera_policy import CameraPolicy
-
-
-def _rotate(img, deg):
-    k = (int(deg) // 90) % 4
-    if k:
-        img = np.rot90(img, k)
-    return np.ascontiguousarray(img)
+from .sensing.camera_worker import CameraFrame, CameraPreprocessProfile, CameraPreprocessWorker
 
 
 class CameraDetectNode(Node):
@@ -52,6 +46,8 @@ class CameraDetectNode(Node):
         self.declare_parameter('hits', 2)
         self.declare_parameter('warmup_frames', 12)
         self.declare_parameter('rotate_deg', 180)
+        self.declare_parameter('camera_profile_revision', 'camera-profile-v1')
+        self.declare_parameter('camera_max_latency_ms', 125.0)
         # The ISP's AWB and AGC are adaptive loops on the same signal the floor
         # reference tracks, so they must stop moving before the reference means
         # anything. Settle with them on, then freeze what they chose.
@@ -75,12 +71,24 @@ class CameraDetectNode(Node):
         self.img_pub = self.create_publisher(Image, 'camera/front', 10)
         self.observation_pub = self.create_publisher(String, 'camera/observation', 10)
         self.controls_pub = self.create_publisher(String, 'camera/controls', 10)
+        self.telemetry_pub = self.create_publisher(String, 'camera/telemetry', 10)
 
         self._settle_deadline = None
         self._locked = None
         self._lock_attempts = 0
         self._cam = None
-        self._floor_hsv = None
+        self._worker = CameraPreprocessWorker(
+            CameraPreprocessProfile(
+                width=int(self.get_parameter('width').value),
+                height=int(self.get_parameter('height').value),
+                fps=float(self.get_parameter('fps').value),
+                rotate_deg=int(self.get_parameter('rotate_deg').value),
+                revision=str(self.get_parameter('camera_profile_revision').value),
+                max_latency_ms=float(self.get_parameter('camera_max_latency_ms').value),
+            ),
+            classifier=self._classify_frame,
+        )
+        self._frame_id = 0
         self._ground = ground_plane(
             height_m=float(self.get_parameter('camera_height_m').value),
             pitch_rad=float(self.get_parameter('camera_pitch_rad').value),
@@ -195,7 +203,7 @@ class CameraDetectNode(Node):
             # that has since changed brightness and colour underneath it. When
             # nothing was frozen there is nothing to re-bootstrap against, so
             # the reset would only cost another warmup of forced blocked=True.
-            self._floor_hsv = None
+            self._worker.reset_floor_reference()
             self._policy.reset()
         self.controls_pub.publish(String(data=summary))
         self.get_logger().info(f'camera controls {summary}')
@@ -211,23 +219,17 @@ class CameraDetectNode(Node):
             bgr = self._cam.capture_array('main')
         except Exception as exc:
             self.get_logger().warn(f'capture failed: {exc}', throttle_duration_sec=2.0)
+            bgr = None
+        processed = self._worker.process(CameraFrame(self._frame_id, capture_stamp, bgr))
+        self._frame_id += 1
+        self.telemetry_pub.publish(String(
+            data=json.dumps(processed.telemetry.as_dict(), sort_keys=True)))
+        if not processed.telemetry.quality_valid:
             self.block_pub.publish(Bool(data=True))
             return
-        if bgr is None or bgr.ndim != 3:
-            self.block_pub.publish(Bool(data=True))
-            return
-        bgr = _rotate(bgr, self.get_parameter('rotate_deg').value)
+        bgr = processed.pixels
         self._publish_front(bgr)
-        res = classify_frame(
-            bgr,
-            floor_hsv=self._floor_hsv,
-            void_v_ratio=float(self.get_parameter('void_v_ratio').value),
-            obst_frac=float(self.get_parameter('obst_frac').value),
-            region_min_area_fraction=float(self.get_parameter('region_min_area_fraction').value),
-            ground=self._ground,
-        )
-        if res['floor_hsv'] is not None:
-            self._floor_hsv = res['floor_hsv']
+        res = processed.result
         cliff, blocked = self._policy.update(res)
         self.cliff_pub.publish(Bool(data=cliff))
         self.block_pub.publish(Bool(data=blocked))
@@ -251,6 +253,17 @@ class CameraDetectNode(Node):
                     f'R={cols[2]["obst"]:.2f}'
                 )
             )
+        )
+
+    def _classify_frame(self, bgr, *, floor_hsv):
+        return classify_frame(
+            bgr,
+            floor_hsv=floor_hsv,
+            void_v_ratio=float(self.get_parameter('void_v_ratio').value),
+            obst_frac=float(self.get_parameter('obst_frac').value),
+            region_min_area_fraction=float(
+                self.get_parameter('region_min_area_fraction').value),
+            ground=self._ground,
         )
 
     def _publish_front(self, bgr):
