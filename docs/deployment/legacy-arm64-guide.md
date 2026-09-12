@@ -1,4 +1,11 @@
-# ARM64 PC 환경 설정 가이드
+# Historical upstream ARM64 guide
+
+> **Provenance only.** This file was moved from the former top-level `doc/`
+> folder. It describes the old `pinky_pro` checkout and package deletion flow;
+> it is not a Rosy OS deployment procedure. Use `arm64-build-notes.md` and the
+> Pi deployment runbooks instead.
+
+---
 현재 패키지를 arm64 환경에서 사용하려면 아래 과정이 필요합니다
 ## PC 설정
 

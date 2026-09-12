@@ -25,7 +25,7 @@ ROSY is a robot middleware and fleet-control platform (ROS 2 Jazzy, first hardwa
 | `deploy/` | Image build, signed release, Pi 5 Docker/systemd runtime (see `deploy/AGENTS.md`) |
 | `dock/` | Charging-dock firmware and ROSY-DOCK-001 contract (see `dock/AGENTS.md`) |
 | `test/` | Host pytest for deploy/release/motor contracts (see `test/AGENTS.md`) |
-| `doc/` | Architecture images and ARM64 notes (see `doc/AGENTS.md`) |
+| `docs/assets/` | Architecture and product images (see `docs/assets/AGENTS.md`) |
 | `docs/solutions/` | Documented solutions to past problems — bugs, best practices, workflow patterns — by category, with YAML frontmatter (`module`, `tags`, `problem_type`). Relevant when implementing or debugging in a documented area |
 | `reference/` | Frozen upstream pinky_pro zip (see `reference/AGENTS.md`) |
 | `.github/` | CI workflow (see `.github/AGENTS.md`) |

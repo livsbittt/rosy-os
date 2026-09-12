@@ -14,6 +14,8 @@ Operator runbooks for Raspberry Pi 5: first Wi-Fi image, runtime services, power
 | `raspberry-pi-runtime.md` | Device permissions, systemd/compose runtime, core/motor/hardware modes |
 | `pinky-pro-board-support.md` | First ROSY OS board: mode-specific capabilities, LiDAR hardware slice |
 | `raspberry-pi-wifi-image.md` | Headless SD burn, Wi-Fi, SSH, Windows deploy |
+| `arm64-build-notes.md` | Current ARM64/Pi build and runtime boundary notes |
+| `legacy-arm64-guide.md` | Historical upstream instructions kept for provenance; do not use for deployment |
 | `pi5-acceptance-checklist.md` | Physical acceptance tests |
 | `power-bench-verification.md` | Power/idle/standby bench |
 | `release-signing-key.md` | Ed25519 signing key handling |

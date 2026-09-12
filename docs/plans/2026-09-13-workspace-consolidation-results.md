@@ -2,6 +2,16 @@
 
 작성일: 2026-09-13.
 
+## 후속 폴더 정리 (D-45, 2026-09-13)
+
+초기 통합 결과에서 분리해 두었던 루트 `doc/`를 다시 정리했다. 이미지 두
+개는 `docs/assets/`로, 현재 ARM64 절차는 `docs/deployment/`로 이동했다.
+upstream 전용 안내는 `legacy-arm64-guide.md`로 이름을 바꾸고 운영에 사용하지
+않는다는 경고를 추가했다. README와 각 AGENTS의 소유 경로를 갱신했으며,
+세부 기준은 [폴더 구조 정리 계획](2026-09-13-folder-structure-governance.md)과
+ADR D-45에 기록했다. 이 변경은 과거 결과의 파일 hash 기록이나 archive
+provenance를 변경하지 않으며, ARM64/Pi 실물 인수도 대신하지 않는다.
+
 ## 원인
 
 T0·T1 흡수, ADR D-37~D-44, 첫 보정 노드 수정은

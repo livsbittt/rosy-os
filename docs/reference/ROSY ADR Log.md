@@ -52,6 +52,7 @@
 | D-42 | 후보 명령과 안전 판단의 내부 전달 계약 | Proposed |
 | D-43 | 보정 schema와 릴리스 generation 저장 매핑 | Proposed |
 | D-44 | ControlBackend 채택과 OMX 작업 액션 경계 | Proposed |
+| D-45 | 저장소 문서와 자산의 단일 기준 경로 | Accepted |
 
 ---
 
@@ -1019,3 +1020,36 @@ Immutable config/data generations remain rollback evidence. Each activation data
 **Validation / Transition:** T4에서 지도·localization·우회·취소·재기동·namespace·자원 비용으로 backend를 판정한다. OMX 액션은 베이스 정지·고정 확인, 보정 revision, arm 실행·결과 확인을 실물 검증한 후 별도 구현 결정으로 승격한다.
 
 **References:** [상세 설계](../plans/2026-09-12-rosy-os-control-integrated-design.md), [실행 계획](../plans/2026-09-12-rosy-control-absorption-plan.md), [현재 증거](../plans/2026-09-12-control-absorption-results.md).
+
+---
+
+## D-45 저장소 문서와 자산의 단일 기준 경로
+
+**Status:** Accepted (2026-09-13). 경로 정리 결정이며 기존 링크의 호환성 및
+실행 인수 상태와 구분한다.
+
+**Context:** Rosy OS 루트에 `doc/`와 `docs/`가 함께 있으면 같은 이름의 문서
+책임이 나뉘고, 흡수된 Control과 장치 배포 문서의 기준 경로를 잘못 선택하기
+쉽다. `doc/`의 이미지와 ARM64 메모는 코드가 참조하지 않는 독립 자료였다.
+
+**Decision:** 저장소 문서는 `docs/` 아래를 단일 기준으로 둔다. 이미지와 제품
+자료는 `docs/assets/`, 현재 ARM64/Pi 절차는 `docs/deployment/`에 둔다. 과거
+upstream 절차는 `docs/deployment/legacy-arm64-guide.md`에 provenance로만
+보존하며 운영 절차로 취급하지 않는다. 루트 `doc/`는 제거한다.
+
+**Alternatives:** `doc/`와 `docs/`를 계속 병행하거나 이미지를 루트에 두는 안은
+탐색 비용과 링크 오류를 유지하므로 채택하지 않는다. 모든 자료를
+`docs/reference/`에 넣는 안은 계약 문서와 비규범 자산을 섞으므로 채택하지
+않는다.
+
+**Consequences:** 새 문서·이미지는 `docs/`의 소유 하에 추가한다. README와
+AGENTS 경로 안내가 갱신되며, 외부에 남은 옛 `doc/` 링크는 별도 redirect가
+없는 한 갱신 대상이다. 이 결정은 ARM64 이미지 빌드나 장치 인수를 완료한
+것을 의미하지 않는다.
+
+**Validation / Transition:** 이동 후 `doc/`가 존재하지 않고 `docs/assets/`
+및 `docs/deployment/arm64-build-notes.md`가 존재하는지 확인한다. 저장소
+링크·경로 계약 시험과 `git diff --check`를 통과시키고, 실제 ARM64 빌드와
+Pi 인수는 기존 T6/T7 게이트로 별도 판정한다.
+
+**References:** [폴더 구조 계획](../plans/2026-09-13-folder-structure-governance.md), [현재 ARM64 메모](../deployment/arm64-build-notes.md).

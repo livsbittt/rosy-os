@@ -1,5 +1,8 @@
 # Rosy Control → Rosy OS 흡수 실행 결과
 
+> 후속 저장소 경로 정리는 ADR D-45와
+> [폴더 구조 정리 결과](2026-09-13-folder-structure-governance.md)에 기록했다.
+
 작성일: 2026-09-12. 브랜치: `feat/rosy-control-absorption`.
 
 ## 현재 단계

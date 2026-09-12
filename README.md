@@ -11,12 +11,12 @@ Rosy Control의 개발 기준은 이 저장소의 `src/rosy_control`로 통합�
 별도 Control 저장소·웹 서버를 새 운영 구성으로 사용하지 않는다.
 현재 소스 편입과 보정 노드 경계 정리는 완료했으며, 전체 runtime·안전 중재·이미지·Pi 인수는 진행 중이다.
 현황은 [흡수 실행 결과](docs/plans/2026-09-12-control-absorption-results.md),
-결정은 [ADR D-37~D-44](docs/reference/ROSY%20ADR%20Log.md)를 따른다.
+결정은 [ADR D-37~D-45](docs/reference/ROSY%20ADR%20Log.md)를 따른다.
 
 ```text
 rosy/ (이 리포지토리)
 ├── docs/                     # 요구사항·ADR·계획·조사·배포·검증 기록
-├── doc/                      # 기존 아키텍처 그림·ARM64 참고 자료
+│   └── assets/               # 아키텍처·제품 이미지
 ├── deploy/                   # OS 이미지·릴리스·장치 운영
 ├── dock/                     # 충전 도크 펌웨어
 ├── test/                     # 호스트 배포·소유권 계약 시험
@@ -39,8 +39,9 @@ rosy/ (이 리포지토리)
 | `docs/spec/ROSY CORE SRS.md` | 로봇(엣지) 요구사항 |
 | `docs/spec/ROSY FLEET SRS.md` | 중앙 서버 요구사항 |
 | `docs/reference/ROSY API & Protocol Reference.md` | 공유 API/프로토콜 계약 |
-| `docs/reference/ROSY ADR Log.md` | 의사결정 기록 (Control 흡수: D-37~D-44) |
+| `docs/reference/ROSY ADR Log.md` | 의사결정 기록 (Control 흡수·폴더 기준: D-37~D-45) |
 | `docs/plan/ROSY Implementation Plan.md` | 실행 계획·추적 매트릭스 |
+| `docs/deployment/arm64-build-notes.md` | ARM64/Pi 빌드 경계와 인수 전제 |
 
 ## 빌드
 
@@ -89,6 +90,8 @@ RPM 상한을 독립적으로 검사하고 엔코더 32비트 롤오버를 안�
 따른다. 장치 권한과 물리 인수시험은
 [`docs/deployment/raspberry-pi-runtime.md`](docs/deployment/raspberry-pi-runtime.md)에
 정리되어 있다.
+ARM64 빌드 경계와 컨테이너 포함 범위는
+[`docs/deployment/arm64-build-notes.md`](docs/deployment/arm64-build-notes.md)를 따른다.
 
 ## 로드맵
 
