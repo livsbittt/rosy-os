@@ -1,4 +1,5 @@
 # ROSY Implementation Plan
+> Status: Historical upstream baseline. The current Rosy OS source-of-truth is under src/, and current absorption/Device execution is tracked in docs/plans/2026-09-12-rosy-os-system-architecture-roadmap.md and docs/plans/2026-09-13-rosy-os-device-validation-implementation-plan.md. Do not use this file as the current deployment procedure.
 ## 구현 계획서
 
 **Document ID:** ROSY-PLN-001

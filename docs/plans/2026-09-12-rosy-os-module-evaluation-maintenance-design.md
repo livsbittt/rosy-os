@@ -1,7 +1,8 @@
 # ROSY OS 모듈 평가·유지보수 설계
+> Status update (2026-09-13): Source absorption is complete in Rosy OS. Use the Device validation plan and absorption results as the current execution records; this design remains the module evaluation and maintenance baseline.
 
 > 2026-09-13 편입 안내: 이 문서는 작성 당시의 조사·평가 근거다. 현재 제품 경계와 구현 순서는 [ADR D-37~D-44](../reference/ROSY%20ADR%20Log.md), [흡수 실행 계획](2026-09-12-rosy-control-absorption-plan.md), [최신 실행 결과](2026-09-12-control-absorption-results.md)를 우선한다. 조사 당시의 미실행·별도 Control 표기는 현재 배포 상태를 뜻하지 않는다.
-작성일: 2026-09-12. 상태: 평가 체계 제안. 구현·실물 인수 완료를 의미하지 않는다.
+작성일: 2026-09-12. 상태: 평가·유지보수 기준 문서. 런타임 및 실물 인수 완료를 의미하지 않는다.
 
 ## 1. 우리가 만드는 제품
 ROSY OS는 Raspberry Pi OS Lite 위에서 동작하는 로봇 런타임 배포판이다. 디바이스에 위치하여 하드웨어와 ROS 실행환경을 관리하고, 웹 운영·제어 API·상태·진단·복구를 제공한다. 커널을 새로 만드는 계획은 아니다.
@@ -78,4 +79,4 @@ ROS lifecycle는 준비·활성·오류 경계를 설계하는 참고 모델이�
 
 
 ## 제품 경계 확정: Control 흡수
-사용자 결정에 따라 Rosy Control의 기존 기능·테스트·설정·기동·웹 운영을 Rosy OS 내부로 흡수한다. 별도 Control 제품과의 연결을 최종 구조로 두지 않는다. 흡수 목적지와 A0–A6 이전 순서는 [수정 로드맵](2026-09-12-rosy-os-system-architecture-roadmap.md)을 따른다. OS 내부 모듈 분리는 유지하며 코드 이전은 아직 수행하지 않았다.
+사용자 결정에 따라 Rosy Control의 기존 기능·테스트·설정·기동·웹 운영을 Rosy OS 내부로 흡수한다. 별도 Control 제품과의 연결을 최종 구조로 두지 않는다. 흡수 목적지와 A0–A6 이전 순서는 [수정 로드맵](2026-09-12-rosy-os-system-architecture-roadmap.md)을 따른다. OS 내부 모듈 분리는 유지하며 소스 흡수는 2026-09-13 기준 완료되었으며, 런타임 및 Device 게이트는 남아 있다.

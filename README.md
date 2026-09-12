@@ -40,7 +40,7 @@ rosy/ (이 리포지토리)
 | `docs/spec/ROSY FLEET SRS.md` | 중앙 서버 요구사항 |
 | `docs/reference/ROSY API & Protocol Reference.md` | 공유 API/프로토콜 계약 |
 | `docs/reference/ROSY ADR Log.md` | 의사결정 기록 (Control 흡수·Device 게이트 기준: D-37~D-53) |
-| `docs/plan/ROSY Implementation Plan.md` | 실행 계획·추적 매트릭스 |
+| `docs/plans/2026-09-13-rosy-os-device-validation-implementation-plan.md` | 실행 계획·추적 매트릭스 |
 | `docs/deployment/arm64-build-notes.md` | ARM64/Pi 빌드 경계와 인수 전제 |
 
 ## 빌드
@@ -94,4 +94,4 @@ ARM64 빌드 경계와 컨테이너 포함 범위는
 
 Phase 0 리네임·멀티로봇 리팩토링 → **Phase 1 rosy_core** → Phase 2 rosy_web →
 Phase 3 2대 검증 → Phase 4 rosy_fleet → Phase 5 Formation → Phase 6 확장.
-상세: `docs/plan/ROSY Implementation Plan.md`
+상세: `docs/plans/2026-09-13-rosy-os-device-validation-implementation-plan.md`
