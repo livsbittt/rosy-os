@@ -95,7 +95,7 @@ calibration snapshot/storage, `rosy_control/safety/node.py`, CORE profile/manage
 
 ### Task 5 — OpenCV 전처리 worker를 선택형 기능으로 제품화한다
 
-현재 `src/rosy_control/rosy_control/vision/camera_detect_node.py`의 HSV 결과는 바닥·절벽·전경 evidence이며 semantic box/grasp 판정이 아니다. 다음을 분리한다.
+현재 `src/rosy_control/rosy_control/camera_detect_node.py`의 HSV 결과는 바닥·절벽·전경 evidence이며 semantic box/grasp 판정이 아니다. 다음을 분리한다.
 
 - camera worker의 입력 해상도·FPS·회전·노출을 profile로 고정하고, frame ID/time/revision/drop/latency/CPU/memory를 telemetry로 남긴다.
 - `requirements*.txt`, `deploy/robot/Dockerfile`, `deploy/robot/compose.yaml`에 선택형 vision 의존성을 추가하되 CORE 컨테이너에 광범위한 `/dev`를 주지 않는다.
