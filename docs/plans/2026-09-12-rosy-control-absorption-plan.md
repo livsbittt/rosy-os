@@ -7,7 +7,7 @@
 **Architecture:** Rosy OS/src/rosy_control로 먼저 편입하여 기존 import와 테스트를 보존한다. 최종 외부 API·웹·명령 중재는 rosy_core, 하드웨어 실행은 OS 내부 노드와 bringup, 배포·복구는 기존 deploy가 소유한다.
 **Tech Stack:** 현재 ROS 2 Jazzy, ament_python/colcon, FastAPI+rclpy, OpenCV/NumPy, Docker/systemd 기반. 카메라 Picamera2/libcamera의 실제 ARM64 실행 위치는 배포 검증에서 결정한다.
 
-작성일: 2026-09-12. 갱신: 2026-09-13. 상태: T0·T1 완료, T2·T3 진행 중, T4~T8 미착수. 구현 범위와 검증 근거는 [흡수 실행 결과](2026-09-12-control-absorption-results.md)에 기록했다. 장치 배포와 실물 인수는 아직 수행하지 않았다.
+작성일: 2026-09-12. 갱신: 2026-09-13. 상태: 소스 흡수 완료. 런타임·Device 설치·실물 인수는 미완료. 구현 범위와 검증 근거는 [흡수 실행 결과](2026-09-12-control-absorption-results.md)에 기록했다. 장치 배포와 실물 인수는 아직 수행하지 않았다.
 
 ## 1. 범위와 설계 결정
 
