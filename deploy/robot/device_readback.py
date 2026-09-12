@@ -119,9 +119,21 @@ def _artifact(root: Path, activation: dict[str, Any] | None) -> dict[str, Any]:
     if activation is None:
         return {"status": "unavailable", "reason": "manifest_missing"}
     release_path = activation.get("release_path")
-    if not isinstance(release_path, str) or not release_path.startswith("/opt/rosy/releases/"):
+    if not isinstance(release_path, str):
         return {"status": "unavailable", "reason": "release_path_invalid"}
-    manifest_path = _rooted(root, release_path.rstrip("/") + "/manifest.json")
+    try:
+        relative_release = Path(release_path).relative_to("/opt/rosy/releases")
+    except ValueError:
+        return {"status": "unavailable", "reason": "release_path_invalid"}
+    if not relative_release.parts or ".." in relative_release.parts:
+        return {"status": "unavailable", "reason": "release_path_invalid"}
+    release_dir = _rooted(root, release_path)
+    releases_root = _rooted(root, "/opt/rosy/releases")
+    try:
+        release_dir.resolve().relative_to(releases_root.resolve())
+    except (OSError, ValueError):
+        return {"status": "unavailable", "reason": "release_path_invalid"}
+    manifest_path = release_dir / "manifest.json"
     raw = _read(manifest_path)
     if raw is None:
         return {"status": "unavailable", "reason": "manifest_missing"}

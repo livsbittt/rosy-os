@@ -154,6 +154,19 @@ def test_readback_holds_when_running_image_is_not_the_manifest_digest(tmp_path: 
     assert evidence["gates"]["device_runtime"] == "HOLD"
 
 
+def test_readback_refuses_activation_path_escape(tmp_path: Path):
+    root = _fake_device(tmp_path)
+    activation_path = root / "var" / "lib" / "rosy" / "activation.json"
+    activation = json.loads(activation_path.read_text(encoding="utf-8"))
+    activation["release_path"] = "/opt/rosy/releases/2026.09.13-001/../../etc"
+    activation_path.write_text(json.dumps(activation), encoding="utf-8")
+
+    evidence = device_readback.collect_readback(root=root, run=_runner)
+
+    assert evidence["artifact"] == {"status": "unavailable", "reason": "release_path_invalid"}
+    assert evidence["gates"]["device_runtime"] == "HOLD"
+
+
 def test_installer_and_wrapper_expose_the_same_readback_command():
     wrapper = (ROOT / "deploy" / "robot" / "device-readback.sh").read_text(encoding="utf-8")
     installer = (ROOT / "deploy" / "robot" / "install-pi.sh").read_text(encoding="utf-8")
