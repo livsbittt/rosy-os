@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 import math
+import os
 from dataclasses import dataclass
 from typing import Optional
 
@@ -80,6 +81,9 @@ class SafetyManager:
         self._policy_revision = ''
         self._policy_clock = time.monotonic
         self.policy_reason = ''
+        self._actuation = None
+        self._actuation_required = False
+        self._simulation_clock_enabled = None
         self.limits = limits
         self.battery_policy = battery
         self.fleet_loss_policy = fleet_loss_policy
@@ -101,6 +105,7 @@ class SafetyManager:
             raise ValueError('A policy evaluator and calibration revision are required')
         self._policy = evaluator
         self._policy_revision = calibration_revision
+        self._actuation = None
         self.policy_required = True
         for listener in list(self.policy_listeners):
             listener()
@@ -112,7 +117,9 @@ class SafetyManager:
             raise ValueError('A Control CommandPolicy is required')
 
         def evaluate(request):
-            output = policy.evaluate(request.linear, request.angular, request.now)
+            bounded = (self._actuation_required and self._actuation is not None and
+                       self._actuation.revision == request.calibration_revision and self._simulation_domain())
+            output = policy.evaluate(request.linear, request.angular, request.now, allow_bounded_sweep=bounded)
             if output is None:
                 raise ValueError('Control observation unavailable')
             snapshot, result = output
@@ -125,8 +132,29 @@ class SafetyManager:
 
         self.bind_policy(evaluate, policy.revision)
 
+    def _simulation_domain(self):
+        return (os.environ.get('ROS_DOMAIN_ID') == '227' and
+                os.environ.get('GZ_PARTITION') == 'pinky_calmap227' and
+                self._simulation_clock_enabled is not None and self._simulation_clock_enabled() is True)
+
+    def bind_simulation_actuation(self, calibration, *, simulation_clock_enabled):
+        """Opt-in only to the existing isolated simulation domain, never hardware."""
+        from rosy_control.control.actuation import SimulationActuation
+        if (not isinstance(calibration, SimulationActuation) or
+                calibration.revision != self._policy_revision or not callable(simulation_clock_enabled)):
+            raise ValueError('Actuation requires the bound policy revision and simulation clock')
+        if (os.environ.get('ROS_DOMAIN_ID') != '227' or os.environ.get('GZ_PARTITION') != 'pinky_calmap227'
+                or simulation_clock_enabled() is not True):
+            raise ValueError('Actuation is restricted to the commissioned simulation domain')
+        self._simulation_clock_enabled = simulation_clock_enabled
+        self._actuation = calibration
+        self._actuation_required = True
+        self.policy_required = True
+        for listener in list(self.policy_listeners):
+            listener()
+
     def evaluate_candidate(self, command_id: int, source: str, linear: float,
-                           angular: float, now: float) -> Optional[tuple[float, float]]:
+                           angular: float, now: float, scope: str = 'nav') -> Optional[tuple[float, float]]:
         if not self.policy_required:
             return linear, angular
         self.policy_reason = 'policy_unavailable'
@@ -160,8 +188,35 @@ class SafetyManager:
             self.policy_reason = decision.reason or 'policy_stop'
             return None
         self.policy_reason = ''
-        return (max(-decision.linear_limit, min(decision.linear_limit, linear)),
-                max(-decision.angular_limit, min(decision.angular_limit, angular)))
+        limited = (max(-decision.linear_limit, min(decision.linear_limit, linear)),
+                   max(-decision.angular_limit, min(decision.angular_limit, angular)))
+        if not self._actuation_required or limited == (0., 0.):
+            return limited
+        self.policy_reason = 'actuation_unavailable'
+        calibration = self._actuation
+        try:
+            if calibration is None or calibration.revision != revision or not self._simulation_domain():
+                return None
+            caps = self.clip(self.limits.max_linear, self.limits.max_angular, scope)
+            self.policy_reason = 'actuation_invalid'
+            prepared = calibration.prepare(*limited, angular, now, caps)
+            if (not finite_velocity(prepared.motor_linear, prepared.angular) or
+                    not finite_velocity(prepared.linear, prepared.angular) or
+                    abs(prepared.motor_linear) != abs(prepared.linear) or
+                    abs(prepared.linear) > min(.014, caps[0]) or abs(prepared.angular) > min(.1, caps[1]) or
+                    caps != self.clip(self.limits.max_linear, self.limits.max_angular, scope) or
+                    not self._simulation_domain()):
+                return None
+            elapsed = self._policy_clock() - started
+            self.policy_reason = 'actuation_stale_or_over_budget'
+            if (calibration is not self._actuation or evaluator is not self._policy or
+                    not 0 <= elapsed <= .01 or now + elapsed > min(calibration.expires_at, decision.expires_at,
+                        calibration.scan_received_at + .2, calibration.scan_source_at + .2)):
+                return None
+        except Exception:
+            return None
+        self.policy_reason = ''
+        return prepared.motor_linear, prepared.angular
 
     def _emit(self, type_: str, severity: str, source: str, data: dict | None = None) -> None:
         if self._events is not None:

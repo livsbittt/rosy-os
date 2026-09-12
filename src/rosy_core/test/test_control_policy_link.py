@@ -173,6 +173,82 @@ def test_tracking_source_delay_and_missing_updates_stop_core(linked):
     assert not policy.update(replace(snapshot, sequence=3))
 
 
+@pytest.fixture
+def simulation_actuation(linked, monkeypatch):
+    from rosy_control.control.actuation import SimulationActuation
+    command, safety, modes, policy, snapshot = linked
+    monkeypatch.setenv('ROS_DOMAIN_ID', '227')
+    monkeypatch.setenv('GZ_PARTITION', 'pinky_calmap227')
+    calibration = SimulationActuation(revision=policy.revision, observed_at=10., expires_at=10.2,
+        linear_gains=(1.25, .75), angular_gains=(1., 1.), linear_sign=-1.,
+        points=((.5, 0.), (0., .5), (-.5, 0.), (0., -.5)), center=(0., 0.), uncertainty=.003,
+        body_radius=.076, scan_received_at=10., scan_source_at=10., scan_complete=True)
+    safety.bind_simulation_actuation(calibration, simulation_clock_enabled=lambda: True)
+    return (*linked, calibration)
+
+
+def test_calibrated_final_candidate_is_swept_and_signed_by_core(simulation_actuation):
+    command, safety, modes, policy, snapshot, calibration = simulation_actuation
+    command.set_nav_twist(Twist(.01, 0.), now=10.)
+    assert command.select_output(now=10.01) == Twist(pytest.approx(-.0125), 0.)
+    safety.set_session_speed(.005)
+    command.set_nav_twist(Twist(.01, 0.), now=10.02)
+    assert command.select_output(now=10.03) == Twist(pytest.approx(-.005), 0.)
+
+
+def test_final_sweep_blocks_collision_without_synthesizing_escape(simulation_actuation):
+    command, safety, modes, policy, snapshot, calibration = simulation_actuation
+    safety.bind_simulation_actuation(replace(calibration, points=((.08, 0.), (1., 1.), (-1., 1.))),
+                                    simulation_clock_enabled=lambda: True)
+    command.set_nav_twist(Twist(.01, 0.), now=10.)
+    assert command.select_output(now=10.01) == Twist()
+    assert not safety.estop
+
+
+def test_bounded_arc_uses_final_sweep_instead_of_full_spin_permission(simulation_actuation):
+    command, safety, modes, policy, snapshot, calibration = simulation_actuation
+    assert policy.update(replace(snapshot, sequence=2,
+        inputs=replace(snapshot.inputs, bounded_motion=True, can_rotate=False)))
+    command.set_nav_twist(Twist(.005, .05), now=10.)
+    assert command.select_output(now=10.01) == Twist(-.005, .05)
+    assert not safety.estop
+
+
+def test_actuation_environment_change_and_policy_rebind_cannot_reuse_calibration(simulation_actuation, monkeypatch):
+    command, safety, modes, policy, snapshot, calibration = simulation_actuation
+    monkeypatch.setenv('ROS_DOMAIN_ID', '230')
+    command.set_nav_twist(Twist(.01, 0.), now=10.)
+    assert command.select_output(now=10.01) == Twist()
+    assert safety.estop
+    monkeypatch.setenv('ROS_DOMAIN_ID', '227')
+    safety.bind_control_policy(policy)
+    safety.release('administrator')
+    modes.release_emergency()
+    modes.transition(Mode.NAVIGATION)
+    command.set_nav_twist(Twist(.01, 0.), now=10.02)
+    assert command.select_output(now=10.03) == Twist()
+    assert safety.estop
+
+
+def test_complete_policy_and_actuation_budget_is_enforced(simulation_actuation):
+    command, safety, modes, policy, snapshot, calibration = simulation_actuation
+    ticks = iter([1., 1.001, 1.021])
+    safety._policy_clock = lambda: next(ticks)
+    command.set_nav_twist(Twist(.01, 0.), now=10.)
+    assert command.select_output(now=10.01) == Twist()
+    assert safety.estop
+
+
+def test_simulation_clock_must_remain_enabled(simulation_actuation):
+    command, safety, modes, policy, snapshot, calibration = simulation_actuation
+    enabled = [True]
+    safety.bind_simulation_actuation(calibration, simulation_clock_enabled=lambda: enabled[0])
+    enabled[0] = False
+    command.set_nav_twist(Twist(.01, 0.), now=10.)
+    assert command.select_output(now=10.01) == Twist()
+    assert safety.estop
+
+
 def test_new_sequence_cannot_refresh_the_same_sensor_sample(linked):
     command, safety, modes, policy, snapshot = linked
     assert not policy.update(replace(snapshot, sequence=2, expires_at=10.4))

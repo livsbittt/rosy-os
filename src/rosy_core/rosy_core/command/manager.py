@@ -108,7 +108,8 @@ class CommandManager:
         if linear == 0. and angular == 0.:
             return ZERO
         epoch, mode = self._input_epoch, self._modes.mode
-        output = self._safety.evaluate_candidate(next(self._policy_ids), source, linear, angular, now)
+        output = self._safety.evaluate_candidate(next(self._policy_ids), source, linear, angular, now,
+                                                 scope='manual' if mode is Mode.MANUAL else 'nav')
         if epoch != self._input_epoch or mode is not self._modes.mode or self._safety.estop:
             return ZERO
         if output is None:

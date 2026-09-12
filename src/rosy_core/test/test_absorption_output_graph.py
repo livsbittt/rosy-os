@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import time
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 try:
     import rclpy
@@ -13,6 +13,7 @@ except ImportError:
 
 if rclpy is not None:
     from rclpy.node import Node
+    from rclpy.parameter import Parameter
     from geometry_msgs.msg import Twist
     from rosy_core.command.arbitration import Mode, ModeMachine, SourceRegistry
     from rosy_core.command.manager import CommandManager, Twist as CoreTwist
@@ -48,8 +49,16 @@ class OutputGraphTests(unittest.TestCase):
     def test_tracked_static_obstacle_reaches_actual_zero_output(self):
         self.exercise(.1, True, None, (0., 0.), control_tracking=True, angular=0.)
 
+    def test_calibrated_swept_candidate_reaches_simulation_motor_topic(self):
+        with patch.dict('os.environ', {'ROS_DOMAIN_ID': '227', 'GZ_PARTITION': 'pinky_calmap227'}):
+            self.exercise(.01, True, None, (-.0125, 0.), control_actuation=True, angular=0.)
+
+    def test_bounded_arc_reaches_motor_topic_without_full_spin_permission(self):
+        with patch.dict('os.environ', {'ROS_DOMAIN_ID': '227', 'GZ_PARTITION': 'pinky_calmap227'}):
+            self.exercise(.005, True, None, (-.005, .05), control_actuation=True, angular=.05)
+
     def exercise(self, linear, required, provider, expected, control_obstacle=False,
-                 control_geometry=False, control_tracking=False, angular=.1):
+                 control_geometry=False, control_tracking=False, control_actuation=False, angular=.1):
         path = Path(__file__).parents[1] / 'rosy_core/bridge/ros_bridge.py'
         cls = next(n for n in ast.parse(path.read_text(encoding='utf-8')).body
                    if isinstance(n, ast.ClassDef) and n.name == 'RosBridge')
@@ -63,15 +72,17 @@ class OutputGraphTests(unittest.TestCase):
             safety.bind_policy(provider, 'calibration-1')
         command = CommandManager(SourceRegistry(), modes, safety)
         rclpy.init()
-        node = Node('output_probe', namespace='rosy_01')
+        node = Node('output_probe', namespace='rosy_01', parameter_overrides=(
+            [Parameter('use_sim_time', value=True)] if control_actuation else []))
         observed = []
         node.create_subscription(Twist, 'cmd_vel', lambda msg: observed.append(msg), 10)
         bridge = SimpleNamespace(_svc=SimpleNamespace(command=command, power=Mock()),
                                  cmd_vel_pub=node.create_publisher(Twist, 'cmd_vel', 10))
         try:
-            if control_obstacle or control_geometry or control_tracking:
+            if control_obstacle or control_geometry or control_tracking or control_actuation:
                 from rosy_control.control.command_gate import CommandPolicy, GateInputs, GateSnapshot
                 from rosy_control.control.lidar_guard import TranslationEvidence
+                from rosy_control.control.actuation import SimulationActuation
                 policy = CommandPolicy('applied-revision')
                 safety.bind_control_policy(policy)
                 now = time.monotonic()
@@ -85,15 +96,22 @@ class OutputGraphTests(unittest.TestCase):
                              state='stationary')]}, {'stamp': 100., 'blocked': False},
                         (0., 0., 0.), 100., source_now=100., received_at=now, radius=.076, margin=.02)
                 self.assertTrue(policy.update(GateSnapshot(policy.session, 1, policy.revision,
-                    now, now + .5, GateInputs(obstacle=control_obstacle), translation, tracking)))
+                    now, now + .5, GateInputs(obstacle=control_obstacle, bounded_motion=control_actuation,
+                                              can_rotate=not control_actuation), translation, tracking)))
+                if control_actuation:
+                    safety.bind_simulation_actuation(SimulationActuation(policy.revision, now, now+.2,
+                        (1.25, .75), (1., 1.), -1., ((.5, 0.), (0., .5), (-.5, 0.), (0., -.5)),
+                        (0., 0.), .003, .076, now, now, True),
+                        simulation_clock_enabled=lambda: node.get_parameter('use_sim_time').value)
             command.set_nav_twist(CoreTwist(linear, angular))
             deadline = time.monotonic() + 5.
             while not observed and time.monotonic() < deadline:
                 scope['_publish_cmd_vel'](bridge)
                 rclpy.spin_once(node, timeout_sec=.05)
             self.assertTrue(observed)
-            self.assertEqual((observed[-1].linear.x, observed[-1].angular.z), expected)
-            if control_obstacle or control_geometry or control_tracking:
+            self.assertEqual((observed[-1].linear.x, observed[-1].angular.z), expected,
+                             f'policy_reason={safety.policy_reason}; estop={safety.estop}')
+            if control_obstacle or control_geometry or control_tracking or control_actuation:
                 self.assertFalse(safety.estop)
             if expected == (0., 0.):
                 bridge._svc.power.on_activity.assert_not_called()

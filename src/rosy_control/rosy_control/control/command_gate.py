@@ -126,7 +126,7 @@ class CommandPolicy:
             self._snapshot = snapshot
         return True
 
-    def evaluate(self, linear, angular, now):
+    def evaluate(self, linear, angular, now, *, allow_bounded_sweep=False):
         with self._lock:
             snapshot = self._snapshot
         if snapshot is None or not snapshot.observed_at <= now <= snapshot.expires_at:
@@ -137,7 +137,7 @@ class CommandPolicy:
                  state.obstacle, state.cliff, state.can_rotate, state.bounded_motion, state.legacy_tilt_recovery)
         if any(type(flag) is not bool for flag in flags):
             result = GateResult(0., 0., 'invalid_sensor_state', True)
-        elif state.legacy_tilt_recovery or state.bounded_motion:
+        elif state.legacy_tilt_recovery or (state.bounded_motion and allow_bounded_sweep is not True):
             # These paths require explicit recovery arbitration / calibrated
             # swept-footprint integration before CORE may activate them.
             result = GateResult(0., 0., 'actuation_policy_unavailable', True)

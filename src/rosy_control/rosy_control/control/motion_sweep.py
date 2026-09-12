@@ -8,6 +8,7 @@ It does not establish physical stopping behavior or authorize a full rotation.
 import math
 from numbers import Real
 from .rotation_envelope import straight_translation_limits
+from .footprint_sweep import footprint_sweep_clearance
 
 
 def _finite_number(value):
@@ -38,7 +39,6 @@ def command_sweep_clearance(*, points, estimate, body_radius, v, w, source_age, 
                 _finite_number(pivot_margin) and pivot_margin > .010 + stale_padding):
             return pivot_margin - .010 - stale_padding
         if estimate.get('footprint_xy'):
-            from .footprint_sweep import footprint_sweep_clearance
             return footprint_sweep_clearance(points, estimate['footprint_xy'], center, uncertainty,
                                              body_radius, v, w, .8, scan_age)
         return bounded_sweep_clearance(points, center, uncertainty, body_radius + stale_padding, v, w, .8)

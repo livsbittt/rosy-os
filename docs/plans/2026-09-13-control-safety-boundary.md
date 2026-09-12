@@ -77,7 +77,7 @@ CORE의 ROS 패키지 의존성에 `rosy_control`을 명시했고 두 패키지�
   가장 이른 만료를 사용해야 한다. 현재 이 공급자는 실제 ROS 센서 콜백에 연결하지 않았다.
 - CommandManager가 후보 명령의 freshness를 소유한다. snapshot은 센서 상태이며 과거 명령 나이를 새 명령에 전파하지 않는다.
 - 일반 obstacle/trajectory 제한은 zero limit으로 재계획 여지를 보존한다. pickup·localization 상실·필수 관측 실패는 e-stop이다.
-- bounded sweep과 legacy 틸트 역방향 생성은 CORE 어댑터에서 정지한다. 필요한 보정·궤적 검사를 생략한 채 허용하지 않는다.
+- 최종 simulation actuation이 등록되지 않은 bounded sweep과 legacy 틸트 역방향 생성은 CORE 어댑터에서 정지한다. 필요한 보정·궤적 검사를 생략한 채 허용하지 않는다.
 - 정책 재등록 시 manual/navigation 후보를 폐기한다. 새로운 정책이나 보정 revision으로 과거 명령을 재실행하지 않는다.
 
 revision은 아직 호출자가 제공하는 적용 식별자다. 파일 digest 검증/loader나 실제 센서 보정 적용의 증거로 취급하지 않는다.
@@ -172,7 +172,7 @@ complete scan·source/receive age 0~0.2초·회전 중심 추정·양의 차체 
 CORE의 현 SafetyDecision은 상한을 낮추는 계약이므로, 보정으로 달라진 최종 후보를 검사하기 전에
 단순히 `bounded_motion` 허용을 켜면 기존 경로와 동등하지 않다. CORE 연결 전 실제 발행 후보·보정 revision·허용 환경을
 같이 고정하고 그 후보에 sweep을 적용해야 한다. 기존 domain 227 시뮬레이션 전용 활성 조건은 변경하지 않았다.
-CORE bounded motion은 계속 비활성/정지이며 물리 장치의 정지 거리나 실물 운행을 승인한 변경이 아니다.
+이 추출 단계에서는 CORE bounded motion을 허용하지 않았다. 후속 조건부 연결은 아래 simulation actuation 절을 따른다. 물리 장치의 정지 거리나 실물 운행은 승인하지 않았다.
 
 검증: 공통 sweep/footprint 집중 시험 52개, Control 전체 962 passed·20 skipped,
 실제 ROS 두 namespace 처리 노드 생성 시험 통과. 실제 모터의 궤적/제동 인수는 남아 있다.
@@ -193,3 +193,26 @@ legacy 틸트 복구 후보를 새 직진 보정 영역으로 재분류하지 �
 이후 추가한 실제 노드 발행 구간 시험을 포함한 actuation 집중 시험 12개와 실제 ROS 노드 생성 시험이 통과했다.
 CORE에서 정책 제한과 보정 변환의 역할을 분리하고, 같은 보정 revision의 PreparedCommand를
 최종 sweep·발행·보정 acknowledgement에 연결하는 작업이 남아 있다.
+
+### 시뮬레이션 한정 CORE 최종 출력 연결
+
+`SafetyManager.bind_simulation_actuation`으로 immutable `SimulationActuation`을 명시적으로 등록할 수 있다.
+등록과 매 출력에서 `ROS_DOMAIN_ID=227`, `GZ_PARTITION=pinky_calmap227`, 실제 simulation clock 활성 콜백을 확인한다.
+기존 운영 profile과 서비스 부팅에서 자동 등록하지 않는다. 물리 장치용 활성화 경로가 아니다.
+
+처리 순서는 `CORE 정책 제한 → 보정/공통 scale → 최종 후보 sweep → motor sign → 기존 RosBridge 발행`이다.
+보정된 후보는 0.014m/s·0.1rad/s와 CORE manual/nav/session 상한을 모두 지킨다.
+유효한 최종 simulation actuation이 있을 때만 bounded 후보의 전체 sweep을 사용하며,
+제자리 전체 회전 허용이 없다는 이유만으로 검증 가능한 제한된 arc를 일괄 차단하지 않는다.
+충돌 sweep은 zero limit, 증거/환경/보정 revision 누락이나 만료는 기존 e-stop으로 처리한다.
+
+정책과 보정의 revision이 일치해야 하며, 정책 재등록은 기존 보정을 무효화하고 후보를 폐기한다.
+선택 결과와 보정·관측 만료를 함께 검사하고, 준비 중 profile/session 상한이 달라져도 발행하지 않는다.
+정책 평가부터 최종 준비까지 합한 시간 예산은 10ms다. 함수가 반환한 뒤 검사하므로 무한 대기를 선점하는 기능은 아니다.
+실제 ROS 시험에서 발견한 첫 출력의 모듈 import 지연은 초기화 시 sweep/NumPy 모듈을 준비하도록 수정했다.
+
+이 revision과 complete-scan/pivot 증거는 아직 명시적 호출자가 공급한다. 장치 identity에 묶인 보정 파일 검증과
+실제 센서 producer의 증거 생성·동기화, 4,096점/64 footprint vertex 최대 입력에서의 장치 성능,
+운영 활성화·보정 ACK·실물 제동 인수는 아직 증명하지 않았다.
+검증: 최종 CORE 전체 725 passed·10 skipped, Control 전체 974 passed·20 skipped,
+격리 ROS 출력 시험 10개 통과. ROS 시험은 실제 use_sim_time 파라미터와 DDS 발행을 사용하며 물리 모터를 연결하지 않는다.
