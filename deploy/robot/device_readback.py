@@ -102,6 +102,8 @@ def _activation(root: Path) -> tuple[dict[str, Any] | None, str | None]:
         return None, "activation_malformed"
     if not isinstance(data, dict):
         return None, "activation_not_object"
+    if data.get("schema_version") != SCHEMA_VERSION:
+        return None, "activation_schema_unknown"
     required = (
         "release_id",
         "release_path",
@@ -112,6 +114,8 @@ def _activation(root: Path) -> tuple[dict[str, Any] | None, str | None]:
     )
     if any(field not in data for field in required):
         return None, "activation_fields_missing"
+    if data.get("runtime_mode") != "core":
+        return None, "activation_runtime_mode_not_core"
     return {field: data[field] for field in ("schema_version", *required)}, None
 
 
@@ -275,6 +279,7 @@ def collect_readback(
 
     identity_ok = all(identity[key] for key in ("robot_number", "ros_domain_id", "namespace"))
     artifact_ok = artifact.get("status") == "available"
+    activation_ok = activation is not None and activation.get("runtime_mode") == "core"
     core_ok = (
         systemd["ok"]
         and core.get("health") == "healthy"
@@ -301,7 +306,7 @@ def collect_readback(
         },
         "ros_graph": ros_graph,
         "gates": {
-            "device_runtime": "GO" if all((identity_ok, artifact_ok, core_ok, architecture_ok, graph_ok)) else "HOLD",
+            "device_runtime": "GO" if all((identity_ok, activation_ok, artifact_ok, core_ok, architecture_ok, graph_ok)) else "HOLD",
             "field": "HOLD",
         },
     }
