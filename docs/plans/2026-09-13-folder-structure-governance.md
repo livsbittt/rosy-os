@@ -62,3 +62,11 @@ motion evidence. measure_motion_contract.py discovers the local absorbed
 package or a validated ROSY_SOURCE_ROOT; no runtime tool may depend on the
 archived checkout or a historical temporary path. ADR D-49 and its four pure
 tests record this rule. Archive files remain historical evidence only.
+
+
+## 2026-09-13 active guide cleanup
+
+The active src/rosy_control/CLAUDE.md and STEPS.txt now contain only Rosy OS
+test, build, Device install, runtime, and readback procedures. Standalone
+Control workspace commands remain only in the separate archive. ADR D-50 and
+the package ownership contract protect this boundary.

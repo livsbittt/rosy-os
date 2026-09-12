@@ -260,3 +260,15 @@ Four pure tests cover default discovery, explicit override, missing-root
 failure, and the retired-reference guard. ADR D-49 records this maintenance
 boundary. The full absorbed Control suite remains the local gate; this change
 does not advance ARM64, Device, or FIELD evidence.
+
+## 2026-09-13 implementation checkpoint: active guide cleanup
+
+The active `rosy_control` guides no longer contain standalone Control
+workspace commands. `CLAUDE.md` and `STEPS.txt` now point to the Rosy OS test,
+ROS 2 build, `install-pi.sh`, `verify-pi.sh`, runtime startup, and JSON
+readback sequence. The original standalone guides remain in the workspace
+archive for historical comparison and are not needed by the package, image, or
+Device runtime. ADR D-50 and the package ownership test record this boundary.
+
+This removes an operator/agent path ambiguity; it does not change the legacy
+entry points or promote any physical capability.

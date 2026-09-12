@@ -44,3 +44,13 @@ def test_absorbed_metadata_and_device_guide_keep_core_command_authority() -> Non
     assert "forward/back control node" not in setup_py
     assert "install-pi.sh" in root_readme
     assert "echo 'ROS_DOMAIN_ID=" not in root_readme
+
+
+def test_absorbed_guides_use_the_rosy_os_device_path() -> None:
+    for name in ("CLAUDE.md", "STEPS.txt"):
+        guide = (PACKAGE / name).read_text(encoding="utf-8")
+        assert "install-pi.sh" in guide
+        assert "verify-pi.sh" in guide
+        assert "device-readback.sh --json" in guide
+        assert "/home/pinky/dev_ws" not in guide
+        assert "/home/pinky/pinky_pro" not in guide
