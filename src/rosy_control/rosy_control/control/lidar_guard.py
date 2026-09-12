@@ -1,5 +1,6 @@
 """Fail-closed lidar bumper decisions, independent of ROS and smoothing."""
 import math
+from dataclasses import dataclass
 
 from ..sensing.body import LIDAR_X, use_radius
 
@@ -64,6 +65,63 @@ def translation_footprint_eligible(corrected_linear, angular, *, enabled, lidar_
                 0 <= scan_age <= .2 and -.05 <= source_age <= .2 and 0 < radius <= .083 and
                 abs(corrected_linear) <= .014 and abs(angular) < 1e-4 and
                 len(ranges) == 6 and all(math.isfinite(v) and v > 0 for v in ranges))
+
+
+@dataclass(frozen=True)
+class TranslationEvidence:
+    scan_received_at: float
+    scan_source_at: float
+    enabled: bool
+    lidar_fresh: bool
+    mount: tuple | None
+    travel: tuple | None
+    radius: float
+    ranges: tuple
+    radial_front: bool
+    radial_rear: bool
+    previous_front: bool
+    previous_rear: bool
+    linear_gains: tuple
+
+
+def command_translation_bumpers(evidence, linear, angular, now):
+    """Recompute the optional translation override for this candidate only.
+
+    Radial bumpers and hysteresis are sensor-derived. They must not already
+    contain the previous command's narrow-footprint override.
+    """
+    if not isinstance(evidence, TranslationEvidence):
+        raise ValueError('Translation evidence is required')
+    flags = (evidence.enabled, evidence.lidar_fresh, evidence.radial_front,
+             evidence.radial_rear, evidence.previous_front, evidence.previous_rear)
+    def finite(value):
+        return type(value) in (int, float) and math.isfinite(value)
+    def vector(value, size):
+        return type(value) is tuple and len(value) == size and all(finite(v) for v in value)
+    if (any(type(flag) is not bool for flag in flags) or
+            not all(finite(v) for v in (linear, angular, now, evidence.scan_received_at,
+                                       evidence.scan_source_at, evidence.radius)) or evidence.radius <= 0 or
+            not vector(evidence.ranges, 6) or not all(v > 0 for v in evidence.ranges) or
+            not vector(evidence.linear_gains, 2) or not all(.75 <= v <= 1.25 for v in evidence.linear_gains) or
+            (evidence.mount is not None and not vector(evidence.mount, 2)) or
+            (evidence.travel is not None and not vector(evidence.travel, 2))):
+        raise ValueError('Invalid translation evidence')
+    scan_age, source_age = now - evidence.scan_received_at, now - evidence.scan_source_at
+    if scan_age > .5 or source_age > .5:
+        raise ValueError('Translation geometry expired')
+    if not evidence.lidar_fresh or scan_age < 0 or source_age < -.05:
+        return True, True
+    corrected = linear
+    if abs(linear) <= .014 and abs(angular) < 1e-4:
+        corrected *= evidence.linear_gains[0 if linear >= 0 else 1]
+    eligible = translation_footprint_eligible(corrected, angular,
+        enabled=evidence.enabled, lidar_fresh=evidence.lidar_fresh,
+        scan_age=scan_age, source_age=source_age, mount=evidence.mount, travel=evidence.travel,
+        radius=evidence.radius, ranges=evidence.ranges)
+    if not eligible:
+        return evidence.radial_front, evidence.radial_rear
+    return (lidar_blocked(evidence.travel[0], evidence.travel[0], evidence.previous_front, 0., .010, True),
+            lidar_blocked(evidence.travel[1], evidence.travel[1], evidence.previous_rear, 0., .010, True))
 
 
 def lidar_can_rotate(ranges, radius, fresh, base_clearance=None, *, sweep_radius=None):

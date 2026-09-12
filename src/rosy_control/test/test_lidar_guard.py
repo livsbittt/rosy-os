@@ -7,6 +7,24 @@ from rosy_control.sensing.lidar import NOSE_YAW, sector_range
 
 
 class LidarGuardTest(unittest.TestCase):
+    def test_candidate_bumpers_use_directional_gain_and_preserve_hysteresis(self):
+        from dataclasses import replace
+        from rosy_control.control.lidar_guard import TranslationEvidence, command_translation_bumpers
+        evidence = TranslationEvidence(10., 10., True, True, (-.017, 0.), (.02, .02), .076,
+                                       (.2,) * 6, True, True, True, True, (1.25, .75))
+        self.assertEqual(command_translation_bumpers(evidence, .014, 0., 10.01), (True, True))
+        self.assertEqual(command_translation_bumpers(evidence, -.014, 0., 10.01), (False, False))
+        near = replace(evidence, travel=(.005, .02))
+        self.assertEqual(command_translation_bumpers(near, .005, 0., 10.01), (True, False))
+        self.assertEqual(command_translation_bumpers(replace(near, previous_front=False), .005, 0., 10.01),
+                         (False, False))
+        with self.assertRaises(ValueError):
+            command_translation_bumpers(replace(evidence, radial_front=False, radial_rear=False), .1, 0., 10.51)
+        for changes in ({'linear_gains': (0., 1.)}, {'ranges': [.2] * 6}, {'radial_front': 0},
+                        {'scan_received_at': float('nan')}, {'travel': (float('nan'), .2)}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                command_translation_bumpers(replace(evidence, **changes), .01, 0., 10.01)
+
     def test_footprint_permission_is_specific_to_the_selected_motion(self):
         from rosy_control.control.lidar_guard import translation_footprint_eligible
         geometry = dict(enabled=True, lidar_fresh=True, scan_age=.1, source_age=.1,

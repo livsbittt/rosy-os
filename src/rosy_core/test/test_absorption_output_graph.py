@@ -39,7 +39,14 @@ class OutputGraphTests(unittest.TestCase):
     def test_control_allows_explicit_reverse_past_front_obstacle(self):
         self.exercise(-.1, True, None, (-.1, .1), control_obstacle=True)
 
-    def exercise(self, linear, required, provider, expected, control_obstacle=False):
+    def test_current_slow_straight_candidate_uses_translation_geometry(self):
+        self.exercise(.01, True, None, (.01, 0.), control_geometry=True, angular=0.)
+
+    def test_current_fast_candidate_cannot_reuse_slow_geometry_permission(self):
+        self.exercise(.1, True, None, (0., 0.), control_geometry=True, angular=0.)
+
+    def exercise(self, linear, required, provider, expected, control_obstacle=False,
+                 control_geometry=False, angular=.1):
         path = Path(__file__).parents[1] / 'rosy_core/bridge/ros_bridge.py'
         cls = next(n for n in ast.parse(path.read_text(encoding='utf-8')).body
                    if isinstance(n, ast.ClassDef) and n.name == 'RosBridge')
@@ -59,21 +66,24 @@ class OutputGraphTests(unittest.TestCase):
         bridge = SimpleNamespace(_svc=SimpleNamespace(command=command, power=Mock()),
                                  cmd_vel_pub=node.create_publisher(Twist, 'cmd_vel', 10))
         try:
-            if control_obstacle:
+            if control_obstacle or control_geometry:
                 from rosy_control.control.command_gate import CommandPolicy, GateInputs, GateSnapshot
+                from rosy_control.control.lidar_guard import TranslationEvidence
                 policy = CommandPolicy('applied-revision')
                 safety.bind_control_policy(policy)
                 now = time.monotonic()
+                translation = (TranslationEvidence(now, now, True, True, (-.017, 0.), (.02, .02), .076,
+                    (.2,) * 6, True, True, True, True, (1., 1.)) if control_geometry else None)
                 self.assertTrue(policy.update(GateSnapshot(policy.session, 1, policy.revision,
-                    now, now + .5, GateInputs(obstacle=True))))
-            command.set_nav_twist(CoreTwist(linear, .1))
+                    now, now + .5, GateInputs(obstacle=control_obstacle), translation)))
+            command.set_nav_twist(CoreTwist(linear, angular))
             deadline = time.monotonic() + 5.
             while not observed and time.monotonic() < deadline:
                 scope['_publish_cmd_vel'](bridge)
                 rclpy.spin_once(node, timeout_sec=.05)
             self.assertTrue(observed)
             self.assertEqual((observed[-1].linear.x, observed[-1].angular.z), expected)
-            if control_obstacle:
+            if control_obstacle or control_geometry:
                 self.assertFalse(safety.estop)
             if expected == (0., 0.):
                 bridge._svc.power.on_activity.assert_not_called()

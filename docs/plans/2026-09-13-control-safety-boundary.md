@@ -118,3 +118,25 @@ CORE용 생산 snapshot에 현재 노드의 `blocked` 값만 복사하면, 이�
 따라서 이 단계에서 운영 센서 노드의 기존 boolean 출력을 CORE에 자동 배선하지 않는다.
 필요한 명령별 geometry 경계를 구현한 뒤 단일 최종 publisher graph로 전환한다.
 검증: Control 전체 958 passed·20 skipped, 실제 ROS 두 namespace의 처리 노드 생성 시험 통과.
+
+### CORE 후보별 translation geometry 소비
+
+`GateSnapshot.translation`에 변경 불가능한 `TranslationEvidence`를 함께 담을 수 있다.
+`CommandPolicy.evaluate`는 CORE가 선택한 현재 속도로 `command_translation_bumpers`를 호출한다.
+같은 snapshot에서 저속 직진이 허용되어도 빠른 직진이나 회전 혼합 후보는 radial 판단으로 돌아간다.
+방향별 보정 gain은 저속 직진 eligibility 계산에 반영하며, 기존 다른 센서의 obstacle/rear 제한을 해제하지 않는다.
+이 gain 계산은 실제 모터 출력에 보정을 적용했다는 증거가 아니다.
+
+생산자는 이전 후보의 footprint override가 섞이지 않은 radial front/rear와 hysteresis 기준값,
+거리·형상·보정 gain 및 같은 프로세스 monotonic 기준 scan 수신/원본 관측 시각을 제공해야 한다.
+현재 명령의 형상 판단을 기존 `blocked` boolean 복사로 대체할 수 없다.
+0.2초가 지난 geometry로 narrow-footprint를 허용하지 않으며 0.5초 초과 geometry는 거절한다.
+snapshot을 다시 발행해도 geometry 자체의 시각은 갱신되지 않는다.
+
+`update_observations(..., translation=...)`로 센서 clock과 형상 증거를 함께 전달한다.
+한 정책에서 geometry를 사용하기 시작한 후 새 snapshot에서 빠지면 기존 snapshot을 폐기한다.
+목록 등 변경 가능한 geometry 값, 잘못된 boolean, nonfinite 값과 범위 밖 gain도 거절한다.
+
+검증: CORE 전체 717 passed·5 skipped, Control 전체 959 passed·20 skipped.
+이후 확장한 실제 ROS 출력 시험 7개와 만료 보강 후 집중 시험 11개(Control)·41개(CORE)가 통과했다.
+운영 센서 producer의 배선, 보정 record 적용, tracked obstacle/전체 sweep·drive 변환과 Pi 인수는 남아 있다.

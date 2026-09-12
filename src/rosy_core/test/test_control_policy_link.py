@@ -89,6 +89,57 @@ def test_sensor_receive_and_source_clocks_reach_core_expiry(linked):
     assert safety.estop
 
 
+def test_geometry_permission_is_recomputed_for_each_selected_candidate(linked):
+    from rosy_control.control.lidar_guard import TranslationEvidence
+    command, safety, modes, policy, snapshot = linked
+    geometry = TranslationEvidence(scan_received_at=10., scan_source_at=10., enabled=True,
+        lidar_fresh=True, mount=(-.017, 0.), travel=(.02, .02), radius=.076, ranges=(.2,) * 6,
+        radial_front=True, radial_rear=True, previous_front=True, previous_rear=True,
+        linear_gains=(1., 1.))
+    assert policy.update(replace(snapshot, sequence=2, translation=geometry))
+    command.set_nav_twist(Twist(.01, 0.), now=10.)
+    assert command.select_output(now=10.01) == Twist(.01, 0.)
+    command.set_nav_twist(Twist(.1, 0.), now=10.02)
+    assert command.select_output(now=10.03) == Twist()
+    assert not safety.estop
+    command.set_nav_twist(Twist(.01, .1), now=10.04)
+    assert command.select_output(now=10.05) == Twist()
+    command.set_nav_twist(Twist(-.01, 0.), now=10.06)
+    assert command.select_output(now=10.07) == Twist(-.01, 0.)
+    # A tighter non-lidar restriction remains in force.
+    assert policy.update(replace(snapshot, sequence=3, translation=geometry,
+                                 inputs=replace(snapshot.inputs, obstacle=True)))
+    command.set_nav_twist(Twist(.01, 0.), now=10.08)
+    assert command.select_output(now=10.09) == Twist()
+
+
+def test_geometry_deadline_is_not_extended_by_snapshot_publication(linked):
+    from rosy_control.control.lidar_guard import TranslationEvidence
+    command, safety, modes, policy, snapshot = linked
+    geometry = TranslationEvidence(9.9, 9.9, True, True, (-.017, 0.), (.02, .02), .076,
+                                   (.2,) * 6, True, True, True, True, (1., 1.))
+    assert policy.update(replace(snapshot, sequence=2, translation=geometry))
+    command.set_nav_twist(Twist(.01, 0.), now=10.15)
+    assert command.select_output(now=10.16) == Twist()
+    assert not safety.estop
+
+
+def test_sensor_updates_cannot_silently_drop_required_geometry(linked):
+    from rosy_control.control.lidar_guard import TranslationEvidence
+    from rosy_control.sensing.observation import Observations
+    command, safety, modes, policy, snapshot = linked
+    geometry = TranslationEvidence(10., 10., True, True, (-.017, 0.), (.02, .02), .076,
+                                   (.2,) * 6, True, True, True, True, (1., 1.))
+    samples = Observations(max_age=.2)
+    samples.add('lidar', 10.)
+    assert policy.update_observations(samples, ('lidar',), snapshot.inputs, 10.01, 2,
+                                      policy.revision, translation=geometry)
+    assert not policy.update_observations(samples, ('lidar',), snapshot.inputs, 10.02, 3, policy.revision)
+    command.set_nav_twist(Twist(.1, 0.), now=10.02)
+    assert command.select_output(now=10.03) == Twist()
+    assert safety.estop
+
+
 def test_new_sequence_cannot_refresh_the_same_sensor_sample(linked):
     command, safety, modes, policy, snapshot = linked
     assert not policy.update(replace(snapshot, sequence=2, expires_at=10.4))
