@@ -98,6 +98,19 @@ T2 완료는 아니다. namespace별 YAML node selector, frame prefix와 base fr
 - 검증: Control 915 passed·18 skipped, ROS TF 시험 2개와 처리 노드 연결 시험 1개 통과.
   조사 CSV는 268개 표현식으로 갱신했으며 endpoint 204개의 분류는 동일하다.
 
+### T2 후속 구현: 보정 적용 응답의 의미 (2026-09-13)
+
+- 기존 calib_node는 call_async 직후 적용·AUTO 완료를 표시했다. 응답 없는 요청·거절·timeout 시험을 RED로 확인했다.
+- 응답 대기와 승인·거절·실패·5초 timeout을 구분하고 client/timer를 회수한다.
+  timeout은 ROS simulation clock이 멈춰도 진행하는 steady clock을 사용한다. 늦은 응답과 중복 요청은 새 완료 상태를 만들지 않는다.
+- SetParameters 승인도 `파라미터 저장 확인 — 운전 적용 미확인`으로 기록한다.
+  legacy SafetyNode의 일부 값이 생성자에서 cache되므로 ROS parameter 승인만으로 실제 정책 revision 적용을 증명할 수 없다.
+- 실제 ROS 서비스에서 승인과 거절을 실행하고 저장된 값과 상태를 확인했다. 드라이버·주행은 실행하지 않았다.
+- 검증: 전체 회귀 919 passed·19 skipped, 이후 추가한 owner 부재·중복 요청을 포함한 집중 시험 6 passed,
+  격리 ROS acknowledgement 시험 1개 통과.
+- D-43의 generation-bound record·장치/geometry identity·다중 파일 transaction·실제 정책 revision acknowledgement는 남아 있다.
+  D-36의 data-working mount를 확인했지만 이번 변경에 새로운 저장 schema나 배포 mount를 추가하지 않았다.
+
 ### T0·T1 기준선
 
 | 범위 | 결과 | 의미 |

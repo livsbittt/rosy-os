@@ -20,6 +20,7 @@ from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from rcl_interfaces.msg import Parameter, ParameterType, ParameterValue
 from rcl_interfaces.srv import SetParameters
+from rclpy.clock import Clock, ClockType
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Imu, LaserScan, Range
@@ -526,7 +527,6 @@ class CalibNode(Node):
         if extra and not self._write(self.get_parameter('sign_path').value, ''.join(lines)):
             return
         self._apply_safety(apply_params)
-        self._status('AUTO 완료')
 
     def _write(self, path, text):
         try:
@@ -538,9 +538,13 @@ class CalibNode(Node):
             return False
 
     def _apply_safety(self, pairs):
+        if getattr(self, '_pending_apply', None) is not None:
+            self._status('이전 파라미터 응답 대기 중 — 중복 적용 거절')
+            return
         client = self.create_client(SetParameters, 'safety_node/set_parameters')
         if not client.wait_for_service(timeout_sec=0.5):
             self._status('safety_node 없음 — yaml만 저장됨')
+            self.destroy_client(client)
             return
         params = []
         for name, val in pairs:
@@ -560,8 +564,40 @@ class CalibNode(Node):
             params.append(Parameter(name=name, value=pv))
         req = SetParameters.Request()
         req.parameters = params
-        client.call_async(req)
-        self._status('safety_node 파라미터 적용')
+        pending = {'client': client, 'timer': None}
+        self._pending_apply = pending
+        self._status('보정 저장됨 — safety_node 파라미터 응답 대기')
+
+        def completed(future):
+            if getattr(self, '_pending_apply', None) is not pending:
+                return
+            try:
+                results = future.result().results
+                accepted = len(results) == len(params) and all(result.successful is True for result in results)
+                message = ('파라미터 저장 확인 — 운전 적용 미확인' if accepted else
+                           '파라미터 적용 거절 또는 일부 실패 — 운전 적용 미확인')
+            except Exception:
+                message = '파라미터 응답 실패 — 운전 적용 미확인'
+            self._finish_apply(pending, message)
+
+        try:
+            future = client.call_async(req)
+            pending['timer'] = self.create_timer(
+                5.0, lambda: self._finish_apply(pending, '파라미터 응답 시간 초과 — 운전 적용 미확인'),
+                clock=Clock(clock_type=ClockType.STEADY_TIME))
+            future.add_done_callback(completed)
+        except Exception:
+            self._finish_apply(pending, '파라미터 요청 실패 — 운전 적용 미확인')
+
+    def _finish_apply(self, pending, message):
+        if getattr(self, '_pending_apply', None) is not pending:
+            return
+        self._pending_apply = None
+        if pending['timer'] is not None:
+            pending['timer'].cancel()
+            self.destroy_timer(pending['timer'])
+        self.destroy_client(pending['client'])
+        self._status(message)
 
 
 def main():
