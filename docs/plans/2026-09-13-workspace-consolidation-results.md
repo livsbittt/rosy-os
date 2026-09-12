@@ -1,5 +1,9 @@
 # Rosy OS 실제 폴더·개발 기준 통합 결과
 
+> **Status: Historical consolidation evidence.** The folder/hash results below
+> preserve the 2026-09-13 transition snapshot. Current source, Device, and
+> physical acceptance status is maintained in the dated Device plan.
+
 작성일: 2026-09-13.
 
 ## 후속 폴더 정리 (D-45, 2026-09-13)
