@@ -16,12 +16,24 @@ if rclpy is not None:
     from geometry_msgs.msg import Twist
     from rosy_core.command.arbitration import Mode, ModeMachine, SourceRegistry
     from rosy_core.command.manager import CommandManager, Twist as CoreTwist
-    from rosy_core.safety.manager import SafetyManager, SpeedLimits, BatteryPolicy
+    from rosy_core.safety.manager import SafetyManager, SpeedLimits, BatteryPolicy, SafetyDecision
 
 
 @unittest.skipIf(rclpy is None, 'Requires network-isolated ROS Jazzy')
 class OutputGraphTests(unittest.TestCase):
     def test_invalid_worker_command_is_published_as_zero(self):
+        self.exercise(float('nan'), False, None, (0., 0.))
+
+    def test_required_missing_policy_publishes_zero(self):
+        self.exercise(.1, True, None, (0., 0.))
+
+    def test_policy_limit_reaches_actual_publisher(self):
+        def limit(request):
+            return SafetyDecision(request.command_id, request.source, request.calibration_revision,
+                                  request.now, request.now + .1, .04, .06, 'limit')
+        self.exercise(.1, True, limit, (.04, .06))
+
+    def exercise(self, linear, required, provider, expected):
         path = Path(__file__).parents[1] / 'rosy_core/bridge/ros_bridge.py'
         cls = next(n for n in ast.parse(path.read_text(encoding='utf-8')).body
                    if isinstance(n, ast.ClassDef) and n.name == 'RosBridge')
@@ -30,7 +42,10 @@ class OutputGraphTests(unittest.TestCase):
         exec(compile(ast.Module(body=[method], type_ignores=[]), str(path), 'exec'), scope)
         modes = ModeMachine()
         modes.transition(Mode.NAVIGATION)
-        command = CommandManager(SourceRegistry(), modes, SafetyManager(SpeedLimits(), BatteryPolicy()))
+        safety = SafetyManager(SpeedLimits(), BatteryPolicy(), policy_required=required)
+        if provider is not None:
+            safety.bind_policy(provider, 'calibration-1')
+        command = CommandManager(SourceRegistry(), modes, safety)
         rclpy.init()
         node = Node('output_probe', namespace='rosy_01')
         observed = []
@@ -38,14 +53,15 @@ class OutputGraphTests(unittest.TestCase):
         bridge = SimpleNamespace(_svc=SimpleNamespace(command=command, power=Mock()),
                                  cmd_vel_pub=node.create_publisher(Twist, 'cmd_vel', 10))
         try:
-            command.set_nav_twist(CoreTwist(float('nan'), .1))
+            command.set_nav_twist(CoreTwist(linear, .1))
             deadline = time.monotonic() + 5.
             while not observed and time.monotonic() < deadline:
                 scope['_publish_cmd_vel'](bridge)
                 rclpy.spin_once(node, timeout_sec=.05)
             self.assertTrue(observed)
-            self.assertEqual((observed[-1].linear.x, observed[-1].angular.z), (0., 0.))
-            bridge._svc.power.on_activity.assert_not_called()
+            self.assertEqual((observed[-1].linear.x, observed[-1].angular.z), expected)
+            if expected == (0., 0.):
+                bridge._svc.power.on_activity.assert_not_called()
         finally:
             node.destroy_node()
             rclpy.shutdown()

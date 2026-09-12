@@ -90,7 +90,7 @@ T5의 웹 기능 대조표는 T1부터 작성 가능하다. 하드웨어 의존�
 **복구:** 이전 설정/보정 원본을 보존한다. 다운그레이드 불가 schema는 적용 전에 거절한다.
 
 ### T3. 명령 중재와 안전 정책 흡수
-**상태:** 진행 중. CORE의 nonfinite 명령·잘못된 제한값 차단을 먼저 구현했다. Control 센서 정책과 calibration revision을 CORE에 연결하는 본 통합은 아직 미완료다.
+**상태:** 진행 중. CORE의 nonfinite 차단과 ID/source/revision/freshness를 검증하는 동기 정책 소비 경계를 구현했다. 실제 Control 센서 evaluator와 검증된 calibration record 공급, 운영 활성화는 미완료다.
 **수정:** D/src/rosy_core/rosy_core/command/manager.py, safety/manager.py, bridge/ros_bridge.py; D/src/rosy_control/rosy_control/safety/, calibration_atomic.py와 명령 발행 노드.
 **생성:** D/src/rosy_core/test/test_control_absorption_safety.py; 내부 제어 계약 문서.
 1. CORE manual/navigation/Fleet/estop과 Control cliff/tilt/pickup/obstacle/localization/보정 제한을 비교한다.
@@ -100,7 +100,7 @@ T5의 웹 기능 대조표는 T1부터 작성 가능하다. 하드웨어 의존�
 5. 요청 식별·유효시각·선택 결과·최종 제한 결과를 연결한다. 보정 trial이 자신의 실제 선택·제한 결과를 확인하도록 acknowledgement를 이전한다.
 6. 감지기/중재기 단절, stale/nonfinite 입력, 자동→수동 전환, estop 해제, 재기동을 시험한다.
 **핵심 설계 제약:** 후보 명령을 평가한 결과가 다른 최신 명령에 적용되면 안 된다. 비동기 판단이면 요청/결과 일치와 만료를 검사한다. 동기 판단이면 제어 주기 내 처리시간을 측정한다. 최종 방식은 구현 계약에 기록한다.
-**현재 명령:** D/src/rosy_core에서 python -m pytest test -q. 격리 ROS에서 test/test_absorption_output_graph.py 실행. test_control_absorption_safety.py는 정책 통합 단계에서 생성할 예정이며 현재 존재하는 시험으로 간주하지 않는다.
+**현재 명령:** D/src/rosy_core에서 python -m pytest test -q. 정책 집중 검증은 test/test_control_absorption_safety.py와 test/test_api.py, 격리 ROS 출력은 test/test_absorption_output_graph.py를 실행한다.
 **실행 검증:** 격리 ROS에서 실제 motor command topic의 publisher 1개, 센서/명령 timeout·모터 deadman을 확인.
 **완료:** 모든 명령원의 안전 우회가 없고 최종 발행권·보정 acknowledgement가 일치한다.
 **복구:** 통합 runtime을 비활성화하고 core로 복귀. 이전/신규 최종 발행자를 동시에 켜지 않는다.

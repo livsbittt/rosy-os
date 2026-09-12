@@ -10,7 +10,8 @@
 - T0 원본과 목적지 기준선: 완료.
 - T1 OS 내부 패키지와 테스트 편입: 완료.
 - T2 ROS 연결·설정·보정: 진행 중. 보정 노드의 상대 ROS 이름과 명시적 저장 경로를 반영했다.
-- T3–T8 명령권·웹·배포·Pi 인수: 미착수.
+- T3 단일 명령권·안전 정책: 진행 중. CORE 정책 소비 경계와 정지 후 후보 폐기를 구현했다. 실제 센서 정책 공급은 미완료다.
+- T4–T8 웹·배포·Pi 인수: 미착수.
 
 후속 구현의 소유권·안전·주행·카메라·보정·배포·평가·OMX 확장점은 [통합 상세 설계](2026-09-12-rosy-os-control-integrated-design.md)에 기록했다. [ROSY ADR Log](../reference/ROSY%20ADR%20Log.md)에 D-37~D-40 Accepted와 D-41~D-44 Proposed로 등록했다. 미검증 기술 선택은 확정하거나 구현 완료로 표시하지 않는다.
 
@@ -166,6 +167,18 @@ T2 완료는 아니다. namespace별 YAML node selector, frame prefix와 base fr
 - CORE 전체 675 passed·1 skipped. 네트워크 없는 ROS Jazzy에서 실제 RosBridge._publish_cmd_vel 메서드와 DDS 출력을 사용해
   잘못된 후보가 cmd_vel zero로 발행되는 것을 확인했다. 전체 ROS CORE 기동이나 물리 정지 시험은 아니다.
 - Control cliff/tilt/pickup/obstacle 정책·calibration revision의 CORE 연결, D-42 판단 전달 방식과 command correlation은 남아 있다.
+
+### T3 후속 구현: 명령·보정 revision에 연결된 정책 소비 (2026-09-13)
+
+- [내부 안전 판단 경계](2026-09-13-control-safety-boundary.md)를 CORE SafetyManager/CommandManager에 연결했다.
+  ID·source·calibration revision·유효시간·호출시간·상한을 검증하고 profile 제한을 높이지 않는다.
+- 정책 stop/실패는 기존 e-stop과 후보 폐기를 사용한다. 서비스 상태 요약과 navigation 취소도 연결했다.
+  관리자 release 권한과 해제 후 과거 명령 미재개를 실제 서비스/API 시험으로 확인했다.
+- 일시적인 zero limit은 비상정지와 구분한다. 평가 도중 새 입력·모드 변경·e-stop이 발생하면 이전 결과를 버린다.
+- CORE 전체 최종 회귀 시험 696 passed·3 skipped. 출력 tick 없이 정지·해제해도 과거 후보가 폐기되는 경우를 포함한다.
+  격리 ROS 출력 시험 3개에서 invalid 명령·판단 누락의 zero와 유효 제한값의 실제 발행을 확인했다.
+- 실제 Control 센서 evaluator, 검증된 calibration loader, 재시작 epoch·장치 성능·운영 profile 연결은 미완료다.
+  control_policy_required는 현재 기본 false이며 별도 센서 worker를 기동하거나 기존 최종 publisher와 병행하지 않는다.
 
 ### T0·T1 기준선
 

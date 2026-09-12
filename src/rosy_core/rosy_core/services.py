@@ -167,7 +167,7 @@ class CoreServices:
         )
         safety = SafetyManager(limits, battery_policy,
                                fleet_loss_policy=str(safety_cfg.get("fleet_loss_policy", "STOP")),
-                               events=events)
+                               events=events, policy_required=safety_cfg.get('control_policy_required', False))
 
         identity = RobotIdentity.from_config(config, profile_model=profile.model)
         capability = Capability(capability_data)
@@ -205,7 +205,11 @@ class CoreServices:
             map_id_provider=lambda: state.map_id,
         )
         nav.session_closed_listener = swarm.on_navigation_session_closed
+        def reflect_stop():
+            state.set_estop(True)
+        safety.estop_listeners.append(reflect_stop)
         safety.estop_listeners.append(swarm.on_estop)
+        safety.estop_listeners.append(lambda: nav.cancel(source='safety_manager'))
         runtime_probe = HostRuntimeProbe(
             host_root=os.environ.get("ROSY_HOST_ROOT", "/"),
             data_path=waypoints_path.parent,

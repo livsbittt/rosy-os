@@ -39,6 +39,24 @@ OPERATOR = {"Authorization": "Bearer rosy-dev-operator"}
 VIEWER = {"Authorization": "Bearer rosy-dev-viewer"}
 
 
+def test_policy_stop_uses_existing_admin_release_and_does_not_resume(client):
+    from rosy_core.command.arbitration import Mode
+    from rosy_core.safety.manager import SafetyDecision
+    tc, svc = client
+    svc.safety.bind_policy(lambda request: SafetyDecision(
+        request.command_id, request.source, request.calibration_revision,
+        request.now, request.now + .1, 0., 0., 'stop'), 'calibration-1')
+    svc.modes.transition(Mode.MANUAL)
+    svc.command.teleop(.05, .1)
+    assert svc.command.select_output() == Twist()
+    assert svc.state.snapshot().safety.estop
+    assert tc.post('/api/v1/safety/release', headers=OPERATOR).status_code == 403
+    assert tc.post('/api/v1/safety/release', headers=ADMIN).status_code == 200
+    assert svc.modes.mode is Mode.IDLE
+    assert not svc.state.snapshot().safety.estop
+    assert not svc.command.manual_active
+
+
 def test_admin_can_update_robot_identity(client, tmp_path, monkeypatch):
     overlay = tmp_path / "rosy.yaml"
     monkeypatch.setattr("rosy_core.config.LOCAL_CONFIG_PATH", overlay)
