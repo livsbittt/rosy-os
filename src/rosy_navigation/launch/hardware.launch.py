@@ -1,7 +1,8 @@
 """hardware.launch.py — Pinky hardware slice: motors + LiDAR + Nav2.
 
 Composes rosy_bringup and Nav2 bringup. D-4 param rewrite lives in
-rosy_navigation.params_rewrite. Does not start SLAM or the Flask web node.
+rosy_navigation.params_rewrite. Does not start SLAM; Rosy OS FastAPI is owned
+by the separate ``rosy_core`` service.
 """
 
 import os
