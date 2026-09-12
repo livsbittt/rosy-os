@@ -6,7 +6,7 @@
 **Architecture:** Rosy OS/src/rosy_control로 먼저 편입하여 기존 import와 테스트를 보존한다. 최종 외부 API·웹·명령 중재는 rosy_core, 하드웨어 실행은 OS 내부 노드와 bringup, 배포·복구는 기존 deploy가 소유한다.
 **Tech Stack:** 현재 ROS 2 Jazzy, ament_python/colcon, FastAPI+rclpy, OpenCV/NumPy, Docker/systemd 기반. 카메라 Picamera2/libcamera의 실제 ARM64 실행 위치는 배포 검증에서 결정한다.
 
-작성일: 2026-09-12. 상태: T0·T1 완료, T2 진행 중, T3~T8 미착수. 구현 범위와 검증 근거는 [흡수 실행 결과](2026-09-12-control-absorption-results.md)에 기록했다. 장치 배포와 실물 인수는 아직 수행하지 않았다.
+작성일: 2026-09-12. 갱신: 2026-09-13. 상태: T0·T1 완료, T2·T3 진행 중, T4~T8 미착수. 구현 범위와 검증 근거는 [흡수 실행 결과](2026-09-12-control-absorption-results.md)에 기록했다. 장치 배포와 실물 인수는 아직 수행하지 않았다.
 
 ## 1. 범위와 설계 결정
 
@@ -77,7 +77,7 @@ T5의 웹 기능 대조표는 T1부터 작성 가능하다. 하드웨어 의존�
 **복구:** OS의 추가 패키지 변경만 되돌릴 수 있는 단위로 유지한다.
 
 ### T2. ROS 그래프·설정·보정 경계 정리
-**상태:** 진행 중. calib_node의 상대 ROS 이름, 명시적 저장 경로, 원자적 YAML 갱신과 격리 ROS 시험을 반영했다. 전체 그래프·TF·identity/schema·generation 연결은 남아 있다.
+**상태:** 진행 중. 상대 endpoint·TF prefix·YAML selector, 단일 보정 파일·명시 context·generation 경로·파일 잠금과 revision 충돌 검사를 반영했다. 인증 actor/profile, 측정 범위·품질·적용 revision·schema 이관/rollback·운영 launch와 실물 인수가 남아 있다.
 **수정:** D/src/rosy_control/launch/, config/, *_node.py, safety/node.py, calibration_atomic.py, calib_node.py.
 **생성:** D/test/test_control_absorption_graph.py, D/src/rosy_control/test/test_os_calibration_storage.py.
 1. 절대 토픽·frame·파라미터 이름을 조사하고 OS namespace·frame_prefix 규칙에 매핑한다.
@@ -85,11 +85,12 @@ T5의 웹 기능 대조표는 T1부터 작성 가능하다. 하드웨어 의존�
 3. config 기본값→장치 overlay→보정 데이터의 우선순위와 쓰기 경로를 확정한다. 패키지 share나 읽기 전용 이미지에 보정값을 쓰지 않는다.
 4. 보정 revision·장치 식별·실효 기구값·freshness와 최종 gate acknowledgement를 보존한다.
 5. 손상 보정·쓰기 실패·이전 schema 복구·장치 교체·재부팅 시 준비 상태를 검증한다.
-**명령:** D에서 python -m pytest test/test_control_absorption_graph.py src/rosy_control/test/test_os_calibration_storage.py -q.
+**현재 명령:** D에서 python -m pytest test/test_control_absorption_package.py -q. D/src/rosy_control에서 python -m pytest test -q. test_os_*_graph.py는 격리 ROS Jazzy에서도 별도 실행한다. Windows skip을 ROS 검증으로 세지 않는다.
 **완료:** 두 로봇 namespace가 분리되고 보정 상태를 소프트웨어 버전과 구분하여 복구할 수 있다.
 **복구:** 이전 설정/보정 원본을 보존한다. 다운그레이드 불가 schema는 적용 전에 거절한다.
 
 ### T3. 명령 중재와 안전 정책 흡수
+**상태:** 진행 중. CORE의 nonfinite 명령·잘못된 제한값 차단을 먼저 구현했다. Control 센서 정책과 calibration revision을 CORE에 연결하는 본 통합은 아직 미완료다.
 **수정:** D/src/rosy_core/rosy_core/command/manager.py, safety/manager.py, bridge/ros_bridge.py; D/src/rosy_control/rosy_control/safety/, calibration_atomic.py와 명령 발행 노드.
 **생성:** D/src/rosy_core/test/test_control_absorption_safety.py; 내부 제어 계약 문서.
 1. CORE manual/navigation/Fleet/estop과 Control cliff/tilt/pickup/obstacle/localization/보정 제한을 비교한다.
@@ -99,7 +100,7 @@ T5의 웹 기능 대조표는 T1부터 작성 가능하다. 하드웨어 의존�
 5. 요청 식별·유효시각·선택 결과·최종 제한 결과를 연결한다. 보정 trial이 자신의 실제 선택·제한 결과를 확인하도록 acknowledgement를 이전한다.
 6. 감지기/중재기 단절, stale/nonfinite 입력, 자동→수동 전환, estop 해제, 재기동을 시험한다.
 **핵심 설계 제약:** 후보 명령을 평가한 결과가 다른 최신 명령에 적용되면 안 된다. 비동기 판단이면 요청/결과 일치와 만료를 검사한다. 동기 판단이면 제어 주기 내 처리시간을 측정한다. 최종 방식은 구현 계약에 기록한다.
-**명령:** D/src/rosy_core에서 python -m pytest test/test_control_absorption_safety.py test/test_core_logic.py test/test_api.py -q.
+**현재 명령:** D/src/rosy_core에서 python -m pytest test -q. 격리 ROS에서 test/test_absorption_output_graph.py 실행. test_control_absorption_safety.py는 정책 통합 단계에서 생성할 예정이며 현재 존재하는 시험으로 간주하지 않는다.
 **실행 검증:** 격리 ROS에서 실제 motor command topic의 publisher 1개, 센서/명령 timeout·모터 deadman을 확인.
 **완료:** 모든 명령원의 안전 우회가 없고 최종 발행권·보정 acknowledgement가 일치한다.
 **복구:** 통합 runtime을 비활성화하고 core로 복귀. 이전/신규 최종 발행자를 동시에 켜지 않는다.

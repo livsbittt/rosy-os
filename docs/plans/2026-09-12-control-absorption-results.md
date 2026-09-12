@@ -104,7 +104,8 @@ T2 완료는 아니다. namespace별 YAML node selector, frame prefix와 base fr
 - 응답 대기와 승인·거절·실패·5초 timeout을 구분하고 client/timer를 회수한다.
   timeout은 ROS simulation clock이 멈춰도 진행하는 steady clock을 사용한다. 늦은 응답과 중복 요청은 새 완료 상태를 만들지 않는다.
 - SetParameters 승인도 `파라미터 저장 확인 — 운전 적용 미확인`으로 기록한다.
-  legacy SafetyNode의 일부 값이 생성자에서 cache되므로 ROS parameter 승인만으로 실제 정책 revision 적용을 증명할 수 없다.
+  legacy SafetyNode는 일부 값을 cache하고 tick의 _refresh_distances에서 갱신하며 IMU 판단 등은 새 센서 callback에서 계산한다.
+  ROS parameter 승인만으로 이 다음 처리와 실제 정책 revision 적용을 증명할 수 없다.
 - 실제 ROS 서비스에서 승인과 거절을 실행하고 저장된 값과 상태를 확인했다. 드라이버·주행은 실행하지 않았다.
 - 검증: 전체 회귀 919 passed·19 skipped, 이후 추가한 owner 부재·중복 요청을 포함한 집중 시험 6 passed,
   격리 ROS acknowledgement 시험 1개 통과.
@@ -155,6 +156,16 @@ T2 완료는 아니다. namespace별 YAML node selector, frame prefix와 base fr
 - Windows/Linux 동시 writer·강제 종료 시험 각각 3 passed. 전체 Control 회귀 943 passed·20 skipped.
   추가 trial snapshot·create-only 검증을 포함한 Linux 저장/이관 집중 시험 20 passed.
 - 잠금은 저장 임계구역의 보호다. 실제 보정 이동의 명령권, 인증 actor, 저장 이후 정책 적용의 일치와 전원 차단 인수는 남아 있다.
+
+### T3 첫 구현: CORE 최종 명령의 수치 유효성 (2026-09-13)
+
+- 실제 CORE CommandManager 입력에서 NaN이 max/min clipping을 거쳐 최대 속도 0.2로 변환되는 RED 시험을 확인했다.
+- 잘못된 navigation 입력은 이전 navigation 후보를 제거하고, 잘못된 manual 입력은 이전 manual 후보를 해제한 뒤
+  기존 VALIDATION_ERROR로 거절한다. SafetyManager도 nonfinite 입력·잘못된 profile 제한을 두 축 zero로 차단한다.
+- session 제한의 음수·nonfinite 갱신은 기존 제한을 유지하며 거절한다. 새로운 정상 명령은 기존 모드·watchdog 규칙을 따른다.
+- CORE 전체 675 passed·1 skipped. 네트워크 없는 ROS Jazzy에서 실제 RosBridge._publish_cmd_vel 메서드와 DDS 출력을 사용해
+  잘못된 후보가 cmd_vel zero로 발행되는 것을 확인했다. 전체 ROS CORE 기동이나 물리 정지 시험은 아니다.
+- Control cliff/tilt/pickup/obstacle 정책·calibration revision의 CORE 연결, D-42 판단 전달 방식과 command correlation은 남아 있다.
 
 ### T0·T1 기준선
 

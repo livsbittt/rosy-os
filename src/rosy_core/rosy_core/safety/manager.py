@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 import time
+import math
 from dataclasses import dataclass
 from typing import Optional
+
+
+def finite_velocity(linear: float, angular: float) -> bool:
+    return all(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+               for value in (linear, angular))
 
 
 class TeleopWatchdog:
@@ -92,19 +98,28 @@ class SafetyManager:
         클라이언트가 필요하다. cmd_vel 이 어차피 전부 `clip` 을 지나므로
         (D-2), 실제로 바퀴에 닿는 값을 여기서 줄인다.
         """
-        self._session_linear = None if max_linear is None else float(max_linear)
+        value = None if max_linear is None else float(max_linear)
+        if value is not None and (not math.isfinite(value) or value < 0):
+            raise ValueError('Session speed limit must be finite and nonnegative')
+        self._session_linear = value
 
     @property
     def session_linear(self) -> Optional[float]:
         return self._session_linear
 
     def clip(self, linear: float, angular: float, scope: str = "nav") -> tuple[float, float]:
+        if not finite_velocity(linear, angular):
+            return 0.0, 0.0
         if scope == "manual":
             max_l, max_a = self.limits.manual_linear, self.limits.manual_angular
         elif scope == "fleet":
             max_l, max_a = self.limits.fleet_linear, self.limits.fleet_angular
         else:
             max_l, max_a = self.limits.max_linear, self.limits.max_angular
+        if (not finite_velocity(max_l, max_a)
+                or not finite_velocity(self.limits.max_linear, self.limits.max_angular)
+                or min(max_l, max_a, self.limits.max_linear, self.limits.max_angular) < 0):
+            return 0.0, 0.0
         max_l = min(max_l, self.limits.max_linear)
         max_a = min(max_a, self.limits.max_angular)
         if self._session_linear is not None:

@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from rosy_core.command.arbitration import Mode, ModeMachine, SourceRegistry
-from rosy_core.safety.manager import SafetyManager, TeleopWatchdog
+from rosy_core.safety.manager import SafetyManager, TeleopWatchdog, finite_velocity
 
 
 @dataclass
@@ -53,6 +53,10 @@ class CommandManager:
         if self._modes.mode is not Mode.MANUAL:
             self._reject(source, f"mode is {self._modes.mode.value}, not MANUAL")
             return False, "MODE_CONFLICT"
+        if not finite_velocity(linear, angular):
+            self.clear_manual()
+            self._reject(source, "invalid velocity")
+            return False, "VALIDATION_ERROR"
         linear, angular = self._safety.clip(linear, angular, scope="manual")
         self._manual_twist = Twist(linear, angular)
         self.watchdog.refresh()
@@ -69,6 +73,9 @@ class CommandManager:
         return self._manual_twist is not None and not self.watchdog.expired()
 
     def set_nav_twist(self, twist: Optional[Twist], now: Optional[float] = None) -> None:
+        if twist is not None and not finite_velocity(twist.linear, twist.angular):
+            self._reject('navigation', 'invalid velocity')
+            twist = None
         self._nav_twist = twist
         self._nav_updated_at = (
             (now if now is not None else time.monotonic()) if twist is not None else None

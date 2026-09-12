@@ -1,0 +1,55 @@
+"""Actual CORE publish method and DDS output in a network-isolated ROS test."""
+import ast
+from pathlib import Path
+from types import SimpleNamespace
+import time
+import unittest
+from unittest.mock import Mock
+
+try:
+    import rclpy
+except ImportError:
+    rclpy = None
+
+if rclpy is not None:
+    from rclpy.node import Node
+    from geometry_msgs.msg import Twist
+    from rosy_core.command.arbitration import Mode, ModeMachine, SourceRegistry
+    from rosy_core.command.manager import CommandManager, Twist as CoreTwist
+    from rosy_core.safety.manager import SafetyManager, SpeedLimits, BatteryPolicy
+
+
+@unittest.skipIf(rclpy is None, 'Requires network-isolated ROS Jazzy')
+class OutputGraphTests(unittest.TestCase):
+    def test_invalid_worker_command_is_published_as_zero(self):
+        path = Path(__file__).parents[1] / 'rosy_core/bridge/ros_bridge.py'
+        cls = next(n for n in ast.parse(path.read_text(encoding='utf-8')).body
+                   if isinstance(n, ast.ClassDef) and n.name == 'RosBridge')
+        method = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == '_publish_cmd_vel')
+        scope = dict(Twist=Twist)
+        exec(compile(ast.Module(body=[method], type_ignores=[]), str(path), 'exec'), scope)
+        modes = ModeMachine()
+        modes.transition(Mode.NAVIGATION)
+        command = CommandManager(SourceRegistry(), modes, SafetyManager(SpeedLimits(), BatteryPolicy()))
+        rclpy.init()
+        node = Node('output_probe', namespace='rosy_01')
+        observed = []
+        node.create_subscription(Twist, 'cmd_vel', lambda msg: observed.append(msg), 10)
+        bridge = SimpleNamespace(_svc=SimpleNamespace(command=command, power=Mock()),
+                                 cmd_vel_pub=node.create_publisher(Twist, 'cmd_vel', 10))
+        try:
+            command.set_nav_twist(CoreTwist(float('nan'), .1))
+            deadline = time.monotonic() + 5.
+            while not observed and time.monotonic() < deadline:
+                scope['_publish_cmd_vel'](bridge)
+                rclpy.spin_once(node, timeout_sec=.05)
+            self.assertTrue(observed)
+            self.assertEqual((observed[-1].linear.x, observed[-1].angular.z), (0., 0.))
+            bridge._svc.power.on_activity.assert_not_called()
+        finally:
+            node.destroy_node()
+            rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    unittest.main()
