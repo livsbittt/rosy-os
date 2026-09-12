@@ -83,6 +83,18 @@ def test_runtime_builds_distinct_targets_from_shared_dockerfile():
     assert "src/rosy_description/meshes/**" in dockerignore
 
 
+def test_core_image_contains_the_absorbed_sensor_worker_runtime():
+    """An enabled sensor adapter must be importable in the CORE image."""
+    dockerfile = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
+
+    assert "COPY src/rosy_control ./src/rosy_control" in dockerfile
+    assert "ros-jazzy-visualization-msgs" in dockerfile
+    assert "ros-jazzy-tf2-ros" in dockerfile
+    assert "python3-numpy" in dockerfile
+    assert "python3-opencv" in dockerfile
+    assert "python3-yaml" in dockerfile
+
+
 def test_initial_io_slice_disables_unavailable_adc_battery_driver():
     compose_command = compose()["services"]["rosy-io"]["command"]
     launch = (

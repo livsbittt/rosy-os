@@ -23,6 +23,12 @@ RUN apt-get -o Acquire::Retries=5 update \
     && apt-get install -y --no-install-recommends \
         python3-pip \
         ros-jazzy-nav2-msgs \
+        ros-jazzy-rcl-interfaces \
+        ros-jazzy-visualization-msgs \
+        ros-jazzy-tf2-ros \
+        python3-numpy \
+        python3-opencv \
+        python3-yaml \
     && python3 -m pip install --break-system-packages --no-cache-dir \
         -r /tmp/requirements-core.txt \
     && mkdir -p /var/lib/rosy/.rosy \
@@ -34,6 +40,7 @@ FROM core-runtime AS core-build
 
 WORKDIR /opt/rosy_ws
 COPY src/rosy_interfaces ./src/rosy_interfaces
+COPY src/rosy_control ./src/rosy_control
 COPY src/rosy_core ./src/rosy_core
 RUN source /opt/ros/jazzy/setup.bash \
     && colcon build --merge-install --packages-up-to rosy_core
