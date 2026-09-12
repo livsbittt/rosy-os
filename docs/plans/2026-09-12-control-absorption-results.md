@@ -17,7 +17,9 @@
 Control 974 passed·20 skipped, 격리된 실제 ROS 출력 시험 10개를 확인했다.
 아래 기록은 작업 당시의 검증 이력이다. 최신 안전 경계와 남은 조건은
 [단일 안전 중재 구현 기록](2026-09-13-control-safety-boundary.md)을 함께 읽는다.
-다음 구현은 보정 파일 검증 → 실제 값 적용/readback → 적용 revision의 정책 공급 순서이며,
+후속 보정 snapshot reader와 비교용 SafetyNode의 생성자 적용/readback을 구현했다.
+Control 전체 979 passed·21 skipped, 실제 ROS 파라미터 시험 3개와 두 namespace 생성 시험을 통과했다.
+다음은 센서 전용 producer와 적용 revision의 CORE 정책 공급 연결이다.
 파일 저장이나 ROS parameter 응답만으로 이 경로가 완성됐다고 판정하지 않는다.
 
 후속 구현의 소유권·안전·주행·카메라·보정·배포·평가·OMX 확장점은 [통합 상세 설계](2026-09-12-rosy-os-control-integrated-design.md)에 기록했다. [ROSY ADR Log](../reference/ROSY%20ADR%20Log.md)에 D-37~D-40 Accepted와 D-41~D-44 Proposed로 등록했다. 미검증 기술 선택은 확정하거나 구현 완료로 표시하지 않는다.

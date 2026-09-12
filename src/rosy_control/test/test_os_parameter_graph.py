@@ -16,6 +16,44 @@ if rclpy is not None:
 
 @unittest.skipIf(rclpy is None, 'Requires isolated ROS Jazzy graph')
 class ParameterGraphTests(unittest.TestCase):
+    def test_verified_record_reaches_actual_stopped_safety_consumer(self):
+        from rosy_control.calibration_record import encode_record
+        from rosy_control.calibration_snapshot import load_calibration_snapshot
+        from rosy_control.safety.node import SafetyNode
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / 'calibration/rosy_01/calibration.yaml'
+            path.parent.mkdir(parents=True)
+            context = dict(robot_id='rosy_01', hardware_model='pinky_pro',
+                           geometry_revision='g1', sensor_revision='s1', data_generation='d1')
+            values = {'imu_roll0': 0.25, 'imu_pitch0': 0.5, 'cliff_raw_max': 321}
+            path.write_text(encode_record({'/**/safety_node': {'ros__parameters': values}},
+                                         context, 'test'), encoding='utf-8')
+            snapshot = load_calibration_snapshot(str(path), context, 'd1', str(root))
+            rclpy.init(args=['--ros-args', '-r', '__ns:=/rosy_01'])
+            node = None
+            try:
+                node = SafetyNode.from_calibration(snapshot)
+                self.assertEqual(node.get_namespace(), '/rosy_01')
+                self.assertTrue(node.get_parameter('start_estopped').value)
+                for name, value in values.items():
+                    self.assertEqual(node.get_parameter(name).value, value)
+                self.assertEqual(node.calibration_parameter_digest, snapshot.digest)
+                node.set_parameters([rclpy.parameter.Parameter('imu_roll0', value=0.75)])
+                with self.assertRaises(ValueError):
+                    snapshot.verify_parameters(node)
+                for name, value in (('start_estopped', False), ('cmd_out', 'other'),
+                                    ('unknown_parameter', 1)):
+                    path.write_text(encode_record({'/**/safety_node': {'ros__parameters': {name: value}}},
+                                                 context, 'test'), encoding='utf-8')
+                    rejected = load_calibration_snapshot(str(path), context, 'd1', str(root))
+                    with self.subTest(name=name), self.assertRaises(ValueError):
+                        SafetyNode.from_calibration(rejected)
+            finally:
+                if node is not None:
+                    node.destroy_node()
+                rclpy.shutdown()
+
     def test_saved_legacy_calibration_is_consumed_by_namespaced_owner_only(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'calibration.yaml'

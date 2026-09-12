@@ -216,3 +216,25 @@ CORE에서 정책 제한과 보정 변환의 역할을 분리하고, 같은 보�
 운영 활성화·보정 ACK·실물 제동 인수는 아직 증명하지 않았다.
 검증: 최종 CORE 전체 725 passed·10 skipped, Control 전체 974 passed·20 skipped,
 격리 ROS 출력 시험 10개 통과. ROS 시험은 실제 use_sim_time 파라미터와 DDS 발행을 사용하며 물리 모터를 연결하지 않는다.
+
+### 보정 파일 snapshot과 실제 파라미터 소비
+
+`load_calibration_snapshot`은 활성 generation의 장치별 고정 파일에서 최대 1MiB를 읽고
+device/model/geometry/sensor/generation 문맥과 digest를 검증한다. immutable snapshot은
+직렬화된 파라미터를 보관하므로 파일 교체나 반환 dict 수정으로 이미 읽은 값이 달라지지 않는다.
+지원 selector는 장치 로컬 `/**` 기본값과 bare 또는 `/**/<node>`다. 대상 node 누락,
+bare/wildcard 중복 및 별도 namespace selector는 추정하지 않고 거절한다.
+
+`SafetyNode.from_calibration`은 이 snapshot의 측정 필드 7종만 생성자 override로 공급하고
+`start_estopped=True`를 강제한다. 선언된 실제 ROS 파라미터와 readback이 일치한 뒤에만
+`calibration_parameter_digest`를 기록한다. 이 값은 생성 시점의 확인 기록이며 이후 변경을 보증하지 않는다.
+명령 토픽·정지 해제 등 측정과 무관한 운영 파라미터는 이 경로에서 덮어쓸 수 없다.
+
+이 factory는 기존 비교용 안전 노드의 소비 경로다. CORE와 함께 자동 기동하지 않으며,
+최종 목표의 센서 전용 producer와 CORE 적용 revision/ACK 연결은 여전히 남아 있다.
+문맥의 신뢰된 공급자·인증 actor·측정 품질/범위·실물 정지는 별도 검증해야 한다.
+digest는 위변조 인증이 아니며 snapshot 자체를 인증 토큰으로 사용하지 않는다.
+
+검증: Control 전체 979 passed·21 skipped. 실제 ROS Jazzy 파라미터 시험 3개에서
+파일→namespaced SafetyNode 생성→값 확인, 후속 값 변경 탐지, 운영 파라미터 거절을 확인했다.
+기존 8개 처리 노드의 두 namespace 생성 시험도 통과했다. timer/모터 드라이버는 실행하지 않았다.

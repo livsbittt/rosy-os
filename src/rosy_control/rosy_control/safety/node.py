@@ -37,8 +37,37 @@ from .evidence import Evidence
 
 class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
 
-    def __init__(self):
-        super().__init__('safety_node')
+    @classmethod
+    def from_calibration(cls, snapshot):
+        """Construct a stopped comparison consumer; never activate beside CORE.
+
+        The digest records constructor readback only, not continuing policy
+        adoption. Later parameter changes require a new verification.
+        """
+        from rclpy.parameter import Parameter
+        from ..calibration_snapshot import CalibrationSnapshot
+        if not isinstance(snapshot, CalibrationSnapshot):
+            raise ValueError('A validated calibration snapshot is required')
+        values = snapshot.node_parameters('safety_node')
+        measured = {'cliff_raw_max', 'cliff_clear_raw', 'cliff_mode', 'cmd_linear_sign',
+                    'imu_roll0', 'imu_pitch0', 'lidar_yaw_offset'}
+        if not set(values).issubset(measured):
+            raise ValueError('Calibration cannot override unrelated operating parameters')
+        overrides = [Parameter(name, value=value) for name, value in values.items()]
+        overrides.append(Parameter('start_estopped', value=True))
+        node = cls(parameter_overrides=overrides)
+        try:
+            snapshot.verify_parameters(node)
+            if node.get_parameter('start_estopped').value is not True:
+                raise ValueError('Calibration consumer must start stopped')
+            node.calibration_parameter_digest = snapshot.digest
+            return node
+        except Exception:
+            node.destroy_node()
+            raise
+
+    def __init__(self, *, parameter_overrides=None):
+        super().__init__('safety_node', parameter_overrides=parameter_overrides)
         self.declare_parameter('cmd_in', 'cmd_vel_raw')
         self.declare_parameter('cmd_out', 'cmd_vel')
         self.declare_parameter('start_estopped', True)
