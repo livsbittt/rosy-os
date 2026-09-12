@@ -146,6 +146,16 @@ T2 완료는 아니다. namespace별 YAML node selector, frame prefix와 base fr
 - 실제 Docker Compose config 렌더링에서 generation 전달을 확인했다. 서비스·모터는 시작하지 않았다.
   설치된 Pi의 mount readback·인증 actor/profile 공급·단일 writer·정책 revision 적용은 계속 미완료다.
 
+### T2 후속 구현: 동시 저장과 revision 충돌 (2026-09-13)
+
+- 동시 writer가 같은 이전값을 읽고 덮어쓰는 RED 시험을 확인했다. OS 파일 잠금으로 read/merge/replace를 보호한다.
+- 두 번째 writer는 busy로 거절한다. 프로세스 종료 시 OS가 잠금을 회수하며 lock 파일 자체는 삭제하지 않는다.
+- CalibNode는 측정 시작의 revision을 저장 시 비교한다. 다른 측정이 먼저 저장됐다면 기존 파일을 보존하고 충돌을 보고한다.
+  이관의 create-only 조건도 잠금 안에서 재검사한다.
+- Windows/Linux 동시 writer·강제 종료 시험 각각 3 passed. 전체 Control 회귀 943 passed·20 skipped.
+  추가 trial snapshot·create-only 검증을 포함한 Linux 저장/이관 집중 시험 20 passed.
+- 잠금은 저장 임계구역의 보호다. 실제 보정 이동의 명령권, 인증 actor, 저장 이후 정책 적용의 일치와 전원 차단 인수는 남아 있다.
+
 ### T0·T1 기준선
 
 | 범위 | 결과 | 의미 |

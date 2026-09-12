@@ -31,7 +31,7 @@ from std_msgs.msg import String, UInt16MultiArray
 from rosy_control.sensing.body import URDF_RADIUS, use_radius
 from rosy_control.sensing.lidar import NOSE_YAW, is_robot_scan, sector_range
 from rosy_control.safety_node import parse_us_range, roll_pitch
-from rosy_control.calibration_storage import merge_calibration, single_calibration_path
+from rosy_control.calibration_storage import merge_calibration, single_calibration_path, calibration_revision
 from rosy_control.calibration_record import validate_context, runtime_calibration_path
 
 
@@ -301,12 +301,17 @@ class CalibNode(Node):
         if step in ('abort',):
             self._abort('취소')
             return
-        if step in ('auto', 'lidar', 'lidar_yaw', 'scan', 'compute', 'save', 'apply'):
+        if step in ('auto', 'lidar', 'lidar_yaw', 'scan', 'compute', 'save', 'apply') or (
+                step == 'floor' and getattr(self, 'calibration_context', None) is not None):
             try:
-                single_calibration_path(self.get_parameter('save_path').value,
+                destination = single_calibration_path(self.get_parameter('save_path').value,
                                         self.get_parameter('sign_path').value,
                                         getattr(self, 'calibration_context', None),
                                         getattr(self, 'calibration_generation', None))
+                if getattr(self, 'calibration_context', None) is not None and (
+                        step in ('auto', 'lidar', 'lidar_yaw', 'scan', 'floor') or
+                        getattr(self, 'calibration_expected_revision', None) is None):
+                    self.calibration_expected_revision = calibration_revision(destination, self.calibration_context)
             except (ValueError, OSError) as exc:
                 self._status(f'보정 저장 경로 거절 — {exc}')
                 return
@@ -544,8 +549,10 @@ class CalibNode(Node):
             if getattr(self, 'calibration_context', None) is not None:
                 path = runtime_calibration_path(path, self.calibration_context,
                                                 getattr(self, 'calibration_generation', ''))
-            merge_calibration(path, text, context=getattr(self, 'calibration_context', None),
-                              actor=getattr(self, 'calibration_actor', None))
+            revision = merge_calibration(path, text, context=getattr(self, 'calibration_context', None),
+                                         actor=getattr(self, 'calibration_actor', None),
+                                         expected_revision=getattr(self, 'calibration_expected_revision', None))
+            self.calibration_expected_revision = revision
             self._status(f'saved {path}')
             return True
         except (OSError, ValueError, yaml.YAMLError) as exc:

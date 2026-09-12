@@ -31,7 +31,7 @@ def migrate(sources, destination):
                     raise ValueError(f'Conflicting calibration value: {selector}/{key}')
                 parameters[key] = value
     _parameters(combined)
-    merge_calibration(str(destination), yaml.safe_dump(combined, sort_keys=False))
+    merge_calibration(str(destination), yaml.safe_dump(combined, sort_keys=False), create_only=True)
 
 
 def main():

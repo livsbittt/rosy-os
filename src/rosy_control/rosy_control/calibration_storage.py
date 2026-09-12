@@ -6,6 +6,7 @@ from pathlib import Path
 
 import yaml
 from .calibration_record import HEADER, MAX_BYTES, decode_record, encode_record, validate_context, runtime_calibration_path
+from .calibration_lock import calibration_lock
 
 
 def single_calibration_path(save_path, sign_path, context=None, runtime_generation=None):
@@ -49,7 +50,32 @@ def _parameters(document):
     _finite(document)
 
 
-def merge_calibration(destination, updates, *, context=None, actor=None):
+def calibration_revision(destination, context):
+    """Snapshot the validated revision before collecting a new trial."""
+    path = Path(destination)
+    validate_context(context)
+    if not path.exists():
+        return 0
+    if path.stat().st_size > MAX_BYTES:
+        raise ValueError('Calibration file exceeds size limit')
+    metadata, parameters = decode_record(path.read_text(encoding='utf-8'), context)
+    _parameters(parameters)
+    return metadata['revision']
+
+
+def merge_calibration(destination, updates, *, context=None, actor=None, expected_revision=None, create_only=False):
+    """Serialize cooperating writers and optionally reject a stale trial."""
+    if not isinstance(destination, str) or not destination.strip():
+        raise ValueError('Calibration destination is not configured')
+    path = Path(destination).resolve()
+    with calibration_lock(path):
+        if create_only and path.exists():
+            raise ValueError('Calibration destination already exists')
+        return _merge_calibration(str(path), updates, context=context, actor=actor,
+                                  expected_revision=expected_revision)
+
+
+def _merge_calibration(destination, updates, *, context=None, actor=None, expected_revision=None):
     """Merge measured fields only; the caller selects the active generation path.
 
     A supplied context requires matching versioned provenance. The caller still
@@ -75,6 +101,10 @@ def merge_calibration(destination, updates, *, context=None, actor=None):
                 raise ValueError('Bound calibration requires matching writer context')
             existing = yaml.safe_load(original)
         _parameters(existing)
+    if expected_revision is not None:
+        if (context is None or type(expected_revision) is not int or expected_revision < 0
+                or expected_revision != (previous['revision'] if previous else 0)):
+            raise ValueError('Calibration revision conflict')
     # A bare ROS selector only matches the root namespace. Keep the file
     # device-local, but let its node settings survive a robot namespace.
     def scoped(document):
@@ -103,6 +133,7 @@ def merge_calibration(destination, updates, *, context=None, actor=None):
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
+        return (previous['revision'] + 1 if previous else 1) if context is not None else None
     finally:
         if temporary and os.path.exists(temporary):
             os.unlink(temporary)

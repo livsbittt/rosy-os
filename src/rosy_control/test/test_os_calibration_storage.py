@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import yaml
 
-from rosy_control.calibration_storage import merge_calibration, single_calibration_path
+from rosy_control.calibration_storage import merge_calibration, single_calibration_path, calibration_revision
 from rosy_control.calibration_record import runtime_calibration_path
 
 
@@ -20,6 +20,7 @@ def node_method(name):
     namespace = {'String': SimpleNamespace, 'merge_calibration': merge_calibration, 'yaml': yaml,
                  'single_calibration_path': single_calibration_path}
     namespace['runtime_calibration_path'] = runtime_calibration_path
+    namespace['calibration_revision'] = calibration_revision
     exec(compile(ast.Module(body=[method], type_ignores=[]), str(path), 'exec'), namespace)
     return namespace[name]
 
@@ -81,7 +82,7 @@ class CalibrationStorageTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 merge_calibration(str(self.path), self.update)
         self.assertEqual(self.path.read_text(), self.original)
-        self.assertEqual(list(self.path.parent.iterdir()), [self.path])
+        self.assertEqual(set(self.path.parent.iterdir()), {self.path, self.path.with_suffix('.yaml.lock')})
 
     def test_separate_generation_paths_do_not_share_updates(self):
         previous = self.path.parent / 'previous' / 'calibration.yaml'
@@ -129,6 +130,26 @@ class CalibrationStorageTests(unittest.TestCase):
             _start_auto=lambda: calls.append('motion'))
         node_method('on_step')(node, SimpleNamespace(data='auto'))
         self.assertEqual(calls, ['status'])
+
+    def test_trial_captures_revision_before_collecting_measurements(self):
+        context = dict(robot_id='rosy_01', hardware_model='Pinky Pro', geometry_revision='g1',
+                       sensor_revision='s1', data_generation='generation-1')
+        merge_calibration(str(self.path), self.update, context=context, actor='first')
+        calls = []
+        node = SimpleNamespace(
+            calibration_context=context,
+            get_parameter=lambda key: SimpleNamespace(value=str(self.path)),
+            _status=lambda message: calls.append('status'),
+            _start_auto=lambda: calls.append('collecting'))
+        node_method('on_step')(node, SimpleNamespace(data='auto'))
+        self.assertEqual(calls, ['collecting'])
+        self.assertEqual(node.calibration_expected_revision, 1)
+        merge_calibration(str(self.path), self.update, context=context, actor='other')
+        original = self.path.read_bytes()
+        with self.assertRaisesRegex(ValueError, 'revision'):
+            merge_calibration(str(self.path), self.update, context=context, actor='first',
+                              expected_revision=node.calibration_expected_revision)
+        self.assertEqual(self.path.read_bytes(), original)
 
     def test_node_reports_failed_write_without_claiming_success(self):
         calls = []
