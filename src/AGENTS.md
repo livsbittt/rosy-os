@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-09 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-13 -->
 
 # src
 
@@ -17,7 +17,7 @@ No files at this level. Each child is a ROS 2 package with its own `package.xml`
 |-----------|---------|
 | `rosy_core/` | Middleware: identity, state, command mux, safety, power, docking, FastAPI/WS, dashboard (see `rosy_core/AGENTS.md`) |
 | `rosy_bringup/` | Physical motors, odometry, LiDAR, battery publisher, cmd_vel deadman (see `rosy_bringup/AGENTS.md`) |
-| `rosy_navigation/` | Nav2/SLAM launch, maps, params; legacy Flask web server (see `rosy_navigation/AGENTS.md`) |
+| `rosy_navigation/` | Nav2/SLAM launch, maps, params; hardware navigation graph (see `rosy_navigation/AGENTS.md`) |
 | `rosy_description/` | URDF/xacro, meshes, RViz view (see `rosy_description/AGENTS.md`) |
 | `rosy_gz_sim/` | Gazebo worlds, multi-robot launch, lamp plugin; CMake no-ops on aarch64 (see `rosy_gz_sim/AGENTS.md`) |
 | `rosy_interfaces/` | Custom services: Emotion, SetBrightness, SetLamp, SetLed (see `rosy_interfaces/AGENTS.md`) |
