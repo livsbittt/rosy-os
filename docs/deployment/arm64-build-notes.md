@@ -60,11 +60,25 @@ deployment.
 
 ## 2026-09-13 builder verification
 
-Docker Desktop `desktop-linux` reports `linux/arm64`, but the actual execution
-probe `docker run --rm --platform linux/arm64 alpine:3.20 uname -m` fails with
-`exec format error`. A clean Rosy OS `f0ba2cf` build reaches the base image and
-fails at the first ARM64 `RUN` step with the same error. This is evidence that
-the current builder has no working QEMU/binfmt execution path; it is not an
-ARM64 artifact. Keep ARTIFACT at `HOLD` until a native ARM64 builder or a
-verified binfmt-enabled builder completes the `core`, `io`, manifest, signing,
-and image-digest checks.
+Docker Desktop `desktop-linux` reports `linux/arm64`. The first real execution
+probe and a clean `f0ba2cf` build failed with `exec format error`, which exposed
+that the builder had no registered ARM64 emulator. Installing the `arm64`
+binfmt handler and rerunning the probe produced `aarch64`.
+
+The clean `ac81f2f` workspace then built
+`rosy-core:arm64-validation-ac81f2f` successfully for `linux/arm64`:
+
+```text
+image ID: sha256:8aea3a0eaf9b20e0af27e70acc1e923c1830ac0577c2191a4ad9955637c02bd5
+architecture: arm64
+os: linux
+```
+
+The image entrypoint sources both ROS Jazzy and the Rosy workspace; through
+that supported path, `python3` imported `rclpy`, OpenCV `4.6.0`, `rosy_core`,
+and `rosy_control` and reported `aarch64`. A direct `--entrypoint python3`
+probe is invalid because it bypasses the ROS environment setup.
+
+This is a reproducible Core image candidate, not a release artifact. Keep
+ARTIFACT at `HOLD` until the `io` image, manifest, signing, registry digest,
+Pi install/readback, and physical checklist gates also pass.
