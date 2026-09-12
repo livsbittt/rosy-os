@@ -14,6 +14,7 @@ import pytest
 from rosy_core.protocol.schemas import HealthState
 
 VIEWER = {"Authorization": "Bearer rosy-dev-viewer"}
+ADMIN = {"Authorization": "Bearer rosy-dev-admin"}
 
 
 @pytest.fixture
@@ -66,6 +67,28 @@ def test_a_single_component_is_readable(client):
     body = tc.get("/api/v1/diagnostics/cpu", headers=VIEWER).json()
 
     assert body == {"component": "cpu", "health": "WARNING"}
+
+
+def test_control_adapter_readback_is_admin_only_and_secret_free(client):
+    tc, svc = client
+
+    class Adapter:
+        enabled = True
+        revision = "worker-v1"
+        calibration_revision = 4
+        calibration_digest = "a" * 64
+
+    svc.control_adapter = Adapter()
+
+    response = tc.get("/api/v1/diagnostics/control-adapter", headers=ADMIN)
+    assert response.status_code == 200
+    assert response.json() == {
+        "enabled": True,
+        "policy_revision": "worker-v1",
+        "calibration_revision": 4,
+        "calibration_digest": "a" * 64,
+    }
+    assert tc.get("/api/v1/diagnostics/control-adapter", headers=VIEWER).status_code == 403
 
 
 def test_an_unknown_component_is_404_not_an_invented_ok(client):

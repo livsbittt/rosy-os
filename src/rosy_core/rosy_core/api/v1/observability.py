@@ -51,6 +51,26 @@ def list_diagnostics(_: AuthContext = Depends(viewer),
     }
 
 
+@diagnostics_router.get("/control-adapter")
+def control_adapter_diagnostic(_: AuthContext = Depends(admin),
+                               svc: CoreServices = Depends(get_services)):
+    """Return calibration binding metadata without exposing parameters or secrets."""
+    adapter = svc.control_adapter
+    if adapter is None:
+        return {
+            "enabled": False,
+            "policy_revision": None,
+            "calibration_revision": None,
+            "calibration_digest": None,
+        }
+    return {
+        "enabled": bool(getattr(adapter, "enabled", False)),
+        "policy_revision": getattr(adapter, "revision", None),
+        "calibration_revision": getattr(adapter, "calibration_revision", None),
+        "calibration_digest": getattr(adapter, "calibration_digest", None),
+    }
+
+
 @diagnostics_router.get("/{component}")
 def diagnostic_detail(component: str, _: AuthContext = Depends(viewer),
                       svc: CoreServices = Depends(get_services)):
