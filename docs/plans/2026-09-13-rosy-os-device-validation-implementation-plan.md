@@ -12,7 +12,7 @@
 
 ## 1. 기준선과 범위
 
-현재 흡수 작업은 소스·문서·정적 테스트 기준으로 완료되었지만, `rosy_core` 실행 그래프에서 `rosy_control` sensor-only adapter를 실제로 켜는 작업, ARM64 이미지에 패키지를 넣는 작업, Pi 설치와 물리 장치 검증은 남아 있다. 기존 `src/rosy_control/launch/robot.launch.py`는 legacy full stack이므로 CORE와 함께 실행하지 않는다. 최종 `cmd_vel` publisher는 `rosy_core/bridge/ros_bridge.py` 한 곳이어야 한다.
+현재 소스·문서·정적 테스트와 ARM64 개발 이미지 후보 검증은 완료되었지만, Device에서 sensor-only adapter를 실제 활성화하는 작업, 서명된 release publication, Pi 설치·readback, 물리 장치 검증은 남아 있다. 기존 `src/rosy_control/launch/robot.launch.py`는 legacy full stack이므로 CORE와 함께 실행하지 않는다. 최종 `cmd_vel` publisher는 `rosy_core/bridge/ros_bridge.py` 한 곳이어야 한다.
 
 증거는 서로 대체하지 않는 다음 계층으로 기록한다.
 
