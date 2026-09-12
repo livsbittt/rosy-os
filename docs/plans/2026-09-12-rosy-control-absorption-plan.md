@@ -10,6 +10,8 @@
 
 ## 1. 범위와 설계 결정
 
+정식 결정은 [ROSY ADR Log](../reference/ROSY%20ADR%20Log.md)의 D-37~D-44를 따른다. D-37~D-40은 Accepted, D-41~D-44는 Proposed다. T2는 D-41·D-43, T3는 D-38·D-42, T4는 D-40·D-44, T5~T8은 D-39의 검증 조건과 연결한다. 상세 경계는 [통합 상세 설계](2026-09-12-rosy-os-control-integrated-design.md)를 참조한다.
+
 사용자가 확정한 제품은 Rosy OS다. 별도 Control 제품·서버·설치를 최종 구성으로 유지하지 않는다. 내부 Python 패키지명 rosy_control을 유지하는 것은 코드 호환 선택이며 별도 제품 유지가 아니다.
 
 기존 전체 구조안에서 제안한 perception/autonomy/calibration 신규 패키지는 이전 목적을 설명한 후보였다. 실제 내부 참조를 확인했으므로 **이번에는 하나의 OS 내부 rosy_control 패키지로 편입**한다. 의미 없는 대량 import 변경과 기능 이전을 동시에 하지 않는다. 이후 분리는 실제 소유권·의존성 문제가 있을 때 별도 판단한다.

@@ -8,7 +8,7 @@
 - T1 OS 내부 패키지와 테스트 편입: 완료.
 - T2–T8 ROS 연결·명령권·웹·배포·Pi 인수: 미착수.
 
-후속 구현의 상세 소유권, 명령·안전 계약, Nav2 backend, 카메라/OpenCV, 보정, 배포, 평가와 OMX 확장점은 [Rosy OS 제어 기능 통합 상세 설계](2026-09-12-rosy-os-control-integrated-design.md)에 확정했다.
+후속 구현의 소유권·안전·주행·카메라·보정·배포·평가·OMX 확장점은 [통합 상세 설계](2026-09-12-rosy-os-control-integrated-design.md)에 기록했다. [ROSY ADR Log](../reference/ROSY%20ADR%20Log.md)에 D-37~D-40 Accepted와 D-41~D-44 Proposed로 등록했다. 미검증 기술 선택은 확정하거나 구현 완료로 표시하지 않는다.
 
 이번 변경은 Rosy Control의 Git 추적 소스 가운데 실행 패키지, 테스트, 설정,
 launch, 웹 자원, 테스트가 직접 참조하는 도구·지도·검증 fixture를

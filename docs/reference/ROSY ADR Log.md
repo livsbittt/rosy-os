@@ -43,6 +43,15 @@
 | D-32 | 광고한 능력을 못 지키면 200 이 아니라 코드로 실패한다 | Accepted |
 | D-33 | 로봇 신원은 하나의 로봇 번호에서 나온다 | Accepted (D-6 대체) |
 | D-34 | 발행 주기는 그것을 읽는 쪽에 맞춘다 | Accepted |
+| D-36 | Signed runtime delivery and writable generation data | Accepted; Pi acceptance pending |
+| D-37 | Rosy Control을 Rosy OS 내부 기능으로 흡수 | Accepted |
+| D-38 | 흡수된 모든 이동 명령의 최종 중재와 정지는 CORE가 소유 | Accepted |
+| D-39 | OS 운용·진단·유지보수와 완료 증거를 통합 | Accepted |
+| D-40 | Nav2 기본 유지와 단일 주행 backend 소유권 | Accepted |
+| D-41 | 카메라와 OpenCV worker 실행 위치 | Proposed |
+| D-42 | 후보 명령과 안전 판단의 내부 전달 계약 | Proposed |
+| D-43 | 보정 schema와 릴리스 generation 저장 매핑 | Proposed |
+| D-44 | ControlBackend 채택과 OMX 작업 액션 경계 | Proposed |
 
 ---
 
@@ -866,3 +875,147 @@ RViz 사용자는 `publish_voxel_map` 을 로컬에서만 되살린다 — 배�
 Immutable config/data generations remain rollback evidence. Each activation data generation also owns a writable `data-working/<generation>` copied from its snapshot; CORE mounts only that working tree. First migration includes HOME's `.rosy` data. Rollback reuses the prior working tree and does not merge candidate writes. `activation.json` remains the sole active-generation authority. The host-owned previous activation is `/etc/rosy/previous-activation.json`, persisted by the activation journal before success is finalized and restored on rollback.
 
 **Consequences:** Working generations require explicit storage retention; no automatic pruning is wired into the delivery CLI. The signed image digests used by this Docker save/load adapter are Docker content image IDs, not registry index digests. The host-agent socket/dashboard installer remains separate. See `docs/deployment/github-updates.md`.
+
+---
+
+## D-37 Rosy Control을 Rosy OS 내부 기능으로 흡수
+
+**Status:** Accepted (2026-09-12). 설계 결정 상태이며 구현·장치 인수 상태와 구분한다.
+
+**Context:** Control의 코드·웹·배포를 별도로 유지하면 장치 운영과 정비의 소유권이 나뉜다. 사용자가 Rosy OS 단일 제품 방향을 확정했다.
+
+**Decision:** 제품·저장소·설치 기준은 Rosy OS로 통일한다. src/rosy_control은 호환성을 유지하는 내부 패키지로 편입한다. 외부 API와 웹은 rosy_core, 하드웨어는 IO/bringup, 배포·복구는 기존 deploy가 소유한다. D-1·D-18·D-22·D-23을 유지한다.
+
+**Alternatives:** 별도 Control 제품 유지와 즉시 전면 패키지 분할을 검토했다. 전자는 운영 중복을 남기고 후자는 기능 이전과 import 변경을 결합하므로 채택하지 않는다.
+
+**Consequences:** 원본은 provenance로 보존한다. 역방향 의존성·선택 설치·장애 격리가 필요하면 내부 패키지 경계를 재검토한다.
+
+**Validation / Transition:** T0·T1 소스 편입과 package build는 완료. T2~T8 런타임 통합은 미완료. 원본 checkout 없이 설치·기동·정비·rollback까지 재현해야 흡수를 종료한다.
+
+**References:** [상세 설계](../plans/2026-09-12-rosy-os-control-integrated-design.md), [실행 계획](../plans/2026-09-12-rosy-control-absorption-plan.md), [현재 증거](../plans/2026-09-12-control-absorption-results.md).
+
+---
+
+## D-38 흡수된 모든 이동 명령의 최종 중재와 정지는 CORE가 소유
+
+**Status:** Accepted (2026-09-12). 설계 결정 상태이며 구현·장치 인수 상태와 구분한다.
+
+**Context:** legacy SafetyNode와 CORE RosBridge가 각각 최종 cmd_vel을 발행할 수 있어 무조건 함께 기동할 수 없다.
+
+**Decision:** D-2를 보강한다. CommandManager가 후보를 선택하고 SafetyManager가 최종 제한을 적용하며 RosBridge만 모터 cmd_vel을 발행한다. Control 보정·주행도 이 경로를 통과한다. IO deadman은 D-22대로 유지한다. e-stop·재기동·소유권 교체 때 과거 이동 명령을 폐기하고 새 요청을 요구한다.
+
+**Alternatives:** 기존 SafetyNode를 최종 발행자로 유지하거나 두 발행자를 병렬 활성화하는 안은 CORE 명령 소유권과 충돌한다.
+
+**Consequences:** 센서 기반 제한과 후보별 판단의 정확한 전달 계약은 D-42 Proposed다. Accepted는 물리 안전 인증이나 구현 완료를 의미하지 않는다.
+
+**Validation / Transition:** T3에서 단일 publisher, stale·nonfinite·단절·모순 입력, e-stop 해제 후 자동 재가동 금지를 시험한다. 기록 재생과 무발행 shadow 비교 후 정지 상태에서 전환한다. 정지 지연·거리 한계는 실물 구동 시험 전에 장치별로 고정한다.
+
+**References:** [상세 설계](../plans/2026-09-12-rosy-os-control-integrated-design.md), [실행 계획](../plans/2026-09-12-rosy-control-absorption-plan.md), [현재 증거](../plans/2026-09-12-control-absorption-results.md).
+
+---
+
+## D-39 OS 운용·진단·유지보수와 완료 증거를 통합
+
+**Status:** Accepted (2026-09-12). 설계 결정 상태이며 구현·장치 인수 상태와 구분한다.
+
+**Context:** 소스 편입만으로 단일 제품 운영이나 기존 기능 동등성을 증명할 수 없다.
+
+**Decision:** CORE 대시보드와 기존 인증 역할로 운전·보정·정비를 제공한다. 새 역할을 임의로 만들지 않는다. capability는 실제 준비 상태를 반영하며 stale 데이터는 현재값과 구분한다. D-36의 서명된 runtime 활성화·복구와 generation별 데이터 규칙을 계승한다. SOURCE/BUILD/LOCAL/SIM/ARTIFACT/DEVICE/FIELD 증거를 따로 기록한다.
+
+**Alternatives:** 별도 Control 서버의 상시 유지, 파일 개수나 단위 테스트만으로 인수하는 안은 운용 동등성을 보장하지 않는다.
+
+**Consequences:** 기능별 설정·시험·진단·복구 대장과 단독 운영 runbook을 T8 산출물로 만든다. 장치별 전환 책임자·복귀 조건을 기록한다.
+
+**Validation / Transition:** T5 실제 브라우저 권한·단절·보정 흐름, T6 artifact·복구, G3/T7 Pinky Pro 실측, T8 원본 runtime 없는 운용을 각각 통과한다.
+
+**References:** [상세 설계](../plans/2026-09-12-rosy-os-control-integrated-design.md), [실행 계획](../plans/2026-09-12-rosy-control-absorption-plan.md), [현재 증거](../plans/2026-09-12-control-absorption-results.md).
+
+---
+
+## D-40 Nav2 기본 유지와 단일 주행 backend 소유권
+
+**Status:** Accepted (2026-09-12). 설계 결정 상태이며 구현·장치 인수 상태와 구분한다.
+
+**Context:** CORE는 Nav2 action을 사용하고 Control은 GoalBrain·route·wander를 사용한다. 목표와 취소 결과의 중복 소유를 막아야 한다.
+
+**Decision:** 기존 운영 기본값 Nav2를 유지한다. CORE NavigationManager가 세션·목표·취소·종료 결과를 소유하며 로봇별 활성 backend는 하나다. 취소된 세션의 늦은 결과는 현재 세션에 반영하지 않는다. 안전한 경로가 있으면 우회하고 없으면 정지한다.
+
+**Alternatives:** 즉시 Control로 전환하거나 두 실행기를 동시에 사용하는 안은 현재 API와 취소 수명주기를 보존하지 못한다.
+
+**Consequences:** ControlBackend의 운영 채택은 D-44에서 별도로 검증한다. 이 결정은 Nav2가 모든 시나리오에서 우수하다는 실측 결론이 아니다.
+
+**Validation / Transition:** T4에서 목표·취소·늦은 결과·재시작·우회·막힘을 공통 시나리오로 검증한다. 경로 생성과 실측 도착을 구분한다.
+
+**References:** [상세 설계](../plans/2026-09-12-rosy-os-control-integrated-design.md), [실행 계획](../plans/2026-09-12-rosy-control-absorption-plan.md), [현재 증거](../plans/2026-09-12-control-absorption-results.md).
+
+---
+
+## D-41 카메라와 OpenCV worker 실행 위치
+
+**Status:** Proposed (2026-09-12). 설계 결정 상태이며 구현·장치 인수 상태와 구분한다.
+
+**Context:** Picamera2/libcamera의 ARM64 장치 접근과 frame 전달 지연은 실행 위치에 따라 다르다. 현재 HSV 기반 근거는 박스 의미 인식이나 grasp pose가 아니다.
+
+**Decision:** 장치 내부 처리와 CORE/IO 분리는 유지한다. 최소 권한 hardware/vision 컨테이너와 호스트 장치 서비스를 비교한다. 어느 실행 위치도 아직 최종 채택하지 않는다.
+
+**Alternatives:** CORE에 광범위한 장치 권한을 주는 안은 D-22와 충돌한다. 나머지 두 후보는 실제 캡처와 장애 복구 결과로 비교한다.
+
+**Consequences:** G2에서 실행 위치를 먼저 결정해야 관련 그래프와 배포 계약을 고정할 수 있다. 가속기나 OMX 영상 기능은 이번 선택만으로 지원된 것으로 광고하지 않는다.
+
+**Validation / Transition:** T2 초기 G2에서 실제 캡처, 최소 권한, 재시작, frame 시각·손실·p95 지연, CPU·메모리를 측정한다. 장치가 없으면 HOLD. 결과·선택 사유·복구 경로를 남긴 뒤 Accepted로 승격한다.
+
+**References:** [상세 설계](../plans/2026-09-12-rosy-os-control-integrated-design.md), [실행 계획](../plans/2026-09-12-rosy-control-absorption-plan.md), [현재 증거](../plans/2026-09-12-control-absorption-results.md).
+
+---
+
+## D-42 후보 명령과 안전 판단의 내부 전달 계약
+
+**Status:** Proposed (2026-09-12). 설계 결정 상태이며 구현·장치 인수 상태와 구분한다.
+
+**Context:** 명령에 대해 계산된 안전 결과를 다른 명령에 적용하거나, 오래된 센서 판단을 새 판단으로 재사용하면 안 된다.
+
+**Decision:** 동일 프로세스의 동기 평가와 비동기 ROS 요청/결과 방식을 비교한다. command/source 상관관계, 센서 freshness, 재시작 epoch, revision, 만료와 실패 시 zero 의미를 요구한다. 상세 설계의 decision_id·command_id 등은 내부 스키마 후보이며 공개 API나 구현된 message가 아니다.
+
+**Alternatives:** 동기 평가는 왕복 지연을 줄이지만 제어 주기 예산과 의존성이 문제다. 비동기는 격리되지만 지연·순서 역전·재생 처리 비용이 있다.
+
+**Consequences:** 서로 다른 호스트·ROS sim time·monotonic 시각을 직접 비교하지 않는다. 부팅 식별, sequence, 수신 시각과 관측 나이의 의미를 확정해야 한다. 명령 독립적 센서 제한과 후보별 충돌 판단을 구분한다.
+
+**Validation / Transition:** T3에서 지연·순서 역전·중복·시계 reset·프로세스 재시작·revision 불일치·sensor expiry를 시험한다. 50 Hz 출력과 처리 예산을 실측하고 적용 결과를 보정 acknowledgement까지 연결한 후 승격한다.
+
+**References:** [상세 설계](../plans/2026-09-12-rosy-os-control-integrated-design.md), [실행 계획](../plans/2026-09-12-rosy-control-absorption-plan.md), [현재 증거](../plans/2026-09-12-control-absorption-results.md).
+
+---
+
+## D-43 보정 schema와 릴리스 generation 저장 매핑
+
+**Status:** Proposed (2026-09-12). 설계 결정 상태이며 구현·장치 인수 상태와 구분한다.
+
+**Context:** 보정은 장치별 데이터이며 OS 업데이트와 rollback에서 보존되어야 한다. 임의의 전역 저장 경로는 D-36의 generation 복구 규칙을 우회할 수 있다.
+
+**Decision:** 장치 identity, schema·geometry·calibration revision, 단위·범위, 변경 감사, 원자적 쓰기와 적용 acknowledgement를 요구한다. /var/lib/rosy/calibration/<device-id>/는 컨테이너 내부 후보 경로다. 호스트에서는 D-36의 활성 data-working/<generation>에 대응해야 하며 정확한 파일명·schema·migration은 미확정이다.
+
+**Alternatives:** 읽기 전용 package share에 쓰거나 모든 generation이 하나의 mutable 보정 파일을 공유하는 안은 채택하지 않는다. 기존 보정 형식 보존과 versioned schema 변환을 비교한다.
+
+**Consequences:** 일반 설정 로더의 config/rosy_default.yaml → ~/.rosy/rosy.yaml → ROSY_CONFIG 순서를 바꾸지 않는다. 장치 profile과 측정 보정의 필드별 결합·충돌 규칙은 별도 정의한다.
+
+**Validation / Transition:** T2에서 손상·장치 불일치·범위 초과·쓰기 실패·재부팅을 시험하고 T6에서 activation/rollback 데이터 격리와 schema 호환을 확인한다. 구버전 복구가 검증된 migration 정책을 기록한 뒤 승격한다.
+
+**References:** [상세 설계](../plans/2026-09-12-rosy-os-control-integrated-design.md), [실행 계획](../plans/2026-09-12-rosy-control-absorption-plan.md), [현재 증거](../plans/2026-09-12-control-absorption-results.md).
+
+---
+
+## D-44 ControlBackend 채택과 OMX 작업 액션 경계
+
+**Status:** Proposed (2026-09-12). 설계 결정 상태이며 구현·장치 인수 상태와 구분한다.
+
+**Context:** Control의 자율 로직 재사용과 향후 Pinky Pro+OMX 박스 이동·적층이 필요하지만 backend 채택, arm 모델과 적재 조건은 미결정이다.
+
+**Decision:** Control 로직은 Nav2 보조·격리 검증·선택 backend 후보로 비교한다. OMX는 로봇 측 원자 액션과 안전 interlock 확장으로 설계하며 Fleet의 상위 임무 소유권(D-12)을 변경하지 않는다. 로컬 연속 작업 오케스트레이션을 제품 기능으로 채택하려면 D-12 확장 여부를 별도 ADR로 결정한다.
+
+**Alternatives:** ControlBackend 전면 채택, Nav2 보조만 사용, 시험 전용 보존을 동일 시나리오로 비교한다. 베이스·팔 동시 동작과 로컬 임무 엔진은 이번 문서로 승인하지 않는다.
+
+**Consequences:** OMX-F/OMX-AI 등 모델 결정과 하중·중심·도달거리·전원·hand-eye 검증 전에는 arm capability를 활성화하지 않는다. 박스 적층 알고리즘은 T2~T8 흡수 완료 조건에 넣지 않는다.
+
+**Validation / Transition:** T4에서 지도·localization·우회·취소·재기동·namespace·자원 비용으로 backend를 판정한다. OMX 액션은 베이스 정지·고정 확인, 보정 revision, arm 실행·결과 확인을 실물 검증한 후 별도 구현 결정으로 승격한다.
+
+**References:** [상세 설계](../plans/2026-09-12-rosy-os-control-integrated-design.md), [실행 계획](../plans/2026-09-12-rosy-control-absorption-plan.md), [현재 증거](../plans/2026-09-12-control-absorption-results.md).

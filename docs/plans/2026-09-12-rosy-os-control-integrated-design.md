@@ -2,13 +2,26 @@
 
 작성일: 2026-09-12
 
-상태: 설계 기준 확정, 소스 흡수 T0·T1 완료, 런타임 통합 T2~T8 예정
+상태: D-37~D-40 Accepted, D-41~D-44 Proposed. 소스 흡수 T0·T1 완료, 런타임 통합 T2~T8 예정
 
 대상: Rosy OS, Pinky Pro, 향후 OMX 계열 로봇암
 
 관련 문서: [흡수 실행 계획](2026-09-12-rosy-control-absorption-plan.md), [흡수 실행 결과](2026-09-12-control-absorption-results.md), [이전 대장](2026-09-12-control-absorption-inventory.csv)
 
 ## 1. 문서 목적과 현재 판단
+
+정식 결정 기록은 [ROSY ADR Log](../reference/ROSY%20ADR%20Log.md)의 D-37~D-44다. Accepted는 채택한 설계 방향이며 구현 완료를 뜻하지 않는다. Proposed의 후보 계약은 검증 전까지 운영 계약으로 확정하지 않는다.
+
+| ADR | 내용 | 상태 |
+|---|---|---|
+| D-37 | Control의 OS 내부 편입과 제품·모듈 소유권 | Accepted |
+| D-38 | 단일 최종 명령권과 정지 후 명령 폐기 | Accepted |
+| D-39 | 운용·정비·복구와 증거 단계 통합 | Accepted |
+| D-40 | Nav2 기본 유지와 단일 backend | Accepted |
+| D-41 | 카메라/OpenCV worker 실행 위치 | Proposed |
+| D-42 | 안전 판단 전달 방식과 내부 스키마 | Proposed |
+| D-43 | 보정 schema와 generation별 저장 매핑 | Proposed |
+| D-44 | ControlBackend 채택과 OMX 액션 경계 | Proposed |
 
 Rosy Control의 기능과 소스는 Rosy OS 내부 `src/rosy_control` 패키지로 편입되었다. 이로써 Rosy OS 저장소가 원본 코드, 테스트, 설정, launch, 카메라·보정·주행·안전 로직을 소유한다. 이것은 **소스 흡수 완료**를 뜻한다. OS 이미지에서 해당 기능을 기동하고 CORE API, 최종 모터 명령, 진단, 업데이트 및 실물 장치까지 하나로 운영하는 **런타임 흡수**는 아직 남아 있다.
 
@@ -121,13 +134,13 @@ T2에서 다음을 수행한다.
 
 ## 5. 설정과 보정 데이터
 
-설정 우선순위는 다음과 같이 고정한다.
+일반 설정 로더의 기존 우선순위는 `config/rosy_default.yaml → ~/.rosy/rosy.yaml → ROSY_CONFIG`로 유지한다. 아래는 데이터 소유 계층이며 새 merge 순서가 아니다. 필드별 결합과 충돌 규칙은 D-43에서 검증한다.
 
 1. 패키지의 읽기 전용 기본값
 2. `/etc/rosy`의 장치 profile과 capability overlay
 3. `/var/lib/rosy`의 장치별 보정 및 승인된 운영 값
 
-보정값은 패키지 share 또는 컨테이너 이미지에 쓰지 않는다. 제안 저장 경로는 `/var/lib/rosy/calibration/<device-id>/`이며 T2에서 기존 Rosy 설정 로더와 스키마에 맞춰 정확한 파일명을 확정한다.
+보정값은 패키지 share 또는 컨테이너 이미지에 쓰지 않는다. 제안 경로 `/var/lib/rosy/calibration/<device-id>/`는 컨테이너 내부 경로이며 호스트에서는 D-36의 활성 `data-working/<generation>`에 대응해야 한다. generation 사이의 전역 mutable 파일 공유는 허용하지 않는다. D-43에서 파일명·schema·migration과 rollback 호환성을 확정한다.
 
 보정 레코드는 최소한 아래 필드를 가진다.
 
@@ -153,7 +166,7 @@ manual watchdog과 navigation 후보의 현재 0.5초 freshness 동작을 기준
 
 ### 6.2 안전 결정
 
-Control의 순수 안전 로직은 센서 관측을 다음 형태의 typed decision으로 만든다. 구체 ROS message 또는 내부 dataclass 선택은 T3 구현에서 정하되 의미는 바꾸지 않는다.
+다음 typed decision은 D-42의 내부 계약 후보이며 현재 구현된 message나 공개 API 필드가 아니다. 동기 평가와 비동기 전달을 비교하고 명령별 판단·센서 공통 제한의 구분, 시계 domain, 재시작 epoch, 수신 시각과 만료 의미까지 T3에서 검증한다.
 
 | 필드 | 의미 |
 |---|---|
@@ -344,6 +357,8 @@ T4 이후로 넘기기 전에 OS artifact 하나로 `카메라/센서 입력 →
 T0에서 확보한 원본 동작과 G2·G3 측정을 같은 방법으로 반복해 기준표를 만든다. 최소 측정 항목은 명령 선택·취소·e-stop 응답, motor deadman, 정지 지연과 거리, 카메라 FPS·frame freshness, CPU·메모리, 경로 완료·우회 성공률, 감지 오탐·미탐, 재기동·복구 시간이다. 각 항목에는 환경, 반복 횟수, 측정 도구, 원본 값, 통합 값, 허용 편차와 GO/HOLD 판정을 기록한다.
 
 ## 14. OMX와 이동형 로봇암 연결점
+
+아래 작업 흐름은 D-44 Proposed의 확장 후보이다. D-12의 Fleet 상위 임무와 로봇 원자 액션 경계를 유지한다. OS 내부 연속 작업 오케스트레이션을 운영 기능으로 채택하려면 D-12 확장 여부를 별도 ADR로 결정한다.
 
 향후 OMX-F 또는 OMX-AI가 선정되면 `rosy_manipulation` 또는 이에 준하는 내부 모듈을 추가한다. 이 모듈은 작업 목표와 팔 상태를 소유하지만 베이스 최종 속도를 직접 발행하지 않는다.
 
