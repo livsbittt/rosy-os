@@ -10,6 +10,23 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "deploy" / "robot" / "device_readback.py"
+
+_TRUSTED_PUBLIC_KEY = (
+    "-----BEGIN PUBLIC KEY-----\n"
+    "MCowBQYDK2VwAyEA" + "L6hVkPrxqDNolCmMvsuHEw0bEP7vFxHk8I3K3j0LiVY=" +
+    "\n-----END PUBLIC KEY-----\n"
+)
+_UNTRUSTED_PUBLIC_KEY = (
+    "-----BEGIN PUBLIC KEY-----\n"
+    "MCowBQYDK2VwAyEA" + "YE9UJoRcaYjFVdGxg8yY6ewbzzZ5ZODOuNXpIFlghOM=" +
+    "\n-----END PUBLIC KEY-----\n"
+)
+_VALID_SIGNATURE = "".join((
+    "d6LFNVwb6qpKp2KHaPrfN4MqGliIhqoN",
+    "aLxqcRqt8oHeP4c0GY2qt2x3aGuFiedJDX",
+    "atBSAYaYpabXoXFGoaAA==",
+))
+
 SPEC = importlib.util.spec_from_file_location("device_readback", MODULE_PATH)
 assert SPEC and SPEC.loader
 device_readback = importlib.util.module_from_spec(SPEC)
@@ -53,6 +70,13 @@ def _fake_device(tmp_path: Path) -> Path:
     )
     release = install / "releases" / "2026.09.13-001"
     release.mkdir(parents=True)
+    (release / "SHA256SUMS").write_bytes(b"test\n")
+    (release / "SHA256SUMS.sig").write_text(_VALID_SIGNATURE, encoding="utf-8")
+    trusted_keys = root / "etc" / "rosy" / "trusted-release-keys"
+    trusted_keys.mkdir(parents=True)
+    (trusted_keys / "rosy-release-2026-01.pem").write_text(
+        _TRUSTED_PUBLIC_KEY, encoding="utf-8"
+    )
     (release / "manifest.json").write_text(
         json.dumps(
             {
@@ -110,6 +134,7 @@ def test_readback_reports_identity_artifact_runtime_and_ros_graph(tmp_path: Path
     }
     assert evidence["artifact"]["git_revision"] == "a" * 40
     assert evidence["artifact"]["containers"]["rosy_core"].startswith("sha256:")
+    assert evidence["artifact"]["signature"] == {"status": "verified"}
     assert evidence["runtime"]["core"]["health"] == "healthy"
     assert evidence["runtime"]["core"]["image_match"] == "verified"
     assert evidence["ros_graph"]["nodes"] == ["/rosy_03/rosy_core"]
@@ -137,6 +162,43 @@ def test_readback_holds_when_immutable_artifact_is_missing(tmp_path: Path):
         "device_runtime": "HOLD",
         "field": "HOLD",
     }
+
+
+def test_readback_holds_when_release_signature_is_missing(tmp_path: Path):
+    root = _fake_device(tmp_path)
+    (root / "opt" / "rosy" / "releases" / "2026.09.13-001" / "SHA256SUMS.sig").unlink()
+
+    evidence = device_readback.collect_readback(root=root, run=_runner)
+
+    assert evidence["artifact"]["signature"] == {
+        "status": "unavailable",
+        "reason": "signature_missing",
+    }
+    assert evidence["gates"]["device_runtime"] == "HOLD"
+
+
+def test_readback_holds_when_release_signature_is_malformed(tmp_path: Path):
+    root = _fake_device(tmp_path)
+    sig = root / "opt" / "rosy" / "releases" / "2026.09.13-001" / "SHA256SUMS.sig"
+    sig.write_text("not base64", encoding="utf-8")
+
+    evidence = device_readback.collect_readback(root=root, run=_runner)
+
+    assert evidence["artifact"]["signature"]["status"] == "unverified"
+    assert evidence["artifact"]["signature"]["reason"] == "SIGNATURE_MALFORMED"
+    assert evidence["gates"]["device_runtime"] == "HOLD"
+
+
+def test_readback_holds_when_trusted_key_does_not_match_signature(tmp_path: Path):
+    root = _fake_device(tmp_path)
+    key = root / "etc" / "rosy" / "trusted-release-keys" / "rosy-release-2026-01.pem"
+    key.write_text(_UNTRUSTED_PUBLIC_KEY, encoding="utf-8")
+
+    evidence = device_readback.collect_readback(root=root, run=_runner)
+
+    assert evidence["artifact"]["signature"]["status"] == "unverified"
+    assert evidence["artifact"]["signature"]["reason"] == "SIGNATURE_INVALID"
+    assert evidence["gates"]["device_runtime"] == "HOLD"
 
 
 def test_readback_holds_when_running_image_is_not_the_manifest_digest(tmp_path: Path):

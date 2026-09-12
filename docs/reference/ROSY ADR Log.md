@@ -58,6 +58,9 @@
 | D-48 | Optional camera preprocessing worker telemetry | Accepted |
 | D-49 | Gazebo motion provenance hashes use the absorbed package root | Accepted |
 | D-50 | Active rosy_control guides use Rosy OS Device procedures | Accepted |
+| D-51 | Independent safety and measured Device acceptance contract | Proposed |
+| D-52 | ARM64 camera placement and shadow handoff gates | Proposed |
+| D-53 | Device signature/readback trust evidence | Accepted; Pi acceptance pending |
 
 ---
 
@@ -1201,3 +1204,96 @@ files for the canonical commands and rejects the old standalone workspace
 paths. Device installation and physical acceptance remain separate gates.
 
 **References:** [package guides](../../src/rosy_control/CLAUDE.md), [Device runbook](../../src/rosy_control/STEPS.txt), [absorption inventory](../plans/2026-09-12-control-absorption-inventory.csv), [folder governance](../plans/2026-09-13-folder-structure-governance.md).
+
+---
+
+## D-51 Independent safety and measured Device acceptance contract
+
+**Status:** Proposed (2026-09-13). The source and simulation suites cannot
+approve physical motion by equivalence alone.
+
+**Context:** The absorbed Control behavior is useful regression evidence, but
+matching it does not establish a safe response to stale, contradictory, or
+missing sensors, restart, e-stop release, or a delayed stop. Device acceptance
+also needs numeric limits that can be reproduced by another operator.
+
+**Decision:** Before a real command handoff, each Device profile must define
+the `NORMAL`, `LIMITED`, `HOLD`, `ESTOP_LATCHED`, and `RECOVERY_PENDING` states,
+required-stream deadlines, invalid and contradictory-input behavior, limit
+precedence, maximum stop latency, and maximum stop distance. Unset values are
+`HOLD`. E-stop release and restart discard the previous candidate and require
+fresh evidence plus an explicit new action. Equivalence tests remain a
+regression layer; the independent safety matrix is a separate acceptance
+layer.
+
+**Consequences:** The implementation plan can report a measured threshold and
+an evidence owner for every physical gate. A green Python/ROS test cannot
+promote a motor, camera, payload, or OMX capability by itself.
+
+**Validation / Transition:** Add the matrix to the selected Pinky Pro profile
+and run boot, restart, CORE loss, sensor loss, tilt, pickup, obstacle, stop,
+e-stop, and recovery trials with wheels lifted first. Record repetitions,
+fixture, timing source, result, artifact revision, and rollback result.
+
+**References:** [Device validation plan](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md), [integrated design](../plans/2026-09-12-rosy-os-control-integrated-design.md).
+
+---
+
+## D-52 ARM64 camera placement and shadow handoff gates
+
+**Status:** Proposed (2026-09-13). Camera execution placement and final command
+handoff remain unaccepted Device decisions.
+
+**Context:** Picamera2/libcamera permissions and timing determine whether a
+host service or least-privilege container can deliver bounded frames. A new
+policy must also be observed with real input before it can own output.
+
+**Decision:** On a native ARM64 bench Pi, compare host capture with a
+least-privilege vision container using identical fixtures. Measure permission,
+restart, frame freshness/drops, p95 latency, CPU, memory, and fault isolation;
+record the selected path in a follow-up accepted ADR. Before changing the
+publisher, run the new producer in shadow mode while the approved publisher
+alone drives the robot. The shadow record must include sample count, mismatch
+classes, worst latency, and owner-approved tolerances. Missing tolerances or a
+second real publisher keep the gate `HOLD`.
+
+**Consequences:** The current camera worker and sensor adapter remain
+observation-only and disabled by default. Device evidence, rather than a
+Windows fixture, decides the placement and handoff.
+
+**Validation / Transition:** Complete the ARM64 spike and shadow replay before
+enabling camera or switching final command ownership. Keep the old generation
+available for rollback and repeat stationary readback after every change.
+
+**References:** [camera worker ADR](#d-48-optional-camera-preprocessing-worker-telemetry), [Device validation plan](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md).
+
+---
+
+## D-53 Device signature/readback trust evidence
+
+**Status:** Accepted (2026-09-13). Pi and physical release acceptance remain
+pending.
+
+**Context:** Rosy release staging verifies the signed checksum list, while the
+current readback reports the manifest key ID and immutable digests. A key ID or
+digest report alone does not prove that the installed release was verified by
+the trusted key or that an unauthorized downgrade was rejected.
+
+**Decision:** Device acceptance retains the signed checksum verification result,
+trusted key ID, manifest, image digests, activation record, and readback as one
+evidence set. A tampered manifest, missing/untrusted signature, unsupported
+downgrade, or digest mismatch quarantines the runtime in core-off state. The
+readback contract exposes a cryptographic verification result and requires it
+for `device_runtime=GO`.
+
+**Consequences:** Existing release staging remains the first enforcement point;
+the Device readback repeats the signed checksum verification without
+serializing credentials. A readback with only `signing_key_id`, missing
+signature material, or a failed verifier is `HOLD`.
+
+**Validation / Transition:** Fake-device cases cover missing, malformed,
+untrusted, and valid signatures. The focused readback and release-boundary
+tests pass locally; repeat on a Pi after installing the signed ARM64 artifact
+and preserve the JSON alongside the release manifest.
+
+**References:** [release signing](../deployment/release-signing-key.md), [Device readback ADR](#d-46-device-install--readback-evidence-contract), [Device validation plan](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md).

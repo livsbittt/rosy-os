@@ -305,12 +305,13 @@ sudo /opt/rosy/deploy/robot/device-readback.sh --json \
 ```
 
 The JSON records the Pi OS identity, robot number/domain/namespace, activation
-record, release git revision, immutable container digests, systemd/core health,
-ROS node list, and the observed `cmd_vel` publisher count. It deliberately
-omits the installer environment and API credentials. `gates.device_runtime`
-is `GO` only when the ARM64 identity, manifest, healthy core, and graph checks
-all pass. `gates.field` remains `HOLD` until the physical commissioning table
-has evidence. A readback is attached to the release evidence; it is not a
+record, release git revision, immutable container digests, signed checksum
+verification result, systemd/core health, ROS node list, and the observed
+`cmd_vel` publisher count. It deliberately omits the installer environment and
+API credentials. `gates.device_runtime` is `GO` only when the ARM64 identity,
+manifest, verified signature, healthy core, and graph checks all pass.
+`gates.field` remains `HOLD` until the physical commissioning table has
+evidence. A readback is attached to the release evidence; it is not a
 substitute for ARM64 registry publication or motor/camera/OMX acceptance.
 
 ## 8. Stop and rollback

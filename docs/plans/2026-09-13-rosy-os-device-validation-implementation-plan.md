@@ -272,3 +272,108 @@ Device runtime. ADR D-50 and the package ownership test record this boundary.
 
 This removes an operator/agent path ambiguity; it does not change the legacy
 entry points or promote any physical capability.
+
+## 2026-09-13 review-driven completion gates
+
+The following gates are required before the source-level work can be called a
+Device-ready implementation. They make the remaining decisions measurable and
+keep a passing regression suite separate from a physical safety approval.
+
+### G0 — independent safety contract
+
+Existing Control equivalence is regression evidence only. Before any real
+`cmd_vel` handoff, the selected Device profile must define and test these
+states: `NORMAL`, `LIMITED`, `HOLD`, `ESTOP_LATCHED`, and
+`RECOVERY_PENDING`. For every required sensor, the profile records the stale
+deadline, non-finite/missing behavior, contradictory-sensor behavior, speed
+limit precedence, maximum stop latency, and maximum stop distance. An empty
+threshold is `HOLD`; it is never treated as an implicit pass.
+
+The test matrix covers boot, process restart, CORE loss, sensor loss, tilt,
+pickup, obstacle, operator stop, e-stop release, and recovery. E-stop release
+and process restart discard the previous candidate and require fresh evidence
+plus an explicit new operator action. The result is an independent safety
+decision, not only a comparison with the absorbed implementation.
+
+### G1 — ARM64 camera placement decision
+
+Before enabling the camera profile, run the same fixture on a native ARM64 Pi
+with (a) a least-privilege vision container and (b) a host Picamera2/libcamera
+service. Measure capture permission, restart behavior, frame freshness and
+drops, p95 processing latency, CPU, memory, and failure isolation. Record the
+selected placement and device path in a follow-up ADR. Until that ADR and its
+readback exist, `camera` remains disabled and its evidence cannot authorize
+motion.
+
+### G2 — backend and shadow decision
+
+Nav2 remains the default. A Control backend can become active only after the
+same goal/cancel/timeout/obstacle/restart fixture is run against both backends
+and the result records localization compatibility, route quality, detour
+success, cancel latency, recovery time, CPU/memory, namespace isolation, and
+maintenance cost. Before changing the final publisher, run the new producer in
+shadow mode: it records candidate selection, limits, reason, revision, and
+latency while the approved publisher alone drives the robot. The release record
+must contain sample count, mismatch classes, worst latency, and owner-approved
+tolerances; missing tolerances keep the gate `HOLD`. Never run two real
+`cmd_vel` publishers as a comparison.
+
+### G3 — Device trust and update evidence
+
+The release stage already verifies the signed checksum list before activation,
+and `device_readback.py` now repeats that verification against the installed
+trusted key. Device commissioning must retain the verification result, trusted
+key ID, manifest, image digests, and activation record together with the
+readback.
+Tampered manifest, missing signature, untrusted key, unsupported downgrade, or
+digest mismatch leaves the runtime quarantined in core-off state. A JSON
+readback with a missing or non-verified signature is `HOLD` even when the image
+digest matches.
+
+### G4 — operator and maintenance state contract
+
+The web surface maps the five safety states and the navigation states
+`INPUT`, `PLANNING`, `MOVING`, `DETOUR`, `LIMITED`, `BLOCKED`, `CANCELING`,
+`SUCCEEDED`, and `FAILED`. Each live value shows last-received time and
+`fresh`, `delayed`, or `disconnected`; stale values disable hazardous actions.
+Calibration follows device check, preparation, confirmation, progress, safe
+cancel/failure, save, apply-pending, and apply-confirmed states. Operator,
+maintenance, and administrator routes are tested for authorization, existing
+session revocation, direct-route access, audit events, and camera/map/diagnostic
+retention. Touch and keyboard behavior is verified on the supported Device
+viewport.
+
+### G5 — objective package split trigger
+
+`rosy_control` stays one absorbed package while its pure logic, ROS adapter, and
+Device profile remain coherent. Reconsider a split only when a measured trigger
+appears: ROS-free logic needs independent reuse, a device dependency requires
+selective installation, a reverse import to CORE appears, fault isolation
+requires a separate process, or release cadences diverge. The trigger and the
+chosen boundary must be recorded before implementation, rather than after a
+large import rewrite.
+
+### Device promotion order
+
+The executable promotion order is now explicit:
+
+1. Flash Raspberry Pi OS Lite 64-bit and record the image checksum, hostname,
+   user, Wi-Fi, SSH, timezone, and device model.
+2. Run `install-pi.sh` with `ROSY_ROBOT_NUMBER`; the installer derives identity,
+   installs Docker/systemd, preserves data/config, and leaves the runtime in
+   `core` mode.
+3. Run `verify-pi.sh`, activate only a signed immutable ARM64 release, and
+   capture `device-readback.sh --json`.
+4. Keep hardware power and torque disabled while checking the stationary CORE
+   graph, one `cmd_vel` publisher, image digest, config/data generation, and
+   signature result.
+5. Enable the context-bound calibration and sensor-only adapter on one bench
+   generation, then repeat readback and sensor freshness checks.
+6. Commission motor deadman, e-stop, UART loss, boot recovery, thermal, and
+   storage behavior with wheels lifted before floor motion.
+7. Commission camera placement/quality, navigation backend, box/pallet payload,
+   and only then OMX mount, payload, hand-eye, collision interlock, and recovery.
+8. Promote a capability only when its evidence record has the measured values,
+   artifact revision/digest, Device identity, operator, timestamp, and rollback
+   result. Any failed gate restores the last known-good generation and leaves
+   field capabilities disabled.
