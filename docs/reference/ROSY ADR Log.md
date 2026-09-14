@@ -61,6 +61,12 @@
 | D-51 | Independent safety and measured Device acceptance contract | Proposed |
 | D-52 | ARM64 camera placement and shadow handoff gates | Proposed |
 | D-53 | Device signature/readback trust evidence | Accepted; Pi acceptance pending |
+| D-54 | Nav2 profile limits and field maps fail closed | Proposed |
+| D-55 | Mobile manipulation is a robot-local mission capability | Proposed |
+| D-56 | Odometry and IMU fusion is a measured optional profile | Proposed |
+| D-57 | ROS-native first; board and vendor differences stay in adapters | Accepted |
+| D-58 | Hardware motion requires an authoritative readiness gate | Accepted |
+| D-59 | 사이트 패브릭은 역할별 계약 버스다 | Accepted |
 
 ---
 
@@ -1297,3 +1303,223 @@ tests pass locally; repeat on a Pi after installing the signed ARM64 artifact
 and preserve the JSON alongside the release manifest.
 
 **References:** [release signing](../deployment/release-signing-key.md), [Device readback ADR](#d-46-device-install--readback-evidence-contract), [Device validation plan](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md).
+
+---
+
+## D-54 Nav2 profile limits and field maps fail closed
+
+**Status:** Proposed (2026-09-13). This decision does not promote the current
+hardware slice to field operation.
+
+**Context:** CORE and Nav2 currently receive related limits from different
+files. The CORE Pinky profile caps angular velocity at 0.80 rad/s, while Nav2
+launch and smoother defaults are higher. Hardware launch also selects a
+packaged demo map when the site map is missing. Those defaults are useful for
+simulation but can hide a commissioning error on a real robot.
+
+**Decision:** The selected Device profile is the source for Nav2 velocity,
+acceleration, goal tolerance, progress and footprint parameters. The launch
+path validates the generated values before enabling hardware mode. Demo maps
+are allowed only for simulation/bench profiles; a field profile enters HOLD
+until a loadable site map, image checksum and matching map ID are present.
+
+**Consequences:** Planner tuning is versioned with the robot profile and the
+same limits apply to API, Nav2 and absorbed Control candidates. A missing or
+stale map becomes a visible commissioning failure instead of a successful goal
+on the wrong map.
+
+**Validation / Transition:** Add source tests for profile/parameter equality,
+map fail-closed behavior and waypoint map matching. On a Pi, record map ID,
+localization covariance, goal error and minimum clearance on a fixed course.
+
+**Implementation note (2026-09-13):** `rosy_navigation.profile_limits` now
+loads the mounted Device profile during `hardware.launch.py`, validates launch
+overrides and velocity-bearing Nav2 parameters, and fails before including the
+Nav2 graph when a ceiling is exceeded. The same launch defaults to a strict
+site-map requirement; only an explicit `allow_demo_map:=true` enables the
+packaged demo map. This closes the source/configuration gate; the field-map
+identity and physical acceptance gates remain open.
+
+**References:** [hardware launch](../../src/rosy_navigation/launch/hardware.launch.py), [Nav2 parameters](../../src/rosy_navigation/params/nav2_params.yaml), [Device validation plan](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md).
+
+---
+
+## D-55 Mobile manipulation is a robot-local mission capability
+
+**Status:** Proposed (2026-09-13). OMX model, mount and payload remain
+unselected and the capability stays disabled.
+
+**Context:** Nav2 can move the base but does not establish grasp success,
+object possession, arm collision safety or pallet stability. The current OS has
+no accepted OMX/MoveIt execution path. A second arm or mission process that
+publishes base velocity would also bypass the CORE command boundary.
+
+**Decision:** A future `rosy_manipulation` action/state machine owns the
+approach, perception, grasp, transport and placement transaction. OMX/MoveIt
+publishes arm actions only; CORE remains the sole final `cmd_vel` arbiter. The
+carried-object state selects a measured 2-D base footprint and speed envelope,
+while MoveIt maintains the corresponding 3-D collision scene. Unknown object,
+arm or gripper state causes HOLD after restart or link loss.
+
+**Consequences:** Navigation and manipulation can be tested independently and
+then composed with one mission ID and one evidence record. The API does not
+advertise OMX until model, mount, power, hand-eye, collision interlock,
+payload and recovery tests pass.
+
+**Validation / Transition:** First validate known rectangular blocks and a
+fixed placement fixture. Record grasp/placement success, repeatability,
+minimum clearance, tip margin, battery/thermal load and recovery outcomes on
+the Pi and Pinky bench before enabling a mobile profile.
+
+**Implementation note (2026-09-13):** The Device configuration now carries a
+`motion_profiles.yaml` template with explicit `unknown`, `base`, `stowed_arm`,
+`carrying_box` and `placing` states. All are unmeasured by default. Hardware
+launch accepts a measured state only when its polygon, clearance, payload,
+motion envelope and MoveIt scene revision are present; it then injects the
+same polygon into both Nav2 costmaps and applies the tighter state speed
+limits. No estimated box or arm dimensions are shipped.
+
+**References:** [mobile manipulation research](../plans/2026-09-12-mobile-manipulation-research.md), [Pinky/OMX mounting research](../plans/2026-09-12-pinky-omx-mounting-spec-research.md), [Device validation plan](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md).
+
+## D-56 Odometry and IMU fusion is a measured optional profile
+
+**Status:** Proposed (2026-09-13). The optional BNO055 driver boundary is
+implemented; physical calibration and fusion promotion remain pending.
+
+**Context:** Nav2 depends on a stable `map → odom → base` transform and fresh
+odometry. The current bridge observes IMU data, but observation alone does not
+make it a valid localization input. Uncalibrated or contradictory IMU data can
+make AMCL and the costmaps appear healthy while the pose is wrong.
+
+**Decision:** Keep encoder odometry as the baseline. Add wheel+IMU fusion only
+as an explicitly selected Device profile after covariance, bias, timestamp,
+frame-prefix, dropout and restart tests pass. Missing or stale fusion input
+keeps navigation in HOLD; it never silently falls back to an unverified pose.
+
+**Consequences:** The baseline remains deployable without the IMU WIP, while a
+future fusion profile has a reproducible acceptance boundary and rollback path.
+
+**Validation / Transition:** Run the optional BNO055 driver on ARM64, capture
+stationary and repeated-turn data, compare encoder-only versus fused pose
+error, then run the same Nav2 goal/cancel/recovery course on a Pi with wheels
+lifted first.
+
+**Implementation note (2026-09-13):** `rosy_imu_bno055` now has bounded,
+stage-labelled chip/configuration/fusion startup, explicit `reset_on_start`
+control (default `false`), signed unit decoding, invalid-sample rejection,
+and transient `sensors/imu/status` health telemetry. The package includes an
+opt-in launch/config path and injected-bus fault tests, but it is not loaded by
+the default Rosy OS image and does not promote IMU data to localization.
+
+**References:** [Pinky profile](../../src/rosy_core/config/profile.pinky_pro.yaml), [ROS bridge](../../src/rosy_core/rosy_core/bridge/ros_bridge.py), [Device validation plan](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md).
+
+---
+
+## D-57 ROS-native first; board and vendor differences stay in adapters
+
+**Status:** Accepted (2026-09-13). This establishes a development direction;
+it does not certify a physical device.
+
+**Context:** Rosy OS already uses ROS 2 messages and Nav2, but the Pinky motor
+path is a custom Python driver and the OMX path is not implemented. Replacing
+those paths with more bespoke middleware would duplicate lifecycle, parameter,
+diagnostic and action contracts that ROS already provides.
+
+**Decision:** Prefer ROS 2 standard interfaces and runtime facilities in this
+order: launch parameters and YAML profiles, lifecycle and diagnostics, Nav2
+actions/costmaps, `sensor_msgs`/`image_transport`, `robot_localization`,
+`ros2_control`, and MoveIt 2. Pinky Pro transport/kinematics and OMX vendor
+transport/model details are adapter responsibilities. Adapters may translate
+hardware and expose standard ROS interfaces, but they must not bypass CORE
+safety or publish the final base `cmd_vel`. Unknown or unmeasured hardware
+stays disabled and fails closed.
+
+**Consequences:** The current `rosy_bringup` driver remains the baseline while
+a measured `ros2_control` replacement is proven. `rosy_bringup.pinky_pro_adapter`
+now validates parameters before SDK construction. `rosy_omx_adapter` provides a
+disabled-by-default, model-neutral controller contract; it does not pretend a
+vendor driver exists, and the Device `io` image ships its profile validator
+without activating hardware. ROS-native packages can be selected without
+changing the external CORE API.
+
+**Validation / Transition:** Keep parameter and adapter tests ROS-free, then
+run launch/graph tests in the Jazzy overlay. On Pi, compare the future
+`ros2_control` base adapter with the current driver for encoder sign, odometry,
+command limits, deadman, torque-off and restart. Select an OMX model only after
+driver, joint limits, MoveIt collision scene, hand-eye, power and payload tests
+pass.
+
+**References:** [Pinky adapter](../../src/rosy_bringup/rosy_bringup/pinky_pro_adapter.py), [OMX adapter](../../src/rosy_omx_adapter/rosy_omx_adapter/profile.py), [ROS-native implementation checkpoint](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md).
+
+---
+
+## D-58 Hardware motion requires an authoritative readiness gate
+
+**Status:** Accepted (2026-09-13). This closes the software-side gate; ROS
+graph, ARM64 image and physical stop-latency evidence remain required.
+
+**Context:** A lifecycle manager or a discovered motor node can exist while
+localization, Nav2 controllers, costmaps or the final motor transport is
+still inactive. Treating node discovery or a REST `accepted` response as
+readiness can therefore pass a velocity candidate into an incomplete graph.
+
+**Decision:** Hardware mode requires active lifecycle transitions from AMCL,
+map server, controller server and both costmaps, plus a refreshed latched
+`motor/ready` adapter lease. The ROS-free
+`NavigationReadinessGate` is the single decision used by navigation requests,
+the command mux and the final CORE publisher. Until every required component
+is active and fresh, CORE reports `navigation_readiness=ERROR`, refuses new
+navigation/teleop requests with `HARDWARE_NOT_READY`, and publishes zero at
+the normal 50 Hz cadence. Core/simulation profiles keep the gate disabled
+unless explicitly opted in.
+
+**Consequences:** Lifecycle state is no longer inferred from node discovery;
+the motor adapter must publish a transient-local ready signal and refresh it
+while its transport is alive. This software gate supplements, and never
+replaces, the driver deadman and physical E-stop. A missing transition or
+expired lease leaves the runtime in HOLD without creating a competing
+`cmd_vel` publisher.
+
+**Validation / Transition:** Host tests cover all component combinations,
+lease expiry, API/command rejection and zero output. The bridge registration
+contract covers the six readiness subscriptions, and bringup tests cover the
+latched adapter signal. Repeat lifecycle, restart, UART-loss and stop-latency
+measurements on the signed ARM64 image with lifted wheels before promoting
+hardware motion.
+
+**References:** [readiness gate](../../src/rosy_core/rosy_core/navigation/readiness.py), [ROS bridge](../../src/rosy_core/rosy_core/bridge/ros_bridge.py), [Pinky bringup](../../src/rosy_bringup/rosy_bringup/bringup.py), [Device validation plan](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md).
+
+---
+
+## D-59 사이트 패브릭은 역할별 계약 버스다
+
+**Status:** Accepted (2026-09-14). 설계 결정 상태이며 Fleet 서버·관제 런타임·영상
+분리·장치 인수 상태와 구분한다.
+
+**Context:** 디바이스, 리더/팔로워, 인지, 관제 PC가 한 제품으로 계속 맞물려야
+한다. 이를 로봇마다 메시지 브로커를 두거나 로봇 간 DDS를 다시 여는 방식으로
+풀면 D-5·D-8·D-22·D-33·D-38과 충돌한다. 반대로 역할이 섞이면 비전이 속도를
+내거나 Fleet이 `cmd_vel`을 흘리거나 CORE가 장치를 직접 열게 된다.
+
+**Decision:** 현장의 모이는 점은 관제 PC의 **한 Fleet 서버**다. 각 디바이스는
+CORE가 노출한 미들웨어 계약(REST 명령, outbound 이벤트, swarm pose 소켓)으로만
+모이고 흩어진다. 한 컴포넌트는 한 역할만 수행한다. 로봇 안 제어 버스(L0
+localhost ROS)와 CORE EventBus(L1)는 유지한다. 원본 영상은 인지 역할(L3)에
+남기고 나중에 프로세스만 분리할 수 있으며, 사이트 계약 버스(L2)의 상시 경로가
+되지 않는다. 사이트 오케스트레이터는 미션·등록·중계만 하고 최종 바퀴 명령을
+생산하지 않는다.
+
+**Alternatives:** 로봇에 Kafka/NATS/MQTT를 올려 단일 버스로 쓰는 안, 로봇 간
+DDS 또는 `rmw_zenoh`를 사이트 패브릭으로 승격하는 안을 검토했다. 전자는 제어
+주기와 최소 권한 분리를 깨고, 후자는 D-33의 격리를 되돌린다. 채택하지 않는다.
+
+**Consequences:** `rosy_fleet` 씨앗은 오케스트레이터 역할의 조각으로 남고, 로봇
+`FleetAgent`는 서버가 생기기 전에 소켓을 열지 않는다. 관제 UI는 Fleet만 본다.
+역할 침범(인지→`cmd_vel`, Fleet→ROS, CORE→`/dev`)은 구현 결함이다. 이 결정은
+Fleet 서버 구현 완료나 영상 미리보기 제공을 뜻하지 않는다.
+
+**Validation / Transition:** 역할·import 경계와 단일 `cmd_vel` publisher, 릴레이
+단절=0 Hz를 호스트 시험으로 고정한다. 관제 서버와 outbound agent는 서버 착수
+시에만 연다. ARM64 이미지와 Pi 인수는 기존 Device 계획을 따른다.
+
+**References:** [사이트 패브릭 설계](../plans/2026-09-14-site-middleware-role-fabric-design.md), [FLEET SRS](../spec/ROSY%20FLEET%20SRS.md), [swarm 슬라이스](../plans/2026-09-08-swarm-formation-slice-design.md).

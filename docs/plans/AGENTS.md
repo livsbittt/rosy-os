@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-09 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-14 -->
 
 # plans
 
@@ -27,6 +27,8 @@ Dated design and execute plans (2026-08-31 onward). These are the working trail 
 | `2026-09-08-swarm-formation-slice-design.md` | Fleet-less N-robot formation slice: `rosy_fleet` seed (geometry, slot assignment, relay, FOR-004 session), `gz_multi core:=true`, sim bench; D-35 candidate |
 | `2026-09-08-swarm-formation-slice.md` (+ `-results`) | Execution plan for that slice (15 TDD tasks, ROS-free until the sim bench) and the results file that records what the sim bench measured and what it could not |
 | `2026-09-13-rosy-os-device-validation-implementation-plan.md` | Rosy OS 기능 구현·자동화 시험·ARM64 artifact·Pi Device 설치/readback·Pinky Pro/OMX 현장 승격 gate |
+| `2026-09-14-site-middleware-role-fabric-design.md` | 관제 PC Fleet 서버가 모으고 흩뜨림. 디바이스는 계약 버스만. 역할 단일 (D-59) |
+| `2026-09-14-site-middleware-role-fabric.md` | D-59 실행: 역할 가드 + ROS-free SiteHub gather/scatter (UI·영상·outbound·Pi 제외) |
 
 ## Subdirectories
 
