@@ -139,6 +139,10 @@ class FakeRobot:
         self._record("navigation_goal", x, y, yaw)
         return {"accepted": True}
 
+    async def estop(self) -> dict:
+        self._record("estop")
+        return {"estop": True}
+
     async def pose_stream(self) -> AsyncIterator[str]:
         self.pose_opens += 1
         if self.pose_error is not None:

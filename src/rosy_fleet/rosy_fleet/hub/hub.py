@@ -62,6 +62,12 @@ class SiteHub:
         if params.source is SwarmReferenceSource.PEER:
             raise HubError("ROLE_VIOLATION", "peer source is not scatterable")
 
+    async def scatter_estop(self, robot_id: str) -> dict:
+        client = self._clients.get(robot_id)
+        if client is None:
+            raise HubError("UNKNOWN_ROBOT", robot_id)
+        return await client.estop()
+
     def _hello(self, envelope: Envelope) -> Envelope:
         try:
             hello = HelloPayload.model_validate(envelope.payload)

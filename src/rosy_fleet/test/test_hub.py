@@ -1,5 +1,7 @@
 """SiteHub는 계약 envelope만 모은다. 바퀴 속도와 원본 영상은 거절한다 (D-59)."""
 
+from fakes import FakeRobot, run
+
 from rosy_core.protocol.schemas import (
     Envelope,
     EnvelopeType,
@@ -114,3 +116,29 @@ def test_peer_source_is_rejected_on_follow_scatter_params():
         assert getattr(exc, "code", None) == "ROLE_VIOLATION" or "peer" in str(exc).lower()
     else:
         raise AssertionError("peer follow must not scatter")
+
+
+def test_scatter_estop_calls_robot_rest_not_a_twist():
+    async def main():
+        robot = FakeRobot("rosy_01")
+        hub = SiteHub([_ep()], clients={"rosy_01": robot})
+        hub.handle(_hello())
+        result = await hub.scatter_estop("rosy_01")
+        assert result == {"estop": True}
+        assert robot.calls == [("estop",)]
+        assert not any("cmd_vel" in str(c) or "twist" in str(c).lower() for c in robot.calls)
+
+    run(main())
+
+
+def test_scatter_estop_unknown_robot_errors():
+    async def main():
+        hub = SiteHub([_ep()])
+        try:
+            await hub.scatter_estop("rosy_99")
+        except Exception as exc:
+            assert "rosy_99" in str(exc) or getattr(exc, "code", "") == "UNKNOWN_ROBOT"
+        else:
+            raise AssertionError("missing client must fail")
+
+    run(main())

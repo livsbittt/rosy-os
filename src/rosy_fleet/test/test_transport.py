@@ -95,6 +95,13 @@ def test_each_call_hits_its_route(method, path):
     assert seen["method"] == ("GET" if method.endswith("state") else "POST")
 
 
+def test_http_estop_posts_safety_stop():
+    import inspect
+    from rosy_fleet.swarm.transport import HttpRobotClient
+    src = inspect.getsource(HttpRobotClient.estop)
+    assert "/api/v1/safety/stop" in src
+
+
 def test_navigation_goal_posts_x_y_yaw():
     seen = {}
 
