@@ -32,4 +32,7 @@ class RobotRegistry:
         return sorted(r.robot_id for r in self._robots.values() if r.online)
 
     def events_since(self, robot_id: str, since_seq: int) -> list[EventMessage]:
-        return [e for e in self.record(robot_id).events if e.seq > since_seq]
+        row = self._robots.get(robot_id)
+        if row is None:
+            return []
+        return [e for e in row.events if e.seq > since_seq]

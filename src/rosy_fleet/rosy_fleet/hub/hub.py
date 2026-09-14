@@ -77,8 +77,10 @@ class SiteHub:
             event = EventMessage.model_validate(envelope.payload)
         except Exception:
             return _error("SESSION_NOT_PAIRED", "hello first")
-        if event.robot_id not in self._paired:
+        if not self._paired:
             return _error("SESSION_NOT_PAIRED", "hello first")
+        if event.robot_id not in self._paired:
+            return _error("PAIRING_INVALID", "robot mismatch")
         row = self.registry.record(event.robot_id)
         row.events.append(event)
         row.last_event_seq = max(row.last_event_seq, event.seq)

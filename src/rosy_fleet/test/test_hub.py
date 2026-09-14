@@ -72,3 +72,12 @@ def test_events_are_kept_in_seq_order_and_gap_fill_reads_since_seq():
         hub.handle(Envelope(type=EnvelopeType.EVENT, payload=event.model_dump(mode="json")))
     filled = hub.registry.events_since("rosy_01", since_seq=1)
     assert [e.seq for e in filled] == [2, 3]
+
+
+def test_event_robot_id_mismatch_after_hello_is_pairing_invalid():
+    hub = SiteHub([_ep()])
+    hub.handle(_hello())
+    event = EventMessage(seq=1, robot_id="rosy_99", type="nav.completed")
+    reply = hub.handle(Envelope(type=EnvelopeType.EVENT, payload=event.model_dump(mode="json")))
+    assert reply.type is EnvelopeType.ERROR
+    assert reply.payload["code"] == "PAIRING_INVALID"
