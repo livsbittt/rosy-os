@@ -21,3 +21,13 @@ def test_fleet_agent_start_does_not_open_a_url():
     agent.start()
     assert seen == []
     assert agent.connected is False
+
+
+def test_connect_raises_until_a_later_plan_enables_outbound():
+    agent = FleetAgent()
+    try:
+        agent._connect("wss://fleet.example/ws/robots")
+    except RuntimeError as exc:
+        assert "not enabled" in str(exc)
+    else:
+        raise AssertionError("outbound must stay disabled in this slice")
