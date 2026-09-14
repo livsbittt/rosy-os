@@ -38,3 +38,37 @@ def test_arming_stays_pure_so_the_plan_can_run_before_the_relay_is_touched():
     names = _imports(SWARM_DIR / "arming.py")
     for name in names:
         assert not name.startswith(ARMING_FORBIDDEN), f"arming.py imports {name}"
+
+
+FLEET_PKG = Path(__file__).resolve().parents[1] / "rosy_fleet"
+HUB_DIR = FLEET_PKG / "hub"
+CORE_FORBIDDEN_PREFIXES = (
+    "rclpy",
+    "rosy_core.command",
+    "rosy_core.bridge",
+    "rosy_core.safety",
+    "rosy_core.navigation",
+    "rosy_core.api",
+)
+
+
+def _py_files(root: Path):
+    return sorted(p for p in root.rglob("*.py") if p.name != "__pycache__")
+
+
+def test_fleet_package_never_imports_rclpy():
+    for path in _py_files(FLEET_PKG):
+        for name in _imports(path):
+            assert name != "rclpy" and not name.startswith("rclpy."), f"{path.name} imports {name}"
+
+
+def test_hub_may_import_only_protocol_schemas_from_rosy_core():
+    if not HUB_DIR.exists():
+        pytest.fail("hub package missing — Task 4 creates it; this test should fail until then")
+    for path in _py_files(HUB_DIR):
+        for name in _imports(path):
+            if name == "rosy_core" or name.startswith("rosy_core."):
+                assert name == "rosy_core.protocol.schemas", f"{path.name} imports {name}"
+            for banned in CORE_FORBIDDEN_PREFIXES:
+                assert name != banned and not name.startswith(banned + "."), path.name
+
