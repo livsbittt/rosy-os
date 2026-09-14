@@ -732,3 +732,11 @@ git commit -m "docs(fabric): record hub-slice completion gates and sequels"
 - 허브는 e-stop을 **REST**로만 흩뿌린다.
 - 로봇 compose·인지·FleetAgent·단일 cmd_vel 경계는 시험이 지킨다.
 - 관제 UI·영상·실제 listen 소켓·Pi 서명은 아직 없다. 그렇게 보고한다.
+
+## 후속 계획 (이 슬라이스 밖)
+
+1. `rosy_fleet hub --listen` WebSocket 서버 (실제 관제 PC 프로세스)
+2. CORE `FleetAgent` outbound — listen이 있고 설정이 켜질 때만
+3. 관제 UI는 Hub REST/상태만
+4. 영상 L3 분리 (D-41/D-52)
+5. Device ARTIFACT/Pi는 기존 2026-09-13 계획

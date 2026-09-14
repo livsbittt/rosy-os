@@ -102,7 +102,7 @@ Fleet 서버가 나중에 내부 큐를 쓰더라도, 로봇이 말하는 언어
 Device 검증 계획의 ARTIFACT → DEVICE → FIELD를 이 설계가 앞지르지 않는다.
 
 1. **계약 고정(지금):** 이 문서와 D-59. 역할 표와 메시지 표를 구현 가드레일로 쓴다.
-2. **허브 슬라이스:** [실행 계획](2026-09-14-site-middleware-role-fabric.md) — 호스트 역할 가드와 ROS 없는 `SiteHub` gather/scatter. 시뮬 릴레이는 기존 `rosy_fleet`을 재사용한다.
+2. **허브 슬라이스:** [실행 계획](2026-09-14-site-middleware-role-fabric.md) — 호스트 역할 가드와 ROS 없는 `SiteHub` gather/scatter. 시뮬 릴레이는 기존 `rosy_fleet`을 재사용한다. 이 단계의 게이트는 hub-slice 호스트 시험이다.
 3. **관제 PC listen + UI:** Hub를 프로세스로 열고, UI는 서버만 본다. 로봇 `FleetAgent`는 이때 처음으로 outbound를 연다.
 4. **영상 분리(선택):** L3 배치를 Pi에서 비교한 뒤(D-52). 사이트 미리보기는 compact/스냅샷만.
 5. **RMW 교체 재검토:** localhost 제어 버스의 계측 문제가 실측될 때만. Zenoh를 로봇 간 버스로 승격하지 않는다.
