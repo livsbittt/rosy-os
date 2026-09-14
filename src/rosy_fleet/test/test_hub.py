@@ -35,3 +35,40 @@ def test_hello_with_wrong_token_is_pairing_invalid_and_stays_offline():
     assert reply.type is EnvelopeType.ERROR
     assert reply.payload["code"] == "PAIRING_INVALID"
     assert hub.registry.online_ids() == []
+
+
+def test_heartbeat_before_hello_is_rejected():
+    hub = SiteHub([_ep()])
+    snap = StateSnapshot(robot_id="rosy_01")
+    env = Envelope(
+        type=EnvelopeType.HEARTBEAT,
+        payload=HeartbeatPayload(state_snapshot=snap).model_dump(mode="json"),
+    )
+    reply = hub.handle(env)
+    assert reply.type is EnvelopeType.ERROR
+    assert reply.payload["code"] == "SESSION_NOT_PAIRED"
+
+
+def test_heartbeat_updates_registry_snapshot():
+    hub = SiteHub([_ep()])
+    hub.handle(_hello())
+    snap = StateSnapshot(robot_id="rosy_01", seq=4)
+    env = Envelope(
+        type=EnvelopeType.HEARTBEAT,
+        payload=HeartbeatPayload(state_snapshot=snap).model_dump(mode="json"),
+    )
+    reply = hub.handle(env)
+    assert reply.type is not EnvelopeType.ERROR
+    stored = hub.registry.record("rosy_01").snapshot
+    assert stored is not None
+    assert stored.seq == 4
+
+
+def test_events_are_kept_in_seq_order_and_gap_fill_reads_since_seq():
+    hub = SiteHub([_ep()])
+    hub.handle(_hello())
+    for seq in (1, 2, 3):
+        event = EventMessage(seq=seq, robot_id="rosy_01", type="nav.completed")
+        hub.handle(Envelope(type=EnvelopeType.EVENT, payload=event.model_dump(mode="json")))
+    filled = hub.registry.events_since("rosy_01", since_seq=1)
+    assert [e.seq for e in filled] == [2, 3]

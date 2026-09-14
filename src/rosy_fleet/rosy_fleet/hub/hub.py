@@ -7,6 +7,8 @@ from typing import Optional, Sequence
 from rosy_core.protocol.schemas import (
     Envelope,
     EnvelopeType,
+    EventMessage,
+    HeartbeatPayload,
     HelloPayload,
     WelcomePayload,
 )
@@ -35,6 +37,10 @@ class SiteHub:
     def handle(self, envelope: Envelope) -> Envelope:
         if envelope.type is EnvelopeType.HELLO:
             return self._hello(envelope)
+        if envelope.type is EnvelopeType.HEARTBEAT:
+            return self._heartbeat(envelope)
+        if envelope.type is EnvelopeType.EVENT:
+            return self._event(envelope)
         return _error("SESSION_NOT_PAIRED", "hello first")
 
     def _hello(self, envelope: Envelope) -> Envelope:
@@ -53,3 +59,27 @@ class SiteHub:
             fleet_name=self._fleet_name,
         )
         return Envelope(type=EnvelopeType.WELCOME, payload=welcome.model_dump())
+
+    def _heartbeat(self, envelope: Envelope) -> Envelope:
+        try:
+            payload = HeartbeatPayload.model_validate(envelope.payload)
+        except Exception:
+            return _error("SESSION_NOT_PAIRED", "hello first")
+        robot_id = payload.state_snapshot.robot_id
+        if robot_id not in self._paired:
+            return _error("SESSION_NOT_PAIRED", "hello first")
+        row = self.registry.record(robot_id)
+        row.snapshot = payload.state_snapshot
+        return Envelope(type=EnvelopeType.HEARTBEAT, payload={})
+
+    def _event(self, envelope: Envelope) -> Envelope:
+        try:
+            event = EventMessage.model_validate(envelope.payload)
+        except Exception:
+            return _error("SESSION_NOT_PAIRED", "hello first")
+        if event.robot_id not in self._paired:
+            return _error("SESSION_NOT_PAIRED", "hello first")
+        row = self.registry.record(event.robot_id)
+        row.events.append(event)
+        row.last_event_seq = max(row.last_event_seq, event.seq)
+        return Envelope(type=EnvelopeType.EVENT, payload={"accepted": True})
