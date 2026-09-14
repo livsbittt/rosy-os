@@ -10,11 +10,21 @@ from rosy_core.protocol.schemas import (
     EventMessage,
     HeartbeatPayload,
     HelloPayload,
+    SwarmFollowParams,
+    SwarmReferenceSource,
     WelcomePayload,
 )
 from rosy_fleet.hub.registry import RobotRegistry
 from rosy_fleet.swarm.robots import RobotEndpoint
 from rosy_fleet.swarm.transport import RobotClient
+
+_FORBIDDEN_PAYLOAD_KEYS = frozenset({"cmd_vel", "image", "twist"})
+
+
+class HubError(Exception):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 def _error(code: str, message: str) -> Envelope:
@@ -37,11 +47,20 @@ class SiteHub:
     def handle(self, envelope: Envelope) -> Envelope:
         if envelope.type is EnvelopeType.HELLO:
             return self._hello(envelope)
+        if envelope.type is EnvelopeType.COMMAND:
+            return _error("ROLE_VIOLATION", "robots do not command the hub")
+        keys = {str(k).lower() for k in envelope.payload}
+        if keys & _FORBIDDEN_PAYLOAD_KEYS:
+            return _error("ROLE_VIOLATION", "hub does not accept cmd_vel, image, or twist")
         if envelope.type is EnvelopeType.HEARTBEAT:
             return self._heartbeat(envelope)
         if envelope.type is EnvelopeType.EVENT:
             return self._event(envelope)
         return _error("SESSION_NOT_PAIRED", "hello first")
+
+    def assert_scatterable(self, params: SwarmFollowParams) -> None:
+        if params.source is SwarmReferenceSource.PEER:
+            raise HubError("ROLE_VIOLATION", "peer source is not scatterable")
 
     def _hello(self, envelope: Envelope) -> Envelope:
         try:

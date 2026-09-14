@@ -81,3 +81,36 @@ def test_event_robot_id_mismatch_after_hello_is_pairing_invalid():
     reply = hub.handle(Envelope(type=EnvelopeType.EVENT, payload=event.model_dump(mode="json")))
     assert reply.type is EnvelopeType.ERROR
     assert reply.payload["code"] == "PAIRING_INVALID"
+
+
+def test_inbound_command_envelope_is_role_violation():
+    hub = SiteHub([_ep()])
+    hub.handle(_hello())
+    reply = hub.handle(Envelope(type=EnvelopeType.COMMAND, payload={"twist": {"linear": 0.2}}))
+    assert reply.type is EnvelopeType.ERROR
+    assert reply.payload["code"] == "ROLE_VIOLATION"
+
+
+def test_payload_with_cmd_vel_or_image_is_role_violation():
+    hub = SiteHub([_ep()])
+    hub.handle(_hello())
+    for payload in ({"cmd_vel": {"linear": 0.1}}, {"image": "base64"}, {"Image": True}):
+        reply = hub.handle(Envelope(type=EnvelopeType.EVENT, payload=payload))
+        assert reply.payload["code"] == "ROLE_VIOLATION", payload
+
+
+def test_peer_source_is_rejected_on_follow_scatter_params():
+    """D-31: peer 소스는 계약에 있지만 허브는 거절한다."""
+    from rosy_core.protocol.schemas import SwarmFollowParams, SwarmReferenceSource
+
+    params = SwarmFollowParams(
+        target_robot_id="rosy_01",
+        source=SwarmReferenceSource.PEER,
+    )
+    hub = SiteHub([_ep()])
+    try:
+        hub.assert_scatterable(params)
+    except Exception as exc:
+        assert getattr(exc, "code", None) == "ROLE_VIOLATION" or "peer" in str(exc).lower()
+    else:
+        raise AssertionError("peer follow must not scatter")
