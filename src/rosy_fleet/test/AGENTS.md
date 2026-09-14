@@ -1,0 +1,60 @@
+<!-- Parent: ../AGENTS.md -->
+<!-- Generated: 2026-09-14 | Updated: 2026-09-14 -->
+
+# test
+
+## Purpose
+
+pytest for rosy_fleet geometry, assignment, robots, transport, relay, arming,
+session, CLI, hub, and the import-boundary check. No ROS. Fakes only — no network.
+
+## Key Files
+
+| File | Description |
+|------|-------------|
+| `conftest.py` | Puts `src/rosy_fleet` and `src/rosy_core` on `sys.path` so pytest runs without colcon install |
+| `fakes.py` | Fake `RobotClient` + `FakeClock` shared by relay/session/hub tests — no network |
+| `test_package.py` | Package import and D-18 schema reuse |
+| `test_geometry.py` | FOR-001 formation slot offsets |
+| `test_assignment.py` | FOR-002 greedy slot assignment |
+| `test_robots.py` | `robots.yaml` load/write and per-robot tokens (D-30) |
+| `test_transport.py` | `HttpRobotClient` REST, including e-stop `POST /api/v1/safety/stop` |
+| `test_relay.py` | D-31 byte-for-byte fan-out; a stopped stream reads 0 Hz |
+| `test_arming.py` | Pure pre-check/assignment planning before the relay is touched |
+| `test_session.py` | FormationSession arm → relay → watch → HOLD/ABORT |
+| `test_cli.py` | CLI parsing and wiring |
+| `test_boundaries.py` | Package-wide `rclpy` ban; hub may import `rosy_core.protocol.schemas` only |
+| `test_hub.py` | SiteHub gather/scatter and role-violation tests (D-59) |
+
+## Subdirectories
+
+None (ignore `__pycache__/`).
+
+## For AI Agents
+
+### Working In This Directory
+
+- Tests use fakes (`fakes.py`) and `settle()`-style polling, never wall-clock `sleep`.
+- SiteHub tests live in `test_hub.py`. Do not stand up a listen server or touch `rosy_core`.
+- `test_boundaries.py` walks the import graph; a new hub/swarm file that imports `rclpy` fails here.
+
+### Testing Requirements
+
+```bash
+python -m pytest src/rosy_fleet/test -v
+```
+
+No ROS required — `conftest.py` puts `src/rosy_core` on `sys.path` for the schema import.
+
+## Dependencies
+
+### Internal
+
+- `rosy_fleet` package (source tree import)
+- `rosy_core.protocol.schemas` (D-18)
+
+### External
+
+- pytest, httpx, pydantic
+
+<!-- MANUAL: -->

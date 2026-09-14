@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-09 | Updated: 2026-09-09 -->
+<!-- Generated: 2026-09-09 | Updated: 2026-09-14 -->
 
 # rosy_fleet
 
@@ -8,9 +8,10 @@
 Fleet-side seed (ROSY-FLEET-SRS-001 FOR-001~004). Formation geometry (FOR-001), slot
 assignment (FOR-002), a reference-stream relay from one leader to N followers (D-31), and
 the FOR-004 formation session (arm → relay → watch → hold), plus the CLI that opens a
-session until the Fleet server exists (Phase 4). No Fleet server yet. Consumes the robot
-contract only — it never modifies `rosy_core` — and imports `rosy_core.protocol.schemas`
-for schema reuse (D-18). No ROS imports anywhere in this package.
+session until the Fleet server exists (Phase 4). No Fleet server yet. SiteHub는 계약
+gather/scatter이며 ROS가 없다. Fleet 서버 UI가 아니다. Consumes the robot contract
+only — it never modifies `rosy_core` — and imports `rosy_core.protocol.schemas` for
+schema reuse (D-18). No ROS imports anywhere in this package.
 
 ## Key Files
 
@@ -25,6 +26,8 @@ for schema reuse (D-18). No ROS imports anywhere in this package.
 | `rosy_fleet/swarm/relay.py` | `Relay`: leader pose socket 1 → follower reference sockets N, byte-for-byte fan-out (D-31) |
 | `rosy_fleet/swarm/arming.py` | `FormationSpec` + pure pre-check/assignment planning, finished before the relay is touched |
 | `rosy_fleet/swarm/session.py` | `FormationSession`: arm → relay → watch → FOR-004 (HOLD/ABORT policy) |
+| `rosy_fleet/hub/registry.py` | Online snapshot and event seq |
+| `rosy_fleet/hub/hub.py` | Envelope handle + scatter_estop |
 | `rosy_fleet/cli.py` | `rosy_fleet relay ...` / `rosy_fleet formation ...` |
 | `test/fakes.py` | Fake `RobotClient` + `FakeClock` shared by relay/session tests — no network |
 | `test/conftest.py` | Puts `src/rosy_fleet` and `src/rosy_core` on `sys.path` so pytest runs without colcon install |
@@ -35,7 +38,8 @@ for schema reuse (D-18). No ROS imports anywhere in this package.
 |-----------|---------|
 | `rosy_fleet/formation/` | Pure geometry and slot-assignment functions — no transport, no ROS |
 | `rosy_fleet/swarm/` | Robot endpoints, transport, relay, arming, and the formation session |
-| `test/` | pytest for geometry, assignment, robots, transport, relay, arming, session, CLI, and the import-boundary check |
+| `rosy_fleet/hub/` | D-59 SiteHub: hello/heartbeat/event gather, REST scatter — no rclpy, no cmd_vel, no Image |
+| `test/` | pytest for geometry, assignment, robots, transport, relay, arming, session, CLI, hub, and the import-boundary check |
 | `resource/` | ament index marker `rosy_fleet` |
 
 ## For AI Agents
