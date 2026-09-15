@@ -39,6 +39,7 @@ RUN apt-get -o Acquire::Retries=5 update \
 FROM core-runtime AS core-build
 
 WORKDIR /opt/rosy_ws
+# omx/imu/vision belong to optional slices, not this core image.
 COPY src/rosy_interfaces ./src/rosy_interfaces
 COPY src/rosy_control ./src/rosy_control
 COPY src/rosy_core ./src/rosy_core

@@ -64,6 +64,13 @@ def test_core_package_does_not_import_optional_slice_code():
                 assert name != banned and not name.startswith(banned + "."), f"{path.name} imports {name}"
 
 
+def test_core_dockerfile_does_not_copy_omx_or_imu():
+    text = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
+    core = text.split("FROM runtime-common AS io-runtime")[0]
+    assert "rosy_omx_adapter" not in core
+    assert "rosy_imu_bno055" not in core
+
+
 def _find_usable_bash():
     candidates = []
     if os.name == "nt":
