@@ -1,7 +1,13 @@
 """D-62: CORE is required; other slices are opt-in presets."""
 
-from robot_contracts import DEPLOY, board_caps
+import ast
+from pathlib import Path
+
+from robot_contracts import DEPLOY, ROOT, board_caps
 import yaml
+
+CORE = ROOT / "src" / "rosy_core" / "rosy_core"
+FORBIDDEN = ("rosy_omx_adapter", "rosy_control.camera", "moveit")
 
 
 def board():
@@ -37,3 +43,17 @@ def test_core_capabilities_do_not_advertise_optional_slices():
     assert vision.get("enabled", False) is False
     assert omx.get("enabled", False) is False
     assert ai.get("enabled", False) is False
+
+
+def test_core_package_does_not_import_optional_slice_code():
+    for path in CORE.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        names = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names.update(a.name for a in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                names.add(node.module)
+        for name in names:
+            for banned in FORBIDDEN:
+                assert name != banned and not name.startswith(banned + "."), f"{path.name} imports {name}"
