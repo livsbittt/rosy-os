@@ -23,7 +23,11 @@ from rosy_core.api.deps import (
 )
 from rosy_core.api.errors import ApiError
 from rosy_core.config import ConfigError, patch_local_config
-from rosy_core.identity import validate_robot_id, validate_robot_name
+from rosy_core.identity import (
+    derived_robot_id,
+    validate_robot_id,
+    validate_robot_name,
+)
 from rosy_core.services import CoreServices
 
 
@@ -47,6 +51,11 @@ def update_system_info(body: IdentityRequest, _: AuthContext = Depends(admin),
     try:
         if body.robot_id is not None:
             patch_robot["id"] = validate_robot_id(body.robot_id)
+            derived = derived_robot_id()
+            if derived and patch_robot["id"] != derived:
+                raise ValueError(
+                    f"robot.id {patch_robot['id']!r} does not match derived identity {derived!r}"
+                )
         if body.robot_name is not None:
             patch_robot["name"] = validate_robot_name(body.robot_name)
     except ValueError as exc:

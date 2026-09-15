@@ -3,7 +3,7 @@ import time
 
 from rosy_core.command.manager import Twist
 
-from conftest import SERVING_CAPS
+from serving_caps import SERVING_CAPS
 
 ADMIN = {"Authorization": "Bearer rosy-dev-admin"}
 OPERATOR = {"Authorization": "Bearer rosy-dev-operator"}

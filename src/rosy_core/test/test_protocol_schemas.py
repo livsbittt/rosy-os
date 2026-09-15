@@ -17,6 +17,35 @@ from rosy_core.protocol.schemas import (
 )
 
 
+def test_hello_payload_missing_robot_id_is_not_a_valid_envelope():
+    from rosy_core.protocol.schemas import EnvelopeContractError, parse_envelope_payload
+
+    env = Envelope(type=EnvelopeType.HELLO, payload={"pairing_token": "x"})
+    with pytest.raises(EnvelopeContractError, match="robot_id"):
+        parse_envelope_payload(env)
+
+
+def test_heartbeat_payload_must_be_a_state_snapshot():
+    from rosy_core.protocol.schemas import (
+        EnvelopeContractError,
+        HeartbeatPayload,
+        parse_envelope_payload,
+    )
+
+    env = Envelope(type=EnvelopeType.HEARTBEAT, payload={"nope": True})
+    with pytest.raises(EnvelopeContractError):
+        parse_envelope_payload(env)
+
+    good = Envelope(
+        type=EnvelopeType.HEARTBEAT,
+        payload=HeartbeatPayload(
+            state_snapshot=StateSnapshot(robot_id="rosy_03")
+        ).model_dump(),
+    )
+    parsed = parse_envelope_payload(good)
+    assert parsed.state_snapshot.robot_id == "rosy_03"
+
+
 def test_envelope_defaults():
     env = Envelope(type=EnvelopeType.HEARTBEAT, payload={})
     assert env.protocol_version == "1.0"

@@ -20,7 +20,7 @@
 | D-8 | 프로세스 내 이벤트 버스 | Accepted |
 | D-9 | Waypoint 로컬 저장소 (JSON) | Accepted |
 | D-10 | Fleet 프로토콜 envelope을 Phase 1에 조기 고정 | Accepted |
-| D-11 | Capability 정적 YAML → API 노출 | Accepted |
+| D-11 | Capability 정적 YAML → API 노출 | Accepted; D-61이 원천을 derive로 고정 |
 | D-12 | Mission은 Fleet 전용, 로봇은 원자 액션 제공 | Accepted |
 | D-13 | map_id = 맵 파일명 + 콘텐츠 체크섬 | Accepted |
 | D-14 | 하드웨어 프로파일 계층 (벤더 중립 구조) | Accepted |
@@ -68,6 +68,11 @@
 | D-58 | Hardware motion requires an authoritative readiness gate | Accepted |
 | D-59 | 사이트 패브릭은 역할별 계약 버스다 | Accepted |
 | D-60 | 추종은 navigation이 아니라 swarm 패키지다 | Accepted |
+| D-61 | 미들웨어 계약 층과 원천 | Accepted |
+| D-62 | Envelope payload는 타입별 스키마다 | Accepted |
+| D-63 | API robot_id는 로봇 번호에서 나온 이름이다 | Accepted |
+| D-64 | 로봇 YAML 오버레이는 알려지지 않은 최상위 키를 거절한다 | Accepted |
+| D-65 | REST 요청 본문은 protocol.schemas에 둔다 | Proposed |
 
 ---
 
@@ -1553,3 +1558,102 @@ import하지 않는다. 매핑 세션 C7, Hub listen, 동작 변경은 이번 �
 호스트 시험의 import 경로 갱신, 기하 대조를 새 경로로 옮긴 뒤 승격 완료로 본다.
 
 **References:** [항법·군집 분리 설계](../plans/2026-09-15-navigation-swarm-split-design.md), [module split](../plans/2026-09-06-module-split-criteria.md).
+
+---
+
+## D-61 미들웨어 계약 층과 원천
+
+**Status:** Accepted (2026-09-16). 설계 결정이며 Device ARTIFACT/FIELD 게이트를 건너뛰지 않는다.
+
+**Context:** 문서·YAML·pydantic·ADR이 모두 "규약"처럼 읽힌다. API Ref는 OpenAPI YAML을 원천이라 했고, CAP-001 YAML은 HWA-003과 별도로 slam/swarm을 광고했으며, `rosy.yaml`은 deep-merge라 모르는 키를 삼켰다. 현장 버스를 YAML 브로커 URL로 열자는 유혹이 D-59와 충돌한다.
+
+**Decision:** 계약은 층마다 원천이 하나다.
+
+| 층 | 말하는 것 | 기계 원천 | YAML의 자리 |
+|---|---|---|---|
+| L0 | localhost ROS, 최종 `cmd_vel` | D-2/D-38, 그래프 시험 | 아님 |
+| L1 | CORE EventBus | `EventMessage` | 아님 |
+| L2 | REST·WS envelope·swarm pose | `rosy_core.protocol.schemas` | 아님. 로봇 YAML에 브로커 URL 금지 (D-59) |
+| 능력 | 이 프로세스가 무엇을 켜는가 | `CapabilityDescriptor` = profile ∩ runtime mode | 점검된 스냅샷. 원천 아님 |
+| 기기 설정 | 토큰·배터리·어댑터 opt-in | `load_config` + D-64 허용 목록 | 오버레이 |
+| 릴리스 | digest·서명 | `manifest.schema.json` | 아님 |
+
+API Ref의 구현된 장(§2–§8, §9.1/9.4/9.5)만 로봇 계약이다. §9.3 미션 DSL과 §10 Fleet REST는 백로그다. FastAPI `/openapi.json`은 파생물이다. D-11의 "정적 YAML에서 생성"은 **derive 결과를 파일로 남긴다**는 뜻으로 읽는다. 파일을 고쳐 능력을 부풀리는 것은 D-32 위반이다.
+
+이 ADR이 열지 않는 것: D-42 내부 후보/안전 전달, D-43 보정 저장 매핑, D-41/D-52 카메라 배치, D-44/D-55 OMX. 그것들은 기존 Proposed로 남긴다.
+
+**Alternatives:** 로봇 YAML 하나를 전 계층 스키마로 쓰는 안, 커밋된 OpenAPI YAML을 원천으로 되돌리는 안. 전자는 사이트 버스와 기기 설정을 섞고, 후자는 pydantic과 세 번째 원천을 만든다. 채택하지 않는다.
+
+**Consequences:** 후속 잠금은 D-62(envelope), D-63(API 신원), D-64(YAML 최상위), D-65(REST 본문 위치)다. Capability 잠금은 `c1a0216`에서 시작했다.
+
+**Validation / Transition:** 능력 시험 `test_capability_contract.py`. 신원·YAML·envelope 시험은 각 후속 ADR.
+
+**References:** [API Ref v1.8](ROSY%20API%20%26%20Protocol%20Reference.md), [D-18](#d-18-프로토콜-스키마-재사용--rosy_core-단일-소스-유지), [D-59](#d-59-사이트-패브릭은-역할별-계약-버스다).
+
+---
+
+## D-62 Envelope payload는 타입별 스키마다
+
+**Status:** Accepted (2026-09-16)
+
+**Context:** D-10이 envelope를 조기 고정했지만 `Envelope.payload`는 `dict[str, Any]`다. 헤더만 타입이고 본문은 SiteHub가 일부 타입만 `model_validate`한다. 같은 구멍을 REST가 라우트별 BaseModel로 메우면 원천이 갈라진다.
+
+**Decision:** 알려진 `EnvelopeType`의 payload는 해당 pydantic 모델로 검증한다 (`parse_envelope_payload`). hello/welcome/heartbeat/event/pose/ack/error는 필수 필드가 없으면 거절한다. 소비자는 알 수 없는 **필드**를 무시한다(API-002, `extra` 기본 ignore). 알 수 없는 **키로 새 계층을 여는 것**(cmd_vel, image, twist)은 역할 위반이다. `command` payload는 Fleet 서버가 열리기 전까지 dict로 남기되, 로봇→허브 COMMAND는 계속 거절한다 (D-59).
+
+**Alternatives:** payload에 discriminated union을 넣어 Envelope 생성 자체를 실패시키는 안. 구 릴레이의 additive 필드와 충돌하기 쉽다. 파서 함수로 검증하는 쪽을 택한다.
+
+**Consequences:** SiteHub와 WS ingest는 이 파서를 쓴다. 라우트 로컬 모델 정리는 D-65.
+
+**Validation / Transition:** `test_protocol_schemas.py`에 타입별 필수 필드 거절. Hub 시험은 기존 hello 실패 경로를 파서로 통과시킨다.
+
+**References:** [D-10](#d-10-fleet-프로토콜-envelope-조기-고정), [schemas.py](../../src/rosy_core/rosy_core/protocol/schemas.py).
+
+---
+
+## D-63 API robot_id는 로봇 번호에서 나온 이름이다
+
+**Status:** Accepted (2026-09-16)
+
+**Context:** D-33은 DDS 도메인과 ROS 네임스페이스에서 기본값을 없앴다. API `robot.id`는 여전히 `rosy_default.yaml`의 `rosy_01`과 `RobotIdentity.from_config(..., "rosy_01")`에 기본값이 있다. `PUT /system/info`는 overlay id만 바꿔 DDS 이름과 어긋날 수 있다. 도메인은 다른데 REST id가 같으면 Fleet이 한 대로 본다.
+
+**Decision:** 외부에 보이는 `robot_id`는 `ROSY_NAMESPACE`와 같고, 둘 다 `ROSY_ROBOT_NUMBER`에서 유도한다 (`rosy_%02d`). 환경이 있으면 YAML id와 불일치는 기동 실패다. 환경이 없는 호스트 시험만 패키지 YAML의 개발용 id를 쓴다. `PUT /system/info`는 유도된 이름과 다른 id를 쓰지 못한다. 표시용 `robot.name`은 로컬 오버레이에 남을 수 있다.
+
+**Alternatives:** API id와 DDS 이름을 영원히 다른 축으로 두는 안. 운영자가 두 번 번호를 매기고, 한쪽만 고치는 사고가 난다. 채택하지 않는다.
+
+**Consequences:** 패키지 `rosy_01`은 개발 기본값으로 남되, 장치 설치 경로(번호 필수)에서는 도달하지 않는다. D-33의 번호 범위·선행 0 거절을 그대로 쓴다.
+
+**Validation / Transition:** 번호/네임스페이스/YAML 불일치 시험. 기존 `test_dds_identity_contracts.py`는 설치 스크립트 쪽을 유지한다.
+
+**References:** [D-33](#d-33-로봇-신원은-하나의-로봇-번호에서-나온다), [identity.py](../../src/rosy_core/rosy_core/identity.py).
+
+---
+
+## D-64 로봇 YAML 오버레이는 알려지지 않은 최상위 키를 거절한다
+
+**Status:** Accepted (2026-09-16)
+
+**Context:** `load_config`는 deep-merge다. `broker: mqtt` 같은 키를 넣어도 부팅한다. 현장 버스를 YAML로 여는 길이 설정 로더에서 막히지 않았다.
+
+**Decision:** 최상위 키는 패키지 `rosy_default.yaml`이 아는 이름만 허용한다 (`robot`, `network`, `state`, `profile`, `capabilities`, `runtime`, `control`, `auth`, `safety`, `navigation`, `power`, `events`, `fleet`). 그 밖의 최상위 키는 `ConfigError`다. 하위 키 전체 JSON Schema는 이번이 아니다 — 배터리 곡선처럼 관대한 폴백이 있는 블록을 한 번에 닫지 않는다. 사이트 브로커 URL을 설정에 추가하는 변경은 D-59 위반으로 거절한다.
+
+**Alternatives:** 파일 전체를 `extra=forbid` pydantic으로 올리는 안. 지금은 하위 키 호환을 깨뜨린다. 최상위부터 닫는다.
+
+**Validation / Transition:** `load_config`가 모르는 최상위 키를 거절하는 시험. 패키지 기본 파일은 통과해야 한다.
+
+**References:** [D-30](#d-30-현장-설정은-로컬-오버레이에만-쓰고-토큰은-해시로만-남긴다), [D-59](#d-59-사이트-패브릭은-역할별-계약-버스다), [config.py](../../src/rosy_core/rosy_core/config.py).
+
+---
+
+## D-65 REST 요청 본문은 protocol.schemas에 둔다
+
+**Status:** Proposed (2026-09-16)
+
+**Context:** `SwarmFollowParams`는 공유 스키마인데 `GoalRequest`, `LimitsRequest`, `IdentityRequest`는 라우트 파일에 있다. API Ref와 라우트와 schemas.py가 세 곳에서 같은 필드를 적으면 CAP-001 YAML과 같은 드리프트가 난다.
+
+**Decision (의도):** 외부 계약이 되는 REST 본문·응답은 `rosy_core.protocol.schemas` (또는 그 패키지의 도메인 모듈)에 둔다. 라우트는 그 모델을 쓴다. 인증 전용 내부 DTO는 라우트에 남을 수 있다.
+
+**Consequences:** 채택 시 라우트 파일을 한 번에 옮기지 않고, 손대는 엔드포인트부터 옮긴다. Accepted는 그 이전이 아니다.
+
+**Validation / Transition:** 새 외부 필드가 schemas.py 밖에만 있으면 시험이 실패하도록 가드를 나중에 붙인다.
+
+**References:** [D-18](#d-18-프로토콜-스키마-재사용--rosy_core-단일-소스-유지), [D-61](#d-61-미들웨어-계약-층과-원천).

@@ -34,6 +34,21 @@ def test_packaged_default_keeps_sensor_adapter_and_calibration_opt_in():
     assert sensor["calibration"]["data_root"] == "/var/lib/rosy"
 
 
+def test_unknown_top_level_yaml_key_is_rejected(tmp_path, monkeypatch):
+    config_path = tmp_path / "rosy.yaml"
+    config_path.write_text("robot:\n  id: rosy_01\nbroker: mqtt\n", encoding="utf-8")
+    monkeypatch.setattr(config_module, "LOCAL_CONFIG_PATH", tmp_path / "missing.yaml")
+    monkeypatch.delenv("ROSY_CONFIG", raising=False)
+    monkeypatch.delenv("ROSY_RUNTIME_MODE", raising=False)
+
+    try:
+        config_module.load_config(str(config_path))
+    except config_module.ConfigError as exc:
+        assert "broker" in str(exc)
+    else:
+        raise AssertionError("unknown top-level YAML keys must not boot")
+
+
 def test_unknown_runtime_mode_env_is_rejected(tmp_path, monkeypatch):
     config_path = tmp_path / "rosy.yaml"
     config_path.write_text("robot:\n  id: rosy_01\n", encoding="utf-8")

@@ -17,10 +17,34 @@ import yaml
 DEFAULT_CONFIG_NAME = "rosy_default.yaml"
 LOCAL_CONFIG_PATH = Path.home() / ".rosy" / "rosy.yaml"
 RUNTIME_MODES = frozenset({"core", "motor", "hardware"})
+# D-64: site-bus keys (broker, kafka, mqtt) must not appear at the top level.
+KNOWN_TOP_LEVEL_KEYS = frozenset({
+    "robot",
+    "network",
+    "state",
+    "profile",
+    "capabilities",
+    "runtime",
+    "control",
+    "auth",
+    "safety",
+    "navigation",
+    "power",
+    "events",
+    "fleet",
+})
 
 
 class ConfigError(Exception):
     """Local overlay could not be written."""
+
+
+def _reject_unknown_top_level(config: dict[str, Any]) -> None:
+    unknown = sorted(key for key in config if key not in KNOWN_TOP_LEVEL_KEYS)
+    if unknown:
+        raise ConfigError(
+            "unknown top-level config key(s): " + ", ".join(unknown)
+        )
 
 
 def overlay_path() -> Path:
@@ -64,6 +88,8 @@ def load_config(explicit_path: Optional[str] = None) -> dict[str, Any]:
     if override_path.exists():
         with open(override_path, encoding="utf-8") as f:
             config = _deep_merge(config, yaml.safe_load(f) or {})
+
+    _reject_unknown_top_level(config)
 
     namespace = os.environ.get("ROSY_NAMESPACE", "").strip().strip("/")
     if namespace:

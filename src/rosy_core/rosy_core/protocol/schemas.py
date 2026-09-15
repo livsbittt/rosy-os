@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 PROTOCOL_VERSION = "1.0"
 
@@ -296,3 +296,31 @@ class EventMessage(BaseModel):
 class AckPayload(BaseModel):
     status: AckStatus
     error: Optional[str] = None
+
+
+class ErrorPayload(BaseModel):
+    code: str
+    message: str
+
+
+class EnvelopeContractError(ValueError):
+    """Known envelope type whose payload failed its schema (D-62)."""
+
+
+def parse_envelope_payload(envelope: Envelope) -> Any:
+    """Validate payload for known types. COMMAND stays a mapping until Fleet exists."""
+    payload_type = {
+        EnvelopeType.HELLO: HelloPayload,
+        EnvelopeType.WELCOME: WelcomePayload,
+        EnvelopeType.HEARTBEAT: HeartbeatPayload,
+        EnvelopeType.EVENT: EventMessage,
+        EnvelopeType.POSE: PoseSample,
+        EnvelopeType.ACK: AckPayload,
+        EnvelopeType.ERROR: ErrorPayload,
+    }.get(envelope.type)
+    if payload_type is None:
+        return envelope.payload
+    try:
+        return payload_type.model_validate(envelope.payload)
+    except ValidationError as exc:
+        raise EnvelopeContractError(str(exc)) from exc

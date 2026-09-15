@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from rosy_core.protocol.schemas import SwarmRole
 
-from conftest import SERVING_CAPS
+from serving_caps import SERVING_CAPS
 
 OPERATOR = {"Authorization": "Bearer rosy-dev-operator"}
 VIEWER = {"Authorization": "Bearer rosy-dev-viewer"}

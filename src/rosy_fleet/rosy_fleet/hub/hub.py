@@ -6,6 +6,7 @@ from typing import Optional, Sequence
 
 from rosy_core.protocol.schemas import (
     Envelope,
+    EnvelopeContractError,
     EnvelopeType,
     EventMessage,
     HeartbeatPayload,
@@ -13,6 +14,7 @@ from rosy_core.protocol.schemas import (
     SwarmFollowParams,
     SwarmReferenceSource,
     WelcomePayload,
+    parse_envelope_payload,
 )
 from rosy_fleet.hub.registry import RobotRegistry
 from rosy_fleet.swarm.robots import RobotEndpoint
@@ -70,8 +72,10 @@ class SiteHub:
 
     def _hello(self, envelope: Envelope) -> Envelope:
         try:
-            hello = HelloPayload.model_validate(envelope.payload)
-        except Exception:
+            hello = parse_envelope_payload(envelope)
+        except (EnvelopeContractError, Exception):
+            return _error("PAIRING_INVALID", "bad hello")
+        if not isinstance(hello, HelloPayload):
             return _error("PAIRING_INVALID", "bad hello")
         expected = self._tokens.get(hello.robot_id)
         if expected is None or expected != hello.pairing_token:
@@ -87,8 +91,10 @@ class SiteHub:
 
     def _heartbeat(self, envelope: Envelope) -> Envelope:
         try:
-            payload = HeartbeatPayload.model_validate(envelope.payload)
-        except Exception:
+            payload = parse_envelope_payload(envelope)
+        except (EnvelopeContractError, Exception):
+            return _error("SESSION_NOT_PAIRED", "hello first")
+        if not isinstance(payload, HeartbeatPayload):
             return _error("SESSION_NOT_PAIRED", "hello first")
         robot_id = payload.state_snapshot.robot_id
         if robot_id not in self._paired:
@@ -99,8 +105,10 @@ class SiteHub:
 
     def _event(self, envelope: Envelope) -> Envelope:
         try:
-            event = EventMessage.model_validate(envelope.payload)
-        except Exception:
+            event = parse_envelope_payload(envelope)
+        except (EnvelopeContractError, Exception):
+            return _error("SESSION_NOT_PAIRED", "hello first")
+        if not isinstance(event, EventMessage):
             return _error("SESSION_NOT_PAIRED", "hello first")
         if not self._paired:
             return _error("SESSION_NOT_PAIRED", "hello first")

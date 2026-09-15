@@ -16,7 +16,7 @@ ADMIN_TOKEN = "rosy-dev-admin"
 OPERATOR_TOKEN = "rosy-dev-operator"
 VIEWER_TOKEN = "rosy-dev-viewer"
 
-from conftest import SERVING_CAPS
+from serving_caps import SERVING_CAPS
 
 LEADS = SERVING_CAPS
 
