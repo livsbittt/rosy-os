@@ -1,6 +1,6 @@
 """D-62: CORE is required; other slices are opt-in presets."""
 
-from robot_contracts import DEPLOY
+from robot_contracts import DEPLOY, board_caps
 import yaml
 
 
@@ -25,3 +25,15 @@ def test_presets_match_current_runtime_modes():
         assert extra not in presets["core"]
         assert extra not in presets["motor"]
         assert extra not in presets["hardware"]
+
+
+def test_core_capabilities_do_not_advertise_optional_slices():
+    caps = board_caps("core")
+    assert caps["navigation"]["goal_navigation"] is False
+    assert caps["swarm"]["follow"] is False
+    vision = caps.get("vision") or {}
+    omx = caps.get("omx") or {}
+    ai = caps.get("ai") or {}
+    assert vision.get("enabled", False) is False
+    assert omx.get("enabled", False) is False
+    assert ai.get("enabled", False) is False

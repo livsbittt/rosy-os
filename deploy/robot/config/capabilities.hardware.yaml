@@ -13,6 +13,12 @@ swarm:
   # autonomously and needs field acceptance before it is advertised.
   follow: false
   lead: false
+vision:
+  enabled: false
+omx:
+  enabled: false
+ai:
+  enabled: false
 docking:
   supported: false
 sensors: [lidar, encoder]

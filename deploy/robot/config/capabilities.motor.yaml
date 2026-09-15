@@ -12,6 +12,12 @@ swarm:
   # Motor bench: no LiDAR and no Nav2 goal navigation yet.
   follow: false
   lead: false
+vision:
+  enabled: false
+omx:
+  enabled: false
+ai:
+  enabled: false
 docking:
   supported: false
 sensors: [encoder]
