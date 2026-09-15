@@ -2,7 +2,7 @@
 
 작성일: 2026-09-15
 
-상태: D-60 Accepted(설계 결정). 코드 이동은 [실행 계획](2026-09-15-navigation-swarm-split.md).
+상태: D-60 Accepted(설계 결정). 소스 이동은 완료됐고 동작은 불변이다. 코드 이동은 [실행 계획](2026-09-15-navigation-swarm-split.md).
 
 관련: [ADR Log](../reference/ROSY%20ADR%20Log.md) D-2, D-12, D-20, D-31, D-38, D-59, D-60 · [module split](2026-09-06-module-split-criteria.md) · [사이트 패브릭](2026-09-14-site-middleware-role-fabric-design.md)
 
