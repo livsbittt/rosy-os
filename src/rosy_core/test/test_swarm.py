@@ -11,12 +11,11 @@ import math
 import pytest
 from rosy_core.capability import Capability
 from rosy_core.navigation.manager import NavGoalSpec, NavigationError, NavigationManager
+from rosy_core.swarm.poses import ReferencePose, follow_goal
 from rosy_core.navigation.swarm import (
     MAX_GOAL_RATE_HZ,
-    ReferencePose,
     SwarmError,
     SwarmManager,
-    follow_goal,
 )
 from rosy_core.protocol.schemas import (
     NavigationState,

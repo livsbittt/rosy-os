@@ -14,7 +14,6 @@ from __future__ import annotations
 import math
 import threading
 import time
-from dataclasses import dataclass
 from typing import Optional
 
 from rosy_core.navigation.manager import NavGoalSpec, NavigationError
@@ -24,6 +23,7 @@ from rosy_core.protocol.schemas import (
     SwarmRole,
     SwarmStatus,
 )
+from rosy_core.swarm.poses import ReferencePose, follow_goal
 
 #: SWM-002 v1: moving goal 갱신 상한. 군집 속도(<=0.2 m/s)에서 충분하고,
 #: 그 이상은 Nav2 플래너를 재시작시키기만 한다.
@@ -35,34 +35,6 @@ class SwarmError(Exception):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
-
-
-@dataclass
-class ReferencePose:
-    """리더가 보고한 pose 한 표본 (API Ref 7.8)."""
-
-    robot_id: str
-    x: float
-    y: float
-    yaw: float
-    seq: int = 0
-    #: 이 좌표가 어느 맵의 것인지. `None` 이면 확인할 수 없다.
-    map_id: Optional[str] = None
-
-
-def follow_goal(reference: ReferencePose, distance: float, lateral: float) -> NavGoalSpec:
-    """리더 뒤 `distance`, 왼쪽으로 `lateral` 떨어진 지점.
-
-    리더의 heading 을 기준으로 잡는다 — 맵 좌표축이 아니다. 그래야 리더가
-    회전해도 대형이 유지된다.
-    """
-    heading = (math.cos(reference.yaw), math.sin(reference.yaw))
-    left = (-math.sin(reference.yaw), math.cos(reference.yaw))
-    return NavGoalSpec(
-        x=reference.x - distance * heading[0] + lateral * left[0],
-        y=reference.y - distance * heading[1] + lateral * left[1],
-        yaw=reference.yaw,
-    )
 
 
 class SwarmManager:
