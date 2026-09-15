@@ -34,7 +34,7 @@ Two kinds of directory live under `rosy_core/`:
 
 **Size is not in this table and must not be added.** See X1.
 
-### Verification — all fifteen subpackages
+### Verification — all sixteen subpackages
 
 *Hand-built. Re-derive before citing.*
 
@@ -47,7 +47,8 @@ Two kinds of directory live under `rosy_core/`:
 | `docking/` | `docking` | `test_docking.py` |
 | `events/` | `events`, `audit` | `test_audit.py` |
 | `fleet_agent/` | — (structural) | `test_fleet_agent.py` |
-| `navigation/` | `nav`, `swarm` *(field name ≠ directory name)* | `test_swarm.py`, `test_initial_pose.py`, `test_swarm_integration.py` |
+| `navigation/` | `nav` *(field name ≠ directory name)* | `test_initial_pose.py` |
+| `swarm/` | `swarm` | `test_swarm.py`, `test_swarm_api.py`, `test_swarm_stream.py`, `test_swarm_integration.py`, `test_navigation_swarm_boundary.py` |
 | `power/` | `power`, `battery` | `test_power.py`, `test_battery.py` |
 | `protocol/` | — (structural) | `test_protocol_schemas.py` |
 | `safety/` | `safety` | **none** → `test_core_logic.py` |

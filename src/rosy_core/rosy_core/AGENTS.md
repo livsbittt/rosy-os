@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-15 -->
 
 # rosy_core (Python package)
 
@@ -34,6 +34,7 @@ Importable middleware. `main.py` starts rclpy; `node.py` builds `CoreServices`, 
 | `events/` | In-process event bus (see `events/AGENTS.md`) |
 | `protocol/` | Pydantic fleet/API schemas (see `protocol/AGENTS.md`) |
 | `navigation/` | Nav facade; Nav2 behind protocol (see `navigation/AGENTS.md`) |
+| `swarm/` | robot-side follow (see `swarm/AGENTS.md`) |
 | `waypoints/` | JSON waypoint store (see `waypoints/AGENTS.md`) |
 | `power/` | IDLE/STANDBY + battery monitor (see `power/AGENTS.md`) |
 | `docking/` | Dock SM, DB, detector (see `docking/AGENTS.md`) |
