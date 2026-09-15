@@ -251,7 +251,7 @@ def test_an_operator_goal_during_a_follow_is_refused_not_silently_overwritten():
         nav.goal(NavGoalSpec(9.0, 9.0, 0.0))
 
     assert raised.value.code == "NAVIGATION_ACTIVE"
-    assert "swarm follow session" in str(raised.value)
+    assert "moving-goal session" in str(raised.value)
 
 
 def test_the_estop_ends_the_follow_and_release_alone_does_not_restart_it():
@@ -742,7 +742,7 @@ def test_mapping_cannot_start_under_a_formation():
         nav.start_mapping()
 
     assert raised.value.code == "NAVIGATION_ACTIVE"
-    assert "swarm follow session" in str(raised.value)
+    assert "moving-goal session" in str(raised.value)
 
 
 def test_a_hold_does_not_open_the_door_to_mapping():

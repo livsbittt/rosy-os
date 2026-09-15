@@ -107,7 +107,7 @@ class NavigationManager:
                 # 추종 중에 들어온 단발 목표는 0.5 초 뒤 스트림에 덮인다.
                 # 조용히 덮이느니 거절하는 편이 낫다.
                 raise NavigationError("NAVIGATION_ACTIVE",
-                                      "a swarm follow session owns the goal — cancel it first")
+                                      "a moving-goal session owns the goal — cancel it first")
             if self._nav_state not in _IDLE_STATES:
                 raise NavigationError(
                     "NAVIGATION_ACTIVE",
@@ -132,15 +132,14 @@ class NavigationManager:
             self._moving_session = self._session_counter
             return self._moving_session
 
-    def moving_goal(self, spec: NavGoalSpec, source: str = "swarm",
+    def moving_goal(self, spec: NavGoalSpec, source: str = "moving",
                     session: Optional[int] = None) -> bool:
         """SWM-001: 이미 주행 중이어도 목표를 갈아끼운다.
 
         `goal()` 은 진행 중인 주행을 NAVIGATION_ACTIVE 로 막는다 — 운영자가
-        실수로 목표를 덮어쓰지 않게 하려는 것이다. 군집 추종은 정반대로,
-        리더가 움직이는 동안 목표가 계속 갱신되는 것이 정상이다. 그래서
-        진행 중 거부만 빼고 안전 게이트는 그대로 지난다: e-stop 과 맵핑
-        세션은 여기서도 막는다.
+        실수로 목표를 덮어쓰지 않게 하려는 것이다. moving-goal 호출자는
+        정반대로, 목표가 계속 갱신되는 것이 정상이다. 그래서 진행 중 거부만
+        빼고 안전 게이트는 그대로 지난다: e-stop 과 맵핑 세션은 여기서도 막는다.
 
         Nav2 NavigateToPose 는 새 목표를 받으면 이전 목표를 선점하므로
         취소를 먼저 보내지 않는다 — 그 사이에 로봇이 멈춰 서기 때문이다.
@@ -185,7 +184,7 @@ class NavigationManager:
                 # and resumes the moment its stream returns.
                 raise NavigationError(
                     "NAVIGATION_ACTIVE",
-                    "a swarm follow session owns the goal — cancel it first")
+                    "a moving-goal session owns the goal — cancel it first")
             if self._nav_state not in _IDLE_STATES:
                 raise NavigationError("NAVIGATION_ACTIVE",
                                       f"navigation in progress ({self._nav_state.value})")
