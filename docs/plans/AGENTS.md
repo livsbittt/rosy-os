@@ -34,6 +34,8 @@ Dated design and execute plans (2026-08-31 onward). These are the working trail 
 | `2026-09-15-module-harness-design.md` | 모듈별 progress·logs·생성 index와 `tools/harness` 계약 시험 (D-61 Proposed) |
 | `2026-09-16-optional-runtime-slices-design.md` | CORE 필수, motor/io/nav/vision/omx/ai 선택 설치 (D-62) |
 | `2026-09-16-optional-runtime-slices.md` | D-62 실행: board 카탈로그, capability 암전, install preset, CORE import 가드 |
+| `2026-09-16-modular-middleware-goal-design.md` | 모듈형 미들웨어 끝 상태 (D-63) |
+| `2026-09-16-core-control-import-boundary.md` | D-64: rosy_control import는 센서 어댑터만 |
 
 ## Subdirectories
 

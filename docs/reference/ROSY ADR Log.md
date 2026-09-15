@@ -70,6 +70,8 @@
 | D-60 | 추종은 navigation이 아니라 swarm 패키지다 | Accepted |
 | D-61 | 모듈 상태는 progress·logs·생성 index로 기록하고 계약 시험으로 지킨다 | Proposed |
 | D-62 | CORE는 필수이고 나머지 런타임은 선택 슬라이스다 | Accepted |
+| D-63 | 모듈형 미들웨어 목표 — CORE는 얇고 슬라이스는 선택이다 | Accepted |
+| D-64 | CORE 생산 코드의 rosy_control import는 센서 어댑터뿐이다 | Accepted |
 
 ---
 
@@ -1620,3 +1622,52 @@ OpenCV/`rosy_control`은 부채이며 이 결정이 제거를 강제하지 않�
 core 스테이지가 omx/imu를 COPY하지 않음을 호스트 시험으로 고정한다.
 
 **References:** [선택 슬라이스 설계](../plans/2026-09-16-optional-runtime-slices-design.md), [실행 계획](../plans/2026-09-16-optional-runtime-slices.md).
+
+---
+
+## D-63 모듈형 미들웨어 목표 — CORE는 얇고 슬라이스는 선택이다
+
+**Status:** Accepted (2026-09-16). 목적지 결정이다. 구현은 자식 ADR이 한 이음새씩 닫는다.
+
+**Context:** Pi 5와 OMX/AI가 같은 미들웨어를 써야 한다. CORE에 카메라·팔·추론·Nav2가
+섞이면 설치와 책임이 다시 한 덩어리가 된다. D-62는 카탈로그만 열었다.
+
+**Decision:** 끝 상태는 이것이다. CORE 프로세스와 `rosy-core` 이미지는 필수이고 얇다
+(API, 안전, 최종 `cmd_vel`, 사건, 대시보드). motor/io/nav/vision/omx/ai는 선택
+슬라이스이며 각자 ROS 메시지 가족과 프로세스를 소유한다. CORE는 슬라이스
+패키지를 import하지 않는다. 이미지는 고르지 않은 스택을 싣지 않는다. CORE
+프로세스를 쪼개지 않고, 로봇에 사이트 브로커를 올리지 않는다.
+
+**Sequence:** D-62 카탈로그 → D-64 CORE의 rosy_control import 경계 → 이후 이미지
+축출, 매핑 분리, nav overlay, vision/omx 설치 가능 overlay.
+
+**Consequences:** 이 ADR만으로 이미지를 바꾸거나 하드웨어를 켜지 않는다. 자식 ADR이
+없을 때 “모듈화 완료”라고 말하지 않는다.
+
+**References:** [목표 설계](../plans/2026-09-16-modular-middleware-goal-design.md).
+
+---
+
+## D-64 CORE 생산 코드의 rosy_control import는 센서 어댑터뿐이다
+
+**Status:** Accepted (2026-09-16). 설계 결정이며 이미지 COPY 축출과 구분한다.
+
+**Context:** `safety/manager.py`가 `rosy_control.control.command_gate`와
+`actuation`을 import한다. 흡수 어댑터 밖에서도 Control 타입을 알고 있으면
+안전 패키지가 센서 스택에 묶인다. D-63 2단계.
+
+**Decision:** `src/rosy_core/rosy_core/` 아래 `rosy_control` import는
+`bridge/control_sensor_adapter.py`만 허용한다. SafetyManager의
+`bind_control_policy` / `bind_simulation_actuation`은 타입 모듈을 import하지
+않고 evaluate/revision 등 공개 속성으로 duck-type 한다. 시험 파일의
+rosy_control import는 허용한다. CORE 이미지에서 rosy_control을 빼는 일은
+후속이다.
+
+**Alternatives:** SafetyManager에 CommandPolicy를 남기는 안은 경계를 문서만으로
+둔다. rosy_control 전체를 이번 단계에서 이미지에서 빼는 안은 센서 어댑터
+런타임을 한꺼번에 옮긴다. 채택하지 않는다.
+
+**Validation / Transition:** AST 가드 시험이 어댑터 외 import를 실패시킨다.
+기존 control policy 링크 시험은 통과해야 한다.
+
+**References:** [실행 계획](../plans/2026-09-16-core-control-import-boundary.md).
