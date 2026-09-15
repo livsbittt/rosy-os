@@ -17,7 +17,7 @@ import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from rosy_core.api.deps import ROLE_RANK, authenticate
-from rosy_core.navigation.swarm import ReferencePose
+from rosy_core.swarm import ReferencePose
 from rosy_core.protocol.schemas import Envelope, EnvelopeType, Pose, PoseSample
 
 ws_router = APIRouter()

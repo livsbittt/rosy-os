@@ -11,11 +11,12 @@ import math
 import pytest
 from rosy_core.capability import Capability
 from rosy_core.navigation.manager import NavGoalSpec, NavigationError, NavigationManager
-from rosy_core.swarm.poses import ReferencePose, follow_goal
-from rosy_core.navigation.swarm import (
+from rosy_core.swarm import (
     MAX_GOAL_RATE_HZ,
+    ReferencePose,
     SwarmError,
     SwarmManager,
+    follow_goal,
 )
 from rosy_core.protocol.schemas import (
     NavigationState,
@@ -377,8 +378,8 @@ def test_the_follow_path_does_not_know_where_the_stream_comes_from():
     import ast
     from pathlib import Path
 
-    source = (Path(__file__).resolve().parents[1] / "rosy_core" / "navigation"
-              / "swarm.py").read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[1] / "rosy_core" / "swarm"
+              / "manager.py").read_text(encoding="utf-8")
     imported: set[str] = set()
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Import):

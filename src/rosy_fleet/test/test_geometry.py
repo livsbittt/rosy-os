@@ -1,4 +1,4 @@
-"""FOR-001 대형 → 슬롯 오프셋. 좌표 규약은 rosy_core.navigation.swarm.follow_goal 과 같다:
+"""FOR-001 대형 → 슬롯 오프셋. 좌표 규약은 rosy_core.swarm.follow_goal 과 같다:
 distance 는 리더 뒤(+), lateral 은 리더 왼쪽(+). 리더는 슬롯 0 이며 목록에 없다."""
 
 import math
@@ -106,7 +106,7 @@ def test_spacing_exactly_at_the_floor_is_accepted_and_the_list_has_one_slot_per_
 def test_slot_world_position_is_the_point_follow_goal_drives_to():
     # 이 모듈의 존재 이유다: 로봇 쪽 follow_goal 과 같은 점을 내야 한다. 손계산이 아니라
     # 그 함수와 직접 비교한다 — 어느 쪽 규약이 바뀌어도 여기서 드러난다.
-    from rosy_core.navigation.swarm import ReferencePose, follow_goal
+    from rosy_core.swarm import ReferencePose, follow_goal
 
     for x, y, yaw, d, lat in [(0.0, 0.0, 0.0, 0.6, 0.0), (1.0, 2.0, math.pi / 2, 1.0, 1.0),
                               (-3.2, 0.7, -2.1, 0.45, -0.6), (5.0, -1.0, 3.0, 1.2, 0.3)]:

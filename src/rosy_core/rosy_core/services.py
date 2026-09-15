@@ -21,7 +21,7 @@ from rosy_core.events.bus import EventBus
 from rosy_core.identity import RobotIdentity
 from rosy_core.maps import MapSnapshotStore
 from rosy_core.navigation.manager import NavigationManager
-from rosy_core.navigation.swarm import SwarmManager
+from rosy_core.swarm import SwarmManager
 from rosy_core.power.battery import (
     BatteryConfig,
     BatteryCurve,

@@ -14,7 +14,7 @@ import pytest
 from rosy_core.bridge.goal_tracker import GoalTracker
 from rosy_core.capability import Capability
 from rosy_core.navigation.manager import NavGoalSpec, NavigationError, NavigationManager
-from rosy_core.navigation.swarm import ReferencePose, SwarmError, SwarmManager
+from rosy_core.swarm import ReferencePose, SwarmError, SwarmManager
 from rosy_core.protocol.schemas import NavigationState, SwarmFollowParams
 from rosy_core.safety.manager import BatteryPolicy, SafetyManager, SpeedLimits
 from rosy_core.state.manager import StateManager

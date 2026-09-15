@@ -8,7 +8,7 @@ from rosy_core.api.v1.common import enter_navigation_mode, operator, viewer
 from rosy_core.api.deps import AuthContext, get_services
 from rosy_core.api.errors import ApiError
 from rosy_core.command.arbitration import Mode
-from rosy_core.navigation.swarm import SwarmError
+from rosy_core.swarm import SwarmError
 from rosy_core.protocol.schemas import SwarmFollowParams
 from rosy_core.services import CoreServices
 

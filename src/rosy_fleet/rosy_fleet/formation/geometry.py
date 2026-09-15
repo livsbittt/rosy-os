@@ -1,7 +1,7 @@
 """rosy_fleet.formation.geometry — FOR-001 대형을 슬롯 오프셋으로 (순수 함수).
 
 팔로워는 리더 heading 기준 `(distance, lateral)` 오프셋을 받는다
-(`rosy_core.navigation.swarm.follow_goal`). 모든 정적 대형은 그 오프셋의 집합이므로
+(`rosy_core.swarm.follow_goal`). 모든 정적 대형은 그 오프셋의 집합이므로
 로봇 계약을 바꾸지 않고 여기서 끝난다. 이 모듈은 전송도 로봇도 모른다 — 입력은
 숫자, 출력은 숫자다.
 """

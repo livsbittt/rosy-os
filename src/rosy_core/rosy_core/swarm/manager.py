@@ -1,4 +1,4 @@
-"""rosy_core.navigation.swarm — SWM-001~007 follow 상태머신 (D-20). ROS 무의존.
+"""rosy_core.swarm.manager — SWM-001~007 follow 상태머신 (D-20). ROS 무의존.
 
 추종 계산은 로봇에 있고 Fleet 은 지정·릴레이만 한다(D-20). 이 모듈은 참조
 pose 가 **어디서 왔는지 묻지 않는다**(SWM-007): `on_reference_pose` 를 부르는
