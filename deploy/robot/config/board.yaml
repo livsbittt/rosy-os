@@ -2,21 +2,31 @@
 # Compose mounts capabilities.${ROSY_RUNTIME_MODE}.yaml and profile.${ROSY_RUNTIME_MODE}.yaml.
 board: pinky_pro
 host: raspberry-pi-5
+slices:
+  required: [core]
+  available: [motor, io, nav, vision, omx, ai]
+presets:
+  core: [core]
+  motor: [core, motor]
+  hardware: [core, motor, io, nav]
 modes:
   core:
     capabilities: capabilities.core.yaml
     profile: profile.core.yaml
     teleop: false
     sensors: []
+    preset: core
   motor:
     capabilities: capabilities.motor.yaml
     profile: profile.motor.yaml
     teleop: true
     sensors: [encoder]
+    preset: motor
   hardware:
     capabilities: capabilities.hardware.yaml
     profile: profile.hardware.yaml
     teleop: true
     sensors: [lidar, encoder]
+    preset: hardware
 aliases:
   pi5-lite: hardware
