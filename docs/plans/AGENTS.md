@@ -31,6 +31,9 @@ Dated design and execute plans (2026-08-31 onward). These are the working trail 
 | `2026-09-14-site-middleware-role-fabric.md` | D-59 실행: 역할 가드 + ROS-free SiteHub gather/scatter (UI·영상·outbound·Pi 제외) |
 | `2026-09-15-navigation-swarm-split-design.md` | 추종을 navigation에서 분리해 `rosy_core.swarm`으로 (D-60) |
 | `2026-09-15-navigation-swarm-split.md` | D-60 실행: poses/manager 이동, navigation import 금지, 동작 불변 |
+| `2026-09-15-module-harness-design.md` | 모듈별 progress·logs·생성 index와 `tools/harness` 계약 시험 (D-61 Proposed) |
+| `2026-09-16-optional-runtime-slices-design.md` | CORE 필수, motor/io/nav/vision/omx/ai 선택 설치 (D-62) |
+| `2026-09-16-optional-runtime-slices.md` | D-62 실행: board 카탈로그, capability 암전, install preset, CORE import 가드 |
 
 ## Subdirectories
 

@@ -68,6 +68,8 @@
 | D-58 | Hardware motion requires an authoritative readiness gate | Accepted |
 | D-59 | 사이트 패브릭은 역할별 계약 버스다 | Accepted |
 | D-60 | 추종은 navigation이 아니라 swarm 패키지다 | Accepted |
+| D-61 | 모듈 상태는 progress·logs·생성 index로 기록하고 계약 시험으로 지킨다 | Proposed |
+| D-62 | CORE는 필수이고 나머지 런타임은 선택 슬라이스다 | Accepted |
 
 ---
 
@@ -1553,3 +1555,68 @@ import하지 않는다. 매핑 세션 C7, Hub listen, 동작 변경은 이번 �
 호스트 시험의 import 경로 갱신, 기하 대조를 새 경로로 옮긴 뒤 승격 완료로 본다.
 
 **References:** [항법·군집 분리 설계](../plans/2026-09-15-navigation-swarm-split-design.md), [module split](../plans/2026-09-06-module-split-criteria.md).
+
+---
+
+## D-61 모듈 상태는 progress·logs·생성 index로 기록하고 계약 시험으로 지킨다
+
+**Status:** Proposed (2026-09-15). `src/rosy_core`, `deploy` 파일럿만 적용했다.
+
+**Context:** AGENTS.md 96개 중 70개가 2026-09-02에서 멈췄다. 진행 상태는 날짜별
+plan 말미, `*-results.md`, git 밖 작업 폴더 `progress.md`에 흩어졌고 같은 항목이
+두 번 기록됐다. 모듈의 현재 gate를 한 곳에서 읽을 수 없고, 이 ADR Log는 109KB로
+커져 인덱스·ID 연속성을 사람이 맞추고 있다.
+
+**Decision:** 책임자와 증거 gate가 있는 모듈(패키지, `deploy`, `dock`, `docs`)은
+`AGENTS.md` 옆에 세 기록을 둔다. `progress.md`는 frontmatter gate 스냅샷을 덮어쓰고
+(`GO`는 evidence, `HOLD`는 blocker 필수), `logs.md`는 추가만 하며, `index.md`와 루트
+`STATUS.md`는 `tools/harness/rosy_harness.py`가 명시적 참조로만 생성한다. 충돌 시
+SRS·API·ADR > progress > logs > AGENTS 순이다. 형식과 생성물 최신성, ADR 인덱스·ID
+연속성은 `test/test_harness_contracts.py`가 CI의 host pytest에서 확인한다.
+하위 폴더는 AGENTS.md만 유지한다.
+
+**Alternatives:** 모든 AGENTS 폴더에 기록을 두는 안은 정체된 AGENTS.md를 세 배로
+늘린다. 중앙 파일 하나에 module 태그를 다는 안은 모듈에서 작업하는 에이전트가 자기
+상태를 바로 읽지 못한다. 채택하지 않는다.
+
+**Consequences:** 기존 날짜별 plan과 results는 설계·증거 기록으로 남고, 최신 상태만
+모듈 `progress.md`로 옮긴다. 이 결정은 기록 구조이며 ARTIFACT/DEVICE/FIELD 판정을
+바꾸지 않는다. ADR의 개별 파일 분리는 후속 단계이며, 분리 후에도 이 Log는 전체
+본문을 담은 생성 파일로 유지해 기존 링크와 시험을 보존한다.
+
+**Validation / Transition:** 파일럿 두 모듈에서 실제 작업 한 사이클을 기록하고 계약
+시험이 통과하면 Accepted로 올린 뒤 나머지 모듈에 적용한다.
+
+**References:** [module harness 설계](../plans/2026-09-15-module-harness-design.md), [폴더 구조 정리](../plans/2026-09-13-folder-structure-governance.md).
+
+---
+
+## D-62 CORE는 필수이고 나머지 런타임은 선택 슬라이스다
+
+**Status:** Accepted (2026-09-16). 설계 결정이며 설치 스크립트·이미지 분리·OMX/AI
+실기 인수와 구분한다.
+
+**Context:** Pi 5와 OMX/AI가 같은 미들웨어를 쓰되, 한 이미지에 모터·Nav2·카메라·팔·
+추론을 다 넣을 수는 없다. 지금 `core|motor|hardware` 모드는 Nav2와 LiDAR를
+hardware에 묶어 두어서 선택 설치가 어렵다. CORE를 프로세스마다 쪼개면 D-1이
+깨진다.
+
+**Decision:** `rosy_core` 프로세스와 `rosy-core` 이미지는 필수 슬라이스다. motor,
+io, nav, vision, omx, ai는 카탈로그에서 고른다. 각 슬라이스는 localhost ROS
+토픽 가족과 프로세스(또는 기존 compose 서비스)를 소유한다. CORE는 슬라이스
+패키지를 import하지 않는다. 꺼진 슬라이스의 capability는 false다. 없는
+슬라이스를 설치 플래그로 조용히 무시하지 않는다. 사이트 버스와 최종 `cmd_vel`은
+바뀌지 않는다.
+
+**Alternatives:** CORE를 메시지 도메인별 노드로 분해하는 안, 단일 이미지+플래그만
+쓰는 안을 검토했다. 전자는 단일 프로세스·단일 publisher를 흔들고, 후자는 Pi
+이미지에 OMX/NPU를 상시 싣는다.
+
+**Consequences:** `board.yaml` presets가 현재 세 모드와 같게 시작해서 호환을 지킨다.
+vision/omx/ai는 카탈로그에만 있고 기본 꺼짐이다. CORE Dockerfile에 이미 있는
+OpenCV/`rosy_control`은 부채이며 이 결정이 제거를 강제하지 않는다.
+
+**Validation / Transition:** 카탈로그 시험, CORE import 가드, install preset 해석,
+core 스테이지가 omx/imu를 COPY하지 않음을 호스트 시험으로 고정한다.
+
+**References:** [선택 슬라이스 설계](../plans/2026-09-16-optional-runtime-slices-design.md), [실행 계획](../plans/2026-09-16-optional-runtime-slices.md).
