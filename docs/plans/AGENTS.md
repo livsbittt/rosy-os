@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-14 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-15 -->
 
 # plans
 
@@ -29,6 +29,8 @@ Dated design and execute plans (2026-08-31 onward). These are the working trail 
 | `2026-09-13-rosy-os-device-validation-implementation-plan.md` | Rosy OS 기능 구현·자동화 시험·ARM64 artifact·Pi Device 설치/readback·Pinky Pro/OMX 현장 승격 gate |
 | `2026-09-14-site-middleware-role-fabric-design.md` | 관제 PC Fleet 서버가 모으고 흩뜨림. 디바이스는 계약 버스만. 역할 단일 (D-59) |
 | `2026-09-14-site-middleware-role-fabric.md` | D-59 실행: 역할 가드 + ROS-free SiteHub gather/scatter (UI·영상·outbound·Pi 제외) |
+| `2026-09-15-navigation-swarm-split-design.md` | 추종을 navigation에서 분리해 `rosy_core.swarm`으로 (D-60) |
+| `2026-09-15-navigation-swarm-split.md` | D-60 실행: poses/manager 이동, navigation import 금지, 동작 불변 |
 
 ## Subdirectories
 
