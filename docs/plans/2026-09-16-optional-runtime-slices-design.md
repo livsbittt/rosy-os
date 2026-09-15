@@ -2,7 +2,7 @@
 
 작성일: 2026-09-16
 
-상태: D-62 Accepted(설계 결정). CORE는 항상 있고, 나머지 슬라이스는 골라 설치한다. OMX·AI·카메라 실기 인수는 이 문서가 GO로 만들지 않는다.
+상태: 카탈로그와 installer가 기존 `core|motor|hardware` 모드에 연결됨. vision/omx/ai는 아직 기동하지 않는다. OMX·AI·카메라 실기 인수는 이 문서가 GO로 만들지 않는다.
 
 관련: D-1, D-22, D-33, D-38, D-48, D-55, D-57, D-58, D-59, D-60 · [runtime maintainability](2026-09-03-runtime-maintainability-rules.md) · [사이트 패브릭](2026-09-14-site-middleware-role-fabric-design.md) · [Device 검증](2026-09-13-rosy-os-device-validation-implementation-plan.md)
 
