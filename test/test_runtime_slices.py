@@ -2,6 +2,7 @@
 
 import ast
 import os
+import shlex
 import shutil
 import subprocess
 from pathlib import Path
@@ -196,13 +197,25 @@ def test_installer_accepts_preset_and_slices_mutually_exclusive():
     assert "mutually exclusive" in text
     assert "resolve_slices_to_mode" in text
     assert "resolve_runtime_mode" in text
-    assert "INSTALL_RUNTIME_MODE" in text
+    assert "ROSY_REQUESTED_PRESET" in text
+    assert "ROSY_REQUESTED_SLICES" in text
+    assert "write_install_runtime_selection" in text
+
+    helper = text[
+        text.index("write_install_runtime_selection() {") : text.index(
+            "write_runtime_environment() {"
+        )
+    ]
+    assert 'set_env_value "$env_file" ROSY_RUNTIME_MODE core' in helper
+    assert "ROSY_REQUESTED_PRESET" in helper
+    assert "ROSY_REQUESTED_SLICES" in helper
+    assert "INSTALL_RUNTIME_MODE" not in helper
 
     env_fn = text[
         text.index("write_runtime_environment() {") : text.index("build_and_start_core() {")
     ]
-    assert "INSTALL_RUNTIME_MODE" in env_fn
-    assert 'set_env_value "$env_file" ROSY_RUNTIME_MODE core' not in env_fn
+    assert "write_install_runtime_selection" in env_fn
+    assert "INSTALL_RUNTIME_MODE" not in env_fn
 
     start_fn = text[
         text.index("build_and_start_core() {") : text.index("enable_boot_service() {")
@@ -213,3 +226,76 @@ def test_installer_accepts_preset_and_slices_mutually_exclusive():
     main = text[text.index("main() {"):]
     assert "parse_install_cli" in main
     assert main.index("parse_install_cli") < main.index("write_runtime_environment")
+    assert "PASS: Rosy core-only runtime is installed and healthy" in main
+    assert "hardware runtime is installed" not in main.lower()
+
+
+def _drive_install_cli(*args: str) -> subprocess.CompletedProcess:
+    """Parse installer CLI and write the runtime-selection keys to a temp env."""
+    quoted = " ".join(shlex.quote(a) for a in args)
+    script = f"""
+    set -euo pipefail
+    lib="$(mktemp)"
+    sed '$d' ./install-pi.sh > "$lib"
+    # shellcheck disable=SC1090
+    source "$lib"
+    SCRIPT_DIR="$(pwd)"
+    parse_install_cli {quoted}
+    env_file="$(mktemp)"
+    write_install_runtime_selection "$env_file"
+    cat "$env_file"
+    """
+    return subprocess.run(
+        [BASH, "-c", script],
+        cwd=str(DEPLOY),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+
+
+def _env_map(text: str) -> dict[str, str]:
+    values = {}
+    for line in text.splitlines():
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key] = value
+    return values
+
+
+@bash_only
+def test_installer_preset_hardware_keeps_runtime_core_and_records_request():
+    result = _drive_install_cli("--preset", "hardware")
+    assert result.returncode == 0, result.stderr
+    env = _env_map(result.stdout)
+    assert env.get("ROSY_RUNTIME_MODE") == "core"
+    assert env.get("ROSY_REQUESTED_PRESET") == "hardware"
+    assert "ROSY_REQUESTED_SLICES" not in env
+
+
+@bash_only
+def test_installer_slices_core_motor_keep_runtime_core_and_record_slices():
+    result = _drive_install_cli("--slices", "core,motor")
+    assert result.returncode == 0, result.stderr
+    env = _env_map(result.stdout)
+    assert env.get("ROSY_RUNTIME_MODE") == "core"
+    assert env.get("ROSY_REQUESTED_SLICES") == "core,motor"
+    assert env.get("ROSY_RUNTIME_MODE") != "motor"
+
+
+@bash_only
+def test_installer_still_rejects_slices_without_core():
+    result = _drive_install_cli("--slices", "motor")
+    assert result.returncode != 0
+    assert "core" in result.stderr.lower()
+
+
+@bash_only
+def test_installer_still_rejects_omx_slice():
+    result = _drive_install_cli("--slices", "core,omx")
+    assert result.returncode != 0
+    err = result.stderr.lower()
+    assert "slice not installable yet" in err or "unknown slice" in err
