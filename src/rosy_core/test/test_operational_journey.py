@@ -3,6 +3,8 @@ import time
 
 from rosy_core.command.manager import Twist
 
+from conftest import SERVING_CAPS
+
 ADMIN = {"Authorization": "Bearer rosy-dev-admin"}
 OPERATOR = {"Authorization": "Bearer rosy-dev-operator"}
 VIEWER = {"Authorization": "Bearer rosy-dev-viewer"}
@@ -20,7 +22,7 @@ class NavigationPort:
 
 
 def test_boot_teleop_disconnect_navigation_estop_and_restart(core_client):
-    client, services = core_client()
+    client, services = core_client(capabilities=SERVING_CAPS)
     port = NavigationPort()
     services.nav.executor = port
     assert client.get("/api/v1/system/info", headers=VIEWER).status_code == 200
@@ -42,6 +44,6 @@ def test_boot_teleop_disconnect_navigation_estop_and_restart(core_client):
     assert services.command.select_output() == Twist()
     assert client.post("/api/v1/mode", json={"mode": "MANUAL"}, headers=OPERATOR).status_code == 200
     assert port.cancels >= 1
-    restarted_client, restarted = core_client()
+    restarted_client, restarted = core_client(capabilities=SERVING_CAPS)
     assert restarted_client.get("/api/v1/system/info", headers=VIEWER).status_code == 200
     assert restarted.command.select_output() == Twist()

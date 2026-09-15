@@ -10,13 +10,17 @@ from __future__ import annotations
 import pytest
 from rosy_core.protocol.schemas import SwarmRole
 
+from conftest import SERVING_CAPS
+
 OPERATOR = {"Authorization": "Bearer rosy-dev-operator"}
 VIEWER = {"Authorization": "Bearer rosy-dev-viewer"}
 
 
 @pytest.fixture
 def client(core_client):
-    return core_client()
+    # Packaged default is runtime.mode core (swarm/nav off). These tests
+    # exercise the SWM-002 routes, so they opt into a serving advertisement.
+    return core_client(capabilities=SERVING_CAPS)
 
 
 FOLLOW = {"target_robot_id": "rosy_02", "distance": 0.5, "lateral": 0.0}

@@ -86,7 +86,7 @@ def test_reset_without_an_executor_is_501_and_publishes_nothing(core_client, eve
 
 def test_reset_with_an_executor_that_cannot_reset_is_501_and_publishes_nothing(
         core_client, events):
-    client, svc = core_client()
+    client, svc = core_client(capabilities={"slam": True})
     svc.nav.executor = RefusingExecutor()
     svc.nav.start_mapping(source="test")
     seen = events(svc)
@@ -145,7 +145,7 @@ def test_reset_without_an_open_session_is_400_not_a_quiet_200(core_client, event
     this reuses its error rather than inventing a second vocabulary for one
     situation.
     """
-    client, svc = core_client()
+    client, svc = core_client(capabilities={"slam": True})
     svc.nav.executor = RefusingExecutor()
     seen = events(svc)
 

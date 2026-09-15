@@ -36,6 +36,7 @@ class RosyCoreNode(Node):
         self._api_thread: Optional[threading.Thread] = None
         self._api_server = None
 
+        from rosy_core.capability import bind_capability
         from rosy_core.profile import RobotProfile
         import yaml
 
@@ -44,7 +45,9 @@ class RosyCoreNode(Node):
         capability_path = _resolve_path(config, "capabilities",
                                         Path(__file__).resolve().parent.parent / "config" / "capabilities.yaml")
         profile = RobotProfile.load(profile_path)
-        capability_data = yaml.safe_load(capability_path.read_text(encoding="utf-8"))
+        advertised = yaml.safe_load(capability_path.read_text(encoding="utf-8")) or {}
+        mode = str((config.get("runtime") or {}).get("mode") or "core")
+        capability_data = bind_capability(profile, mode, advertised).to_dict()
 
         waypoints_path = Path.home() / ".rosy" / "waypoints.json"
         self.core = CoreServices.build(config, profile, capability_data, waypoints_path)

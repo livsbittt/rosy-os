@@ -13,7 +13,7 @@ Default robot config, Pinky Pro hardware profile, and static capability YAML. In
 |------|-------------|
 | `rosy_default.yaml` | CFG-001 defaults: robot id, API port 8080, auth tokens, safety/battery curve, power, navigation |
 | `profile.pinky_pro.yaml` | HWA-001 Pinky Pro profile (model, max velocities, geometry) |
-| `capabilities.yaml` | CAP-001 static flags (D-11); must match the profile (HWA-003) |
+| `capabilities.yaml` | CAP-001 advertisement for packaged `runtime.mode: core`. Must equal `derive_capability(profile, mode)` |
 
 ## Subdirectories
 

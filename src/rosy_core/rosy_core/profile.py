@@ -29,3 +29,21 @@ class RobotProfile:
     def max_angular_velocity(self) -> Optional[float]:
         v = self._data.get("max_angular_velocity")
         return float(v) if v is not None else None
+
+    @property
+    def sensor_names(self) -> tuple[str, ...]:
+        raw = self._data.get("sensors") or []
+        names: list[str] = []
+        for item in raw:
+            if isinstance(item, str) and item.strip():
+                names.append(item.strip())
+            elif isinstance(item, dict):
+                names.extend(str(key) for key in item.keys())
+        return tuple(names)
+
+    @property
+    def docking_supported(self) -> bool:
+        docking = self._data.get("docking")
+        if isinstance(docking, dict):
+            return bool(docking.get("supported"))
+        return bool(docking)

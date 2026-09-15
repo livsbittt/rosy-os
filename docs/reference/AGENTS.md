@@ -23,7 +23,7 @@ None.
 
 ### Working In This Directory
 
-- Schema source of truth for Python is still `rosy_core.protocol.schemas` (D-18); this API ref is the human contract.
+- Schema source of truth for Python is `rosy_core.protocol.schemas` and `CapabilityDescriptor` (D-18, HWA-003). Implemented API Ref chapters are the human contract; §10 Fleet REST is backlog.
 - Host Agent: CORE client is `rosy_core.system.host_agent_client`; server is `deploy/release/host_agent.py`.
 - Important ADRs: D-1 single process, D-2 cmd_vel mux, D-3 FastAPI replaces Flask, D-8 in-process event bus, D-22 Core/IO split + deadman, D-23 embedded dashboard, D-24/D-25 power (STANDBY not hibernate), D-27 deep-battery halt exception, D-33 robot identity from one robot number (supersedes D-6), D-34 publish rates matched to the consumer, D-38 CORE owns final cmd_vel, D-59 site fabric is a per-role contract bus, D-60 swarm follow is not owned by navigation.
 

@@ -131,7 +131,10 @@ class FakeExecutor:
 def client(tmp_path):
     config = yaml.safe_load((CONFIG_DIR / "rosy_default.yaml").read_text(encoding="utf-8"))
     profile = RobotProfile.load(CONFIG_DIR / "profile.pinky_pro.yaml")
-    caps = yaml.safe_load((CONFIG_DIR / "capabilities.yaml").read_text(encoding="utf-8"))
+    from rosy_core.capability import derive_capability
+
+    caps = derive_capability(profile, "hardware").to_dict()
+    caps["slam"] = True
     services = CoreServices.build(config, profile, caps, tmp_path / "wp.json")
     services.nav.executor = FakeExecutor()
     return TestClient(create_app(config, services)), services

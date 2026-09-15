@@ -2,13 +2,14 @@
 ## 공유 인터페이스 계약서
 
 **Document ID:** ROSY-API-REF-001
-**Version:** v1.7
+**Version:** v1.8
 **Status:** Approved
 **대상 독자:** rosy_core 개발자, rosy_fleet 개발자, 외부 SDK·AI·연동 시스템
 
-> **거버넌스:** 본 문서는 로봇(rosy_core)과 Fleet(rosy_fleet)이 **공유하는 유일한 인터페이스 계약**이다.
-> 본 문서의 변경은 양측 합의 + 문서 버전 업을 통해서만 가능하며(일방 변경 금지), 구현은 본 문서에 명시된 스키마를 임의로 확장하지 않는다.
-> 구현 시 본 문서를 OpenAPI(YAML)로 기계 판독 가능하게 유지하는 것을 원칙으로 한다(계약 테스트의 원천).
+> **거버넌스:** 로봇이 실제로 말하는 면(§2–§8, §9.1 Capability, §9.4 Profile, §9.5 Command 추적)이 **구현된 공유 계약**이다.
+> 기계 원천은 `rosy_core.protocol.schemas` 와 `rosy_core.capability.CapabilityDescriptor` 이다 (D-18, HWA-003). FastAPI `/openapi.json` 은 라우트 모델에서 **파생**된다. 커밋된 OpenAPI YAML 파일은 없다.
+> §9.3 Mission DSL 과 §10 Fleet REST 는 Fleet 서버 백로그다. 로봇 계약이 아니며, `rosy_fleet` 씨앗도 이 경로를 서빙하지 않는다.
+> 본 문서의 구현된 장을 바꿀 때는 스키마·시험을 같은 변경에 넣는다. 구현 없는 장을 로봇이 말하는 것처럼 쓰지 않는다.
 
 **관련 문서:** ROSY-CORE-SRS-001 / ROSY-FLEET-SRS-001 / ROSY-ADR-001 / ROSY-PLN-001
 
@@ -43,7 +44,7 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 
 ### API-004 원천 일관성
 
-본 문서와 구현 OpenAPI 간 불일치 발견 시 본 문서를 우선하고, 수정은 합의 후 양측에 동시 반영한다. 계약 테스트(Implementation Plan §테스트)가 불일치를 회귀 차단한다.
+구현된 장과 pydantic 스키마가 어긋나면 **스키마와 시험이 우선**하고, 이 문서를 같은 변경에서 고친다. FastAPI가 런타임에 뿌리는 OpenAPI는 파생물이다. 저장소에 OpenAPI YAML을 계약 원천으로 두지 않는다.
 
 ---
 
@@ -433,21 +434,27 @@ close code: `4401` 은 토큰이 없거나 틀린 것(`/ws/state` 와 동일), `
 
 ## 9.1 Capability Descriptor (CAP-001)
 
+기계 스키마는 `CapabilityDescriptor` (`extra=forbid`) 이다. 광고 내용은 **Robot Profile ∩ runtime mode** 에서 유도한다 (HWA-003). YAML 파일은 그 결과와 같아야 하며, 모드가 `core` 인데 `slam`/`swarm` 을 true 로 적을 수 없다.
+
+패키지 기본(`rosy_default.yaml` `runtime.mode: core`) 예:
+
 ```json
 {
   "capability_version": 1,
-  "navigation": { "goal_navigation": true, "return_home": true,
+  "navigation": { "goal_navigation": false, "return_home": false,
                   "max_linear_velocity": 0.2, "max_angular_velocity": 0.8 },
-  "teleop": true,
-  "slam": true,
-  "swarm": { "follow": true, "lead": true },
-  "docking": { "supported": false },   // true 이면 DNC-004~006 전체가 활성
-  "sensors": ["lidar", "imu", "battery", "encoder"],
-  "events": ["nav.*", "safety.*"],
+  "teleop": false,
+  "slam": false,
+  "swarm": { "follow": false, "lead": false },
+  "docking": { "supported": false },
+  "sensors": [],
+  "events": ["safety.*", "mode.*", "waypoint.*", "system.*", "command.*"],
   "api_versions": ["v1"],
   "protocol_version": "1.0"
 }
 ```
+
+`hardware` 모드는 Nav2/teleop 를 켜고 slam/swarm 은 현장 인수 전까지 false 다. `true` 이면 DNC-004~006 전체가 활성인 `docking.supported` 와 같이, 서빙되는 경로가 있을 때만 켠다.
 
 ## 9.2 Waypoint (WPT-001)
 
@@ -456,7 +463,11 @@ close code: `4401` 은 토큰이 없거나 틀린 것(`/ws/state` 와 동일), `
   "map_id": "warehouse_a", "metadata": { "label": "충전독 앞" } }
 ```
 
-## 9.3 Mission DSL v1 (MSN-001)
+## 9.3 Mission DSL v1 (MSN-001) — 미구현, 로봇 계약 아님
+
+미션 DSL 은 로봇에 넣지 않는다 (D-12). 아래는 Fleet 서버가 생길 때의 목표 초안이며, CORE 가 파싱하거나 저장하지 않는다.
+
+## 9.3.1 초안
 
 ```json
 { "mission_id": "patrol_evening",
@@ -496,9 +507,11 @@ profile:
 
 ---
 
-# 10. Fleet REST API 카탈로그
+# 10. Fleet REST API 카탈로그 — 미구현 백로그
 
-Fleet(rosy_fleet)이 제공하는 엔드포인트. Base: `http://<fleet-host>:8081`
+이 장은 로봇 공유 계약이 아니다. Fleet 서버는 없고, `src/rosy_fleet` 씨앗은 이 경로를 열지 않는다. 사이트 오케스트레이션은 로봇 CORE REST/WS(§5–§8) 와 pose 릴레이만 쓴다 (D-59). 아래 표는 서버가 생길 때의 목표 목록이다.
+
+Fleet 목표 Base: `http://<fleet-host>:8081`
 
 ## 10.1 로봇·페어링
 
@@ -557,6 +570,7 @@ Fleet(rosy_fleet)이 제공하는 엔드포인트. Base: `http://<fleet-host>:80
 
 | 버전 | 일자 | 내용 |
 |---|---|---|
+| v1.8 | 2026-09-16 | 정정: 기계 원천은 pydantic (`schemas.py`, `CapabilityDescriptor`). 커밋된 OpenAPI YAML 은 없다. CAP-001 은 Profile∩mode 유도이며 패키지 기본은 `core` 광고. §9.3·§10 은 Fleet 백로그로 표시 (구현된 로봇 계약에서 분리). |
 | v1.7 | 2026-09-06 | Additive: §7.8 pose payload 에 `map_id` — 다른 맵의 참조 pose 는 목표가 되지 않고 `swarm.hold(map_mismatch)` 를 낸다(MAP-002 를 추종으로 확장). `swarm/state` 에 `max_speed`·`map_mismatch`, `safety/state` 에 `limits.session_linear` 추가. `max_speed` 는 이제 검증만이 아니라 실제 상한으로 적용된다. 그리고 정정: `slam/reset` 은 리셋하지 않았는데도 200 을 돌려주고 있었다. 런타임 미지원은 501 `CAPABILITY_NOT_SUPPORTED`, 세션 없음은 400 `VALIDATION_ERROR` 로 답한다 — CAP-003 준수 시정이며 의미 변경이 아니다(200 쪽이 위반이었다). D-32 |
 | v1.6 | 2026-09-06 | Additive: DIAG-001 `diagnostics` 조회 구현. 군집 추종 구현 — `swarm/follow·cancel·state` 가 실제로 서빙되고, `/ws/swarm/pose`(SWM-003)·`/ws/swarm/reference`(SWM-007) 소켓 신설(§7.8, D-31). `swarm/state` 에 `holding`·`target_robot_id`·`source`·`stream_age_s` 추가 |
 | v1.5 | 2026-09-06 | Additive: 현장 설정 — `PUT system/info`, `system/tokens/*`, `system/runtime`, `host/*` 릴레이 카탈로그(§5.7) 신설. `safety/limits` 에 `fleet_loss_policy`·배터리 임계값 추가(SAF-004/005). 미구현 상태였던 `diagnostics/*`·`ros/*`·`swarm/*` 행에 표시. 토큰은 해시 저장이며 목록은 불투명 `id` 로 식별한다(D-30) |

@@ -34,6 +34,26 @@ def client(tmp_path, monkeypatch):
     return TestClient(app), services
 
 
+@pytest.fixture
+def serving_client(tmp_path, monkeypatch):
+    """Hardware-mode advertisement: Nav2/teleop routes exist and are allowed."""
+    httpx = pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from rosy_core.capability import derive_capability
+
+    monkeypatch.setattr("rosy_core.config.LOCAL_CONFIG_PATH", tmp_path / "rosy.yaml")
+    monkeypatch.delenv("ROSY_CONFIG", raising=False)
+    config = yaml.safe_load(
+        (Path(__file__).parent.parent / "config" / "rosy_default.yaml").read_text(encoding="utf-8")
+    )
+    config.setdefault("runtime", {})["mode"] = "hardware"
+    profile = RobotProfile.load(Path(__file__).parent.parent / "config" / "profile.pinky_pro.yaml")
+    caps = derive_capability(profile, "hardware").to_dict()
+    services = CoreServices.build(config, profile, caps, tmp_path / "wp.json")
+    app = create_app(config, services)
+    return TestClient(app), services
+
+
 ADMIN = {"Authorization": "Bearer rosy-dev-admin"}
 OPERATOR = {"Authorization": "Bearer rosy-dev-operator"}
 VIEWER = {"Authorization": "Bearer rosy-dev-viewer"}
@@ -174,7 +194,9 @@ def test_system_info_and_capabilities(client):
     assert r.json()["hardware_model"] == "Pinky Pro"
     assert r.json()["runtime_mode"] == "core"
     r = tc.get("/api/v1/system/capabilities", headers=VIEWER)
-    assert r.json()["swarm"] == {"follow": True, "lead": True}
+    assert r.json()["swarm"] == {"follow": False, "lead": False}
+    assert r.json()["slam"] is False
+    assert r.json()["teleop"] is False
 
 
 def test_system_runtime_requires_viewer_and_returns_safe_snapshot(client):
@@ -199,8 +221,8 @@ def test_system_runtime_requires_viewer_and_returns_safe_snapshot(client):
     assert "rosy-dev-admin" not in response.text
 
 
-def test_auth_roles(client):
-    tc, _ = client
+def test_auth_roles(serving_client):
+    tc, _ = serving_client
     assert tc.get("/api/v1/robot/state").status_code == 401            # UNAUTHORIZED
     assert tc.get("/api/v1/robot/state", headers=VIEWER).status_code == 200
     assert tc.post("/api/v1/teleop", json={}, headers=VIEWER).status_code == 403   # FORBIDDEN
@@ -208,8 +230,8 @@ def test_auth_roles(client):
     assert tc.post("/api/v1/safety/release", headers=OPERATOR).status_code == 403  # release는 Admin
 
 
-def test_teleop_flow_and_watchdog_zero(client):
-    tc, svc = client
+def test_teleop_flow_and_watchdog_zero(serving_client):
+    tc, svc = serving_client
     assert tc.post("/api/v1/mode", json={"mode": "MANUAL"}, headers=OPERATOR).status_code == 200
     r = tc.post("/api/v1/teleop", json={"linear": 0.1, "angular": 0.0}, headers=OPERATOR)
     assert r.status_code == 200
@@ -243,8 +265,8 @@ def test_navigation_mode_requires_capability_and_clears_stale_twist(client):
     assert svc.command.select_output().linear == 0.0
 
 
-def test_a_goal_enters_navigation_mode_so_nav_cmd_vel_reaches_the_wheels(client):
-    tc, svc = client
+def test_a_goal_enters_navigation_mode_so_nav_cmd_vel_reaches_the_wheels(serving_client):
+    tc, svc = serving_client
 
     class LocalExecutor:
         def send_goal(self, spec):
@@ -446,8 +468,8 @@ def test_admin_speed_limits_persist_to_local_overlay(client, tmp_path, monkeypat
     assert reloaded["safety"]["manual_linear"] == pytest.approx(0.09)
 
 
-def test_waypoints_crud_and_goal(client):
-    tc, svc = client
+def test_waypoints_crud_and_goal(serving_client):
+    tc, svc = serving_client
     wp = {"name": "zone_a", "x": 1.5, "y": 2.5, "yaw": 0.0, "map_id": None, "metadata": {}}
     assert tc.post("/api/v1/waypoints", json=wp, headers=OPERATOR).status_code == 201
     dup = tc.post("/api/v1/waypoints", json=wp, headers=OPERATOR)

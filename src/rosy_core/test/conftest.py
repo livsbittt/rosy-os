@@ -15,6 +15,20 @@ import yaml
 
 CONFIG_DIR = Path(__file__).parent.parent / "config"
 
+# Opt-in advertisement for tests that exercise Nav2/SLAM/swarm routes.
+# Packaged capabilities.yaml follows runtime.mode core and keeps those flags off.
+SERVING_CAPS = {
+    "navigation": {
+        "goal_navigation": True,
+        "return_home": True,
+        "max_linear_velocity": 0.20,
+        "max_angular_velocity": 0.80,
+    },
+    "teleop": True,
+    "slam": True,
+    "swarm": {"follow": True, "lead": True},
+}
+
 
 @pytest.fixture
 def core_client(tmp_path):
