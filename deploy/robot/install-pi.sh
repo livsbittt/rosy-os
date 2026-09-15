@@ -11,10 +11,47 @@ RUN_USER="${ROSY_RUN_USER:-${SUDO_USER:-rosy}}"
 INITIAL_CREDENTIALS="/etc/rosy/initial-credentials.txt"
 INITIAL_CREDENTIALS_CREATED=0
 UPGRADE_GUARD_ACTIVE=0
+INSTALL_RUNTIME_MODE="core"
 
 fail() {
     echo "FAIL: $*" >&2
     exit 1
+}
+
+# --preset names a catalog mode/alias; --slices names a set that must match a
+# preset. Both map onto ROSY_RUNTIME_MODE. vision/omx/ai are not installable yet.
+parse_install_cli() {
+    local preset="" slices=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --preset)
+                [[ $# -ge 2 && -n "${2:-}" && "$2" != --* ]] || fail "--preset requires a value"
+                [[ -z "$slices" ]] || fail "--preset and --slices are mutually exclusive"
+                [[ -z "$preset" ]] || fail "--preset specified more than once"
+                preset="$2"
+                shift 2
+                ;;
+            --slices)
+                [[ $# -ge 2 && -n "${2:-}" && "$2" != --* ]] || fail "--slices requires a value"
+                [[ -z "$preset" ]] || fail "--preset and --slices are mutually exclusive"
+                [[ -z "$slices" ]] || fail "--slices specified more than once"
+                slices="$2"
+                shift 2
+                ;;
+            *)
+                fail "unknown argument: $1"
+                ;;
+        esac
+    done
+
+    # shellcheck source=config/resolve-mode.sh
+    source "$SCRIPT_DIR/config/resolve-mode.sh"
+    local board="$SCRIPT_DIR/config/board.yaml"
+    if [[ -n "$preset" ]]; then
+        INSTALL_RUNTIME_MODE="$(resolve_runtime_mode "$preset" "$board")" || exit $?
+    elif [[ -n "$slices" ]]; then
+        INSTALL_RUNTIME_MODE="$(resolve_slices_to_mode "$slices" "$board")" || exit $?
+    fi
 }
 
 on_install_exit() {
@@ -290,7 +327,7 @@ write_runtime_environment() {
     set_env_default "$env_file" ROSY_MOTOR_PROFILE_ACCELERATION 200
     set_env_value "$env_file" ROSY_CONFIG_PATH "$ROSY_CONFIG"
     set_env_value "$env_file" ROSY_DATA_PATH "$ROSY_DATA"
-    set_env_value "$env_file" ROSY_RUNTIME_MODE core
+    set_env_value "$env_file" ROSY_RUNTIME_MODE "${INSTALL_RUNTIME_MODE:-core}"
     chown root:"$run_group" "$env_file"
     chmod 0640 "$env_file"
 }
@@ -337,6 +374,7 @@ enable_boot_service() {
 }
 
 main() {
+    parse_install_cli "$@"
     require_root
     preflight_host
     stop_existing_runtime
