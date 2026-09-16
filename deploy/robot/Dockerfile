@@ -12,9 +12,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Hub linux/arm64 ros:jazzy-ros-base from 2026-09-16 ships 0-byte CPython
 # sources (stdlib, debpython, colcon, packaging, numpy, ...). Reinstall
 # from Ubuntu ports in this order: stdlib first (so python3 runs), then
-# python3-minimal, then every installed python3-* package. Later stages
-# still --reinstall pip/numpy/yaml. No-op on a healthy amd64 or native
-# Pi image of the same packages.
+# python3-minimal, then every installed python3-* package via the helper
+# script (inline $ vars are eaten by Dockerfile substitution). Later
+# stages still --reinstall pip/numpy/yaml. No-op on a healthy amd64 or
+# native Pi image of the same packages.
+COPY deploy/robot/restore-hollow-python.sh /tmp/restore-hollow-python.sh
 RUN apt-get -o Acquire::Retries=5 update \
     && apt-get install --reinstall -y --no-install-recommends \
         libpython3.12-minimal \
@@ -22,10 +24,8 @@ RUN apt-get -o Acquire::Retries=5 update \
     && apt-get install --reinstall -y --no-install-recommends \
         python3-minimal \
         python3 \
-    && py_pkgs="$(dpkg-query -W -f='$${Package}\n' | grep '^python3-' || true)" \
-    && if [ -n "$$py_pkgs" ]; then \
-         apt-get install --reinstall -y --no-install-recommends $$py_pkgs; \
-       fi \
+    && bash /tmp/restore-hollow-python.sh \
+    && rm -f /tmp/restore-hollow-python.sh \
     && apt-get install -y --no-install-recommends \
         ros-jazzy-rmw-cyclonedds-cpp \
     && rm -rf /var/lib/apt/lists/*
