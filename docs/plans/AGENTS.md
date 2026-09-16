@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-15 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-16 -->
 
 # plans
 
@@ -31,6 +31,8 @@ Dated design and execute plans (2026-08-31 onward). These are the working trail 
 | `2026-09-14-site-middleware-role-fabric.md` | D-59 실행: 역할 가드 + ROS-free SiteHub gather/scatter (UI·영상·outbound·Pi 제외) |
 | `2026-09-15-navigation-swarm-split-design.md` | 추종을 navigation에서 분리해 `rosy_core.swarm`으로 (D-60) |
 | `2026-09-15-navigation-swarm-split.md` | D-60 실행: poses/manager 이동, navigation import 금지, 동작 불변 |
+| `2026-09-16-concept-runtime-alignment-design.md` | Concept Node/Device/Capability mapped onto CORE + D-62; apt/rosyctl deferred (D-63 Proposed) |
+| `2026-09-16-concept-runtime-alignment.md` | Execution: identity one plane, inventory API, adapter manifests, TaskKind, Control launch guard |
 
 ## Subdirectories
 

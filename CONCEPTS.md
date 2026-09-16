@@ -28,6 +28,50 @@ A recorded refusal that stops a unit's runtime from starting after a release fai
 
 A hold is evaluated before the runtime starts, and its verdict is specifically "does this block the runtime" rather than "did everything succeed" — the two differ, and keying on the latter is how a held device boots anyway. The gate expresses its verdict as a process exit status, and nothing in the boot path may retry or restart past it, since either would convert a hold into a boot.
 
+## Domain objects
+
+v1 maps the concept OS objects onto CORE + D-62 slices (D-63). Code names below are the types that will hold this data; they are not a second runtime.
+
+### Node
+The computer that runs CORE — hostname, architecture, OS, software version, runtime mode, and active slices.
+
+*Code:* `RuntimeNode`
+
+*Avoid:* rclpy node. ROS nodes stay an implementation detail inside the CORE process (D-1).
+
+### Device
+The physical robot CORE manages. Its `device_id` is the robot id (the ROS namespace derived from the Robot number).
+
+*Code:* `Device`
+
+*Avoid:* treating Nav2, a driver, or a compose service as a Device.
+
+### Component
+A functional part of a Device — drivetrain, lidar, encoder, and the rest listed from the mounted hardware YAML or capabilities.
+
+*Code:* `Component`
+
+### Capability
+An advertised boolean or descriptor of what the Device can do. It is not a scheduler and does not start work.
+
+*Code:* `Capability`, `CapabilityDescriptor`
+
+*Avoid:* `rosy-profile-*` as a capability. Install presets and D-62 slices are not capabilities.
+
+### Asset
+v1 is the single Device (`type=mobile_base`, `asset_id=robot_id`).
+
+*Code:* `Asset`
+
+A composite Pinky+OMX MobileManipulator is not an Asset yet (concept 09 / concept 13 Phase 5).
+
+### Task
+An atomic REST action the robot will run (`TaskKind`: move, navigate, follow, dock, and the like).
+
+*Code:* `TaskKind`
+
+*Avoid:* workflow or mission — those belong to Fleet (D-12).
+
 ## Swarm formation
 
 ### Reference stream
@@ -51,4 +95,6 @@ Every formation shape reduces to one slot offset per follower, so changing shape
 
 - "Robot id" had been used for both the Robot number and the namespace derived from it — these are distinct, and only the number is supplied by a person.
 - "Hold" in swarm material means the formation-wide stop made by withholding the stream; "e-stop" is the robot's own emergency path and is faster. The two are not interchangeable even though both leave robots stationary.
-- "Profile" is used by the container tooling for its own service grouping; Runtime mode is the project concept, and the two are not interchangeable even where they share names.
+- "Profile" still means Compose service grouping or hardware YAML; Runtime mode is the staged install preset (core, then motor, then hardware). D-62 slices are the install units. None of these is a Capability, and they are not interchangeable even where they share names.
+- "Node" in this glossary is the computer running CORE (`RuntimeNode`), not an rclpy node.
+- "Task" here is an atomic REST action; Fleet missions and concept 08 workflows are a different object (D-12).
