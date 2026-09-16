@@ -17,7 +17,7 @@ The pair of a robot's DDS domain and its ROS namespace, derived together from on
 The two halves must agree, because separating robots by domain alone still leaves their topic names colliding. Identity is device state, not repository content: no template, installer default, or compose default supplies it, and a missing identity stops the runtime rather than being filled in — a default is what once shipped every unit with the same one. Re-provisioning a unit under a different number fails loudly instead of renumbering it in place, and all derived values are validated before any of them is written, so a unit is never left half-migrated.
 
 ### Runtime mode
-The staged capability level a unit runs at: core, then motor, then hardware, each admitting more physical hardware than the last.
+The staged install/hardware preset a unit runs at: core, then motor, then hardware, each admitting more physical hardware than the last.
 
 *Avoid:* profile
 
@@ -40,7 +40,7 @@ The computer that runs CORE — hostname, architecture, OS, software version, ru
 *Avoid:* rclpy node. ROS nodes stay an implementation detail inside the CORE process (D-1).
 
 ### Device
-The physical robot CORE manages. Its `device_id` is the robot id (the ROS namespace derived from the Robot number).
+The physical robot CORE manages. Its `device_id` is the ROS namespace derived from the Robot number.
 
 *Code:* `Device`
 

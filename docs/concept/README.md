@@ -85,7 +85,7 @@ ROSY OS uses six primary domain objects:
 | 12 Dataset & learning | — | **target-not-built** |
 | 13 Current-to-target | this design (Phase 0 = freeze terms) | in progress |
 | 14 Verification | Device validation plan | Device GO not claimed |
-| 15 Ubuntu modular install | D-62 slices (`core` / `motor` / `io` / `nav` presets), not apt/`rosyctl` | apt path **target-not-built** |
+| 15 Ubuntu modular install | D-62 slices via runtime-mode presets core/motor/hardware (hardware → core+motor+io+nav), not apt/`rosyctl` | apt path **target-not-built** |
 
 ## First Refactoring Priority
 

@@ -1,7 +1,7 @@
 # Concept Runtime Alignment Design
 
 작성일: 2026-09-16
-상태: pending approval (설계). 코드·ADR 본문 반영은 실행 계획.
+상태: D-65 Proposed 기록됨. 남은 실행은 identity / inventory / manifests.
 
 관련: D-1, D-2, D-11, D-12, D-17, D-22, D-33, D-38, D-57, D-62 ·
 [concept 00–04, 06–08, 13, 15](../concept/README.md) ·
