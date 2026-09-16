@@ -113,9 +113,10 @@ zero as octal and would derive domain 43 for `03` but domain 48 for `010` (D-33)
 sudo ROSY_ROBOT_NUMBER=3 /opt/rosy/deploy/robot/install-pi.sh
 ```
 
-The installer writes `ROS_DOMAIN_ID=43` and `ROSY_NAMESPACE=rosy_03` into `.env`
-only if they are not already set. Omitting `ROSY_ROBOT_NUMBER` is a hard failure,
-not a default — a default is what once shipped every unit as 42/`rosy_01`.
+The installer writes `ROSY_ROBOT_NUMBER=3`, `ROS_DOMAIN_ID=43` and
+`ROSY_NAMESPACE=rosy_03` into `.env` only if they are not already set. Omitting
+`ROSY_ROBOT_NUMBER` is a hard failure, not a default — a default is what once
+shipped every unit as 42/`rosy_01`.
 
 #### Renumbering a unit that is already commissioned
 
@@ -124,8 +125,9 @@ the existing and the derived value, so a live robot is never renumbered mid-miss
 To renumber deliberately:
 
 1. Stop the runtime: `sudo /opt/rosy/deploy/robot/runtime-mode.sh down`
-2. Edit both keys together — they must stay consistent:
+2. Edit all three keys together — they must stay consistent:
    ```bash
+   sudo sed -i 's/^ROSY_ROBOT_NUMBER=.*/ROSY_ROBOT_NUMBER=3/' /opt/rosy/deploy/robot/.env
    sudo sed -i 's/^ROS_DOMAIN_ID=.*/ROS_DOMAIN_ID=43/' /opt/rosy/deploy/robot/.env
    sudo sed -i 's/^ROSY_NAMESPACE=.*/ROSY_NAMESPACE=rosy_03/' /opt/rosy/deploy/robot/.env
    ```

@@ -33,6 +33,8 @@ Robot middleware (ROSY-CORE-SRS-001). One process: rclpy node `rosy_core` + uvic
 - Policy modules (`command`, `safety`, `power`, `docking`, `state`, `events`, `protocol`) must stay ROS-import-free so pytest can run on Windows/CI without rclpy.
 - `CoreServices` in `services.py` is the DI container. Wire new managers there, then expose via API routes.
 - Do not publish `cmd_vel` from API or Nav2. CommandManager.select_output() is the only source; bridge publishes at 50 Hz (D-2).
+- Identity: `robot.id` follows `ROSY_NAMESPACE` / robot number. `PUT /api/v1/system/info` may rename; rebinding `robot_id` is `409 IDENTITY_LOCKED` (D-33, D-65).
+- Inventory: `GET /api/v1/system/inventory` is a derived snapshot (Node/Device/Component/Asset/TaskKind ids). `GET /api/v1/system/capabilities` stays CAP-001.
 - Battery deep shutdown: write sentinel JSON only. Host unit performs halt.
 - Optional ROS pkgs: wrap slam_toolbox (and similar) in constructor try/except.
 

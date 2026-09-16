@@ -36,31 +36,15 @@ Every existing module must be classified as:
 
 ### Phase 0 - Freeze Architecture Terms
 
-Finalize:
-
-- Node
-- Device
-- Component
-- Capability
-- Asset
-- Task
+Done in glossary (D-65, `CONCEPTS.md`): Node, Device, Component, Capability, Asset, Task mapped onto CORE + D-62 slices.
 
 ### Phase 1 - Introduce ROSY Base Runtime
 
-Create:
-
-- identity
-- profiles
-- lifecycle
-- plugin manager
-- heartbeat
+Done for v1 identity + inventory: robot number / namespace bind, `GET /api/v1/system/inventory`, derived DeviceState. Not done: apt `rosy-runtime-base`, dynamic plugin manager, separate heartbeat timer (CORE-001 snapshot remains the heartbeat).
 
 ### Phase 2 - Move Device-Specific Code
 
-Move:
-
-- Pinky code to Pinky adapter
-- OMX code to OMX adapter
+Manifests, not a package move: `rosy_bringup/config/adapter.manifest.yaml` (Pinky) and `rosy_omx_adapter/config/adapter.manifest.yaml` (disabled). UART/Dynamixel stay in `rosy_bringup`.
 
 ### Phase 3 - Introduce Capability Registry
 

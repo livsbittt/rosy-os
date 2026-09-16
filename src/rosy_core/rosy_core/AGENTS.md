@@ -19,6 +19,7 @@ Importable middleware. `main.py` starts rclpy; `node.py` builds `CoreServices`, 
 | `identity.py` | IDN-001 robot id/name/IP/version |
 | `profile.py` | HWA-001 `RobotProfile` loader |
 | `capability.py` | CAP-001 dotted lookup + `CapabilityError` |
+| `domain/` | Concept inventory, adapter registry, TaskKind (ROS-free) |
 | `maps.py` | MAP-003/004 **grid frames for the render path** — last OccupancyGrid / Path / Costmap snapshot (ROS-free). Not map artifacts: authoring and persistence are not its concern |
 
 ## Subdirectories
