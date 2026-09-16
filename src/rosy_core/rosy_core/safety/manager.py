@@ -112,14 +112,15 @@ class SafetyManager:
 
     def bind_control_policy(self, policy) -> None:
         """Consume absorbed Control decisions without importing ROS or publishing."""
-        from rosy_control.control.command_gate import CommandPolicy
-        if not isinstance(policy, CommandPolicy):
+        evaluate = getattr(policy, "evaluate", None)
+        revision = getattr(policy, "revision", None)
+        if not callable(evaluate) or not isinstance(revision, str) or not revision:
             raise ValueError('A Control CommandPolicy is required')
 
-        def evaluate(request):
+        def _evaluate(request):
             bounded = (self._actuation_required and self._actuation is not None and
                        self._actuation.revision == request.calibration_revision and self._simulation_domain())
-            output = policy.evaluate(request.linear, request.angular, request.now, allow_bounded_sweep=bounded)
+            output = evaluate(request.linear, request.angular, request.now, allow_bounded_sweep=bounded)
             if output is None:
                 raise ValueError('Control observation unavailable')
             snapshot, result = output
@@ -130,7 +131,7 @@ class SafetyManager:
                                   snapshot.observed_at, snapshot.expires_at,
                                   abs(result.linear), abs(result.angular), disposition, result.reason)
 
-        self.bind_policy(evaluate, policy.revision)
+        self.bind_policy(_evaluate, revision)
 
     def _simulation_domain(self):
         return (os.environ.get('ROS_DOMAIN_ID') == '227' and
@@ -139,9 +140,8 @@ class SafetyManager:
 
     def bind_simulation_actuation(self, calibration, *, simulation_clock_enabled):
         """Opt-in only to the existing isolated simulation domain, never hardware."""
-        from rosy_control.control.actuation import SimulationActuation
-        if (not isinstance(calibration, SimulationActuation) or
-                calibration.revision != self._policy_revision or not callable(simulation_clock_enabled)):
+        revision = getattr(calibration, "revision", None)
+        if (revision != self._policy_revision or not callable(simulation_clock_enabled)):
             raise ValueError('Actuation requires the bound policy revision and simulation clock')
         if (os.environ.get('ROS_DOMAIN_ID') != '227' or os.environ.get('GZ_PARTITION') != 'pinky_calmap227'
                 or simulation_clock_enabled() is not True):

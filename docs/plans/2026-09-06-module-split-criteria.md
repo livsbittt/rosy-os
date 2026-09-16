@@ -143,6 +143,7 @@ in lockstep:
 | `bridge/control_sensor_adapter.py` — `node` → `_sensor_only`, `bind_policy_handoff`, `destroy_node`, `observations`, `profile`, `refresh_profile`, and dynamic `name` | **Accepted.** The adapter validates and cleans up an injected ROS worker/test double and checks its sensor-only lifecycle surface. The dynamic `name` probe is the command-authority deny-list check. |
 | `bridge/control_sensor_adapter.py` — `safety` → `bind_control_policy`; `observations` → `max_age` | **Accepted.** These are optional public hooks on injected CORE safety/observation objects used to bind policy and its lease; missing hooks fail closed. |
 | `node.py` — `self` → `get_namespace` | **Accepted.** ROS namespace compatibility guard for the host test stub and the real `rclpy` node. |
+| `safety/manager.py` — `policy` → `evaluate`, `revision`; `calibration` → `revision` | **Accepted.** D-64: SafetyManager duck-types Control policy/actuation public members so `safety/` does not import `rosy_control`. |
 
 **Resolved — the criterion earned its keep on first application.** `navigation/manager.py`
 reached the executor through `hasattr(self.executor, "reset_mapping")`, a member no contract

@@ -65,6 +65,24 @@ def test_core_package_does_not_import_optional_slice_code():
                 assert name != banned and not name.startswith(banned + "."), f"{path.name} imports {name}"
 
 
+ALLOWED_ROSY_CONTROL = {"control_sensor_adapter.py"}
+
+
+def test_only_control_sensor_adapter_imports_rosy_control():
+    for path in CORE.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        names = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names.update(a.name for a in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                names.add(node.module)
+                names.update(f"{node.module}.{a.name}" for a in node.names)
+        hits = [n for n in names if n == "rosy_control" or n.startswith("rosy_control.")]
+        if hits and path.name not in ALLOWED_ROSY_CONTROL:
+            raise AssertionError(f"{path.relative_to(CORE)} imports {hits}")
+
+
 def test_core_dockerfile_does_not_copy_omx_or_imu():
     text = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
     core = text.split("FROM runtime-common AS io-runtime")[0]

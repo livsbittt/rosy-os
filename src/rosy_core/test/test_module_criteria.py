@@ -70,6 +70,11 @@ ALLOWED = Counter({
     ("bridge/control_sensor_adapter.py", "getattr", "safety", '"bind_control_policy"'): 1,
     ("bridge/control_sensor_adapter.py", "hasattr", "observations", '"max_age"'): 1,
     ("node.py", "getattr", "self", '"get_namespace"'): 1,
+    # Accepted: D-64 duck-type of Control policy/actuation without importing
+    # rosy_control into safety/.
+    ("safety/manager.py", "getattr", "policy", '"evaluate"'): 1,
+    ("safety/manager.py", "getattr", "policy", '"revision"'): 1,
+    ("safety/manager.py", "getattr", "calibration", '"revision"'): 1,
 })
 
 
