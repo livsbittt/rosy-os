@@ -33,10 +33,10 @@ select a mode rather than starting containers by hand.
 
 The absorbed `src/rosy_control` package is part of the Rosy OS source tree and
 is covered by the host and ROS graph tests. Its pure sensing, OpenCV, planning,
-calibration, and safety-policy code is reusable from the workspace. The current
-device Dockerfile copies it into the `rosy-core` build for the explicitly
-opt-in sensor adapter; the legacy full-stack launch is still not an operational
-Compose mode. Do not enable that launch beside CORE because it can publish a
+calibration, and safety-policy code is reusable from the workspace. D-66 keeps
+it out of the `rosy-core` image; the opt-in sensor adapter is fail-closed
+without the Control slice. The legacy full-stack launch is still not an
+operational Compose mode. Do not enable that launch beside CORE because it can publish a
 competing final `cmd_vel`. Camera/Picamera2 access and hardware launch wiring
 remain separate transition gates.
 
@@ -95,6 +95,49 @@ OpenCV `4.6.0`, `serial`, and `dynamixel_sdk`; and both
 The IO image includes the full Nav2/LiDAR userland, but these checks do not
 claim serial-device access, motor movement, map availability, or camera
 capture. Those remain Device/FIELD gates.
+
+Do not reuse the `ac81f2f` core/io IDs as D-66 evidence. That core image
+ships OpenCV and `rosy_control`.
+
+## 2026-09-17 D-66 QEMU HOLD
+
+Host: Docker Desktop 29.7.2 builder `desktop-linux`, binfmt `aarch64` via
+`tonistiigi/binfmt`. Source: `4fb2874` plus Dockerfile workarounds on
+`chore/public-release-prep`. Tag attempted:
+`rosy-core:arm64-validation-4fb2874`. **No image loaded. ARTIFACT stays HOLD.**
+
+Hub `ros:jazzy-ros-base` linux/arm64 pushed 2026-09-16
+(index `sha256:c3706ef0a0aa45413c07803cf433602f543b22e45b4855f6fca955c2d8ecc4e8`,
+arm64 `sha256:064675e31a58565a0eb6e757e20ddf35c9544021869221dd7e5da89f43b13558`)
+ships hollow files. AMD64 of the same tag is fine. Ubuntu arm64 `.deb`s are
+fine. `docker cp` evidence:
+
+| path | arm64 Hub image |
+|---|---|
+| `/usr/lib/python3.12/os.py` | 0 bytes (amd64: 39786) |
+| `/usr/lib/python3.12/encodings/__init__.py` | 0 bytes (amd64: 5884) |
+| `/usr/share/python3` `.py` | 6 zero-byte files (debpython) |
+| `/usr/lib/python3/dist-packages` colcon `.py` | 240 zero-byte files |
+| `/usr/bin/gcc` | missing |
+| `/usr/bin/make` | 0 bytes |
+| `/usr/bin/cmake` | real, 10489912 bytes |
+| cmake `Modules/*.cmake` | 0 bytes |
+
+Workarounds committed (no-op on a healthy amd64 or native Pi image):
+`restore-hollow-python.sh` after CPython stdlib/minimal, then
+`restore-hollow-toolchain.sh` in `core-build`/`io-build` only, `set -eo`
+without nounset around `setup.bash`, and `test -d install`. Proven in
+one-shot containers: `python3 -c 'print(123)'`, `pip 24.0`, `numpy 1.26.4`,
+colcon discovering `rosy_interfaces`. Not proven: a loaded D-66 core image.
+
+QEMU then failed `apt-get` (`Method http has died unexpectedly`) and later
+`exec /bin/bash: exec format error` on cached ARM64 layers. Reinstalling
+binfmt restores alpine `uname -m = aarch64` but does not stay stable across
+long `buildx --platform linux/arm64` runs on this host.
+
+Next ARTIFACT path is a native Pi 5 `linux/arm64` build, or a pinned
+pre-2026-09-16 `ros:jazzy-ros-base` arm64 digest. Do not treat this QEMU
+session as Device or ARTIFACT GO.
 
 ## Compose and installer syntax verification
 
