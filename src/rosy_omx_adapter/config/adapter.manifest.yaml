@@ -1,0 +1,5 @@
+id: rosy.device.omx
+version: 0.1.0
+device_type: manipulator
+enabled: false
+provides: []

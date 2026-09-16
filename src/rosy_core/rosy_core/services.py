@@ -15,6 +15,7 @@ from rosy_core.docking.agent import DockAgent
 from rosy_core.docking.database import DockDatabase
 from rosy_core.docking.detector import SimulatedDetector
 from rosy_core.docking.manager import DockingConfig, DockingManager
+from rosy_core.domain.adapters import AdapterRegistry
 from rosy_core.domain.capabilities import descriptors_from_cap001
 from rosy_core.domain.model import inventory_from_config, slices_from_config
 from rosy_core.protocol.schemas import DockState, HealthState
@@ -142,6 +143,7 @@ class CoreServices:
     runtime_probe: HostRuntimeProbe
     maps: MapSnapshotStore
     audit: FileAuditLog
+    adapter_registry: AdapterRegistry = field(default_factory=AdapterRegistry)
     started_at: float = field(default_factory=time.time)
     # Optional absorbed Control worker, owned by the RosyCoreNode lifecycle.
     # It is populated only when the explicit sensor adapter profile is enabled.
@@ -151,6 +153,9 @@ class CoreServices:
     def build(cls, config: dict[str, Any], profile: RobotProfile,
               capability_data: dict, waypoints_path) -> "CoreServices":
         robot_id = config.get("robot", {}).get("id", "rosy_01")
+        adapter_registry = AdapterRegistry.from_paths(
+            (config.get("adapters") or {}).get("manifests") or []
+        )
         events = EventBus(robot_id, buffer_size=int(config.get("events", {}).get("ring_buffer_size", 1000)))
         audit = FileAuditLog(Path(waypoints_path).parent / "audit.jsonl")
         events.subscribe(audit.record)
@@ -224,7 +229,7 @@ class CoreServices:
                    command=command, safety=safety, waypoints=waypoints, nav=nav,
                    power=power, battery=battery, docking=docking, swarm=swarm,
                    runtime_probe=runtime_probe, maps=MapSnapshotStore(),
-                   audit=audit)
+                   audit=audit, adapter_registry=adapter_registry)
 
     def inventory(self) -> dict[str, Any]:
         cap001 = self.capability.to_dict()
@@ -242,4 +247,5 @@ class CoreServices:
             estop=bool(self.safety.estop),
         )
         data["capability_ids"] = [d.id for d in descriptors_from_cap001(cap001)]
+        data["adapters"] = [item.id for item in self.adapter_registry.enabled()]
         return data

@@ -1,0 +1,6 @@
+id: rosy.device.pinky
+version: 0.1.0
+device_type: mobile_base
+enabled: true
+requires_slices: [core]
+provides: [drive, battery, lidar, local_safety]
