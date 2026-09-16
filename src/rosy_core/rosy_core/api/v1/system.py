@@ -46,7 +46,12 @@ def update_system_info(body: IdentityRequest, _: AuthContext = Depends(admin),
     patch_robot: dict[str, str] = {}
     try:
         if body.robot_id is not None:
-            patch_robot["id"] = validate_robot_id(body.robot_id)
+            requested_id = validate_robot_id(body.robot_id)
+            if requested_id != svc.identity.robot_id:
+                raise ApiError(
+                    "IDENTITY_LOCKED", 409,
+                    "robot_id is derived from the robot number",
+                )
         if body.robot_name is not None:
             patch_robot["name"] = validate_robot_name(body.robot_name)
     except ValueError as exc:
@@ -57,11 +62,6 @@ def update_system_info(body: IdentityRequest, _: AuthContext = Depends(admin),
         patch_local_config({"robot": patch_robot})
     except (ConfigError, OSError) as exc:
         raise ApiError("INTERNAL_ERROR", 500, f"failed to persist robot identity: {exc}")
-    if "id" in patch_robot:
-        svc.identity.robot_id = patch_robot["id"]
-        svc.state.set_robot_id(patch_robot["id"])
-        svc.events.set_robot_id(patch_robot["id"])
-        svc.config.setdefault("robot", {})["id"] = patch_robot["id"]
     if "name" in patch_robot:
         svc.identity.robot_name = patch_robot["name"]
         svc.config.setdefault("robot", {})["name"] = patch_robot["name"]

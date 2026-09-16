@@ -40,25 +40,30 @@ def _primary_ip() -> str:
 class RobotIdentity:
     def __init__(self, robot_id: str, robot_name: str, profile_model: str = "unknown",
                  serial: Optional[str] = None, hardware_version: Optional[str] = None,
-                 runtime_mode: str = "core") -> None:
+                 runtime_mode: str = "core", robot_number: Optional[int] = None) -> None:
         self.robot_id = robot_id
         self.robot_name = robot_name
         self.profile_model = profile_model
         self.serial = serial
         self.hardware_version = hardware_version
         self.runtime_mode = runtime_mode
+        self.robot_number = robot_number
 
     @classmethod
     def from_config(cls, config: dict[str, Any], profile_model: str = "unknown") -> "RobotIdentity":
-        robot = config.get("robot", {})
+        robot = config.get("robot") or {}
         mode = str((config.get("runtime") or {}).get("mode") or "core")
+        number = robot.get("number")
+        if number is not None:
+            number = int(number)
         return cls(
-            robot_id=robot.get("id", "rosy_01"),
-            robot_name=robot.get("name", "Rosy 01"),
+            robot_id=robot.get("id") or "rosy_01",
+            robot_name=robot.get("name") or "Rosy 01",
             profile_model=profile_model,
             serial=robot.get("serial"),
             hardware_version=robot.get("hardware_version"),
             runtime_mode=mode,
+            robot_number=number,
         )
 
     def info(self) -> dict[str, Any]:
@@ -66,6 +71,7 @@ class RobotIdentity:
         return {
             "robot_id": self.robot_id,
             "robot_name": self.robot_name,
+            "robot_number": self.robot_number,
             "hostname": socket.gethostname(),
             "ip_address": _primary_ip(),
             "hardware_model": self.profile_model,

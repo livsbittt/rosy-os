@@ -57,23 +57,17 @@ def test_policy_stop_uses_existing_admin_release_and_does_not_resume(client):
     assert not svc.command.manual_active
 
 
-def test_admin_can_update_robot_identity(client, tmp_path, monkeypatch):
+def test_admin_can_rename_robot_but_not_rebind_id(client, tmp_path, monkeypatch):
     overlay = tmp_path / "rosy.yaml"
     monkeypatch.setattr("rosy_core.config.LOCAL_CONFIG_PATH", overlay)
     monkeypatch.delenv("ROSY_CONFIG", raising=False)
-    tc, svc = client
-    updated = tc.put(
-        "/api/v1/system/info",
-        json={"robot_id": "rosy_07", "robot_name": "Bay 7"},
-        headers=ADMIN,
-    )
-    assert updated.status_code == 200
-    assert updated.json()["robot_id"] == "rosy_07"
-    assert updated.json()["robot_name"] == "Bay 7"
-    assert svc.identity.robot_id == "rosy_07"
-    assert svc.state.snapshot().robot_id == "rosy_07"
-    saved = yaml.safe_load(overlay.read_text(encoding="utf-8"))
-    assert saved["robot"]["id"] == "rosy_07"
+    tc, _svc = client
+    renamed = tc.put("/api/v1/system/info", json={"robot_name": "Bay 7"}, headers=ADMIN)
+    assert renamed.status_code == 200
+    assert renamed.json()["robot_name"] == "Bay 7"
+    locked = tc.put("/api/v1/system/info", json={"robot_id": "rosy_07"}, headers=ADMIN)
+    assert locked.status_code == 409
+    assert locked.json()["error"]["code"] == "IDENTITY_LOCKED"
     assert tc.put("/api/v1/system/info", json={"robot_id": "NOPE"}, headers=ADMIN).status_code == 400
     assert tc.put("/api/v1/system/info", json={"robot_id": "rosy_08"}, headers=OPERATOR).status_code == 403
 

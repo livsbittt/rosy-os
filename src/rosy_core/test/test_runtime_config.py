@@ -55,11 +55,43 @@ def test_ros_namespace_derives_core_frame_prefix(tmp_path, monkeypatch):
     monkeypatch.setattr(config_module, "LOCAL_CONFIG_PATH", tmp_path / "missing.yaml")
     monkeypatch.delenv("ROSY_CONFIG", raising=False)
     monkeypatch.delenv("ROSY_RUNTIME_MODE", raising=False)
+    monkeypatch.delenv("ROSY_ROBOT_NUMBER", raising=False)
     monkeypatch.setenv("ROSY_NAMESPACE", "/rosy_07/")
 
     config = config_module.load_config(str(config_path))
 
     assert config["robot"]["frame_prefix"] == "rosy_07/"
+
+
+def test_namespace_env_sets_robot_id(tmp_path, monkeypatch):
+    config_path = tmp_path / "rosy.yaml"
+    config_path.write_text("robot:\n  id: rosy_01\n  name: Keep Me\n", encoding="utf-8")
+    monkeypatch.setattr(config_module, "LOCAL_CONFIG_PATH", tmp_path / "missing.yaml")
+    monkeypatch.delenv("ROSY_CONFIG", raising=False)
+    monkeypatch.delenv("ROSY_RUNTIME_MODE", raising=False)
+    monkeypatch.setenv("ROSY_NAMESPACE", "rosy_03")
+    monkeypatch.setenv("ROSY_ROBOT_NUMBER", "3")
+
+    config = config_module.load_config(str(config_path))
+
+    assert config["robot"]["id"] == "rosy_03"
+    assert config["robot"]["name"] == "Keep Me"
+    assert config["robot"]["number"] == 3
+
+
+def test_robot_number_must_match_namespace(tmp_path, monkeypatch):
+    config_path = tmp_path / "rosy.yaml"
+    config_path.write_text("robot:\n  id: rosy_01\n", encoding="utf-8")
+    monkeypatch.setattr(config_module, "LOCAL_CONFIG_PATH", tmp_path / "missing.yaml")
+    monkeypatch.delenv("ROSY_CONFIG", raising=False)
+    monkeypatch.setenv("ROSY_NAMESPACE", "rosy_03")
+    monkeypatch.setenv("ROSY_ROBOT_NUMBER", "4")
+    try:
+        config_module.load_config(str(config_path))
+    except ValueError as exc:
+        assert "ROSY_ROBOT_NUMBER" in str(exc)
+    else:
+        raise AssertionError("mismatched number and namespace must not boot")
 
 
 def test_patch_local_config_merges_safety_limits_without_clobbering(tmp_path):

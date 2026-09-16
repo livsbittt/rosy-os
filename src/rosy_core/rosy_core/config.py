@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any, Optional
 
@@ -68,6 +69,25 @@ def load_config(explicit_path: Optional[str] = None) -> dict[str, Any]:
     namespace = os.environ.get("ROSY_NAMESPACE", "").strip().strip("/")
     if namespace:
         config.setdefault("robot", {})["frame_prefix"] = f"{namespace}/"
+
+    robot = config.setdefault("robot", {})
+    if namespace:
+        robot["id"] = namespace
+    number_env = os.environ.get("ROSY_ROBOT_NUMBER", "").strip()
+    if number_env:
+        if not re.fullmatch(r"0|[1-9][0-9]*", number_env):
+            raise ValueError(
+                f"ROSY_ROBOT_NUMBER must be a decimal integer with no leading zero, got {number_env!r}"
+            )
+        number = int(number_env)
+        expected = f"rosy_{number:02d}"
+        if namespace and namespace != expected:
+            raise ValueError(
+                f"ROSY_ROBOT_NUMBER={number} derives {expected}, not ROSY_NAMESPACE={namespace}"
+            )
+        robot["number"] = number
+        if not namespace:
+            robot["id"] = expected
 
     mode = os.environ.get("ROSY_RUNTIME_MODE", "").strip()
     if mode:
