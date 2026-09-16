@@ -90,6 +90,13 @@ def test_core_dockerfile_does_not_copy_omx_or_imu():
     assert "rosy_imu_bno055" not in core
 
 
+def test_core_dockerfile_does_not_copy_rosy_control_or_opencv():
+    text = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
+    core = text.split("FROM runtime-common AS io-runtime")[0]
+    assert "COPY src/rosy_control" not in core
+    assert "python3-opencv" not in core
+
+
 def _find_usable_bash():
     candidates = []
     if os.name == "nt":

@@ -2,7 +2,7 @@
 
 작성일: 2026-09-16
 
-상태: D-63 Accepted(목표). 자식 ADR이 한 이음새씩 닫는다. D-62 카탈로그는 1단계. D-64가 다음 실행이다.
+상태: D-63 Accepted(목표). 자식 ADR이 한 이음새씩 닫는다. D-62·D-64·D-66은 소스 완료. 매핑 분리·nav overlay는 남는다.
 
 관련: D-1, D-22, D-38, D-57, D-59, D-60, D-62, D-64 · [선택 슬라이스](2026-09-16-optional-runtime-slices-design.md)
 
@@ -25,8 +25,8 @@ Pi 5와 OMX/AI가 **같은 CORE**를 쓴다. CORE는 필수이고 얇다. 모터
 | 단계 | ADR | 닫는 이음새 | 상태 |
 |---|---|---|---|
 | 1 | D-62 | 설치 카탈로그, preset, first-boot는 core | 이 브랜치에서 소스 완료 |
-| 2 | D-64 | CORE 생산 코드의 `rosy_control` import를 어댑터로만 | 이번 실행 |
-| 3 | 후속 | CORE 이미지에서 OpenCV/`rosy_control` COPY 축출 | 아직 아님 |
+| 2 | D-64 | CORE 생산 코드의 `rosy_control` import를 어댑터로만 | 소스 완료 |
+| 3 | D-66 | CORE 이미지에서 OpenCV/`rosy_control` COPY 축출 | 소스 완료 |
 | 4 | 후속 | 매핑 세션을 navigation에서 분리 (기존 C7) | 아직 아님 |
 | 5 | 후속 | nav compose overlay (hardware 묶음 해제) | 아직 아님 |
 | 6 | 후속 | vision/omx 설치 가능 overlay (D-52, D-55 실측 후) | 아직 아님 |

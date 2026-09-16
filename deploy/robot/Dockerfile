@@ -27,7 +27,6 @@ RUN apt-get -o Acquire::Retries=5 update \
         ros-jazzy-visualization-msgs \
         ros-jazzy-tf2-ros \
         python3-numpy \
-        python3-opencv \
         python3-yaml \
     && python3 -m pip install --break-system-packages --no-cache-dir \
         -r /tmp/requirements-core.txt \
@@ -39,9 +38,8 @@ RUN apt-get -o Acquire::Retries=5 update \
 FROM core-runtime AS core-build
 
 WORKDIR /opt/rosy_ws
-# omx/imu/vision belong to optional slices, not this core image.
+# omx/imu/vision/control belong to optional slices, not this core image.
 COPY src/rosy_interfaces ./src/rosy_interfaces
-COPY src/rosy_control ./src/rosy_control
 COPY src/rosy_core ./src/rosy_core
 RUN source /opt/ros/jazzy/setup.bash \
     && colcon build --merge-install --packages-up-to rosy_core
