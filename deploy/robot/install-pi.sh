@@ -294,10 +294,11 @@ require_robot_identity() {
     # 있으면 아무 말 없이 지나가므로, 불일치는 여기서 직접 잡아야 한다.
     derived[ROS_DOMAIN_ID]="$domain"
     derived[ROSY_NAMESPACE]="$namespace"
+    derived[ROSY_ROBOT_NUMBER]="$number"
     # 검사를 먼저 다 하고 나서 쓴다. 한 키를 쓰고 다음 키에서 실패하면 도메인과
     # 네임스페이스가 어긋난 채로 남는데, 신원이 절반만 이주한 기기가 바로 이
     # 작업이 없애려는 상태다.
-    for key in ROS_DOMAIN_ID ROSY_NAMESPACE; do
+    for key in ROS_DOMAIN_ID ROSY_NAMESPACE ROSY_ROBOT_NUMBER; do
         existing="$(get_env_value "$env_file" "$key")"
         if [[ -n "$existing" && "$existing" != "${derived[$key]}" ]]; then
             fail "$env_file already has $key=$existing but ROSY_ROBOT_NUMBER=$number derives ${derived[$key]}. 이 기기는 이미 다른 번호로 자리잡았다 — 재번호 절차는 docs/deployment/raspberry-pi-runtime.md 를 따르라."
@@ -305,6 +306,7 @@ require_robot_identity() {
     done
     set_env_default "$env_file" ROS_DOMAIN_ID "$domain"
     set_env_default "$env_file" ROSY_NAMESPACE "$namespace"
+    set_env_default "$env_file" ROSY_ROBOT_NUMBER "$number"
 }
 
 # First-boot unit always runs core. Requested preset/slices are commissioning

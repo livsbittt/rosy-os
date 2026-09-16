@@ -142,6 +142,17 @@ def test_installer_requires_the_robot_number():
         )
 
 
+def test_installer_persists_the_robot_number_without_renumbering():
+    text = _text(INSTALLER)
+    body = text[
+        text.index("require_robot_identity() {"): text.index("write_install_runtime_selection() {")
+    ]
+    assert "ROSY_ROBOT_NUMBER" in body
+    assert 'set_env_default "$env_file" ROSY_ROBOT_NUMBER' in body
+    assert 'set_env_value "$env_file" ROSY_ROBOT_NUMBER' not in text
+    assert "already has ROSY_ROBOT_NUMBER" in body or "already has $key=" in body
+
+
 def test_installer_derives_identity_before_starting_any_container():
     """compose 가 뜨기 전에 실패해야 한다 — 뜬 뒤면 이미 충돌한 것이다.
 
