@@ -52,13 +52,11 @@ Done for v1: `TaskKind.concept_id` maps REST actions to concept ids (`mobility.m
 
 ### Phase 4 - Introduce Compute Fabric
 
-Move AI/edge execution into ROSY Compute.
+Not v1 (D-71). Do not add Gram/RTX fabric or a model registry in CORE.
 
 ### Phase 5 - Composite Asset
 
-Create:
-
-`Pinky + OMX = MobileManipulator`
+Not v1 (D-71, D-55). `Pinky + OMX = MobileManipulator` stays disabled until D-55 is Accepted with evidence.
 
 ## 5. Migration Rule
 

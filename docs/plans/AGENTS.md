@@ -36,8 +36,10 @@ Dated design and execute plans (2026-08-31 onward). These are the working trail 
 | `2026-09-16-optional-runtime-slices.md` | D-62 실행: board 카탈로그, capability 암전, install preset, CORE import 가드 |
 | `2026-09-16-modular-middleware-goal-design.md` | 모듈형 미들웨어 끝 상태 (D-63) |
 | `2026-09-16-core-control-import-boundary.md` | D-64: rosy_control import는 센서 어댑터만 |
-| `2026-09-16-concept-runtime-alignment-design.md` | Concept Node/Device/Capability mapped onto CORE + D-62; apt/rosyctl deferred (D-65 Proposed) |
+| `2026-09-16-concept-runtime-alignment-design.md` | Concept Node/Device/Capability mapped onto CORE + D-62; apt/rosyctl deferred (D-65) |
 | `2026-09-16-concept-runtime-alignment.md` | Execution: identity one plane, inventory API, adapter manifests, TaskKind, Control launch guard |
+| `2026-09-17-arm64-artifact-native-pi-plan.md` | D-66 ARM64 after QEMU HOLD: native Pi (or pinned digest), not Hub hollow ros-base |
+| `2026-09-17-concept-folder-adr-plan.md` | concept 00–15 → D-67–D-71; 09–12 and apt/rosyctl are not v1 |
 
 ## Subdirectories
 

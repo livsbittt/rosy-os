@@ -72,8 +72,13 @@
 | D-62 | CORE는 필수이고 나머지 런타임은 선택 슬라이스다 | Accepted |
 | D-63 | 모듈형 미들웨어 목표 — CORE는 얇고 슬라이스는 선택이다 | Accepted |
 | D-64 | CORE 생산 코드의 rosy_control import는 센서 어댑터뿐이다 | Accepted |
-| D-65 | 개념 객체는 CORE와 D-62 슬라이스에 매핑한다 | Proposed |
+| D-65 | 개념 객체는 CORE와 D-62 슬라이스에 매핑한다 | Accepted |
 | D-66 | CORE 이미지에 rosy_control과 OpenCV가 없다 | Accepted |
+| D-67 | RobotMode가 운용 계약이고 DeviceState는 inventory 파생이다 | Accepted |
+| D-68 | CAP-001과 개념 descriptor는 문서를 나눈다 | Accepted |
+| D-69 | 어댑터는 트리 안 YAML 매니페스트다 | Accepted |
+| D-70 | 워크플로 엔진은 로봇이 아니라 Fleet이다 | Accepted |
+| D-71 | concept 05·09–12·15 apt는 v1 미들웨어가 아니다 | Accepted |
 
 ---
 
@@ -1678,8 +1683,8 @@ rosy_control import는 허용한다. CORE 이미지에서 rosy_control을 빼는
 
 ## D-65 개념 객체는 CORE와 D-62 슬라이스에 매핑한다
 
-**Status:** Proposed (2026-09-16). 용어 동결이며 인벤토리 API·어댑터 매니페스트
-구현과 구분한다.
+**Status:** Accepted (2026-09-17). inventory API, 어댑터 매니페스트, Phase 3
+descriptor availability가 올라왔다.
 
 **Context:** `docs/concept`는 분산 OS 목표(Node/Device/Component/Capability/
 Asset/Task, apt 프로파일, 제어면)를 적는다. 살아 있는 스택은 Pinky CORE와
@@ -1703,9 +1708,8 @@ concept 13의 이후 단계다. Concept 05 ROS 토픽(`/rosy/{device_id}/state`)
 워크플로 엔진은 v1이 아니다(D-12). D-63 모듈형 미들웨어 목표와 D-64 import
 경계는 그대로다.
 
-**Validation / Transition:** 용어집 여섯 객체와 concept README 현재 매핑 표가
-있으면 이 기록은 유효하다. 인벤토리 API와 어댑터 매니페스트는 후속 실행이
-Accepted로 올릴 증거다.
+**Validation / Transition:** `CONCEPTS.md` 여섯 객체, `GET /api/v1/system/inventory`,
+Pinky/OMX 매니페스트, `TaskKind.concept_id`와 inventory `descriptors`.
 
 **References:** [concept-runtime-alignment 설계](../plans/2026-09-16-concept-runtime-alignment-design.md), [concept 13 이관](../concept/13_ROSY_Current_to_Target_Migration.md).
 
@@ -1726,3 +1730,150 @@ Accepted로 올릴 증거다.
 **Validation / Transition:** Dockerfile core 스테이지 문자열 가드. `colcon --packages-up-to rosy_core`가 `rosy_control` 소스 없이 성립한다.
 
 **References:** [모듈형 미들웨어 목표](../plans/2026-09-16-modular-middleware-goal-design.md).
+
+---
+
+## D-67 RobotMode가 운용 계약이고 DeviceState는 inventory 파생이다
+
+**Status:** Accepted (2026-09-17). concept 06.
+
+**Context:** concept 06은 BOOTING…UPDATING 장치 수명 주기를 적는다. 살아 있는
+계약은 `RobotMode`(`IDLE|MANUAL|NAVIGATION|DOCKING|EMERGENCY`)와 안전 정지다.
+두 상태 기계를 명령 경로에 나란히 두면 클라이언트가 어느 쪽이 권위인지
+모른다.
+
+**Decision:** 명령·안전·deadman의 권위 상태는 `RobotMode`다. concept
+`DeviceState`는 `GET /api/v1/system/inventory`의 파생 값이다. EMERGENCY/e-stop
+→ `SAFE_STOP`, diagnostics ERROR → `FAULT`, 바쁜 모드 → `BUSY`, 스냅샷 전
+→ `BOOTING`, 그 외 IDLE+정상 → `READY`. `RobotMode` enum을 concept 이름로
+바꾸지 않는다.
+
+**Alternatives:** `RobotMode`를 concept 06 enum으로 교체하는 안은 API와 안전
+시험을 깨뜨린다. DeviceState를 명령 거절의 유일한 근거로 쓰는 안은 기존
+estop/모드 경로와 이중화된다. 채택하지 않는다.
+
+**Consequences:** inventory는 개념 수명 주기를 보여 준다. 텔레옵·내비 거절은
+계속 모드·safety·CAP-003이다. 라이브 기동 직후 BOOTING 연결은 후속이다.
+
+**Validation / Transition:** `test_domain_model.py`의 READY/SAFE_STOP/BOOTING.
+`RobotMode` 스키마 시험은 그대로 통과해야 한다.
+
+**References:** [concept 06](../concept/06_ROSY_Device_State_and_Lifecycle.md), D-65.
+
+---
+
+## D-68 CAP-001과 개념 descriptor는 문서를 나눈다
+
+**Status:** Accepted (2026-09-17). concept 07. `0728125`.
+
+**Context:** D-11은 `GET /api/v1/system/capabilities`에 CAP-001 YAML 불리언을
+둔다. concept 07은 `mobility.move` 같은 id와 동적 가용성을 원한다. 한
+문서에 둘을 섞으면 CAP-001 소비자가 깨진다(D-32).
+
+**Decision:** CAP-001 본문은 바꾸지 않는다. 개념 id는 inventory
+`descriptors[]`(`id`, `available`)와 `capability_ids`에만 둔다. YAML이 true인
+플래그만 광고한다. `manipulate.pick` / `scan_rfid` / `infer` / `train`은
+슬라이스가 생기기 전에 광고하지 않는다. `available`은 DeviceState가
+BOOTING·FAULT·SAFE_STOP·OFFLINE·UPDATING이면 false다. `TaskKind.require()`는
+CAP-001 플래그로 501을 유지한다.
+
+**Alternatives:** CAP-001을 개념 id로 교체하는 안, 정적 YAML만 두고 가용성을
+숨기는 안. 전자는 D-11 소비자를 깨고, 후자는 concept 07 §5를 무시한다.
+
+**Consequences:** Fleet/SDK는 기존 capabilities를 읽고, 개념 뷰는 inventory를
+읽는다. require()가 concept id를 말하게 바꾸는 것은 에러 본문 계약이므로
+별도 ADR이 필요하다.
+
+**Validation / Transition:** `test_capability_descriptors.py`,
+`test_inventory_is_a_mobile_base_without_pick_or_rfid`.
+
+**References:** [concept 07](../concept/07_ROSY_Capability_Model.md), D-11, D-32.
+
+---
+
+## D-69 어댑터는 트리 안 YAML 매니페스트다
+
+**Status:** Accepted (2026-09-17). concept 04, 15.
+
+**Context:** concept 04/15는 `rosy-adapter-pinky` apt와 `rosyctl`을 그린다.
+살아 있는 어댑터는 `rosy_bringup`(Pinky)과 꺼진 `rosy_omx_adapter`다. D-62는
+설치 모듈을 슬라이스로 이미 정했다.
+
+**Decision:** 장치 어댑터는 워크스페이스 패키지 +
+`config/adapter.manifest.yaml`이다. CORE `AdapterRegistry`는 YAML만 읽고
+OMX/MoveIt 런타임을 import하지 않는다(D-62, D-64). Debian
+`rosy-adapter-*`와 `rosyctl`은 만들지 않는다. 매니페스트 `provides`가 비면
+(OMX disabled) 능력이 없다. 어댑터는 운용 `cmd_vel`을 발행하지 않는다(D-38).
+
+**Alternatives:** 패키지를 apt 프로파일로 재배치하는 안은 D-62를 뒤집는다.
+setuptools entry-point 동적 로딩은 이번 범위가 아니다.
+
+**Consequences:** Pinky/OMX 매니페스트가 카탈로그다. 새 장치는 패키지+YAML로
+추가한다. concept 15 Layer 3 apt는 D-71이 미룬다.
+
+**Validation / Transition:** 매니페스트 파싱 시험, CORE가 `rosy_omx_adapter`
+코드를 import하지 않는다는 가드.
+
+**References:** [concept 04](../concept/04_ROSY_Device_Adapter_Specification.md), D-57, D-62.
+
+---
+
+## D-70 워크플로 엔진은 로봇이 아니라 Fleet이다
+
+**Status:** Accepted (2026-09-17). concept 08. D-12를 concept Task/Workflow에
+명시한다.
+
+**Context:** concept 08은 Task 상태(PENDING…BLOCKED)와 TransportObject 같은
+워크플로를 적는다. D-12는 미션 DSL을 Fleet에만 둔다. 로봇에 두 번째 상태기계를
+만들면 원자 액션 API와 미션이 섞인다.
+
+**Decision:** 로봇이 노출하는 Task는 `TaskKind`(MOVE, NAVIGATE, RETURN_HOME,
+FOLLOW, DOCK)와 기존 매니저다. PENDING→SUCCEEDED 워크플로 객체, 우선순위
+스케줄러, 크로스 디바이스 워크플로는 로봇에 두지 않는다. 미션은 Fleet(미구현)
+영역이다. `TaskKind.concept_id`가 필요한 개념 capability를 가리킨다.
+
+**Alternatives:** 로봇에 concept 08 상태기계를 심는 안은 D-12와 로컬 안전
+경계를 흐린다. 채택하지 않는다.
+
+**Consequences:** CORE 라우트는 원자 액션만 추가한다. Pick/Place/Transport
+워크플로는 D-55·D-71 이전에는 API에 없다.
+
+**Validation / Transition:** `TaskKind` 목록과 inventory `task_kinds`. 새
+미션 리소스가 `rosy_core`에 생기면 이 결정을 어긴다.
+
+**References:** [concept 08](../concept/08_ROSY_Task_and_Workflow.md), D-12.
+
+---
+
+## D-71 concept 05·09–12·15 apt는 v1 미들웨어가 아니다
+
+**Status:** Accepted (2026-09-17). 목표 OS 나중 단계의 명시적 연기.
+
+**Context:** concept 폴더는 분산 제어면, `/rosy/{device_id}/state` 토픽 트리,
+Pinky+OMX 합성 Asset, Gram/RTX 패브릭, VLA, Teach-Record-Train, apt/`rosyctl`,
+concept 14의 Gram/합성 수락을 그린다. 이를 현재 스프린트 백로그로 읽으면
+D-1·D-12·D-38·D-62와 충돌한다.
+
+**Decision:** 다음을 v1 미들웨어가 아니라고 고정한다.
+
+- concept 05 공개 토픽/액션 트리. 외부 클라이언트는 REST/WS만 쓴다.
+- concept 09 합성 Asset. D-55가 OMX를 켜기 전에는 `asset.type=mobile_base`
+  단일 Device다.
+- concept 10 Compute Fabric (Gram/RTX 역할 노드).
+- concept 11 모델 레지스트리·VLA·정책 배포. vision/ai는 D-62 카탈로그만.
+- concept 12 데이터셋/에피소드 파이프라인.
+- concept 15 `rosy-runtime-*` apt 메타패키지와 `rosyctl`.
+- concept 14의 Gram 인식·합성 태스크 수락. Device GO는 Device 검증 계획이
+  정한다.
+
+**Alternatives:** concept 본문을 v1 범위로 다시 쓰는 안은 목표 문서를 지운다.
+지금 패브릭을 구현하는 안은 CORE를 제어면으로 만든다. 채택하지 않는다.
+
+**Consequences:** 미들웨어 작업은 D-67–D-70과 Device ARTIFACT 계획 안에서
+한다. 09–12 구현 PR은 이 ADR을 먼저 뒤집어야 한다.
+
+**Validation / Transition:** concept README 매핑 표의 target-not-built 행.
+합성·패브릭·rosyctl 코드가 `rosy_core`에 생기면 실패로 본다.
+
+**References:** [concept README](../concept/README.md),
+[concept 폴더 ADR 계획](../plans/2026-09-17-concept-folder-adr-plan.md).

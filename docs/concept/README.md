@@ -64,28 +64,28 @@ ROSY OS uses six primary domain objects:
 | 14 | Verification & Acceptance | v1 validation criteria |
 | 15 | Ubuntu Modular Installation | Package/profile installation design |
 
-## Current mapping (2026-09-16)
+## Current mapping (2026-09-17)
 
-`docs/concept` is the **target** distributed OS. v1 maps those terms onto the live Pinky CORE + D-62 slices stack (D-65). Contract documents win on API, modes, `cmd_vel`, and identity: [CORE SRS](../spec/ROSY%20CORE%20SRS.md) §1.3, [ADR log](../reference/ROSY%20ADR%20Log.md) (D-62 slices), [this design](../plans/2026-09-16-concept-runtime-alignment-design.md). Live glossary: [CONCEPTS.md](../../CONCEPTS.md).
+`docs/concept` is the **target** distributed OS. v1 maps those terms onto the live Pinky CORE + D-62 slices stack (D-65). Contract documents win on API, modes, `cmd_vel`, and identity: [CORE SRS](../spec/ROSY%20CORE%20SRS.md) §1.3, [ADR log](../reference/ROSY%20ADR%20Log.md) (D-62, D-65, D-67–D-71), [alignment design](../plans/2026-09-16-concept-runtime-alignment-design.md), [concept ADR plan](../plans/2026-09-17-concept-folder-adr-plan.md). Live glossary: [CONCEPTS.md](../../CONCEPTS.md).
 
-| Concept | v1 mapping | Status |
-|---|---|---|
-| 00 Vision & definition | CORE SRS product scope | live contract |
-| 01 Target architecture | ADR log + this design | target; v1 is CORE + slices |
-| 02 Domain model | CONCEPTS.md Node / Device / Component / Capability / Asset / Task | glossary frozen (D-65) |
-| 03 Runtime architecture | `rosy_core` process (D-1) | live |
-| 04 Device adapter | `rosy_bringup` (Pinky), `rosy_omx_adapter` (disabled) | live adapters; manifests later |
-| 05 ROS 2 interface | CORE SRS §1.3 — REST/WS is the external API | concept `/rosy/{device_id}/…` topics are **not** the API |
-| 06 Device state & lifecycle | existing `RobotMode`; inventory `device_state` including BOOTING | live |
-| 07 Capability | CAP-001 YAML booleans (D-11, D-32); inventory `descriptors[].available` follows DeviceState (concept 07 §5) | live |
-| 08 Task & workflow | atomic REST actions; missions stay Fleet (D-12) | live actions; workflow **target-not-built** |
-| 09 Composite robot | — | **target-not-built** |
-| 10 Compute fabric | — | **target-not-built** |
-| 11 AI & Physical AI | — | **target-not-built** |
-| 12 Dataset & learning | — | **target-not-built** |
-| 13 Current-to-target | this design (Phase 0 = freeze terms) | in progress |
-| 14 Verification | Device validation plan | Device GO not claimed |
-| 15 Ubuntu modular install | D-62 slices via runtime-mode presets core/motor/hardware (hardware → core+motor+io+nav), not apt/`rosyctl` | apt path **target-not-built** |
+| Concept | v1 mapping | ADR | Status |
+|---|---|---|---|
+| 00 Vision & definition | CORE SRS product scope | D-15, D-65 | live contract |
+| 01 Target architecture | CORE + D-62 slices; control plane = Fleet (unimplemented) | D-1, D-62, D-71 | target; v1 is CORE + slices |
+| 02 Domain model | CONCEPTS.md Node / Device / Component / Capability / Asset / Task | D-65 | live |
+| 03 Runtime architecture | `rosy_core` process; no `rosy-runtime-*` apt | D-1, D-69 | live |
+| 04 Device adapter | `rosy_bringup`, `rosy_omx_adapter` (disabled) + YAML manifests | D-57, D-69 | live |
+| 05 ROS 2 interface | REST/WS is the external API | D-65, D-71 | concept `/rosy/{device_id}/…` is **not** the API |
+| 06 Device state & lifecycle | `RobotMode` operational; inventory `device_state` derived | D-67 | live |
+| 07 Capability | CAP-001 on `/capabilities`; descriptors on inventory | D-11, D-68 | live |
+| 08 Task & workflow | `TaskKind` atomic REST; missions on Fleet | D-12, D-70 | live actions; workflow **not v1** |
+| 09 Composite robot | single-device Asset only | D-55, D-71 | **not v1** |
+| 10 Compute fabric | — | D-71 | **not v1** |
+| 11 AI & Physical AI | vision/ai catalog only | D-41, D-71 | **not v1** |
+| 12 Dataset & learning | — | D-71 | **not v1** |
+| 13 Current-to-target | Phase 0–3 live; 4–5 = D-71 | D-65, D-71 | Phase 0–3 live |
+| 14 Verification | Device validation ARTIFACT/DEVICE/FIELD | D-71 | Device GO not claimed |
+| 15 Ubuntu modular install | D-62 slices, not apt/`rosyctl` | D-62, D-69, D-71 | apt path **not v1** |
 
 ## First Refactoring Priority
 
