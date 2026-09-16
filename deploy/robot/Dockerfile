@@ -80,7 +80,7 @@ WORKDIR /opt/rosy_ws
 # omx/imu/vision/control belong to optional slices, not this core image.
 COPY src/rosy_interfaces ./src/rosy_interfaces
 COPY src/rosy_core ./src/rosy_core
-RUN set -euo pipefail \
+RUN set -eo pipefail \
     && source /opt/ros/jazzy/setup.bash \
     && colcon build --merge-install --packages-up-to rosy_core \
     && test -d /opt/rosy_ws/install
@@ -127,7 +127,7 @@ COPY src/rosy_description ./src/rosy_description
 COPY src/rosy_bringup ./src/rosy_bringup
 COPY src/rosy_navigation ./src/rosy_navigation
 RUN mkdir -p src/rosy_description/meshes
-RUN set -euo pipefail \
+RUN set -eo pipefail \
     && source /opt/ros/jazzy/setup.bash \
     && colcon build --merge-install \
         --packages-select sllidar_ros2 rosy_interfaces rosy_description rosy_bringup rosy_navigation \
