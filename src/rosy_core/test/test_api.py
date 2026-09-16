@@ -177,6 +177,17 @@ def test_inventory_is_a_mobile_base_without_pick_or_rfid(client):
     assert response.status_code == 200
     body = response.json()
     assert body["device"]["device_type"] == "mobile_base"
+    ids = body["capability_ids"]
+    assert "mobility.move" in ids
+    assert "mobility.navigate" in ids
+    assert "mobility.follow" in ids
+    assert "mobility.lead" in ids
+    assert "perception.localize" in ids
+    assert "mobility.dock" not in ids
+    assert "manipulate.pick" not in ids
+    assert "scan_rfid" not in ids
+    assert "infer" not in ids
+    assert "train" not in ids
     blob = json.dumps(body)
     assert "pick" not in blob
     assert "rfid" not in blob

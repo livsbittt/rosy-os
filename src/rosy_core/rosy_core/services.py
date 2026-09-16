@@ -15,6 +15,7 @@ from rosy_core.docking.agent import DockAgent
 from rosy_core.docking.database import DockDatabase
 from rosy_core.docking.detector import SimulatedDetector
 from rosy_core.docking.manager import DockingConfig, DockingManager
+from rosy_core.domain.capabilities import descriptors_from_cap001
 from rosy_core.domain.model import inventory_from_config, slices_from_config
 from rosy_core.protocol.schemas import DockState, HealthState
 from rosy_core.events.audit import FileAuditLog
@@ -226,8 +227,9 @@ class CoreServices:
                    audit=audit)
 
     def inventory(self) -> dict[str, Any]:
-        sensors = self.capability.to_dict().get("sensors") or []
-        return inventory_from_config(
+        cap001 = self.capability.to_dict()
+        sensors = cap001.get("sensors") or []
+        data = inventory_from_config(
             self.config,
             profile_model=self.profile.model if self.profile is not None else "unknown",
             sensors=[str(item) for item in sensors],
@@ -239,3 +241,5 @@ class CoreServices:
             ),
             estop=bool(self.safety.estop),
         )
+        data["capability_ids"] = [d.id for d in descriptors_from_cap001(cap001)]
+        return data
