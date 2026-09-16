@@ -233,6 +233,7 @@ class CoreServices:
     def inventory(self) -> dict[str, Any]:
         cap001 = self.capability.to_dict()
         sensors = cap001.get("sensors") or []
+        snap = self.state.snapshot()
         data = inventory_from_config(
             self.config,
             profile_model=self.profile.model if self.profile is not None else "unknown",
@@ -241,9 +242,10 @@ class CoreServices:
             mode=self.modes.mode,
             health_error=any(
                 health is HealthState.ERROR
-                for health in self.state.snapshot().diagnostics_summary.values()
+                for health in snap.diagnostics_summary.values()
             ),
             estop=bool(self.safety.estop),
+            booting=not snap.diagnostics_summary,
             cap001=cap001,
         )
         data["adapters"] = [item.id for item in self.adapter_registry.enabled()]

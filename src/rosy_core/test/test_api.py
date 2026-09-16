@@ -174,6 +174,33 @@ def test_system_info_and_capabilities(client):
     assert r.json()["swarm"] == {"follow": True, "lead": True}
 
 
+def test_inventory_is_booting_before_diagnostics_arrive(client):
+    tc, svc = client
+    inventory = tc.get("/api/v1/system/inventory", headers=VIEWER)
+    assert inventory.status_code == 200
+    body = inventory.json()
+    assert body["device_state"] == "BOOTING"
+    by_id = {item["id"]: item["available"] for item in body["descriptors"]}
+    assert by_id["mobility.move"] is False
+    robot = tc.get("/api/v1/robot/state", headers=VIEWER)
+    assert robot.status_code == 200
+    assert robot.json()["mode"] == "IDLE"
+    assert svc.modes.mode.value == "IDLE"
+
+
+def test_inventory_leaves_booting_after_a_diagnostic(client):
+    from rosy_core.protocol.schemas import HealthState
+
+    tc, svc = client
+    svc.state.set_diagnostic("drive", HealthState.OK)
+    body = tc.get("/api/v1/system/inventory", headers=VIEWER).json()
+    assert body["device_state"] == "READY"
+    by_id = {item["id"]: item["available"] for item in body["descriptors"]}
+    assert by_id["mobility.move"] is True
+    robot = tc.get("/api/v1/robot/state", headers=VIEWER).json()
+    assert robot["mode"] == "IDLE"
+
+
 def test_inventory_is_a_mobile_base_without_pick_or_rfid(client):
     tc, _svc = client
     response = tc.get("/api/v1/system/inventory", headers=VIEWER)
