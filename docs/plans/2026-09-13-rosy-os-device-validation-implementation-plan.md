@@ -21,7 +21,7 @@
 | SOURCE | 소스·ADR·경계·패키지 구조 | GO | 변경마다 diff와 ADR 연결 |
 | LOCAL | Windows의 순수 Python/문서/계약 테스트 | GO(환경 의존 일부 제외) | 반복 가능한 명령과 결과 저장 |
 | ROS-SIM | ROS 2 Jazzy graph, parameter, topic, safety 시나리오 | GO(기존 증거) | container에서 재실행 가능한 smoke |
-| ARTIFACT | linux/arm64 이미지·digest·서명·manifest | HOLD | 빌드와 서명 readback |
+| ARTIFACT | linux/arm64 이미지·digest·서명·manifest | HOLD | 빌드와 서명 readback. D-66 이후 CORE는 `rosy_control`/OpenCV를 포함하지 않으므로 `ac81f2f` digest는 재사용하지 않는다. 2026-09-17 호스트 QEMU는 Hub `jazzy-ros-base` arm64 hollow 이미지에서 실패했다. 다음 실행: `docs/plans/2026-09-17-arm64-artifact-native-pi-plan.md`. |
 | DEVICE | Pi OS 설치·identity·systemd·컨테이너·센서 readback | HOLD | 설치 전후 manifest와 health 증거 |
 | FIELD | Pinky Pro 구동·정지·카메라·적재·암 | PARKED | 안전 담당자와 실물 시험 승인 |
 
