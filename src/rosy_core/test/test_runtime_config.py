@@ -7,6 +7,7 @@ import yaml
 
 import rosy_core.config as config_module
 from rosy_core.config import ConfigError, patch_local_config
+from rosy_core.identity import RobotIdentity
 from rosy_core.identity import SOFTWARE_VERSION
 
 
@@ -77,6 +78,11 @@ def test_namespace_env_sets_robot_id(tmp_path, monkeypatch):
     assert config["robot"]["id"] == "rosy_03"
     assert config["robot"]["name"] == "Keep Me"
     assert config["robot"]["number"] == 3
+    monkeypatch.setenv("ROS_DOMAIN_ID", "43")
+    info = RobotIdentity.from_config(config).info()
+    assert info["ros_namespace"] == "rosy_03"
+    assert info["ros_domain_id"] == 43
+    assert info["robot_number"] == 3
 
 
 def test_robot_number_must_match_namespace(tmp_path, monkeypatch):

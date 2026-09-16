@@ -6,6 +6,7 @@ x-ros-environment: &ros-environment
   CYCLONEDDS_URI: file:///etc/rosy/cyclonedds.xml
   ROS_LOG_DIR: /tmp/ros-logs
   ROSY_NAMESPACE: "${ROSY_NAMESPACE:?ROSY_NAMESPACE 미설정 — install-pi.sh 를 ROSY_ROBOT_NUMBER 와 함께 실행하라 (ADR D-33)}"
+  ROSY_ROBOT_NUMBER: "${ROSY_ROBOT_NUMBER:-}"
 
 x-runtime-defaults: &runtime-defaults
   network_mode: host

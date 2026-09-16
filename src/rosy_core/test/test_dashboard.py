@@ -235,6 +235,10 @@ def test_dashboard_field_settings_use_click_handlers_not_form_submit():
     assert 'id="limits-save" class="primary-button" disabled' in html
     assert 'id="dock-register" class="primary-button" disabled' in html
     assert 'id="identity-save" class="primary-button" disabled' in html
+    assert 'id="robot-id-input"' in html
+    assert "readonly" in html.split('id="robot-id-input"', 1)[1].split(">", 1)[0]
+    assert "JSON.stringify({ robot_name: robotName })" in script
+    assert "robot_id: robotId" not in script
     assert 'id="token-add" class="primary-button" disabled' in html
     assert 'id="slam-save"' in settings
     assert '["waypoint-save"]?.addEventListener("click"' in script

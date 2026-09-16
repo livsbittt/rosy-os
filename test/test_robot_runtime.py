@@ -61,6 +61,9 @@ def test_runtime_uses_one_namespace_and_a_real_core_health_endpoint():
     assert "namespace:=${ROSY_NAMESPACE}" in services["rosy-motor"]["command"]
     assert "namespace:=${ROSY_NAMESPACE}" in services["rosy-io"]["command"]
     assert "/api/v1" in " ".join(services["rosy-core"]["healthcheck"]["test"])
+    number = services["rosy-core"]["environment"]["ROSY_ROBOT_NUMBER"]
+    assert number == "${ROSY_ROBOT_NUMBER:-}", number
+    assert "${ROSY_ROBOT_NUMBER:?" not in compose_text
 
 
 def test_runtime_builds_distinct_targets_from_shared_dockerfile():

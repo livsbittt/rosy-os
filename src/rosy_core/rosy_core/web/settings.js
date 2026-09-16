@@ -432,19 +432,18 @@ bindFormSave("identity-form", "identity-save");
 bindFormSave("token-form", "token-add");
 
 elements["identity-save"]?.addEventListener("click", async () => {
-  const robotId = elements["robot-id-input"]?.value.trim();
   const robotName = elements["robot-name-input"]?.value.trim();
-  if (!robotId || !robotName) {
-    setFieldMessage("identity-message", "로봇 ID와 이름을 모두 입력하세요.");
+  if (!robotName) {
+    setFieldMessage("identity-message", "이름을 입력하세요.");
     return;
   }
   try {
     const info = await api("/api/v1/system/info", {
       method: "PUT",
-      body: JSON.stringify({ robot_id: robotId, robot_name: robotName }),
+      body: JSON.stringify({ robot_name: robotName }),
     });
     hooks.onIdentityChanged(info);
-    setFieldMessage("identity-message", "신원을 저장했습니다. ROS namespace는 재시작 후 따라갑니다.");
+    setFieldMessage("identity-message", "표시 이름을 저장했습니다.");
   } catch (error) {
     setFieldMessage("identity-message", `신원 저장 실패: ${error.message}`);
   }

@@ -68,10 +68,20 @@ class RobotIdentity:
 
     def info(self) -> dict[str, Any]:
         """IDN-003 응답 스키마 (API Ref §5.1)."""
+        namespace = os.environ.get("ROSY_NAMESPACE", "").strip().strip("/") or self.robot_id
+        domain_raw = os.environ.get("ROS_DOMAIN_ID", "").strip()
+        if domain_raw:
+            domain_id: Optional[int] = int(domain_raw)
+        elif self.robot_number is not None:
+            domain_id = 40 + self.robot_number
+        else:
+            domain_id = None
         return {
             "robot_id": self.robot_id,
             "robot_name": self.robot_name,
             "robot_number": self.robot_number,
+            "ros_namespace": namespace,
+            "ros_domain_id": domain_id,
             "hostname": socket.gethostname(),
             "ip_address": _primary_ip(),
             "hardware_model": self.profile_model,
