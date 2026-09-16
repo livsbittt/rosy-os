@@ -10,12 +10,17 @@ ENV DEBIAN_FRONTEND=noninteractive \
     ROS_LOG_DIR=/tmp/ros-logs
 
 # Hub linux/arm64 ros:jazzy-ros-base from 2026-09-16 ships 0-byte CPython
-# stdlib sources (os.py, encodings/*). Reinstall from Ubuntu ports restores
-# them. No-op on a healthy amd64 or native Pi image of the same packages.
+# stdlib and debpython sources. Reinstall from Ubuntu ports in this order:
+# stdlib first (so python3 runs), then python3-minimal (debpython), then
+# later stages --reinstall numpy/yaml/pip. No-op on a healthy amd64 or
+# native Pi image of the same packages.
 RUN apt-get -o Acquire::Retries=5 update \
     && apt-get install --reinstall -y --no-install-recommends \
         libpython3.12-minimal \
         libpython3.12-stdlib \
+    && apt-get install --reinstall -y --no-install-recommends \
+        python3-minimal \
+        python3 \
     && apt-get install -y --no-install-recommends \
         ros-jazzy-rmw-cyclonedds-cpp \
     && rm -rf /var/lib/apt/lists/*
@@ -26,14 +31,15 @@ FROM runtime-common AS core-runtime
 
 COPY deploy/robot/requirements-core.txt /tmp/requirements-core.txt
 RUN apt-get -o Acquire::Retries=5 update \
-    && apt-get install -y --no-install-recommends \
+    && apt-get install --reinstall -y --no-install-recommends \
         python3-pip \
+        python3-numpy \
+        python3-yaml \
+    && apt-get install -y --no-install-recommends \
         ros-jazzy-nav2-msgs \
         ros-jazzy-rcl-interfaces \
         ros-jazzy-visualization-msgs \
         ros-jazzy-tf2-ros \
-        python3-numpy \
-        python3-yaml \
     && python3 -m pip install --break-system-packages --no-cache-dir \
         -r /tmp/requirements-core.txt \
     && mkdir -p /var/lib/rosy/.rosy \
@@ -65,9 +71,10 @@ FROM runtime-common AS io-runtime
 
 COPY deploy/robot/requirements-io.txt /tmp/requirements-io.txt
 RUN apt-get -o Acquire::Retries=5 update \
-    && apt-get install -y --no-install-recommends \
+    && apt-get install --reinstall -y --no-install-recommends \
         python3-pip \
         python3-yaml \
+    && apt-get install -y --no-install-recommends \
         ros-jazzy-joint-state-publisher \
         ros-jazzy-robot-state-publisher \
         ros-jazzy-tf-transformations \
