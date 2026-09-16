@@ -9,7 +9,13 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     ROS_LOG_DIR=/tmp/ros-logs
 
+# Hub linux/arm64 ros:jazzy-ros-base from 2026-09-16 ships 0-byte CPython
+# stdlib sources (os.py, encodings/*). Reinstall from Ubuntu ports restores
+# them. No-op on a healthy amd64 or native Pi image of the same packages.
 RUN apt-get -o Acquire::Retries=5 update \
+    && apt-get install --reinstall -y --no-install-recommends \
+        libpython3.12-minimal \
+        libpython3.12-stdlib \
     && apt-get install -y --no-install-recommends \
         ros-jazzy-rmw-cyclonedds-cpp \
     && rm -rf /var/lib/apt/lists/*
