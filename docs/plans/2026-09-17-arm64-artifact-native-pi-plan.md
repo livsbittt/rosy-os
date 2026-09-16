@@ -4,7 +4,7 @@
 
 **Goal:** D-66 CORE 이미지(`rosy_control`/OpenCV 없음)를 **네이티브 linux/arm64**로 빌드하고 digest까지 기록해 ARTIFACT를 HOLD에서 한 단계 올린다. 호스트 QEMU는 1순위가 아니다.
 
-**Architecture:** `rosy_core`만 `core` 스테이지에 들어간다. Control 센서 워커와 OpenCV는 `io`/Control slice. Hub `ros:jazzy-ros-base` linux/arm64 (2026-09-16)는 CPython/colcon/gcc/cmake 모듈이 0바이트라 QEMU 경로가 막혔다. Dockerfile의 `restore-hollow-python.sh` / `restore-hollow-toolchain.sh`는 건강한 이미지에서는 no-op로 남긴다.
+**Architecture:** `rosy_core`만 `core` 스테이지에 들어간다. Control 센서 워커와 OpenCV는 `io`/Control slice. Hub `ros:jazzy-ros-base` linux/arm64 (2026-09-16)는 CPython/colcon/gcc/cmake 모듈이 0바이트일 수 있다. `restore-hollow-python.sh`는 `/usr` CPython뿐 아니라 `/opt/ros` 0바이트 `.py` 소유 패키지(`ros-jazzy-*`)까지 재설치하고, 0바이트 파일이 없으면 apt reinstall을 하지 않는다. `restore-hollow-toolchain.sh`는 gcc/make/cmake 모듈이 있을 때 skip 한다.
 
 **Tech Stack:** ROS 2 Jazzy, Docker Buildx, Raspberry Pi OS Lite 64-bit, pytest (host, ROS-free).
 
@@ -14,7 +14,7 @@
 
 - 실행 SoT: `docs/plans/2026-09-13-rosy-os-device-validation-implementation-plan.md`
 - 증거 노트: `docs/deployment/arm64-build-notes.md` 섹션 `2026-09-17 D-66 QEMU HOLD`
-- HEAD (계획 작성 시점): `c83f44d` on `chore/public-release-prep` = local `main`
+- HEAD (계획 작성 시점): gated hollow-restore 커밋 on `chore/public-release-prep` = local `main`. 호스트 가드: `python -m pytest test/test_restore_hollow.py -q`
 - `ac81f2f` core/io digest는 D-66 이전이다. 재사용 금지.
 - ARTIFACT / DEVICE / FIELD는 모두 HOLD. 호스트 pytest는 Device GO가 아니다.
 - `src/rosy_imu_bno055/**` WIP는 건드리지 않는다.
@@ -38,7 +38,7 @@ docker buildx inspect --bootstrap
 
 Expected: `aarch64` / `arm64`. QEMU가 보이면 이 계획은 Task 1b로 간다.
 
-**Step 2 (권장):** native Pi에서 `--platform linux/arm64` 없이 `core` 타깃을 빌드한다. Hub 이미지가 여전히 0바이트면 restore 스크립트가 같은 우분투 `.deb`로 채운다.
+**Step 2 (권장):** native Pi에서 `--platform linux/arm64` 없이 `core` 타깃을 빌드한다. Hub 이미지가 건강하면 restore 스크립트가 skip 한다. 0바이트 `.py`(CPython 또는 `/opt/ros`)나 gcc/make 부재면 해당 소유 패키지만 Ubuntu ports에서 재설치한다.
 
 **Step 1b (호스트 QEMU를 꼭 써야 할 때만):** 2026-09-16 이전 `ros:jazzy-ros-base` linux/arm64 digest를 핀한다. `ac81f2f` 이미지 레이어에서 쓰인 digest를 쓰거나, osrf가 재발행한 건강한 태그를 확인한다. 현재 Hub 태그 `jazzy-ros-base` arm64를 그대로 다시 QEMU하지 않는다.
 

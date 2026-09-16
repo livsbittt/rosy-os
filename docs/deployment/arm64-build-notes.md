@@ -123,9 +123,12 @@ fine. `docker cp` evidence:
 | `/usr/bin/cmake` | real, 10489912 bytes |
 | cmake `Modules/*.cmake` | 0 bytes |
 
-Workarounds committed (no-op on a healthy amd64 or native Pi image):
-`restore-hollow-python.sh` after CPython stdlib/minimal, then
-`restore-hollow-toolchain.sh` in `core-build`/`io-build` only, `set -eo`
+Workarounds committed: `restore-hollow-python.sh` skips when no 0-byte `.py`
+files exist; otherwise it reinstalls CPython stdlib/minimal first, then
+dpkg owners of remaining 0-byte files under `/usr` **and `/opt/ros`**.
+`restore-hollow-toolchain.sh` skips when gcc/g++/make and a
+`CMakeDetermineCCompiler.cmake` module are present and non-empty. Host
+guard: `python -m pytest test/test_restore_hollow.py -q`. `set -eo`
 without nounset around `setup.bash`, and `test -d install`. Proven in
 one-shot containers: `python3 -c 'print(123)'`, `pip 24.0`, `numpy 1.26.4`,
 colcon discovering `rosy_interfaces`. Not proven: a loaded D-66 core image.

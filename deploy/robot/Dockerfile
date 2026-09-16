@@ -9,21 +9,13 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     ROS_LOG_DIR=/tmp/ros-logs
 
-# Hub linux/arm64 ros:jazzy-ros-base from 2026-09-16 ships 0-byte CPython
-# sources (stdlib, debpython, colcon, packaging, numpy, ...). Reinstall
-# from Ubuntu ports in this order: stdlib first (so python3 runs), then
-# python3-minimal, then every installed python3-* package via the helper
-# script (inline $ vars are eaten by Dockerfile substitution). Later
-# stages still --reinstall pip/numpy/yaml. No-op on a healthy amd64 or
-# native Pi image of the same packages.
+# Hub linux/arm64 ros:jazzy-ros-base from 2026-09-16 may ship 0-byte
+# CPython and ROS Python sources. The helper no-ops when no 0-byte .py
+# files exist (healthy amd64 / native Pi). On a hollow image it
+# reinstalls stdlib, then python3-minimal, then owners of remaining
+# 0-byte files including /opt/ros.
 COPY deploy/robot/restore-hollow-python.sh /tmp/restore-hollow-python.sh
 RUN apt-get -o Acquire::Retries=5 update \
-    && apt-get install --reinstall -y --no-install-recommends \
-        libpython3.12-minimal \
-        libpython3.12-stdlib \
-    && apt-get install --reinstall -y --no-install-recommends \
-        python3-minimal \
-        python3 \
     && bash /tmp/restore-hollow-python.sh \
     && rm -f /tmp/restore-hollow-python.sh \
     && apt-get install -y --no-install-recommends \
@@ -36,11 +28,10 @@ FROM runtime-common AS core-runtime
 
 COPY deploy/robot/requirements-core.txt /tmp/requirements-core.txt
 RUN apt-get -o Acquire::Retries=5 update \
-    && apt-get install --reinstall -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
         python3-pip \
         python3-numpy \
         python3-yaml \
-    && apt-get install -y --no-install-recommends \
         ros-jazzy-nav2-msgs \
         ros-jazzy-rcl-interfaces \
         ros-jazzy-visualization-msgs \
@@ -84,10 +75,9 @@ FROM runtime-common AS io-runtime
 
 COPY deploy/robot/requirements-io.txt /tmp/requirements-io.txt
 RUN apt-get -o Acquire::Retries=5 update \
-    && apt-get install --reinstall -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
         python3-pip \
         python3-yaml \
-    && apt-get install -y --no-install-recommends \
         ros-jazzy-joint-state-publisher \
         ros-jazzy-robot-state-publisher \
         ros-jazzy-tf-transformations \
