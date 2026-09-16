@@ -54,10 +54,10 @@ RUN apt-get -o Acquire::Retries=5 update \
 
 FROM core-runtime AS core-build
 
+COPY deploy/robot/restore-hollow-toolchain.sh /tmp/restore-hollow-toolchain.sh
 RUN apt-get -o Acquire::Retries=5 update \
-    && apt-get install -y --no-install-recommends \
-        build-essential \
-        cmake \
+    && bash /tmp/restore-hollow-toolchain.sh \
+    && rm -f /tmp/restore-hollow-toolchain.sh \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/rosy_ws
@@ -100,11 +100,11 @@ RUN apt-get -o Acquire::Retries=5 update \
 
 FROM io-runtime AS io-build
 
+COPY deploy/robot/restore-hollow-toolchain.sh /tmp/restore-hollow-toolchain.sh
 RUN apt-get -o Acquire::Retries=5 update \
-    && apt-get install -y --no-install-recommends \
-        build-essential \
-        cmake \
-        git \
+    && bash /tmp/restore-hollow-toolchain.sh \
+    && apt-get install -y --no-install-recommends git \
+    && rm -f /tmp/restore-hollow-toolchain.sh \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/rosy_ws
