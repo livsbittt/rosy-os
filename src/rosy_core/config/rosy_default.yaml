@@ -17,6 +17,9 @@ capabilities: capabilities.yaml
 runtime:
   mode: core                      # ROSY_RUNTIME_MODE overrides on the robot
 
+adapters:
+  manifests: []                   # host default; device overlay may list YAML paths
+
 control:
   sensor_adapter:
     enabled: false                # explicit opt-in; CORE remains stationary until enabled
