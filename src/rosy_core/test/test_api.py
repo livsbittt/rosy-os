@@ -171,6 +171,17 @@ def test_system_info_and_capabilities(client):
     assert r.json()["swarm"] == {"follow": True, "lead": True}
 
 
+def test_inventory_is_a_mobile_base_without_pick_or_rfid(client):
+    tc, _svc = client
+    response = tc.get("/api/v1/system/inventory", headers=VIEWER)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["device"]["device_type"] == "mobile_base"
+    blob = json.dumps(body)
+    assert "pick" not in blob
+    assert "rfid" not in blob
+
+
 def test_system_runtime_requires_viewer_and_returns_safe_snapshot(client):
     tc, svc = client
 

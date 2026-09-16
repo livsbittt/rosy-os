@@ -1,8 +1,11 @@
-"""rosy_core.api.v1.system — IDN-003 신원, CAP-001 capability, SEC-101 토큰, 호스트 런타임."""
+"""rosy_core.api.v1.system — IDN-003 신원, CAP-001 capability, SEC-101 토큰, 호스트 런타임, inventory."""
 
 from __future__ import annotations
 
 import hmac
+from dataclasses import asdict, is_dataclass
+from enum import Enum
+from typing import Any
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -145,6 +148,23 @@ def delete_token(token_id: str, auth: AuthContext = Depends(admin),
 @system_router.get("/capabilities")
 def capabilities(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
     return svc.capability.to_dict()
+
+
+def _jsonable(value: Any) -> Any:
+    if isinstance(value, Enum):
+        return value.value
+    if is_dataclass(value) and not isinstance(value, type):
+        value = asdict(value)
+    if isinstance(value, dict):
+        return {key: _jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(item) for item in value]
+    return value
+
+
+@system_router.get("/inventory")
+def system_inventory(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
+    return _jsonable(svc.inventory())
 
 
 @system_router.get("/runtime")
