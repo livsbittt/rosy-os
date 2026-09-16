@@ -48,7 +48,7 @@ Manifests, not a package move: `rosy_bringup/config/adapter.manifest.yaml` (Pink
 
 ### Phase 3 - Introduce Capability Registry
 
-Remove direct hardware assumptions from Task logic.
+Done for v1: `TaskKind.concept_id` maps REST actions to concept ids (`mobility.move`, …); inventory `descriptors` carry `available` from DeviceState (SAFE_STOP/FAULT/BOOTING → false). CAP-001 `GET /capabilities` is unchanged. Not done: scheduler that assigns work across nodes.
 
 ### Phase 4 - Introduce Compute Fabric
 

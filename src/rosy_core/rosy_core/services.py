@@ -16,7 +16,6 @@ from rosy_core.docking.database import DockDatabase
 from rosy_core.docking.detector import SimulatedDetector
 from rosy_core.docking.manager import DockingConfig, DockingManager
 from rosy_core.domain.adapters import AdapterRegistry
-from rosy_core.domain.capabilities import descriptors_from_cap001
 from rosy_core.domain.model import inventory_from_config, slices_from_config
 from rosy_core.protocol.schemas import DockState, HealthState
 from rosy_core.events.audit import FileAuditLog
@@ -245,7 +244,7 @@ class CoreServices:
                 for health in self.state.snapshot().diagnostics_summary.values()
             ),
             estop=bool(self.safety.estop),
+            cap001=cap001,
         )
-        data["capability_ids"] = [d.id for d in descriptors_from_cap001(cap001)]
         data["adapters"] = [item.id for item in self.adapter_registry.enabled()]
         return data

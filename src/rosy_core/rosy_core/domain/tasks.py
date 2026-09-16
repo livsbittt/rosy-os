@@ -24,5 +24,15 @@ class TaskKind(str, enum.Enum):
             TaskKind.DOCK: "docking.supported",
         }[self]
 
+    @property
+    def concept_id(self) -> str:
+        return {
+            TaskKind.MOVE: "mobility.move",
+            TaskKind.NAVIGATE: "mobility.navigate",
+            TaskKind.RETURN_HOME: "mobility.navigate",
+            TaskKind.FOLLOW: "mobility.follow",
+            TaskKind.DOCK: "mobility.dock",
+        }[self]
+
     def require(self, capability: Capability) -> None:
         capability.require(self.capability)

@@ -76,8 +76,8 @@ ROSY OS uses six primary domain objects:
 | 03 Runtime architecture | `rosy_core` process (D-1) | live |
 | 04 Device adapter | `rosy_bringup` (Pinky), `rosy_omx_adapter` (disabled) | live adapters; manifests later |
 | 05 ROS 2 interface | CORE SRS §1.3 — REST/WS is the external API | concept `/rosy/{device_id}/…` topics are **not** the API |
-| 06 Device state & lifecycle | existing `RobotMode` | live modes; derived `DeviceState` later |
-| 07 Capability | CAP-001 YAML booleans (D-11, D-32) | live |
+| 06 Device state & lifecycle | existing `RobotMode`; inventory `device_state` including BOOTING | live |
+| 07 Capability | CAP-001 YAML booleans (D-11, D-32); inventory `descriptors[].available` follows DeviceState (concept 07 §5) | live |
 | 08 Task & workflow | atomic REST actions; missions stay Fleet (D-12) | live actions; workflow **target-not-built** |
 | 09 Composite robot | — | **target-not-built** |
 | 10 Compute fabric | — | **target-not-built** |

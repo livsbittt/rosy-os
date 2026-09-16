@@ -6,7 +6,7 @@ import enum
 import platform
 import socket
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, Sequence
+from typing import Any, Iterable, Mapping, Optional, Sequence
 
 from rosy_core.identity import SOFTWARE_VERSION
 
@@ -74,12 +74,19 @@ def _mode_value(mode: Any) -> str:
     return str(mode)
 
 
-def _device_state(mode: Any, health_error: bool, estop: bool) -> DeviceState:
+def _device_state(
+    mode: Any,
+    health_error: bool,
+    estop: bool,
+    booting: bool = False,
+) -> DeviceState:
     value = _mode_value(mode)
     if estop or value == "EMERGENCY":
         return DeviceState.SAFE_STOP
     if health_error:
         return DeviceState.FAULT
+    if booting:
+        return DeviceState.BOOTING
     if value in {"NAVIGATION", "DOCKING", "MANUAL"}:
         return DeviceState.BUSY
     return DeviceState.READY
@@ -103,6 +110,8 @@ def inventory_from_config(
     mode: Any,
     health_error: bool,
     estop: bool,
+    booting: bool = False,
+    cap001: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     robot = config.get("robot") or {}
     robot_id = str(robot.get("id") or "rosy_01")
@@ -112,7 +121,8 @@ def inventory_from_config(
         if slices is not None
         else slices_from_config(config)
     )
-    return {
+    state = _device_state(mode, health_error, estop, booting=booting)
+    payload: dict[str, Any] = {
         "node": RuntimeNode(
             runtime_mode=str(runtime.get("mode") or "core"),
             slices=resolved_slices,
@@ -132,5 +142,23 @@ def inventory_from_config(
             type="mobile_base",
             devices=(robot_id,),
         ),
-        "device_state": _device_state(mode, health_error, estop),
+        "device_state": state,
     }
+    if cap001 is not None:
+        from rosy_core.domain.capabilities import descriptors_from_cap001
+        from rosy_core.domain.tasks import TaskKind
+
+        descriptors = descriptors_from_cap001(cap001, device_state=state)
+        payload["descriptors"] = [
+            {"id": item.id, "available": item.available} for item in descriptors
+        ]
+        payload["capability_ids"] = [item.id for item in descriptors]
+        payload["task_kinds"] = [
+            {
+                "kind": kind.value,
+                "concept_id": kind.concept_id,
+                "capability": kind.capability,
+            }
+            for kind in TaskKind
+        ]
+    return payload

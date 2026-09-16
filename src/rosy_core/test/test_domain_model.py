@@ -43,3 +43,42 @@ def test_estop_maps_to_safe_stop():
         estop=True,
     )
     assert data["device_state"] is DeviceState.SAFE_STOP
+
+
+def test_booting_when_snapshot_has_not_arrived():
+    data = inventory_from_config(
+        {"robot": {"id": "rosy_01"}, "runtime": {"mode": "core"}},
+        profile_model="Pinky Pro",
+        sensors=[],
+        slices=["core"],
+        mode=Mode.IDLE,
+        health_error=False,
+        estop=False,
+        booting=True,
+    )
+    assert data["device_state"] is DeviceState.BOOTING
+
+
+def test_inventory_exposes_descriptors_and_task_kinds():
+    data = inventory_from_config(
+        {"robot": {"id": "rosy_01"}, "runtime": {"mode": "hardware"}},
+        profile_model="Pinky Pro",
+        sensors=["lidar"],
+        slices=["core", "motor", "io", "nav"],
+        mode=Mode.IDLE,
+        health_error=False,
+        estop=False,
+        cap001={
+            "teleop": True,
+            "navigation": {"goal_navigation": True, "return_home": True},
+            "swarm": {"follow": True, "lead": False},
+            "docking": {"supported": False},
+            "slam": False,
+        },
+    )
+    ids = {d["id"]: d["available"] for d in data["descriptors"]}
+    assert ids["mobility.move"] is True
+    assert "manipulate.pick" not in ids
+    kinds = {item["kind"]: item["concept_id"] for item in data["task_kinds"]}
+    assert kinds["MOVE"] == "mobility.move"
+    assert kinds["NAVIGATE"] == "mobility.navigate"
