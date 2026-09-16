@@ -69,8 +69,9 @@ def slices_from_config(config: dict[str, Any]) -> tuple[str, ...]:
 
 
 def _mode_value(mode: Any) -> str:
-    value = getattr(mode, "value", mode)
-    return str(value)
+    if isinstance(mode, enum.Enum):
+        return str(mode.value)
+    return str(mode)
 
 
 def _device_state(mode: Any, health_error: bool, estop: bool) -> DeviceState:
