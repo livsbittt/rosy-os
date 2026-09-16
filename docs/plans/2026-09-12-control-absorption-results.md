@@ -302,3 +302,20 @@ only during import/subprocess startup; it did not expose a product assertion
 failure. The canonical commands in `src/rosy_control/README.md`,
 `CLAUDE.md`, `STEPS.txt`, and the Device plan now make the import contract
 explicit.
+
+### D-66 core image eviction + Device Task 0 host baseline (2026-09-17)
+
+Branch: `chore/public-release-prep`. HEAD at recording: `d58e057` plus this note.
+Did not touch `src/rosy_imu_bno055/**` WIP.
+
+- D-66: `rosy-core` image no longer COPY `rosy_control` or install `python3-opencv`.
+  `rosy_core/package.xml` has no `rosy_control` exec_depend. Default sensor adapter
+  stays disabled. Enabling it without a control slice fail-closes on import.
+- Host Device Task 0 contracts: `test_control_absorption_package.py`,
+  `test_network_topology_contracts.py`, `test_runtime_slices.py`,
+  `test_control_launch_boundary.py` → **51 passed**.
+- Absorbed Control suite: `PYTHONPATH=src/rosy_control;src/rosy_core;src`
+  `pytest src/rosy_control/test` → **995 passed, 26 skipped**.
+- ROS Jazzy graph smoke, ARM64 image build, signed digest, Pi install/readback:
+  **not run on this Windows host**. ARTIFACT and DEVICE remain HOLD.
+  A passing host pytest is not image or field acceptance.
