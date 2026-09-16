@@ -1,4 +1,7 @@
-﻿"""Select processing features; hardware bringup and ADC are separate prerequisites."""
+﻿"""LEGACY_FULL_STACK: Select processing features; hardware bringup and ADC are separate prerequisites.
+
+Do not launch this file beside rosy_core. CORE owns the final cmd_vel publisher.
+"""
 import os
 
 from ament_index_python.packages import get_package_share_directory
