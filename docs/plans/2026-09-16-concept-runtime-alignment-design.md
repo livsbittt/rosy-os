@@ -38,7 +38,7 @@ Device ARTIFACT/Pi GO is still the validation plan’s job. This design does not
 | `docs/concept/` | Target OS. README gains an explicit **current mapping** table. Concept 15 apt path is deferred, not deleted. |
 | D-62 slices | v1 realization of “install only what the node needs.” |
 
-Proposed ADR **D-63**: concept OS is the target; v1 maps terms onto CORE + D-62; Debian profiles and the control plane stay later phases of concept 13.
+Proposed ADR **D-65**: concept OS is the target; v1 maps terms onto CORE + D-62; Debian profiles and the control plane stay later phases of concept 13. D-63 remains the modular-middleware goal; this freeze does not reuse that ID.
 
 ## 4. Install model
 

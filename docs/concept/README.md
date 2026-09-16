@@ -66,13 +66,13 @@ ROSY OS uses six primary domain objects:
 
 ## Current mapping (2026-09-16)
 
-`docs/concept` is the **target** distributed OS. v1 maps those terms onto the live Pinky CORE + D-62 slices stack (D-63). Contract documents win on API, modes, `cmd_vel`, and identity: [CORE SRS](../spec/ROSY%20CORE%20SRS.md) §1.3, [ADR log](../reference/ROSY%20ADR%20Log.md) (D-62 slices), [this design](../plans/2026-09-16-concept-runtime-alignment-design.md). Live glossary: [CONCEPTS.md](../../CONCEPTS.md).
+`docs/concept` is the **target** distributed OS. v1 maps those terms onto the live Pinky CORE + D-62 slices stack (D-65). Contract documents win on API, modes, `cmd_vel`, and identity: [CORE SRS](../spec/ROSY%20CORE%20SRS.md) §1.3, [ADR log](../reference/ROSY%20ADR%20Log.md) (D-62 slices), [this design](../plans/2026-09-16-concept-runtime-alignment-design.md). Live glossary: [CONCEPTS.md](../../CONCEPTS.md).
 
 | Concept | v1 mapping | Status |
 |---|---|---|
 | 00 Vision & definition | CORE SRS product scope | live contract |
 | 01 Target architecture | ADR log + this design | target; v1 is CORE + slices |
-| 02 Domain model | CONCEPTS.md Node / Device / Component / Capability / Asset / Task | glossary frozen (D-63) |
+| 02 Domain model | CONCEPTS.md Node / Device / Component / Capability / Asset / Task | glossary frozen (D-65) |
 | 03 Runtime architecture | `rosy_core` process (D-1) | live |
 | 04 Device adapter | `rosy_bringup` (Pinky), `rosy_omx_adapter` (disabled) | live adapters; manifests later |
 | 05 ROS 2 interface | CORE SRS §1.3 — REST/WS is the external API | concept `/rosy/{device_id}/…` topics are **not** the API |

@@ -30,7 +30,7 @@ A hold is evaluated before the runtime starts, and its verdict is specifically "
 
 ## Domain objects
 
-v1 maps the concept OS objects onto CORE + D-62 slices (D-63). Code names below are the types that will hold this data; they are not a second runtime.
+v1 maps the concept OS objects onto CORE + D-62 slices (D-65). Code names below are the types that will hold this data; they are not a second runtime.
 
 ### Node
 The computer that runs CORE — hostname, architecture, OS, software version, runtime mode, and active slices.

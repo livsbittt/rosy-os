@@ -12,6 +12,12 @@ swarm:
   # CORE only: no motors and no Nav2, so there is nothing to follow with.
   follow: false
   lead: false
+vision:
+  enabled: false
+omx:
+  enabled: false
+ai:
+  enabled: false
 docking:
   supported: false
 sensors: []

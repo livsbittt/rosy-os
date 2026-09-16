@@ -11,10 +11,50 @@ RUN_USER="${ROSY_RUN_USER:-${SUDO_USER:-rosy}}"
 INITIAL_CREDENTIALS="/etc/rosy/initial-credentials.txt"
 INITIAL_CREDENTIALS_CREATED=0
 UPGRADE_GUARD_ACTIVE=0
+INSTALL_REQUESTED_PRESET=""
+INSTALL_REQUESTED_SLICES=""
 
 fail() {
     echo "FAIL: $*" >&2
     exit 1
+}
+
+# --preset names a catalog mode/alias; --slices names a set that must match a
+# preset. Both are validated now and recorded as intent. First-boot runtime
+# stays core; vision/omx/ai are not installable yet.
+parse_install_cli() {
+    local preset="" slices=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --preset)
+                [[ $# -ge 2 && -n "${2:-}" && "$2" != --* ]] || fail "--preset requires a value"
+                [[ -z "$slices" ]] || fail "--preset and --slices are mutually exclusive"
+                [[ -z "$preset" ]] || fail "--preset specified more than once"
+                preset="$2"
+                shift 2
+                ;;
+            --slices)
+                [[ $# -ge 2 && -n "${2:-}" && "$2" != --* ]] || fail "--slices requires a value"
+                [[ -z "$preset" ]] || fail "--preset and --slices are mutually exclusive"
+                [[ -z "$slices" ]] || fail "--slices specified more than once"
+                slices="$2"
+                shift 2
+                ;;
+            *)
+                fail "unknown argument: $1"
+                ;;
+        esac
+    done
+
+    # shellcheck source=config/resolve-mode.sh
+    source "$SCRIPT_DIR/config/resolve-mode.sh"
+    local board="$SCRIPT_DIR/config/board.yaml"
+    if [[ -n "$preset" ]]; then
+        INSTALL_REQUESTED_PRESET="$(resolve_runtime_mode "$preset" "$board")" || exit $?
+    elif [[ -n "$slices" ]]; then
+        resolve_slices_to_mode "$slices" "$board" >/dev/null || exit $?
+        INSTALL_REQUESTED_SLICES="$slices"
+    fi
 }
 
 on_install_exit() {
@@ -267,6 +307,19 @@ require_robot_identity() {
     set_env_default "$env_file" ROSY_NAMESPACE "$namespace"
 }
 
+# First-boot unit always runs core. Requested preset/slices are commissioning
+# intent, not the mode systemd starts now.
+write_install_runtime_selection() {
+    local env_file="$1"
+    set_env_value "$env_file" ROSY_RUNTIME_MODE core
+    if [[ -n "${INSTALL_REQUESTED_PRESET:-}" ]]; then
+        set_env_value "$env_file" ROSY_REQUESTED_PRESET "$INSTALL_REQUESTED_PRESET"
+    fi
+    if [[ -n "${INSTALL_REQUESTED_SLICES:-}" ]]; then
+        set_env_value "$env_file" ROSY_REQUESTED_SLICES "$INSTALL_REQUESTED_SLICES"
+    fi
+}
+
 write_runtime_environment() {
     local env_file run_group dialout_gid
     env_file="$INSTALL_ROOT/deploy/robot/.env"
@@ -290,7 +343,7 @@ write_runtime_environment() {
     set_env_default "$env_file" ROSY_MOTOR_PROFILE_ACCELERATION 200
     set_env_value "$env_file" ROSY_CONFIG_PATH "$ROSY_CONFIG"
     set_env_value "$env_file" ROSY_DATA_PATH "$ROSY_DATA"
-    set_env_value "$env_file" ROSY_RUNTIME_MODE core
+    write_install_runtime_selection "$env_file"
     chown root:"$run_group" "$env_file"
     chmod 0640 "$env_file"
 }
@@ -337,6 +390,7 @@ enable_boot_service() {
 }
 
 main() {
+    parse_install_cli "$@"
     require_root
     preflight_host
     stop_existing_runtime
@@ -348,6 +402,12 @@ main() {
     enable_boot_service
     UPGRADE_GUARD_ACTIVE=0
     echo "PASS: Rosy core-only runtime is installed and healthy"
+    if [[ -n "${INSTALL_REQUESTED_PRESET:-}" ]]; then
+        echo "INFO: requested preset ${INSTALL_REQUESTED_PRESET} recorded; ROSY_RUNTIME_MODE stays core until commissioning"
+    fi
+    if [[ -n "${INSTALL_REQUESTED_SLICES:-}" ]]; then
+        echo "INFO: requested slices ${INSTALL_REQUESTED_SLICES} recorded; ROSY_RUNTIME_MODE stays core until commissioning"
+    fi
     if ((INITIAL_CREDENTIALS_CREATED)); then
         echo "Credentials: sudo cat $INITIAL_CREDENTIALS"
         echo "After recording them: sudo rm -f $INITIAL_CREDENTIALS"

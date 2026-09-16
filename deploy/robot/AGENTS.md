@@ -1,11 +1,11 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-16 -->
 
 # robot
 
 ## Purpose
 
-On-device runtime: multi-stage Dockerfile (`core` / `io` targets), Compose `rosy-runtime`, systemd units, Pi install and Windows deploy/verify scripts. `rosy-core` is FastAPI/rclpy only; motors and LiDAR are separate services (D-22).
+On-device runtime: multi-stage Dockerfile (`core` / `io` targets), Compose `rosy-runtime`, systemd units, Pi install and Windows deploy/verify scripts. `rosy-core` is FastAPI/rclpy only; motors and LiDAR are separate services (D-22). Slice catalog (`config/board.yaml`): **CORE required**; motor/io/nav install as existing modes; vision/omx/ai are catalog-only and stay dark.
 
 ## Key Files
 
@@ -15,7 +15,7 @@ On-device runtime: multi-stage Dockerfile (`core` / `io` targets), Compose `rosy
 | `compose.yaml` | `rosy-core` (always), `rosy-motor` (profile `motor`), hardware/LiDAR/Nav2 (profile `hardware`); host network, read-only, cap_drop ALL |
 | `runtime-mode.sh` | Modes: `core` \| `motor` \| `hardware` (not `io`) |
 | `entrypoint.sh` | Container entry |
-| `install-pi.sh` | First-boot install on Pi |
+| `install-pi.sh` | First-boot install on Pi. `--preset` (mode/alias) or `--slices` (must match a preset, include `core`); both map to `ROSY_RUNTIME_MODE`. vision/omx/ai: not installable yet |
 | `configure-uart-pi5.sh` | Pi 5 UART (`ttyAMA4` for Dynamixel) |
 | `deploy-from-windows.ps1` | Copy/deploy from a Windows host |
 | `verify-from-windows.ps1` | Remote verify |
@@ -39,6 +39,7 @@ On-device runtime: multi-stage Dockerfile (`core` / `io` targets), Compose `rosy
 ### Working In This Directory
 
 - Healthcheck: `GET http://127.0.0.1:8080/api/v1`.
+- CORE is the only required slice. vision/omx/ai are catalogued with `enabled: false` and no compose service; do not start them.
 - `rosy-core` has **no** `/dev` devices and no Docker socket. Do not add them.
 - Host proc/sys bind-mounts are read-only for dashboard telemetry (`ROSY_HOST_ROOT=/host`).
 - Low-battery shutdown: CORE writes `battery-shutdown-request.json`; the host unit executes halt (sentinel age 900 s, grace cap 600 s). CORE must not call shutdown itself (D-27).
@@ -63,7 +64,7 @@ Compose YAML anchors `x-ros-environment` and `x-runtime-defaults`. Namespace `__
 ### Internal
 
 - Build context `../..` (repo root)
-- Config overlays: `config/board.yaml` plus `capabilities.{core,motor,hardware}.yaml`. `pi5-lite` is an alias resolved by `config/resolve-mode.sh`.
+- Config overlays: `config/board.yaml` (`slices` / `presets`) plus `capabilities.{core,motor,hardware}.yaml`. `pi5-lite` is an alias resolved by `config/resolve-mode.sh`.
 
 ### External
 

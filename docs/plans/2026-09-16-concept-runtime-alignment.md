@@ -18,7 +18,7 @@
 
 ---
 
-### Task 1: Freeze terms (D-63 + glossary + concept map)
+### Task 1: Freeze terms (D-65 + glossary + concept map)
 
 **Files:**
 - Modify: `docs/reference/ROSY ADR Log.md`
@@ -29,7 +29,7 @@
 
 **Step 1: Write the ADR**
 
-Append to the ADR table and a new `## D-63` section:
+Append to the ADR table and a new `## D-65` section (D-61–D-64 already occupy earlier IDs):
 
 - Status: Proposed
 - Decision: v1 maps concept objects onto CORE + D-62 slices. Concept 15 apt/`rosyctl` and the control plane are later concept-13 phases. Concept 05 ROS topics are not the external API (CORE SRS §1.3).
@@ -61,7 +61,7 @@ Add both 2026-09-16 concept-runtime-alignment files to `docs/plans/AGENTS.md`.
 
 ```bash
 git add docs/reference/"ROSY ADR Log.md" CONCEPTS.md docs/concept/README.md docs/plans/AGENTS.md
-git commit -m "docs: freeze concept terms onto CORE and D-62 (D-63)"
+git commit -m "docs: freeze concept terms onto CORE and D-62 (D-65)"
 ```
 
 ---
@@ -534,7 +534,7 @@ Expected: PASS. Record skip counts; do not treat skips as GO.
 
 Before claiming the plan executed:
 
-1. ADR D-63 exists; CONCEPTS.md has the six objects; concept README has the mapping table.
+1. ADR D-65 exists; CONCEPTS.md has the six objects; concept README has the mapping table. D-63 remains the modular-middleware goal.
 2. Identity tests in `test/test_dds_identity_contracts.py` and `src/rosy_core/test/test_runtime_config.py` pass.
 3. `PUT /api/v1/system/info` cannot rebind `robot_id` (`test_api.py`).
 4. `GET /api/v1/system/inventory` exists; capabilities GET is unchanged.
