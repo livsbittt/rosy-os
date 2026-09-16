@@ -10,11 +10,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
     ROS_LOG_DIR=/tmp/ros-logs
 
 # Hub linux/arm64 ros:jazzy-ros-base from 2026-09-16 ships 0-byte CPython
-# stdlib, debpython, and colcon sources. Reinstall from Ubuntu ports in
-# this order: stdlib first (so python3 runs), then python3-minimal
-# (debpython), then colcon plugins (otherwise `colcon build` exits 0 with
-# no install/). Later stages --reinstall numpy/yaml/pip. No-op on a
-# healthy amd64 or native Pi image of the same packages.
+# sources (stdlib, debpython, colcon, packaging, numpy, ...). Reinstall
+# from Ubuntu ports in this order: stdlib first (so python3 runs), then
+# python3-minimal, then every installed python3-* package. Later stages
+# still --reinstall pip/numpy/yaml. No-op on a healthy amd64 or native
+# Pi image of the same packages.
 RUN apt-get -o Acquire::Retries=5 update \
     && apt-get install --reinstall -y --no-install-recommends \
         libpython3.12-minimal \
@@ -22,32 +22,10 @@ RUN apt-get -o Acquire::Retries=5 update \
     && apt-get install --reinstall -y --no-install-recommends \
         python3-minimal \
         python3 \
-    && apt-get install --reinstall -y --no-install-recommends \
-        python3-colcon-argcomplete \
-        python3-colcon-bash \
-        python3-colcon-cd \
-        python3-colcon-cmake \
-        python3-colcon-common-extensions \
-        python3-colcon-core \
-        python3-colcon-defaults \
-        python3-colcon-devtools \
-        python3-colcon-library-path \
-        python3-colcon-metadata \
-        python3-colcon-mixin \
-        python3-colcon-notification \
-        python3-colcon-output \
-        python3-colcon-package-information \
-        python3-colcon-package-selection \
-        python3-colcon-parallel-executor \
-        python3-colcon-pkg-config \
-        python3-colcon-powershell \
-        python3-colcon-python-setup-py \
-        python3-colcon-recursive-crawl \
-        python3-colcon-ros \
-        python3-colcon-test-result \
-        python3-colcon-zsh \
-        python3-vcstool \
-        ros-jazzy-ament-package \
+    && py_pkgs="$(dpkg-query -W -f='$${Package}\n' | grep '^python3-' || true)" \
+    && if [ -n "$$py_pkgs" ]; then \
+         apt-get install --reinstall -y --no-install-recommends $$py_pkgs; \
+       fi \
     && apt-get install -y --no-install-recommends \
         ros-jazzy-rmw-cyclonedds-cpp \
     && rm -rf /var/lib/apt/lists/*
