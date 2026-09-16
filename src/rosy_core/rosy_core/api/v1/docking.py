@@ -9,6 +9,7 @@ from rosy_core.api.v1.common import admin, operator, viewer
 from rosy_core.api.deps import AuthContext, get_services
 from rosy_core.api.errors import ApiError
 from rosy_core.docking.database import DockError, DockInstance, DockType
+from rosy_core.domain.tasks import TaskKind
 from rosy_core.services import CoreServices
 
 
@@ -121,7 +122,7 @@ def teach_dock(dock_id: str, auth: AuthContext = Depends(operator),
 @docking_router.post("/dock")
 def docking_dock(body: DockCommand, auth: AuthContext = Depends(operator),
                  svc: CoreServices = Depends(get_services)):
-    svc.capability.require("docking.supported")       # DNC-003 — 미지원이면 501
+    TaskKind.DOCK.require(svc.capability)              # DNC-003 — 미지원이면 501
     try:
         svc.docking.dock(body.dock)
     except DockError as exc:
@@ -132,7 +133,7 @@ def docking_dock(body: DockCommand, auth: AuthContext = Depends(operator),
 @docking_router.post("/undock")
 def docking_undock(auth: AuthContext = Depends(operator),
                    svc: CoreServices = Depends(get_services)):
-    svc.capability.require("docking.supported")
+    TaskKind.DOCK.require(svc.capability)
     try:
         svc.docking.undock()
     except DockError as exc:
@@ -143,6 +144,6 @@ def docking_undock(auth: AuthContext = Depends(operator),
 @docking_router.post("/cancel")
 def docking_cancel(auth: AuthContext = Depends(operator),
                    svc: CoreServices = Depends(get_services)):
-    svc.capability.require("docking.supported")
+    TaskKind.DOCK.require(svc.capability)
     svc.docking.cancel()
     return svc.docking.status().model_dump()

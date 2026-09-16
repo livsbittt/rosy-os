@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from rosy_core.api.v1.common import enter_navigation_mode, operator, viewer
 from rosy_core.api.deps import AuthContext, get_services
 from rosy_core.api.errors import ApiError
+from rosy_core.domain.tasks import TaskKind
 from rosy_core.services import CoreServices
 
 
@@ -24,7 +25,7 @@ class GoalRequest(BaseModel):
 @navigation_router.post("/navigation/goal")
 def navigation_goal(body: GoalRequest, auth: AuthContext = Depends(operator),
                     svc: CoreServices = Depends(get_services)):
-    svc.capability.require("navigation.goal_navigation")
+    TaskKind.NAVIGATE.require(svc.capability)
     spec = svc.nav.resolve_goal(x=body.x, y=body.y, yaw=body.yaw, waypoint=body.waypoint)
     enter_navigation_mode(svc, auth)
     svc.nav.goal(spec, source=f"api:{auth.role}")
@@ -45,7 +46,7 @@ def navigation_cancel(auth: AuthContext = Depends(operator),
 @navigation_router.post("/navigation/home")
 def navigation_home(auth: AuthContext = Depends(operator),
                     svc: CoreServices = Depends(get_services)):
-    svc.capability.require("navigation.return_home")
+    TaskKind.RETURN_HOME.require(svc.capability)
     enter_navigation_mode(svc, auth)
     svc.nav.home(source=f"api:{auth.role}")
     return {"accepted": True, "mode": svc.modes.mode.value}
@@ -70,7 +71,7 @@ class InitialPoseRequest(BaseModel):
 @navigation_router.post("/localization/initialpose")
 def initialpose(body: InitialPoseRequest, auth: AuthContext = Depends(operator),
                 svc: CoreServices = Depends(get_services)):
-    svc.capability.require("navigation.goal_navigation")
+    TaskKind.NAVIGATE.require(svc.capability)
     if svc.nav.executor is None:
         raise ApiError("CAPABILITY_NOT_SUPPORTED", 501, "localization executor unavailable")
     svc.nav.executor.send_initial_pose(body.x, body.y, body.yaw)

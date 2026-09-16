@@ -9,6 +9,7 @@ from rosy_core.api.v1.common import operator
 from rosy_core.api.deps import AuthContext, get_services
 from rosy_core.api.errors import ApiError
 from rosy_core.command.arbitration import Mode
+from rosy_core.domain.tasks import TaskKind
 from rosy_core.protocol.schemas import RobotMode
 from rosy_core.services import CoreServices
 
@@ -30,7 +31,7 @@ def set_mode(body: ModeRequest, auth: AuthContext = Depends(operator),
              svc: CoreServices = Depends(get_services)):
     new_mode = Mode(body.mode)
     if new_mode is Mode.NAVIGATION:
-        svc.capability.require("navigation.goal_navigation")
+        TaskKind.NAVIGATE.require(svc.capability)
         if svc.modes.mode is not Mode.NAVIGATION:
             svc.command.clear_navigation()
     if new_mode is Mode.MANUAL:
@@ -50,6 +51,7 @@ def set_mode(body: ModeRequest, auth: AuthContext = Depends(operator),
 @control_router.post("/teleop")
 def teleop(body: TeleopRequest, auth: AuthContext = Depends(operator),
            svc: CoreServices = Depends(get_services)):
+    TaskKind.MOVE.require(svc.capability)
     accepted, code = svc.command.teleop(body.linear, body.angular, source="manual")
     if not accepted:
         raise ApiError(code, 409 if code in ("MODE_CONFLICT", "EMERGENCY_ACTIVE") else 400,
