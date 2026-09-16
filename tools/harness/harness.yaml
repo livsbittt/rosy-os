@@ -1,0 +1,99 @@
+# Module harness registry.
+# Design: docs/plans/2026-09-15-module-harness-design.md (ADR D-61 Proposed).
+# Regenerate after editing any progress.md / logs.md:
+#   python tools/harness/rosy_harness.py generate
+
+adr_log: docs/reference/ROSY ADR Log.md
+
+# IDs absent from the ADR log on purpose. Remove an entry once the ADR is written.
+adr_gaps:
+  D-29: "unused; the vision accelerator shield design only proposed the number"
+  D-35: "reserved for the swarm formation HOLD decision pending the sim bench"
+
+status: STATUS.md
+stale_after_commits: 5
+
+# D-73: `tests` feeds generated index.md. `functional` is the module's own
+# shipped-code surface. Shared compose/Nav2 slice files are contracts only.
+modules:
+  - name: rosy_core
+    path: src/rosy_core
+    tests: [src/rosy_core/test]
+    functional_kind: pytest
+    functional: [src/rosy_core/test]
+  - name: deploy
+    path: deploy
+    tests: [test]
+    functional_kind: host-contract
+    functional: [test/test_robot_runtime.py]
+  - name: rosy_control
+    path: src/rosy_control
+    tests: [src/rosy_control/test, test/test_control_absorption_package.py]
+    functional_kind: pytest
+    functional: [src/rosy_control/test]
+  - name: rosy_fleet
+    path: src/rosy_fleet
+    tests: [src/rosy_fleet/test]
+    functional_kind: pytest
+    functional: [src/rosy_fleet/test]
+  - name: rosy_gz_sim
+    path: src/rosy_gz_sim
+    tests: [src/rosy_gz_sim/test]
+    functional_kind: pytest
+    functional: [src/rosy_gz_sim/test]
+  - name: rosy_navigation
+    path: src/rosy_navigation
+    tests: [test/test_nav2_hardware_slice.py, test/test_footprint_profiles.py, test/test_nav2_profile_limits.py, test/test_nav2_bandwidth_contracts.py, test/test_flask_launch_removed.py]
+    functional_kind: pytest
+    functional: [test/test_footprint_profiles.py, test/test_nav2_profile_limits.py]
+  - name: rosy_bringup
+    path: src/rosy_bringup
+    tests: [test/test_motor_control.py, test/test_bringup_motor_contracts.py, test/test_dynamixel_driver_safety.py, src/rosy_bringup/test/test_command_deadman.py, src/rosy_bringup/test/test_pinky_pro_adapter.py]
+    functional_kind: pytest
+    functional: [src/rosy_bringup/test/test_command_deadman.py, test/test_motor_control.py]
+  - name: rosy_emotion
+    path: src/rosy_emotion
+    tests: [src/rosy_emotion/test/test_info_screen.py, test/test_nav2_hardware_slice.py]
+    functional_kind: pytest
+    functional: [src/rosy_emotion/test/test_info_screen.py]
+  - name: rosy_led
+    path: src/rosy_led
+    tests: [src/rosy_led/test/test_led_package_contract.py, test/test_nav2_hardware_slice.py]
+    functional_kind: host-contract
+    functional: [src/rosy_led/test/test_led_package_contract.py]
+  - name: rosy_imu_bno055
+    path: src/rosy_imu_bno055
+    tests: [src/rosy_imu_bno055/test/test_package_contract.py, test/test_nav2_hardware_slice.py]
+    functional_kind: host-contract
+    functional: [src/rosy_imu_bno055/test/test_package_contract.py]
+  - name: rosy_sensor_adc
+    path: src/rosy_sensor_adc
+    tests: [src/rosy_sensor_adc/test/test_adc_package_contract.py, test/test_nav2_hardware_slice.py]
+    functional_kind: host-contract
+    functional: [src/rosy_sensor_adc/test/test_adc_package_contract.py]
+  - name: rosy_lamp_control
+    path: src/rosy_lamp_control
+    tests: [src/rosy_lamp_control/test/test_lamp_package_contract.py, test/test_nav2_hardware_slice.py]
+    functional_kind: host-contract
+    functional: [src/rosy_lamp_control/test/test_lamp_package_contract.py]
+  - name: rosy_interfaces
+    path: src/rosy_interfaces
+    tests: [src/rosy_interfaces/test/test_srv_surface.py]
+    functional_kind: interface-only
+    functional: [src/rosy_interfaces/test/test_srv_surface.py]
+    artifacts: [src/rosy_interfaces/srv/SetLed.srv, src/rosy_interfaces/srv/SetLamp.srv, src/rosy_interfaces/srv/SetBrightness.srv, src/rosy_interfaces/srv/Emotion.srv]
+  - name: rosy_description
+    path: src/rosy_description
+    tests: [src/rosy_description/test/test_urdf_surface.py, test/test_robot_runtime.py]
+    functional_kind: host-contract
+    functional: [src/rosy_description/test/test_urdf_surface.py]
+  - name: dock
+    path: dock
+    tests: [test/test_dock_contract.py, src/rosy_core/test/test_docking.py]
+    functional_kind: pytest
+    functional: [src/rosy_core/test/test_docking.py]
+  - name: docs
+    path: docs
+    tests: [test/test_network_topology_contracts.py, test/test_harness_contracts.py]
+    functional_kind: records
+    functional: [test/test_harness_contracts.py]
