@@ -54,6 +54,12 @@ RUN apt-get -o Acquire::Retries=5 update \
 
 FROM core-runtime AS core-build
 
+RUN apt-get -o Acquire::Retries=5 update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /opt/rosy_ws
 # omx/imu/vision/control belong to optional slices, not this core image.
 COPY src/rosy_interfaces ./src/rosy_interfaces
@@ -93,6 +99,13 @@ RUN apt-get -o Acquire::Retries=5 update \
     && rm -rf /var/lib/apt/lists/* /tmp/requirements-io.txt
 
 FROM io-runtime AS io-build
+
+RUN apt-get -o Acquire::Retries=5 update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        git \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/rosy_ws
 ARG SLLIDAR_COMMIT=34300099fadfc772965962dec837bf436706188f
