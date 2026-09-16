@@ -10,10 +10,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
     ROS_LOG_DIR=/tmp/ros-logs
 
 # Hub linux/arm64 ros:jazzy-ros-base from 2026-09-16 ships 0-byte CPython
-# stdlib and debpython sources. Reinstall from Ubuntu ports in this order:
-# stdlib first (so python3 runs), then python3-minimal (debpython), then
-# later stages --reinstall numpy/yaml/pip. No-op on a healthy amd64 or
-# native Pi image of the same packages.
+# stdlib, debpython, and colcon sources. Reinstall from Ubuntu ports in
+# this order: stdlib first (so python3 runs), then python3-minimal
+# (debpython), then colcon plugins (otherwise `colcon build` exits 0 with
+# no install/). Later stages --reinstall numpy/yaml/pip. No-op on a
+# healthy amd64 or native Pi image of the same packages.
 RUN apt-get -o Acquire::Retries=5 update \
     && apt-get install --reinstall -y --no-install-recommends \
         libpython3.12-minimal \
@@ -21,6 +22,32 @@ RUN apt-get -o Acquire::Retries=5 update \
     && apt-get install --reinstall -y --no-install-recommends \
         python3-minimal \
         python3 \
+    && apt-get install --reinstall -y --no-install-recommends \
+        python3-colcon-argcomplete \
+        python3-colcon-bash \
+        python3-colcon-cd \
+        python3-colcon-cmake \
+        python3-colcon-common-extensions \
+        python3-colcon-core \
+        python3-colcon-defaults \
+        python3-colcon-devtools \
+        python3-colcon-library-path \
+        python3-colcon-metadata \
+        python3-colcon-mixin \
+        python3-colcon-notification \
+        python3-colcon-output \
+        python3-colcon-package-information \
+        python3-colcon-package-selection \
+        python3-colcon-parallel-executor \
+        python3-colcon-pkg-config \
+        python3-colcon-powershell \
+        python3-colcon-python-setup-py \
+        python3-colcon-recursive-crawl \
+        python3-colcon-ros \
+        python3-colcon-test-result \
+        python3-colcon-zsh \
+        python3-vcstool \
+        ros-jazzy-ament-package \
     && apt-get install -y --no-install-recommends \
         ros-jazzy-rmw-cyclonedds-cpp \
     && rm -rf /var/lib/apt/lists/*
@@ -53,8 +80,10 @@ WORKDIR /opt/rosy_ws
 # omx/imu/vision/control belong to optional slices, not this core image.
 COPY src/rosy_interfaces ./src/rosy_interfaces
 COPY src/rosy_core ./src/rosy_core
-RUN source /opt/ros/jazzy/setup.bash \
-    && colcon build --merge-install --packages-up-to rosy_core
+RUN set -euo pipefail \
+    && source /opt/ros/jazzy/setup.bash \
+    && colcon build --merge-install --packages-up-to rosy_core \
+    && test -d /opt/rosy_ws/install
 
 FROM core-runtime AS core
 
@@ -98,9 +127,11 @@ COPY src/rosy_description ./src/rosy_description
 COPY src/rosy_bringup ./src/rosy_bringup
 COPY src/rosy_navigation ./src/rosy_navigation
 RUN mkdir -p src/rosy_description/meshes
-RUN source /opt/ros/jazzy/setup.bash \
+RUN set -euo pipefail \
+    && source /opt/ros/jazzy/setup.bash \
     && colcon build --merge-install \
-        --packages-select sllidar_ros2 rosy_interfaces rosy_description rosy_bringup rosy_navigation
+        --packages-select sllidar_ros2 rosy_interfaces rosy_description rosy_bringup rosy_navigation \
+    && test -d /opt/rosy_ws/install
 
 FROM io-runtime AS io
 
