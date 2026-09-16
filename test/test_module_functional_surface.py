@@ -52,6 +52,14 @@ def test_interface_only_modules_declare_their_own_artifacts():
             assert path.stat().st_size > 0
 
 
+def test_core_docking_is_not_the_dock_firmware_surface():
+    dock = next(item for item in _catalog() if item["name"] == "dock")
+    core = next(item for item in _catalog() if item["name"] == "rosy_core")
+    assert "src/rosy_core/test/test_docking.py" not in (dock.get("functional") or [])
+    assert "test/test_dock_contract.py" in (dock.get("functional") or [])
+    assert "src/rosy_core/test" in (core.get("functional") or [])
+
+
 def test_functional_paths_belong_to_the_module():
     for module in _catalog():
         name = module["name"]

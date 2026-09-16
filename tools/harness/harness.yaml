@@ -39,8 +39,8 @@ modules:
   - name: rosy_gz_sim
     path: src/rosy_gz_sim
     tests: [src/rosy_gz_sim/test]
-    functional_kind: pytest
-    functional: [src/rosy_gz_sim/test]
+    functional_kind: host-contract
+    functional: [src/rosy_gz_sim/test/test_gz_package_contract.py]
   - name: rosy_navigation
     path: src/rosy_navigation
     tests: [test/test_nav2_hardware_slice.py, test/test_footprint_profiles.py, test/test_nav2_profile_limits.py, test/test_nav2_bandwidth_contracts.py, test/test_flask_launch_removed.py]
@@ -90,10 +90,10 @@ modules:
   - name: dock
     path: dock
     tests: [test/test_dock_contract.py, src/rosy_core/test/test_docking.py]
-    functional_kind: pytest
-    functional: [src/rosy_core/test/test_docking.py]
+    functional_kind: host-contract
+    functional: [test/test_dock_contract.py]
   - name: docs
     path: docs
     tests: [test/test_network_topology_contracts.py, test/test_harness_contracts.py]
     functional_kind: records
-    functional: [test/test_harness_contracts.py]
+    functional: [test/test_network_topology_contracts.py]
