@@ -16,6 +16,9 @@ __pycache__/
 node_modules/
 dist/
 
+# rosy_games 실기 URL/토큰
+src/rosy_games/config/match.local.yaml
+
 # Fleet 로컬 DB
 *.sqlite3
 *.db

@@ -14,3 +14,10 @@
 - gate 변화: 없음. DEVICE/FIELD PARKED
 - 결정: D-90 LOCAL 호스트 루프. PlayerClient HTTP는 다음
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · feat(games): CORE mode/teleop/stop client and dry-run CLI
+- 변경: HttpPlayerClient, match.yaml, `rosy_games match --dry-run`
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 16 passed
+- gate 변화: 없음. DEVICE/FIELD PARKED
+- 결정: D-90. overhead 카메라는 열지 않음
+- 교훈: 없음
