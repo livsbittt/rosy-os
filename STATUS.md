@@ -9,7 +9,7 @@
 | [deploy](deploy/progress.md) | 릴리스·플랫폼 | uncommitted (2026-09-15) | GO | GO | N/A | HOLD | HOLD | N/A |
 | [rosy_control](src/rosy_control/progress.md) | CONTROL | 8fdd8d2 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [rosy_fleet](src/rosy_fleet/progress.md) | FLEET | uncommitted (2026-09-17) | GO | GO | HOLD | PARKED | PARKED | PARKED |
-| [rosy_gz_sim](src/rosy_gz_sim/progress.md) | SIM | uncommitted (2026-09-15) | HOLD | HOLD | HOLD | N/A | N/A | N/A |
+| [rosy_gz_sim](src/rosy_gz_sim/progress.md) | SIM | uncommitted (2026-09-17) | GO | GO | HOLD | N/A | N/A | N/A |
 | [rosy_navigation](src/rosy_navigation/progress.md) | NAV | uncommitted (2026-09-15) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [rosy_bringup](src/rosy_bringup/progress.md) | BRINGUP | uncommitted (2026-09-15) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [rosy_emotion](src/rosy_emotion/progress.md) | 장치 | uncommitted (2026-09-15) | HOLD | GO | HOLD | HOLD | PARKED | PARKED |
@@ -33,9 +33,7 @@
 - rosy_control ARTIFACT: 서명된 ARM64 manifest·immutable digest 발행 전. 흡수된 코드는 deploy가 소유하는 OS 이미지에 번들된다
 - rosy_control DEVICE: Pi bench Device 설치와 device-readback.sh --json 증거 없음. Control sensor adapter 활성화는 Device 보정 generation에 묶인다(D-47)
 - rosy_fleet ROS-SIM: swarm formation sim bench(Task 14, gz_multi robots:=N mode:=nav core:=true) 미실행. 패키지는 ROS를 import하지 않지만 relay·HOLD 지연 실측은 ROS/Gazebo 환경에서만 나온다
-- rosy_gz_sim SOURCE: 유일한 시험 src/rosy_gz_sim/test/test_gz_multi_core.py가 pytest.importorskip('launch')로 이 Windows 호스트에서 전부 skip된다(2026-09-15, 1 skipped) — ROS 2 launch 패키지 없이는 재실행 불가
-- rosy_gz_sim LOCAL: 동일 — 유일한 시험이 skip만 하므로 증거가 아니다(1 skipped, 2026-09-15). ROS 2 Jazzy + launch/launch_ros 설치 후 재실행 필요
-- rosy_gz_sim ROS-SIM: Gazebo/ros_gz multi-robot 시나리오(gz_multi.launch.py) 미실행. ROS 2 Jazzy + Gazebo 환경에서 재실행 필요
+- rosy_gz_sim ROS-SIM: gz_multi.launch.py 멀티로봇 시나리오 미실행. ROS 2 Jazzy + Gazebo 필요 (Task 14)
 - rosy_navigation ROS-SIM: Nav2/SLAM Toolbox 실물 launch 미재실행. 현재는 ament_lint와 조합 계약 시험뿐 — ROS 2 Jazzy 환경에서 hardware.launch.py/gz_*.launch.xml 재실행 필요
 - rosy_navigation ARTIFACT: ARM64 로봇 이미지에 포함되나(Dockerfile/compose) 서명 manifest와 immutable digest 발행 전
 - rosy_navigation DEVICE: Pi bench Device 설치와 device-readback.sh --json 증거 없음

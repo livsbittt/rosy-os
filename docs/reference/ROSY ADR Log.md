@@ -89,7 +89,7 @@
 | D-79 | 게이트 GO는 현재 트리 재실행만 인정한다 | Accepted |
 | D-80 | G4 GO는 Device 표면이다 | Accepted |
 | D-81 | Fleet 콘솔 v1 gather는 CORE REST 폴링이다 | Accepted |
-| D-82 | 팔레트는 OKLCH에서 생성하고 수치 게이트로 지킨다 | Proposed |
+| D-82 | 팔레트는 OKLCH에서 생성하고 수치 게이트로 지킨다 | Accepted |
 
 ---
 
@@ -2294,7 +2294,7 @@ CORE REST 폴링이다. "Fleet 서버 미구현"과 "콘솔이 이미 있다"가
 
 ## D-82 팔레트는 OKLCH에서 생성하고 수치 게이트로 지킨다
 
-**Status:** Proposed (2026-09-17). concept 16 §6, D-72 L1.
+**Status:** Accepted (2026-09-17). concept 16 §6, D-72 L1. 값 계약이지 Device GO가 아니다.
 
 **Context:** D-72 S1은 `styles.css`의 원시 색 62곳을 `tokens.css`로 옮겼지만
 **값은 그대로 두고 의미 배치를 S5로 미뤘다.** 옮기고 나서 값을 재 보니 팔레트가

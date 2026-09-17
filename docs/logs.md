@@ -59,3 +59,10 @@
 - 결정: D-82 Proposed — 팔레트를 OKLCH에서 생성하고 값이 지켜야 할 성질을 계약 시험으로 고정한다. 경보는 둘(정상은 잉크), 위험은 채움, 밝기가 색상보다 먼저, status는 따뜻한 띠·series는 차가운 띠
 - 교훈: D-72 S1이 색을 토큰으로 "옮기기만" 하고 값을 재지 않았다. 옮긴 뒤 재 보니 적록 색약에서 위험과 주의가 1.07:1로 붕괴해 있었다 — 리팩토링에서 값을 보존하는 것과 값이 옳은지 확인하는 것은 다른 일이고, 전자만 하면 결함이 그대로 이사한다
 
+## 2026-09-17 · uncommitted · docs(adr): accept D-82 after palette gate tests
+- 변경: D-82 Status Proposed→Accepted. 계약 시험 `test_palette_gates.py`가 값을 지킨다
+- 증거: `PYTHONPATH=src/rosy_core;src python -m pytest src/rosy_core/test/test_palette_gates.py src/rosy_core/test/test_ui_token_contracts.py -q`
+- gate 변화: 없음
+- 결정: D-82 Accepted. Device GO가 아니다
+- 교훈: 없음
+

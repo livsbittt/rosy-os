@@ -20,6 +20,7 @@
 | D-79 | 게이트 GO는 현재 트리 재실행만 인정한다 |
 | D-80 | G4 GO는 Device 표면이다 |
 | D-81 | Fleet 콘솔 v1 gather는 CORE REST 폴링이다 |
+| D-82 | 팔레트는 OKLCH에서 생성하고 수치 게이트로 지킨다 |
 
 ## 계획·결과 문서
 
@@ -38,8 +39,8 @@
 
 ## 최근 기록
 
+- 2026-09-17 · uncommitted · docs(adr): accept D-82 after palette gate tests
 - 2026-09-17 · uncommitted · docs(adr): record the OKLCH palette decision as D-82
 - 2026-09-17 · uncommitted · docs(adr): lock leftover gates as D-78–D-81
 - 2026-09-17 · 8fdd8d2 · docs: lock G4 vocabulary, one operator console, and D-61 records
 - 2026-09-17 · uncommitted · docs(adr): supersede D-7 so the local screen has one standing decision
-- 2026-09-17 · uncommitted · docs(concept): fix interface design laws and per-surface grammar as D-72
