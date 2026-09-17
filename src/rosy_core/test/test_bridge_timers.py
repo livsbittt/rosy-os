@@ -55,6 +55,7 @@ _ROS_MODULES = [
     "geometry_msgs", "geometry_msgs.msg",
     "nav_msgs", "nav_msgs.msg",
     "nav2_msgs", "nav2_msgs.action", "nav2_msgs.msg",
+    "lifecycle_msgs", "lifecycle_msgs.msg",
     "sensor_msgs", "sensor_msgs.msg",
     "std_msgs", "std_msgs.msg",
     "std_srvs", "std_srvs.srv",
@@ -184,6 +185,12 @@ EXPECTED_SUBSCRIPTIONS = [
     ("odom", "_on_odom", 10),
     ("battery/voltage", "_on_battery", 10),
     ("nav_cmd_vel", "_on_nav_cmd_vel", 10),
+    ("amcl/transition_event", "_on_amcl_transition", 10),
+    ("map_server/transition_event", "_on_map_server_transition", 10),
+    ("controller_server/transition_event", "_on_controller_transition", 10),
+    ("local_costmap/local_costmap/transition_event", "_on_local_costmap_transition", 10),
+    ("global_costmap/global_costmap/transition_event", "_on_global_costmap_transition", 10),
+    ("motor/ready", "_on_motor_ready", "LATCHED"),
     ("scan", "_on_scan", 10),
     ("imu_raw", "_on_imu", 10),
     ("us_sensor/range", "_on_us_range", 10),
@@ -241,7 +248,7 @@ def test_the_three_latched_endpoints_stay_latched(registered):
     latched = {topic for topic, qos in registered.node.publishers if qos == "LATCHED"}
     latched |= {t for t, _cb, qos in registered.node.subscriptions if qos == "LATCHED"}
 
-    assert latched == {"map", "power/mode", "docking/collision_exemption"}
+    assert latched == {"map", "power/mode", "docking/collision_exemption", "motor/ready"}
 
 
 def test_the_bridge_opens_the_same_service_clients(registered):
@@ -261,3 +268,13 @@ def test_both_executor_contracts_are_wired_to_the_bridge(registered):
     reproduce these two assignments, and nothing else checks that it did."""
     assert registered.services.nav.executor is registered.bridge
     assert registered.services.docking.executor is registered.bridge
+
+
+def test_lifecycle_transition_parser_accepts_active_id_and_label(registered):
+    active_id = types.SimpleNamespace(goal_state=types.SimpleNamespace(id=3, label="inactive"))
+    inactive = types.SimpleNamespace(goal_state=types.SimpleNamespace(id=2, label="active"))
+    label_only = types.SimpleNamespace(goal_state=types.SimpleNamespace(id="bad", label="ACTIVE"))
+
+    assert registered.bridge._lifecycle_active(active_id) is True
+    assert registered.bridge._lifecycle_active(inactive) is False
+    assert registered.bridge._lifecycle_active(label_only) is True

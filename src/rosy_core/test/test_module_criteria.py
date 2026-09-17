@@ -70,6 +70,12 @@ ALLOWED = Counter({
     ("bridge/control_sensor_adapter.py", "getattr", "safety", '"bind_control_policy"'): 1,
     ("bridge/control_sensor_adapter.py", "hasattr", "observations", '"max_age"'): 1,
     ("node.py", "getattr", "self", '"get_namespace"'): 1,
+    # Accepted: readiness service injection and ROS TransitionEvent state
+    # compatibility. All fields are public and remain inside the bridge.
+    ("bridge/ros_bridge.py", "getattr", "services", '"readiness"'): 1,
+    ("bridge/ros_bridge.py", "getattr", "msg", '"goal_state"'): 1,
+    ("bridge/ros_bridge.py", "getattr", "goal", '"id"'): 1,
+    ("bridge/ros_bridge.py", "getattr", "goal", '"label"'): 1,
     # Accepted: D-64 duck-type of Control policy/actuation without importing
     # rosy_control into safety/.
     ("safety/manager.py", "getattr", "policy", '"evaluate"'): 1,

@@ -28,11 +28,14 @@ ZERO = Twist()
 
 class CommandManager:
     def __init__(self, registry: SourceRegistry, modes: ModeMachine,
-                 safety: SafetyManager, events=None) -> None:
+                 safety: SafetyManager, events=None, readiness=None) -> None:
         self._registry = registry
         self._modes = modes
         self._safety = safety
         self._events = events
+        # Optional ROS-free runtime gate.  It is enabled for the hardware
+        # profile and remains inert for core/simulation profiles.
+        self._readiness = readiness
         self.watchdog = TeleopWatchdog(timeout_ms=500)
         self._manual_twist: Optional[Twist] = None
         self._manual_source = 'manual'
@@ -43,6 +46,12 @@ class CommandManager:
         self._input_epoch = 0
         self._safety.estop_listeners.append(self._clear_for_stop)
         self._safety.policy_listeners.append(self._clear_for_stop)
+
+    def set_readiness_gate(self, readiness) -> None:
+        self._readiness = readiness
+
+    def _motion_ready(self) -> bool:
+        return self._readiness is None or self._readiness.is_ready()
 
     def _reject(self, source: str, reason: str) -> None:
         if self._events is not None:
@@ -56,6 +65,10 @@ class CommandManager:
         if self._safety.estop or self._modes.is_emergency:
             self._reject(source, "e-stop active")
             return False, "EMERGENCY_ACTIVE"
+        if not self._motion_ready():
+            self.clear_manual()
+            self._reject(source, "navigation readiness HOLD")
+            return False, "HARDWARE_NOT_READY"
         if self._modes.mode is not Mode.MANUAL:
             self._reject(source, f"mode is {self._modes.mode.value}, not MANUAL")
             return False, "MODE_CONFLICT"
@@ -121,6 +134,8 @@ class CommandManager:
     def select_output(self, now: Optional[float] = None) -> Twist:
         current = now if now is not None else time.monotonic()
         if self._safety.estop or self._modes.is_emergency:
+            return ZERO
+        if not self._motion_ready():
             return ZERO
         if self._modes.mode is Mode.MANUAL:
             if self._manual_twist is not None and not self.watchdog.expired(current):

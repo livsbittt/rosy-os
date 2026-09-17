@@ -43,11 +43,15 @@ _IDLE_STATES = {NavigationState.IDLE, NavigationState.ARRIVED,
 class NavigationManager:
     def __init__(self, events, state_manager, waypoints, safety,
                  map_id_provider=None, stuck_timeout_s: float = 30.0,
-                 stuck_min_progress: float = 0.05) -> None:
+                 stuck_min_progress: float = 0.05, readiness=None) -> None:
         self._events = events
         self._state = state_manager
         self._waypoints = waypoints
         self._safety = safety
+        # Optional ROS-free gate supplied by CoreServices.  The bridge updates
+        # it from lifecycle/adapter observations; keeping the dependency
+        # duck-typed preserves the host-testable navigation facade.
+        self._readiness = readiness
         self._map_id_provider = map_id_provider or (lambda: self._state.map_id)
         self.executor: Optional[NavExecutor] = None
         self._nav_state = NavigationState.IDLE
@@ -69,6 +73,18 @@ class NavigationManager:
         #: 알리지 않으면 추종자는 자기가 살아 있다고 계속 광고하면서 목표를
         #: 하나도 내지 못하는 상태로 남는다.
         self.session_closed_listener = None
+
+    def set_readiness_gate(self, readiness) -> None:
+        """Attach the runtime readiness gate after construction if needed."""
+        self._readiness = readiness
+
+    def require_ready(self) -> None:
+        """Reject a motion request while the hardware readiness gate is HOLD."""
+        if self._readiness is None:
+            return
+        snapshot = self._readiness.snapshot()
+        if not snapshot.ready:
+            raise NavigationError("HARDWARE_NOT_READY", f"navigation readiness HOLD: {snapshot.reason}")
 
     @property
     def nav_state(self) -> NavigationState:
@@ -97,6 +113,7 @@ class NavigationManager:
         return NavGoalSpec(x=float(x), y=float(y), yaw=float(yaw or 0.0))
 
     def goal(self, spec: NavGoalSpec, source: str = "api") -> None:
+        self.require_ready()
         executor = self._require_executor()
         if self._safety.estop:
             raise NavigationError("EMERGENCY_ACTIVE", "e-stop is active")
@@ -144,6 +161,7 @@ class NavigationManager:
         Nav2 NavigateToPose 는 새 목표를 받으면 이전 목표를 선점하므로
         취소를 먼저 보내지 않는다 — 그 사이에 로봇이 멈춰 서기 때문이다.
         """
+        self.require_ready()
         executor = self._require_executor()
         if self._safety.estop:
             raise NavigationError("EMERGENCY_ACTIVE", "e-stop is active")

@@ -26,6 +26,7 @@ from geometry_msgs.msg import PoseWithCovarianceStamped, Twist
 from nav_msgs.msg import OccupancyGrid, Odometry, Path
 from nav2_msgs.action import NavigateToPose
 from nav2_msgs.msg import Costmap
+from lifecycle_msgs.msg import TransitionEvent
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import BatteryState, Imu, LaserScan, Range
 from std_msgs.msg import Bool, Float32, String
@@ -72,6 +73,7 @@ class RosBridge:
     def __init__(self, node: Node, services) -> None:
         self._node = node
         self._svc = services
+        self._readiness = getattr(services, "readiness", None)
         cfg = services.config
         self._frame_prefix = str(cfg.get("robot", {}).get("frame_prefix", ""))
         self._base_frame = f"{self._frame_prefix}base_footprint"
@@ -89,6 +91,20 @@ class RosBridge:
         node.create_subscription(Odometry, "odom", self._on_odom, 10)
         node.create_subscription(Float32, "battery/voltage", self._on_battery, 10)
         node.create_subscription(Twist, "nav_cmd_vel", self._on_nav_cmd_vel, 10)
+        # Nav2 lifecycle nodes announce their authoritative goal state on
+        # transition_event.  CORE never infers readiness from node discovery;
+        # it requires these active transitions plus the motor adapter lease.
+        node.create_subscription(TransitionEvent, "amcl/transition_event",
+                                 self._on_amcl_transition, 10)
+        node.create_subscription(TransitionEvent, "map_server/transition_event",
+                                 self._on_map_server_transition, 10)
+        node.create_subscription(TransitionEvent, "controller_server/transition_event",
+                                 self._on_controller_transition, 10)
+        node.create_subscription(TransitionEvent, "local_costmap/local_costmap/transition_event",
+                                 self._on_local_costmap_transition, 10)
+        node.create_subscription(TransitionEvent, "global_costmap/global_costmap/transition_event",
+                                 self._on_global_costmap_transition, 10)
+        node.create_subscription(Bool, "motor/ready", self._on_motor_ready, _LATCHED)
         node.create_subscription(LaserScan, "scan", self._on_scan, 10)
         node.create_subscription(Imu, "imu_raw", self._on_imu, 10)
         node.create_subscription(Range, "us_sensor/range", self._on_us_range, 10)
@@ -170,8 +186,47 @@ class RosBridge:
     def _on_nav_cmd_vel(self, msg: Twist) -> None:
         self._svc.command.set_nav_twist(CoreTwist(linear=msg.linear.x, angular=msg.angular.z))
 
+    @staticmethod
+    def _lifecycle_active(msg: TransitionEvent) -> bool:
+        goal = getattr(msg, "goal_state", None)
+        state_id = getattr(goal, "id", None)
+        if state_id is not None:
+            try:
+                return int(state_id) == 3  # lifecycle_msgs/State.PRIMARY_STATE_ACTIVE
+            except (TypeError, ValueError):
+                pass
+        return str(getattr(goal, "label", "")).strip().lower() == "active"
+
+    def _on_amcl_transition(self, msg: TransitionEvent) -> None:
+        if self._readiness is not None:
+            self._readiness.observe("amcl", self._lifecycle_active(msg))
+
+    def _on_map_server_transition(self, msg: TransitionEvent) -> None:
+        if self._readiness is not None:
+            self._readiness.observe("map_server", self._lifecycle_active(msg))
+
+    def _on_controller_transition(self, msg: TransitionEvent) -> None:
+        if self._readiness is not None:
+            self._readiness.observe("controller_server", self._lifecycle_active(msg))
+
+    def _on_local_costmap_transition(self, msg: TransitionEvent) -> None:
+        if self._readiness is not None:
+            self._readiness.observe("local_costmap", self._lifecycle_active(msg))
+
+    def _on_global_costmap_transition(self, msg: TransitionEvent) -> None:
+        if self._readiness is not None:
+            self._readiness.observe("global_costmap", self._lifecycle_active(msg))
+
+    def _on_motor_ready(self, msg: Bool) -> None:
+        if self._readiness is not None:
+            self._readiness.observe("motor_adapter", bool(msg.data), lease=True)
+
     def _publish_cmd_vel(self) -> None:
         out = self._svc.command.select_output()
+        if self._readiness is not None and not self._readiness.is_ready():
+            # Keep the final publisher alive at 50 Hz, but never pass a stale
+            # Nav2/manual candidate through while the hardware graph is HOLD.
+            out = CoreTwist()
         if out.linear != 0.0 or out.angular != 0.0:
             # 절전 정책은 모터 경로에 개입하지 않는다. 명령이 나가는 것을
             # 관측만 하고 센서·화면을 즉시 ACTIVE로 되돌린다 (안전 인터록).
@@ -345,6 +400,11 @@ class RosBridge:
         results = self.diagnostics.collect()
         for component, health in results.items():
             self._svc.state.set_diagnostic(component, health)
+        if self._readiness is not None:
+            self._svc.state.set_diagnostic(
+                "navigation_readiness",
+                HealthState.OK if self._readiness.snapshot().ready else HealthState.ERROR,
+            )
 
 
     # --- DockingExecutor 구현 (docking.manager와 계약) -------------------------

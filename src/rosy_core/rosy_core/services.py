@@ -16,6 +16,7 @@ from rosy_core.docking.database import DockDatabase
 from rosy_core.docking.detector import SimulatedDetector
 from rosy_core.docking.manager import DockingConfig, DockingManager
 from rosy_core.domain.adapters import AdapterRegistry
+
 from rosy_core.domain.model import inventory_from_config, slices_from_config
 from rosy_core.protocol.schemas import DockState, HealthState
 from rosy_core.events.audit import FileAuditLog
@@ -23,6 +24,7 @@ from rosy_core.events.bus import EventBus
 from rosy_core.identity import RobotIdentity
 from rosy_core.maps import MapSnapshotStore
 from rosy_core.navigation.manager import NavigationManager
+from rosy_core.navigation.readiness import NavigationReadinessGate
 from rosy_core.swarm import SwarmManager
 from rosy_core.power.battery import (
     BatteryConfig,
@@ -135,6 +137,7 @@ class CoreServices:
     safety: SafetyManager
     waypoints: WaypointManager
     nav: NavigationManager
+    readiness: NavigationReadinessGate
     power: PowerManager
     battery: BatteryMonitor
     docking: DockingManager
@@ -161,6 +164,23 @@ class CoreServices:
 
         safety_cfg = config.get("safety", {})
         nav_cfg = config.get("navigation", {})
+        readiness_cfg = nav_cfg.get("readiness", {}) or {}
+        if not isinstance(readiness_cfg, dict):
+            raise ValueError("navigation.readiness must be a mapping")
+        # Hardware is fail-closed even if an old local overlay omitted the
+        # new key.  Core and simulation keep the historical inert gate unless
+        # explicitly opted in for a bench test.
+        runtime_mode = str(config.get("runtime", {}).get("mode", "core")).strip().lower()
+        raw_readiness_required = readiness_cfg.get("required", runtime_mode == "hardware")
+        if type(raw_readiness_required) is not bool:
+            raise ValueError("navigation.readiness.required must be a boolean")
+        readiness_required = raw_readiness_required
+        readiness_components = readiness_cfg.get("required_components")
+        readiness = NavigationReadinessGate(
+            required=readiness_required,
+            stale_after_s=readiness_cfg.get("stale_after_s", 2.0),
+            required_components=readiness_components,
+        )
         limits = SpeedLimits(
             max_linear=float(profile.max_linear_velocity or nav_cfg.get("max_linear_velocity", 0.20)),
             max_angular=float(profile.max_angular_velocity or nav_cfg.get("max_angular_velocity", 0.80)),
@@ -183,10 +203,11 @@ class CoreServices:
         state = StateManager(robot_id)
         registry = SourceRegistry(config.get("command_sources"))
         modes = ModeMachine()
-        command = CommandManager(registry, modes, safety, events=events)
+        command = CommandManager(registry, modes, safety, events=events, readiness=readiness)
         waypoints = WaypointManager(waypoints_path, events=events)
         nav = NavigationManager(events, state, waypoints, safety,
-                                stuck_timeout_s=float(safety_cfg.get("stuck_timeout_s", 30.0)))
+                                stuck_timeout_s=float(safety_cfg.get("stuck_timeout_s", 30.0)),
+                                readiness=readiness)
         power = PowerManager(_power_config(config.get("power", {})), events=events)
         battery = BatteryMonitor(
             _battery_config(safety_cfg, data_path=waypoints_path.parent),
@@ -226,6 +247,7 @@ class CoreServices:
         return cls(config=config, identity=identity, profile=profile, capability=capability,
                    events=events, state=state, registry=registry, modes=modes,
                    command=command, safety=safety, waypoints=waypoints, nav=nav,
+                   readiness=readiness,
                    power=power, battery=battery, docking=docking, swarm=swarm,
                    runtime_probe=runtime_probe, maps=MapSnapshotStore(),
                    audit=audit, adapter_registry=adapter_registry)

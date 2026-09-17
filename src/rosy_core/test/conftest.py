@@ -7,11 +7,27 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Optional
 
 import pytest
 import yaml
+
+# colcon install 없이 pytest 를 돌린다 (Windows/CI) — `src/rosy_fleet/test/conftest.py`
+# 와 같은 방식이다. `rosy_control` 이 필요한 이유는 D-66 이 남긴 단 하나의 seam 때문이다:
+# `test_control_sensor_adapter.py` 가 core 어댑터와 `rosy_control.calibration_storage`
+# 가 맞물리는 자리를 검사한다. 이것이 없으면 그 한 파일의 ImportError 가 collection 을
+# 중단시켜 rosy_core 스위트 전체가 실행되지 않는다 — CI 의 rosy_core 스텝과
+# AGENTS.md 의 조합 명령이 둘 다 여기서 죽었다.
+# 이 경로는 테스트 전용이다. 이미지 경계(core 는 rosy_control 을 COPY 하지 않는다)는
+# `test/test_robot_runtime.py` 와 `test/test_runtime_slices.py` 가 따로 고정한다.
+SRC = Path(__file__).resolve().parents[2]
+
+for _path in (SRC / "rosy_core", SRC / "rosy_control"):
+    _entry = str(_path)
+    if _entry not in sys.path:
+        sys.path.insert(0, _entry)
 
 CONFIG_DIR = Path(__file__).parent.parent / "config"
 

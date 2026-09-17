@@ -9,6 +9,7 @@ from __future__ import annotations
 from rosy_core.api.deps import AuthContext, require_role
 from rosy_core.api.errors import ApiError
 from rosy_core.command.arbitration import Mode
+from rosy_core.navigation.manager import NavigationError
 from rosy_core.protocol.schemas import RobotMode
 from rosy_core.services import CoreServices
 
@@ -19,6 +20,10 @@ admin = require_role("administrator")
 
 def enter_navigation_mode(svc: CoreServices, auth: AuthContext) -> None:
     """D-2: Nav2 velocity only reaches the wheels in NAVIGATION."""
+    try:
+        svc.nav.require_ready()
+    except NavigationError as exc:
+        raise ApiError(exc.code, 503, str(exc)) from exc
     if svc.modes.mode is Mode.NAVIGATION:
         return
     svc.command.clear_navigation()

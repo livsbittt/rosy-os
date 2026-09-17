@@ -54,7 +54,17 @@ def navigation_home(auth: AuthContext = Depends(operator),
 
 @navigation_router.get("/navigation/state")
 def navigation_state(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
-    return {"navigation": svc.nav.nav_state.value, "map_id": svc.state.map_id}
+    readiness = svc.readiness.snapshot()
+    return {
+        "navigation": svc.nav.nav_state.value,
+        "map_id": svc.state.map_id,
+        "readiness": {
+            "required": readiness.required,
+            "ready": readiness.ready,
+            "missing": list(readiness.missing),
+            "reason": readiness.reason,
+        },
+    }
 
 
 @navigation_router.get("/navigation/path")
