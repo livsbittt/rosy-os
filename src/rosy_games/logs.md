@@ -43,3 +43,9 @@
 - 변경: 경계 시험이 field/game/policy에서 cv2/httpx/rclpy/rosy_core/rosy_fleet을 금지하고, host는 overhead.py만 cv2를 허용한다. loop.py/transport.py는 cv2 없음. LOCAL 호스트를 overhead 없이 닫음.
 - 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 31 passed
 - gate 변화: LOCAL GO 유지. SOURCE는 트리에서 overhead/homography를 다음 계획으로 명시한 채 GO. DEVICE/FIELD PARKED.
+
+## 2026-09-18 · uncommitted · feat(games): plug soccer in and arm CORE without a camera
+
+- 변경: `catalog`로 soccer/heuristic 플러그인. `match.local.yaml` 오버레이. `HoldObserver`+`run_match`로 카메라 없이 MANUAL 무장·정지 teleop. 관측 예외 시 양쪽 halt. 빈 토큰은 Authorization 생략.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 42 passed
+- gate 변화: 없음. LOCAL GO 유지. DEVICE/FIELD PARKED.

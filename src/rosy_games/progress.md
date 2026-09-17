@@ -10,7 +10,7 @@ gates:
     cmd: "python -m pytest src/rosy_games/test/test_games_boundaries.py test/test_rosy_games_surface.py -q"
   LOCAL:
     state: GO
-    evidence: "31 passed, 카메라 없이 득점·이격·쌍정지·dry-run. overhead/homography 없음 (2026-09-18 Windows)"
+    evidence: "42 passed, 플러그인 카탈로그·local overlay·HoldObserver 실기 CLI(--ticks). overhead 없음 (2026-09-18 Windows)"
     cmd: "python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q"
   ROS-SIM:
     state: N/A
@@ -28,7 +28,7 @@ plans:
 ## 지금 상태
 
 - 노트북 게임 호스트 (D-90). CORE 모드 아님. 최종 `cmd_vel` 없음.
-- LOCAL 호스트 닫힘: 심판·휴리스틱·MatchHost·HttpPlayerClient·`match --dry-run`. `isaac/` 없음. `host/overhead.py`와 `field/homography.py`는 만들지 않음.
+- LOCAL 호스트: 심판·휴리스틱은 플러그인(`catalog`). 호스트가 `match.local.yaml`·HoldObserver·MANUAL 무장으로 카메라를 기다린다. `isaac/` 없음.
 - DEVICE/FIELD는 천장 카메라 실측. 호스트 pytest로 승격하지 않는다.
 
 ## 다음 gate

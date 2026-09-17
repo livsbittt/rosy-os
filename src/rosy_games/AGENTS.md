@@ -21,7 +21,8 @@ Laptop game host (D-90). CORE does not import this package. Final `cmd_vel` stay
 | `rosy_games/field/` | Pitch numbers. No camera, no HTTP |
 | `rosy_games/game/` | Referee. No policy HTTP |
 | `rosy_games/policy/` | Heuristic now, neural later |
-| `rosy_games/host/` | Match loop and CORE teleop client. No `overhead.py` yet |
+| `rosy_games/catalog.py` | Named plugins: `soccer` game, `heuristic` policy |
+| `rosy_games/host/` | Match loop, HoldObserver, CORE teleop. No `overhead.py` yet |
 | `test/` | ROS-free pytest |
 
 ## For AI Agents
