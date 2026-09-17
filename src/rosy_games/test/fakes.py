@@ -23,15 +23,19 @@ class FakePlayerClient:
         *,
         fail_teleop: bool = False,
         fail_estop: bool = False,
+        fail_manual: bool = False,
     ) -> None:
         self.robot_id = robot_id
         self.fail_teleop = fail_teleop
         self.fail_estop = fail_estop
+        self.fail_manual = fail_manual
         self.teleops: list[tuple[float, float]] = []
         self.estops = 0
         self.manual = 0
 
     def set_manual(self) -> None:
+        if self.fail_manual:
+            raise RuntimeError("set_manual failed")
         self.manual += 1
 
     def teleop(self, linear: float, angular: float) -> None:

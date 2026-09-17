@@ -10,7 +10,8 @@ MATCH = PKG / "config" / "match.yaml"
 
 
 def test_load_match_builds_field_and_two_endpoints():
-    field, robots = load_match(MATCH)
+    setup = load_match(MATCH)
+    field, robots = setup.field, setup.robots
     assert field.length_m == 2.0
     assert field.width_m == 1.4
     assert field.goal_width_m == 0.35

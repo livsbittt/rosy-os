@@ -20,7 +20,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
-    field, robots = load_match(args.config)
+    setup = load_match(args.config)
+    field, robots = setup.field, setup.robots
     if not args.dry_run:
         raise SystemExit("run with --dry-run")
     print(f"field {field.length_m}x{field.width_m} m")

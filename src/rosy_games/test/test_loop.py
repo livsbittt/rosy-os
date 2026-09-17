@@ -30,6 +30,27 @@ def _clients(*, fail=None):
     return home, away
 
 
+def test_arm_puts_both_robots_in_manual_before_ticks():
+    home, away = _clients()
+    host = MatchHost(FakeObserver(_obs()), (home, away))
+    host.arm()
+    assert home.manual == 1 and away.manual == 1
+    assert home.estops == 0 and away.estops == 0
+
+
+def test_arm_failure_estops_both_robots():
+    home = FakePlayerClient("rosy_01", fail_manual=True)
+    away = FakePlayerClient("rosy_02")
+    host = MatchHost(FakeObserver(_obs()), (home, away))
+    try:
+        host.arm()
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("expected set_manual to fail")
+    assert away.estops == 1
+
+
 def test_kickoff_not_ready_teleops_zero_to_both_robots():
     home, away = _clients()
     observer = FakeObserver(_obs(ball=None, lost_ball=True))

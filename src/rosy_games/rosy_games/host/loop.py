@@ -10,6 +10,7 @@ from typing import Iterable, Protocol
 
 from rosy_games.field import ZERO
 from rosy_games.game import MatchState, SoccerGame
+from rosy_games.game.protocol import Game
 from rosy_games.game.gate import CommandSet, gate
 from rosy_games.host.observer import Observer
 from rosy_games.policy.heuristic import HeuristicPolicy
@@ -32,7 +33,7 @@ class MatchHost:
         observer: Observer,
         clients: Iterable[PlayerClient],
         *,
-        game: SoccerGame | None = None,
+        game: Game | None = None,
         policy: Policy | None = None,
     ) -> None:
         self.observer = observer
@@ -41,21 +42,41 @@ class MatchHost:
         self.policy = policy or HeuristicPolicy(self.game.field)
 
     def reset(self) -> MatchState:
+        self.arm()
         return self.game.reset()
 
-    def tick(self) -> MatchState:
-        obs = self.observer.observe()
-        state = self.game.step(obs)
-        twists = self.policy.act(obs, state)
-        commands = gate(twists, obs, state, self.game.field)
-        if not commands.estop:
-            try:
-                self._teleop_all(commands)
-            except Exception:
-                commands = CommandSet(twists=dict(commands.twists), estop=True)
-        if commands.estop:
+    def arm(self) -> None:
+        """Put every robot in MANUAL before the first tick. Failure stops both."""
+        try:
+            for client in self.clients:
+                client.set_manual()
+        except Exception:
+            self.halt()
+            raise
+
+    def halt(self) -> None:
+        try:
             self._estop_all()
-        return state
+        except Exception:
+            pass
+
+    def tick(self) -> MatchState:
+        try:
+            obs = self.observer.observe()
+            state = self.game.step(obs)
+            twists = self.policy.act(obs, state)
+            commands = gate(twists, obs, state, self.game.field)
+            if not commands.estop:
+                try:
+                    self._teleop_all(commands)
+                except Exception:
+                    commands = CommandSet(twists=dict(commands.twists), estop=True)
+            if commands.estop:
+                self._estop_all()
+            return state
+        except Exception:
+            self.halt()
+            raise
 
     def _teleop_all(self, commands: CommandSet) -> None:
         for client in self.clients:
