@@ -38,8 +38,8 @@
 
 ## 최근 기록
 
+- 2026-09-17 · uncommitted · docs(adr): record the OKLCH palette decision as D-82
 - 2026-09-17 · uncommitted · docs(adr): lock leftover gates as D-78–D-81
 - 2026-09-17 · 8fdd8d2 · docs: lock G4 vocabulary, one operator console, and D-61 records
 - 2026-09-17 · uncommitted · docs(adr): supersede D-7 so the local screen has one standing decision
 - 2026-09-17 · uncommitted · docs(concept): fix interface design laws and per-surface grammar as D-72
-- 2026-09-16 · uncommitted · docs(harness): hold docs while the ADR log carries a conflict marker

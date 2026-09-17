@@ -23,6 +23,7 @@
 | D-72 | 표면은 법을 공유하고 문법은 나눈다 |
 | D-75 | 로봇 로컬 화면은 손으로 쓴 정적 자산이다 — D-7 React 대체 |
 | D-77 | 운용자 콘솔은 CORE `/dashboard` 하나다 |
+| D-82 | 팔레트는 OKLCH에서 생성하고 수치 게이트로 지킨다 |
 
 ## 계획·결과 문서
 
@@ -43,6 +44,7 @@
 
 ## 최근 기록
 
+- 2026-09-17 · uncommitted · feat(web): regenerate the palette from OKLCH and gate its values
 - 2026-09-17 · 8fdd8d2 · feat(core): D-72 S3–S6 evidence, gauges, inventory states
 - 2026-09-17 · uncommitted · feat(web): compress dashboard assets and make tokens.css the single source of colour
 - 2026-09-15 · uncommitted · docs(harness): stop carrying over unrerun ROS-SIM evidence

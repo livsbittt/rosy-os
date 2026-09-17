@@ -52,3 +52,10 @@
 - 결정: D-78–D-81 Accepted (경로·증거 규칙). G0–G3는 D-41–D-56 Proposed 유지
 - 교훈: 없음
 
+## 2026-09-17 · uncommitted · docs(adr): record the OKLCH palette decision as D-82
+- 변경: ADR Log에 D-82 표 행·본문 추가(Proposed). `docs/progress.md`의 `adrs`에 D-82 추가
+- 증거: `python tools/harness/rosy_harness.py lint` 0 errors, 13 warnings; `python -m pytest test/test_network_topology_contracts.py test/test_harness_contracts.py -q` (2026-09-17 Windows, 미커밋 WIP 포함 작업 트리)
+- gate 변화: 없음. SOURCE/LOCAL GO 유지
+- 결정: D-82 Proposed — 팔레트를 OKLCH에서 생성하고 값이 지켜야 할 성질을 계약 시험으로 고정한다. 경보는 둘(정상은 잉크), 위험은 채움, 밝기가 색상보다 먼저, status는 따뜻한 띠·series는 차가운 띠
+- 교훈: D-72 S1이 색을 토큰으로 "옮기기만" 하고 값을 재지 않았다. 옮긴 뒤 재 보니 적록 색약에서 위험과 주의가 1.07:1로 붕괴해 있었다 — 리팩토링에서 값을 보존하는 것과 값이 옳은지 확인하는 것은 다른 일이고, 전자만 하면 결함이 그대로 이사한다
+
