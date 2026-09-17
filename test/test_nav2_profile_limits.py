@@ -21,6 +21,14 @@ PROFILE = ROOT / "deploy" / "robot" / "config" / "profile.hardware.yaml"
 NAV2 = ROOT / "src" / "rosy_navigation" / "params" / "nav2_params.yaml"
 
 
+def test_costmaps_wait_for_amcl_before_activating():
+    """RTF 0.3에서 기본 TF 대기는 AMCL 첫 스캔보다 짧다. costmap이 죽으면 목표가 REJECTED다."""
+    data = yaml.safe_load(NAV2.read_text(encoding="utf-8"))
+    for costmap in ("local_costmap", "global_costmap"):
+        timeout = data[costmap][costmap]["ros__parameters"]["initial_transform_timeout"]
+        assert timeout >= 30.0, f"{costmap} initial_transform_timeout={timeout}"
+
+
 def test_nav2_default_inflation_is_the_hardware_value():
     """현장 기본은 0.15 m. 시뮬 월드는 worlds.yaml이 덮어쓴다."""
     data = yaml.safe_load(NAV2.read_text(encoding="utf-8"))
