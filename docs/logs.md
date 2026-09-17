@@ -66,3 +66,10 @@
 - 결정: D-82 Accepted. Device GO가 아니다
 - 교훈: 없음
 
+## 2026-09-17 · dc89264 · docs(harness): stamp last_verified after SOURCE re-run
+- 변경: deploy를 제외한 모듈 progress last_verified를 dc89264로. deploy SOURCE의 bash identity 시험은 이 Windows 호스트에서 Git Bash 임시경로가 깨져 재실행 증거가 아니다
+- 증거: 185 passed, 13 failed (전부 test_dds_identity_contracts.py). 나머지 SOURCE 계약은 통과
+- gate 변화: 없음. ARTIFACT/DEVICE HOLD
+- 결정: D-79
+- 교훈: 없음
+

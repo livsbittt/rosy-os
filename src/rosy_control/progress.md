@@ -2,7 +2,7 @@
 module: rosy_control
 logical_modules: [M05, M06, M07, M11]
 owner: CONTROL
-last_verified: { commit: "8fdd8d2", date: 2026-09-17 }
+last_verified: { commit: "dc89264", date: 2026-09-17 }
 gates:
   SOURCE:
     state: GO

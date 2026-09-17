@@ -39,8 +39,8 @@
 
 ## 최근 기록
 
+- 2026-09-17 · dc89264 · docs(harness): stamp last_verified after SOURCE re-run
 - 2026-09-17 · uncommitted · docs(adr): accept D-82 after palette gate tests
 - 2026-09-17 · uncommitted · docs(adr): record the OKLCH palette decision as D-82
 - 2026-09-17 · uncommitted · docs(adr): lock leftover gates as D-78–D-81
 - 2026-09-17 · 8fdd8d2 · docs: lock G4 vocabulary, one operator console, and D-61 records
-- 2026-09-17 · uncommitted · docs(adr): supersede D-7 so the local screen has one standing decision

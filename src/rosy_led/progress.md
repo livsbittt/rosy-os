@@ -2,7 +2,7 @@
 module: rosy_led
 logical_modules: [M02]
 owner: 장치
-last_verified: { commit: "uncommitted", date: 2026-09-17 }
+last_verified: { commit: "dc89264", date: 2026-09-17 }
 gates:
   SOURCE:
     state: GO

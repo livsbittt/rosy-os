@@ -2,7 +2,7 @@
 module: rosy_description
 logical_modules: [M06, M07]
 owner: 로봇 통합
-last_verified: { commit: "uncommitted", date: 2026-09-17 }
+last_verified: { commit: "dc89264", date: 2026-09-17 }
 gates:
   SOURCE:
     state: GO

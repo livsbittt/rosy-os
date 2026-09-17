@@ -5,22 +5,22 @@
 
 | 모듈 | owner | last verified | SOURCE | LOCAL | ROS-SIM | ARTIFACT | DEVICE | FIELD |
 |---|---|---|---|---|---|---|---|---|
-| [rosy_core](src/rosy_core/progress.md) | CORE | 8fdd8d2 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
+| [rosy_core](src/rosy_core/progress.md) | CORE | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [deploy](deploy/progress.md) | 릴리스·플랫폼 | uncommitted (2026-09-15) | GO | GO | N/A | HOLD | HOLD | N/A |
-| [rosy_control](src/rosy_control/progress.md) | CONTROL | 8fdd8d2 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
-| [rosy_fleet](src/rosy_fleet/progress.md) | FLEET | uncommitted (2026-09-17) | GO | GO | HOLD | PARKED | PARKED | PARKED |
-| [rosy_gz_sim](src/rosy_gz_sim/progress.md) | SIM | uncommitted (2026-09-17) | GO | GO | HOLD | N/A | N/A | N/A |
-| [rosy_navigation](src/rosy_navigation/progress.md) | NAV | uncommitted (2026-09-15) | GO | GO | HOLD | HOLD | HOLD | PARKED |
-| [rosy_bringup](src/rosy_bringup/progress.md) | BRINGUP | uncommitted (2026-09-15) | GO | GO | HOLD | HOLD | HOLD | PARKED |
-| [rosy_emotion](src/rosy_emotion/progress.md) | 장치 | uncommitted (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
-| [rosy_led](src/rosy_led/progress.md) | 장치 | uncommitted (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
-| [rosy_imu_bno055](src/rosy_imu_bno055/progress.md) | 장치 | uncommitted (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
-| [rosy_sensor_adc](src/rosy_sensor_adc/progress.md) | 장치 | uncommitted (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
-| [rosy_lamp_control](src/rosy_lamp_control/progress.md) | 장치 | uncommitted (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
-| [rosy_interfaces](src/rosy_interfaces/progress.md) | 장치 | uncommitted (2026-09-17) | GO | GO | N/A | HOLD | HOLD | PARKED |
-| [rosy_description](src/rosy_description/progress.md) | 로봇 통합 | uncommitted (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
-| [dock](dock/progress.md) | 도킹 | uncommitted (2026-09-15) | GO | GO | HOLD | HOLD | HOLD | PARKED |
-| [docs](docs/progress.md) | 거버넌스 | 8fdd8d2 (2026-09-17) | GO | GO | N/A | N/A | N/A | N/A |
+| [rosy_control](src/rosy_control/progress.md) | CONTROL | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
+| [rosy_fleet](src/rosy_fleet/progress.md) | FLEET | dc89264 (2026-09-17) | GO | GO | HOLD | PARKED | PARKED | PARKED |
+| [rosy_gz_sim](src/rosy_gz_sim/progress.md) | SIM | dc89264 (2026-09-17) | GO | GO | HOLD | N/A | N/A | N/A |
+| [rosy_navigation](src/rosy_navigation/progress.md) | NAV | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
+| [rosy_bringup](src/rosy_bringup/progress.md) | BRINGUP | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
+| [rosy_emotion](src/rosy_emotion/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
+| [rosy_led](src/rosy_led/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
+| [rosy_imu_bno055](src/rosy_imu_bno055/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
+| [rosy_sensor_adc](src/rosy_sensor_adc/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
+| [rosy_lamp_control](src/rosy_lamp_control/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
+| [rosy_interfaces](src/rosy_interfaces/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | N/A | HOLD | HOLD | PARKED |
+| [rosy_description](src/rosy_description/progress.md) | 로봇 통합 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
+| [dock](dock/progress.md) | 도킹 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
+| [docs](docs/progress.md) | 거버넌스 | dc89264 (2026-09-17) | GO | GO | N/A | N/A | N/A | N/A |
 
 ## HOLD blockers
 

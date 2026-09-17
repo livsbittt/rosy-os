@@ -2,7 +2,7 @@
 module: rosy_core
 logical_modules: [M03, M04, M06, M07, M11, M12, M13]
 owner: CORE
-last_verified: { commit: "8fdd8d2", date: 2026-09-17 }
+last_verified: { commit: "dc89264", date: 2026-09-17 }
 gates:
   SOURCE:
     state: GO

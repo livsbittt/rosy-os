@@ -2,7 +2,7 @@
 module: dock
 logical_modules: [M07, M11]
 owner: 도킹
-last_verified: { commit: "uncommitted", date: 2026-09-15 }
+last_verified: { commit: "dc89264", date: 2026-09-17 }
 gates:
   SOURCE:
     state: GO
