@@ -16,7 +16,7 @@
 | D-4 | Namespace + frame_prefix 조합 | Accepted |
 | D-5 | Fleet↔로봇: 로봇 outbound WS + Fleet REST 명령 | Accepted |
 | D-6 | 로봇 간 DDS 차단 (도메인 격리) | Superseded by D-33 |
-| D-7 | React+TS+Vite, 빌드 산출물 정적 서빙 | Accepted |
+| D-7 | React+TS+Vite, 빌드 산출물 정적 서빙 | Superseded by D-75 |
 | D-8 | 프로세스 내 이벤트 버스 | Accepted |
 | D-9 | Waypoint 로컬 저장소 (JSON) | Accepted |
 | D-10 | Fleet 프로토콜 envelope을 Phase 1에 조기 고정 | Accepted |
@@ -79,8 +79,10 @@
 | D-69 | 어댑터는 트리 안 YAML 매니페스트다 | Accepted |
 | D-70 | 워크플로 엔진은 로봇이 아니라 Fleet이다 | Accepted |
 | D-71 | concept 05·09–12·15 apt는 v1 미들웨어가 아니다 | Accepted |
+| D-72 | 표면은 법을 공유하고 문법은 나눈다 | Proposed |
 | D-73 | 모듈마다 자기 코드를 도는 기능 시험 표면이 있다 | Accepted |
 | D-74 | 작업 명령은 CORE를 거쳐 내부 ROS로 가고 조회는 CORE에 남는다 | Accepted |
+| D-75 | 로봇 로컬 화면은 손으로 쓴 정적 자산이다 — D-7 React 대체 | Proposed |
 
 ---
 
@@ -158,7 +160,7 @@
 
 ## D-7 React + TS + Vite 정적 서빙
 
-**Status:** Accepted (2026-08)
+**Status:** Superseded by D-75 (2026-09-17)
 
 **Context:** 로봇 로컬 Web UI가 필요하다. 로봇 보드(RPi급) 리소스가 제한적이다.
 
@@ -1755,10 +1757,13 @@ Pinky/OMX 매니페스트, `TaskKind.concept_id`와 inventory `descriptors`.
 estop/모드 경로와 이중화된다. 채택하지 않는다.
 
 **Consequences:** inventory는 개념 수명 주기를 보여 준다. 텔레옵·내비 거절은
-계속 모드·safety·CAP-003이다. 라이브 기동 직후 BOOTING 연결은 후속이다.
+계속 모드·safety·CAP-003이다. 진단이 오기 전 `GET /inventory`는 BOOTING이고
+`RobotMode`는 IDLE이다.
 
-**Validation / Transition:** `test_domain_model.py`의 READY/SAFE_STOP/BOOTING.
-`RobotMode` 스키마 시험은 그대로 통과해야 한다.
+**Validation / Transition:** `test_domain_model.py` READY/SAFE_STOP/BOOTING.
+`test_api.py::test_inventory_is_booting_before_diagnostics_arrive` 와
+`test_inventory_leaves_booting_after_a_diagnostic`. `RobotMode` 스키마 시험은
+그대로 통과해야 한다. HOST 2026-09-17: 해당 묶음 19 passed.
 
 **References:** [concept 06](../concept/06_ROSY_Device_State_and_Lifecycle.md), D-65.
 
@@ -1787,7 +1792,8 @@ CAP-001 플래그로 501을 유지한다.
 별도 ADR이 필요하다.
 
 **Validation / Transition:** `test_capability_descriptors.py`,
-`test_inventory_is_a_mobile_base_without_pick_or_rfid`.
+`test_inventory_is_a_mobile_base_without_pick_or_rfid`. HOST 2026-09-17:
+SAFE_STOP/BOOTING에서 `available=false`, pick/rfid/infer/train 없음.
 
 **References:** [concept 07](../concept/07_ROSY_Capability_Model.md), D-11, D-32.
 
@@ -1916,8 +1922,9 @@ Windows 개발 호스트에서 돌지 않는다.
 **Consequences:** LED/ADC/램프/interfaces는 자기 계약 시험을 가진다. 새 모듈은
 harness `functional` 없이 머지하지 않는다. 이 결정이 DEVICE/FIELD GO가 아니다.
 
-**Validation / Transition:** `test/test_module_functional_surface.py`가
-`harness.yaml`의 `functional` 경로 존재·종류·공유 슬라이스 금지를 확인한다.
+**Validation / Transition:** `test/test_module_functional_surface.py`.
+`python tools/harness/run_functional.py` — HOST 2026-09-17: 16/16 modules
+passed. DEVICE/FIELD 아님.
 
 **References:** D-61, [module harness 설계](../plans/2026-09-15-module-harness-design.md).
 
@@ -1956,7 +1963,14 @@ sink를 적기 전에 API에 넣지 않는다.
 워크플로 엔진은 여전히 Fleet이다(D-70).
 
 **Validation / Transition:** `src/rosy_core/test/test_command_mapping.py`.
-모든 `TaskKind`의 sink가 `ros`이고, system/host prefix는 work prefix와
-겹치지 않는다.
+모든 `TaskKind` sink가 `ros`, system/host는 work prefix와 겹치지 않음.
+HOST 2026-09-17: `PYTHONPATH=src/rosy_core python -m pytest
+src/rosy_core/test/test_command_mapping.py
+src/rosy_core/test/test_domain_model.py
+src/rosy_core/test/test_capability_descriptors.py
+src/rosy_core/test/test_api.py::test_inventory_is_booting_before_diagnostics_arrive
+src/rosy_core/test/test_api.py::test_inventory_leaves_booting_after_a_diagnostic
+src/rosy_core/test/test_api.py::test_inventory_is_a_mobile_base_without_pick_or_rfid
+test/test_module_functional_surface.py -q` → 19 passed.
 
 **References:** CORE SRS §1.3, D-1, D-2, D-12, D-38, D-70, D-71.
