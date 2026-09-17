@@ -33,6 +33,7 @@ RUN apt-get -o Acquire::Retries=5 update \
         python3-numpy \
         python3-yaml \
         ros-jazzy-nav2-msgs \
+        ros-jazzy-lifecycle-msgs \
         ros-jazzy-rcl-interfaces \
         ros-jazzy-visualization-msgs \
         ros-jazzy-tf2-ros \
@@ -107,11 +108,12 @@ COPY src/rosy_interfaces ./src/rosy_interfaces
 COPY src/rosy_description ./src/rosy_description
 COPY src/rosy_bringup ./src/rosy_bringup
 COPY src/rosy_navigation ./src/rosy_navigation
+COPY src/rosy_omx_adapter ./src/rosy_omx_adapter
 RUN mkdir -p src/rosy_description/meshes
 RUN set -eo pipefail \
     && source /opt/ros/jazzy/setup.bash \
     && colcon build --merge-install \
-        --packages-select sllidar_ros2 rosy_interfaces rosy_description rosy_bringup rosy_navigation \
+        --packages-select sllidar_ros2 rosy_interfaces rosy_description rosy_bringup rosy_navigation rosy_omx_adapter \
     && test -d /opt/rosy_ws/install
 
 FROM io-runtime AS io

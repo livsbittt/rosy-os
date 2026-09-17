@@ -63,7 +63,7 @@ def test_runtime_uses_one_namespace_and_a_real_core_health_endpoint():
     assert "/api/v1" in " ".join(services["rosy-core"]["healthcheck"]["test"])
     number = services["rosy-core"]["environment"]["ROSY_ROBOT_NUMBER"]
     assert number == "${ROSY_ROBOT_NUMBER:-}", number
-    assert "${ROSY_ROBOT_NUMBER:?" not in compose_text
+    assert "${ROSY_ROBOT_NUMBER:?" not in (DEPLOY / "compose.yaml").read_text(encoding="utf-8")
 
 
 def test_runtime_builds_distinct_targets_from_shared_dockerfile():
@@ -86,6 +86,21 @@ def test_runtime_builds_distinct_targets_from_shared_dockerfile():
     assert "src/rosy_description/meshes/**" in dockerignore
 
 
+def test_motion_profile_is_mounted_into_each_device_runtime():
+    services = compose()["services"]
+    profile_mount = "./config/profile.${ROSY_RUNTIME_MODE:-core}.yaml:/etc/rosy/profile.yaml:ro"
+    motion_mount = "./config/motion_profiles.yaml:/etc/rosy/motion_profiles.yaml:ro"
+
+    assert profile_mount in services["rosy-motor"]["volumes"]
+    assert profile_mount in services["rosy-io"]["volumes"]
+    assert motion_mount in services["rosy-core"]["volumes"]
+    assert motion_mount in services["rosy-motor"]["volumes"]
+    assert motion_mount in services["rosy-io"]["volumes"]
+    assert services["rosy-io"]["environment"]["ROSY_MOTION_PROFILE_FILE"] == (
+        "/etc/rosy/motion_profiles.yaml"
+    )
+
+
 def test_core_image_does_not_ship_the_absorbed_sensor_worker_runtime():
     """CORE boots without rosy_control; the adapter is an optional slice."""
     dockerfile = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
@@ -97,6 +112,19 @@ def test_core_image_does_not_ship_the_absorbed_sensor_worker_runtime():
     assert "ros-jazzy-tf2-ros" in core
     assert "python3-numpy" in core
     assert "python3-yaml" in core
+
+
+def test_io_image_contains_the_disabled_omx_adapter_contract():
+    """The Device image ships the model-neutral OMX boundary without enabling hardware."""
+    dockerfile = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
+
+    assert "COPY src/rosy_omx_adapter ./src/rosy_omx_adapter" in dockerfile
+    assert "rosy_omx_adapter" in dockerfile
+    disabled = (
+        ROOT / "src" / "rosy_omx_adapter" / "config" / "omx.disabled.yaml"
+    ).read_text(encoding="utf-8")
+    assert "enabled: false" in disabled
+    assert "hardware_plugin: \"\"" in disabled
 
 
 def test_initial_io_slice_disables_unavailable_adc_battery_driver():
@@ -121,8 +149,8 @@ def test_motor_only_profile_excludes_lidar_and_passes_uart_parameters():
     assert "motor_device:=/dev/rosy-motor" in command
     assert "motor_baudrate:=${ROSY_MOTOR_BAUDRATE:-1000000}" in command
     assert "motor_ids:=${ROSY_MOTOR_IDS:-[1,2]}" in command
-    assert "max_linear_mps:=${ROSY_MAX_LINEAR_MPS:-0.25}" in command
-    assert "max_angular_rps:=${ROSY_MAX_ANGULAR_RPS:-2.5}" in command
+    assert "max_linear_mps:=${ROSY_MAX_LINEAR_MPS:-0.20}" in command
+    assert "max_angular_rps:=${ROSY_MAX_ANGULAR_RPS:-0.80}" in command
     assert "max_wheel_rpm:=${ROSY_MAX_WHEEL_RPM:-100.0}" in command
     assert (
         "motor_profile_acceleration:=${ROSY_MOTOR_PROFILE_ACCELERATION:-200}"
@@ -134,8 +162,8 @@ def test_motor_only_profile_excludes_lidar_and_passes_uart_parameters():
 def test_hardware_profile_passes_the_same_motor_safety_limits():
     command = compose()["services"]["rosy-io"]["command"]
 
-    assert "max_linear_mps:=${ROSY_MAX_LINEAR_MPS:-0.25}" in command
-    assert "max_angular_rps:=${ROSY_MAX_ANGULAR_RPS:-2.5}" in command
+    assert "max_linear_mps:=${ROSY_MAX_LINEAR_MPS:-0.20}" in command
+    assert "max_angular_rps:=${ROSY_MAX_ANGULAR_RPS:-0.80}" in command
     assert "max_wheel_rpm:=${ROSY_MAX_WHEEL_RPM:-100.0}" in command
     assert (
         "motor_profile_acceleration:=${ROSY_MOTOR_PROFILE_ACCELERATION:-200}"
@@ -146,8 +174,8 @@ def test_hardware_profile_passes_the_same_motor_safety_limits():
 def test_example_environment_exposes_motor_limits_as_data_only_values():
     environment = (DEPLOY / ".env.example").read_text(encoding="utf-8")
 
-    assert "ROSY_MAX_LINEAR_MPS=0.25" in environment
-    assert "ROSY_MAX_ANGULAR_RPS=2.5" in environment
+    assert "ROSY_MAX_LINEAR_MPS=0.20" in environment
+    assert "ROSY_MAX_ANGULAR_RPS=0.80" in environment
     assert "ROSY_MAX_WHEEL_RPM=100.0" in environment
     assert "ROSY_MOTOR_PROFILE_ACCELERATION=200" in environment
     assert "ROSY_MAP=/var/lib/rosy/maps/site.yaml" in environment

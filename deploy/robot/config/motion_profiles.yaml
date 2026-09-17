@@ -1,0 +1,31 @@
+# Measured mobile-manipulation profiles.
+# Keep states unmeasured until Pinky/OMX geometry, payload and MoveIt scene
+# have been recorded. Hardware launch will reject a selected unmeasured state.
+motion_profiles:
+  selected_state: unknown
+  profiles:
+    unknown:
+      measured: false
+      footprint: []
+      payload: {}
+      moveit_scene_revision: ""
+    base:
+      measured: false
+      footprint: []
+      payload: {}
+      moveit_scene_revision: ""
+    stowed_arm:
+      measured: false
+      footprint: []
+      payload: {}
+      moveit_scene_revision: ""
+    carrying_box:
+      measured: false
+      footprint: []
+      payload: {}
+      moveit_scene_revision: ""
+    placing:
+      measured: false
+      footprint: []
+      payload: {}
+      moveit_scene_revision: ""

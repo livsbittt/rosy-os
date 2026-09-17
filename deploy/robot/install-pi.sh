@@ -339,8 +339,8 @@ write_runtime_environment() {
     set_env_value "$env_file" ROSY_DIALOUT_GID "$dialout_gid"
     set_env_default "$env_file" ROSY_MOTOR_BAUDRATE 1000000
     set_env_default "$env_file" ROSY_MOTOR_IDS '[1,2]'
-    set_env_default "$env_file" ROSY_MAX_LINEAR_MPS 0.25
-    set_env_default "$env_file" ROSY_MAX_ANGULAR_RPS 2.5
+    set_env_default "$env_file" ROSY_MAX_LINEAR_MPS 0.20
+    set_env_default "$env_file" ROSY_MAX_ANGULAR_RPS 0.80
     set_env_default "$env_file" ROSY_MAX_WHEEL_RPM 100.0
     set_env_default "$env_file" ROSY_MOTOR_PROFILE_ACCELERATION 200
     set_env_value "$env_file" ROSY_CONFIG_PATH "$ROSY_CONFIG"
