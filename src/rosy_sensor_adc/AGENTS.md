@@ -13,6 +13,9 @@ C++ I2C ADC node (`rosy_sensor_adc`). Channels 0–2 IR, 3 ultrasonic, 4 battery
 |------|-------------|
 | `package.xml` | ament_cmake; rclcpp, sensor_msgs, realtime_tools |
 | `CMakeLists.txt` | Builds `src/main_node.cpp` **only on aarch64** (wiringPi); x86 logs skip |
+| `progress.md` | Current gate snapshot (SOURCE…FIELD). Overwrite; state of record over this file |
+| `logs.md` | Append-only work journal, one entry per change |
+| `index.md` | Generated: ADRs, plans, solutions, tests, recent logs. Do not edit |
 
 ## Subdirectories
 
@@ -24,6 +27,7 @@ C++ I2C ADC node (`rosy_sensor_adc`). Channels 0–2 IR, 3 ultrasonic, 4 battery
 
 ### Working In This Directory
 
+- Harness (D-61 Proposed): read `progress.md` and `index.md` first. After a change, append `logs.md`, overwrite `progress.md` if a gate moved, then run `python tools/harness/rosy_harness.py generate` from the repo root.
 - Default I2C `/dev/i2c-1`, address `0x08`.
 - Parameters `rate_active` / `rate_idle` / `rate_standby` (20 / 5 / 2 Hz). Until a valid `power/mode` arrives, keep the startup rate.
 - wiringPi I2C is a Pi-only dependency.

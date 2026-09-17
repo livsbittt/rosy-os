@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-15 -->
 
 # deploy
 
@@ -9,7 +9,13 @@ Robot-host delivery: build a signed ROSY OS image, store/activate releases, and 
 
 ## Key Files
 
-None at this level — three sibling pipelines.
+Three sibling pipelines below; at this level only the harness records.
+
+| File | Description |
+|------|-------------|
+| `progress.md` | Current gate snapshot (ARTIFACT/DEVICE). Overwrite; state of record over this file |
+| `logs.md` | Append-only work journal, one entry per change |
+| `index.md` | Generated: ADRs, plans, solutions, tests, recent logs. Do not edit |
 
 ## Subdirectories
 
@@ -23,6 +29,7 @@ None at this level — three sibling pipelines.
 
 ### Working In This Directory
 
+- Harness (D-61 Proposed): read `progress.md` and `index.md` first. After a change, append `logs.md`, overwrite `progress.md` if a gate moved, then run `python tools/harness/rosy_harness.py generate` from the repo root.
 - CORE is internet-facing and unprivileged. Do not add `nmcli`, `reboot`, or docker-compose control inside `rosy_core`.
 - Compose services: `rosy-core` (always), `rosy-motor` (profile `motor`), hardware/LiDAR (profile `hardware`). `runtime-mode.sh` modes are `core` | `motor` | `hardware`.
 - Release images must be built on native arm64, not x86 QEMU (`deploy/image/build-image.sh`).

@@ -13,6 +13,9 @@ Robot URDF/xacro, visual/collision meshes, and RViz model view. First hardware i
 |------|-------------|
 | `package.xml` | ament_cmake; xacro, robot_state_publisher |
 | `CMakeLists.txt` | Installs urdf, meshes, launch, rviz |
+| `progress.md` | Current gate snapshot (SOURCE…FIELD). Overwrite; state of record over this file |
+| `logs.md` | Append-only work journal, one entry per change |
+| `index.md` | Generated: ADRs, plans, solutions, tests, recent logs. Do not edit |
 
 ## Subdirectories
 
@@ -27,6 +30,7 @@ Robot URDF/xacro, visual/collision meshes, and RViz model view. First hardware i
 
 ### Working In This Directory
 
+- Harness (D-61 Proposed): read `progress.md` and `index.md` first. After a change, append `logs.md`, overwrite `progress.md` if a gate moved, then run `python tools/harness/rosy_harness.py generate` from the repo root.
 - Gazebo uses `rosy_gz.urdf.xacro`. Do not break the sim-specific plugins/topics.
 - Keep inertia helper in `urdf/common/insert_inertia.urdf.xacro`.
 - Joint names `left_wheel_joint` / `right_wheel_joint` must stay aligned with `rosy_bringup`.

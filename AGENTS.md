@@ -1,4 +1,5 @@
-<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+<!-- Parent: ../AGENTS.md -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-14 -->
 
 # ROSY
 

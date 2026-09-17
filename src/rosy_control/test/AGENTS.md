@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-06 | Updated: 2026-09-06 -->
+<!-- Generated: 2026-09-06 | Updated: 2026-09-14 -->
 
 # test/ (pure-logic suite)
 
@@ -17,6 +17,12 @@ ROS-free unittest suite covering every pure-logic decision module. No ROS on the
 | `test_route.py` | `control/route` |
 | `test_scale.py` | `safety/scale` corridor auto-scale |
 | `test_watch.py` | `watch.py` graph inspect |
+
+## Subdirectories
+
+| Directory | Purpose |
+|-----------|---------|
+| `fixtures/` | Recorded scans, maps, and localization snapshots used by tests (see `fixtures/AGENTS.md`) |
 
 ## For AI Agents
 

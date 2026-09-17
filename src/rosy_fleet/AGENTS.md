@@ -31,21 +31,25 @@ schema reuse (D-18). No ROS imports anywhere in this package.
 | `rosy_fleet/cli.py` | `rosy_fleet relay ...` / `rosy_fleet formation ...` |
 | `test/fakes.py` | Fake `RobotClient` + `FakeClock` shared by relay/session tests — no network |
 | `test/conftest.py` | Puts `src/rosy_fleet` and `src/rosy_core` on `sys.path` so pytest runs without colcon install |
+| `progress.md` | Current gate snapshot (SOURCE…FIELD). Overwrite; state of record over this file |
+| `logs.md` | Append-only work journal, one entry per change |
+| `index.md` | Generated: ADRs, plans, solutions, tests, recent logs. Do not edit |
 
 ## Subdirectories
 
 | Directory | Purpose |
 |-----------|---------|
-| `rosy_fleet/formation/` | Pure geometry and slot-assignment functions — no transport, no ROS |
-| `rosy_fleet/swarm/` | Robot endpoints, transport, relay, arming, and the formation session |
-| `rosy_fleet/hub/` | D-59 SiteHub: hello/heartbeat/event gather, REST scatter — no rclpy, no cmd_vel, no Image |
-| `test/` | pytest for geometry, assignment, robots, transport, relay, arming, session, CLI, hub, and the import-boundary check |
+| `rosy_fleet/formation/` | Pure geometry and slot-assignment functions — no transport, no ROS (see `rosy_fleet/formation/AGENTS.md`) |
+| `rosy_fleet/swarm/` | Robot endpoints, transport, relay, arming, and the formation session (see `rosy_fleet/swarm/AGENTS.md`) |
+| `rosy_fleet/hub/` | D-59 SiteHub: hello/heartbeat/event gather, REST scatter — no rclpy, no cmd_vel, no Image (see `rosy_fleet/hub/AGENTS.md`) |
+| `test/` | pytest for geometry, assignment, robots, transport, relay, arming, session, CLI, hub, and the import-boundary check (see `test/AGENTS.md`) |
 | `resource/` | ament index marker `rosy_fleet` |
 
 ## For AI Agents
 
 ### Working In This Directory
 
+- Harness (D-61 Proposed): read `progress.md` and `index.md` first. After a change, append `logs.md`, overwrite `progress.md` if a gate moved, then run `python tools/harness/rosy_harness.py generate` from the repo root.
 - `formation/` and `swarm/arming.py` are pure — no `httpx`, `websockets`, `asyncio`, or `rclpy` imports. `test/test_boundaries.py` enforces this by walking the import graph.
 - The relay forwards leader frames byte-for-byte and never synthesizes one. A stream that stops must read 0 Hz, not repeat the last frame.
 - HOLD (FOR-004's whole-formation hold) is made by pausing the relay, not by a new endpoint (design §6.4, D-35 candidate).

@@ -1,4 +1,5 @@
-<!-- Generated: 2026-09-06 | Updated: 2026-09-06 -->
+<!-- Parent: ../AGENTS.md -->
+<!-- Generated: 2026-09-06 | Updated: 2026-09-14 -->
 
 # rosy_control (absorbed into Rosy OS)
 
@@ -12,6 +13,9 @@ ROS 2 Jazzy package absorbed into the **Rosy OS** workspace for the Pinky Pro de
 | `STEPS.txt` | Korean operator runbook: bringup order, tuning log, LCD/web notes |
 | `package.xml` / `setup.py` | ament_python package manifest and entry points |
 | `resource/rosy_control` | ament resource marker (generated, do not edit) |
+| `progress.md` | Current gate snapshot (SOURCE…FIELD). Overwrite; state of record over this file |
+| `logs.md` | Append-only work journal, one entry per change |
+| `index.md` | Generated: ADRs, plans, solutions, tests, recent logs. Do not edit |
 
 ## Subdirectories
 | Directory | Purpose |
@@ -20,14 +24,15 @@ ROS 2 Jazzy package absorbed into the **Rosy OS** workspace for the Pinky Pro de
 | `config/` | Shared and per-node ROS parameters (see `config/AGENTS.md`) |
 | `launch/` | Launch files; bringup order matters (see `launch/AGENTS.md`) |
 | `test/` | Pure-logic unittest suite, no ROS needed (see `test/AGENTS.md`) |
-| `tools/` | ROS-name audit, calibration migration, Gazebo and validation helpers; inspect the selected tool before use |
-| `docs/` | Camera ground calibration, localization and narrow-passage behavior references |
+| `tools/` | ROS-name audit, calibration migration, Gazebo helpers (see `tools/AGENTS.md`) |
+| `docs/` | Camera ground calibration, localization, narrow-passage notes, dated validation dumps (see `docs/AGENTS.md`) |
 | `web/` | web_node dashboard UI — served from share/rosy_control/web (see `web/AGENTS.md`) |
-| `map/` | Gazebo world asset for the desk maze |
+| `map/` | Gazebo world asset for the desk maze (see `map/AGENTS.md`) |
 
 ## For AI Agents
 
 ### Working In This Directory
+- Harness (D-61 Proposed): read `progress.md` and `index.md` first. After a change, append `logs.md`, overwrite `progress.md` if a gate moved, then run `python tools/harness/rosy_harness.py generate` from the repo root.
 - Treat this directory as part of Rosy OS. The original checkout is archived for provenance; no runtime, build, or test may require it.
 - Preserve pure-logic behavior and its tests before changing ROS wiring. The target runtime must not activate this package's legacy final `/cmd_vel` publisher beside `rosy_core`.
 - Keep new **decision logic in the pure-logic subjects** (`rosy_control/control/`, `rosy_control/planning/`, `rosy_control/sensing/`, `rosy_control/watch.py`) — no ROS imports there, that is what the tests cover.

@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-07 | Updated: 2026-09-07 -->
+<!-- Generated: 2026-09-07 | Updated: 2026-09-14 -->
 # web/ (web_node dashboard UI)
 
 ## Purpose
@@ -12,6 +12,10 @@ only when its gen counter changes; posts to `/cmd`, `/wander`, `/estop`,
 | File | Description |
 |---|---|
 | `dashboard.html` | the whole console: three regions (감지 / 관측 / 조작), map canvas with overlays, lidar dial, clearance gauges, safety flags, camera, and every control |
+
+## Subdirectories
+
+None.
 
 ## For AI Agents
 
@@ -60,3 +64,24 @@ only when its gen counter changes; posts to `/cmd`, `/wander`, `/estop`,
   web_node's `/teleop`, and `data-post` values must be in its `POST_VERBS`.
 - Canvas draw functions must early-return on a zero-size canvas: the node
   tests in `tools/test_dashboard_*.cjs` run the IIFE with stub elements.
+
+### Testing Requirements
+
+Dashboard IIFE tests (when present) in `tools/test_dashboard_*.cjs`. Host browser contract: `Rosy OS/test/test_dashboard_browser.py`. Do not require a live robot for HTML structure checks.
+
+### Common Patterns
+
+One HTML file, one IIFE, `data-post` / `data-hold` / `data-view`. No build step.
+
+## Dependencies
+
+### Internal
+
+- `rosy_control/web_node.py` (serves this file; `/state.json`, `/map.png`, POST verbs)
+- Limits from `config/robot.yaml` via `web_node.read_limits`
+
+### External
+
+None (browser only).
+
+<!-- MANUAL: -->

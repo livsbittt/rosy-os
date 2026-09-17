@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-14 -->
 
 # rosy_gz_sim
 
@@ -13,6 +13,9 @@ Gazebo simulation: worlds, models, ros_gz bridge params, lamp plugin, and `gz_mu
 |------|-------------|
 | `package.xml` | ament_cmake; ros_gz, gz_ros2_control |
 | `CMakeLists.txt` | Installs launch, worlds, models, params, plugins. **`return()` on aarch64** — do not "fix" that skip |
+| `progress.md` | Current gate snapshot (SOURCE…FIELD). Overwrite; state of record over this file |
+| `logs.md` | Append-only work journal, one entry per change |
+| `index.md` | Generated: ADRs, plans, solutions, tests, recent logs. Do not edit |
 
 ## Subdirectories
 
@@ -23,10 +26,14 @@ Gazebo simulation: worlds, models, ros_gz bridge params, lamp plugin, and `gz_mu
 | `models/` | Robot/shelf meshes and SDF (see `models/AGENTS.md`) |
 | `params/` | `rosy_bridge.yaml` ros_gz topic maps |
 | `plugins/` | `gz_lamp_control_plugin.cpp/.hpp` |
+| `scripts/` | Swarm formation bench (no rclpy; uses `rosy_fleet`) (see `scripts/AGENTS.md`) |
+| `test/` | `gz_multi.launch.py` identity/port contracts (see `test/AGENTS.md`) |
 
 ## For AI Agents
 
 ### Working In This Directory
+
+Harness (D-61 Proposed): read `progress.md` and `index.md` first. After a change, append `logs.md`, overwrite `progress.md` if a gate moved, then run `python tools/harness/rosy_harness.py generate` from the repo root.
 
 ```bash
 ros2 launch rosy_gz_sim gz_multi.launch.py robots:=2

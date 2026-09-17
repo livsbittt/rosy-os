@@ -12,7 +12,7 @@ ROS-101: the only module allowed to import rclpy message types and talk to the R
 | File | Description |
 |------|-------------|
 | `__init__.py` | Package marker |
-| `ros_bridge.py` | 11 subs, 5 pubs, 4 service clients, 6 timers, the Nav2 action client and TF. Exact list pinned in `test/test_bridge_timers.py` — update both together |
+| `ros_bridge.py` | 17 subs, 5 pubs, 4 service clients, 6 timers, the Nav2 action client and TF. Exact list pinned in `test/test_bridge_timers.py` — update both together |
 | `translate.py` | ROS-free message → domain dict conversion. Imports no ROS type, so host pytest runs it |
 | `goal_tracker.py` | ROS-free Nav2 goal generations: which result is current, what to cancel |
 | `display.py` | ROS-free `display/info` decisions: address resolution and payload rounding (PWR-003) |
@@ -52,7 +52,7 @@ Host pytest does not import `ros_bridge.py` (optional ROS). CI boot smoke + the 
 `pull_request`, and this repository has no remote, so neither event can fire. Treat construction-time
 correctness in this file as unverified until CI actually runs.
 One exception, deliberately narrow — `test/test_bridge_timers.py` stubs `rclpy` in `sys.modules` to build
-the bridge against a recording node and assert **what it registers**: six timers at fixed periods, eleven
+the bridge against a recording node and assert **what it registers**: six timers at fixed periods, seventeen
 subscriptions with their callbacks and QoS, five publishers with QoS, four service clients, the action
 client, the TF listener and both executor wirings. Structural only. It exists so the 3b adapter reshape
 is gradable without a robot. Do not add semantic tests there and do not move the stub into `conftest.py` —
@@ -62,6 +62,13 @@ The ROS-free siblings are host-testable and carry real value assertions — `tra
 ### Common Patterns
 
 `frame_prefix` on TF frames. Hash map files for `map_id` (D-13).
+
+Readiness subscriptions are intentional: lifecycle `transition_event` is the
+source for AMCL, map server, controller and both costmaps; `motor/ready` is a
+transient-local adapter lease. They feed the ROS-free
+`navigation.readiness.NavigationReadinessGate` and do not create another
+velocity path. Hardware mode remains HOLD until all required components report
+active and the motor lease is refreshed.
 
 ## Dependencies
 

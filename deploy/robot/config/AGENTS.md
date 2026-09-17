@@ -14,9 +14,10 @@ Pinky Pro board overlays mounted into `rosy-core`. `ROSY_RUNTIME_MODE` selects `
 | `profile.core.yaml` / `capabilities.core.yaml` | Dashboard only: no teleop, no lidar |
 | `profile.motor.yaml` / `capabilities.motor.yaml` | Dynamixel teleop, encoder only |
 | `profile.hardware.yaml` / `capabilities.hardware.yaml` | Motor + RPLidar + Nav2 goal/return-home; slam still false |
+| `motion_profiles.yaml` | Measured base/arm/payload states; defaults to unmeasured `unknown` |
 | `board.yaml` | Modes, aliases (`pi5-lite` → `hardware`), `slices` (`required: [core]`; available motor/io/nav/vision/omx/ai), and `presets` (`core` / `motor` / `hardware`) |
 | `resolve-mode.sh` | Maps aliases and `--slices` sets onto catalog modes; overlay YAML exists only for catalog modes |
-| `rosy.pi5.example.yaml` | Example `ROSY_CONFIG` for the device |
+| `rosy.pi5.example.yaml` | Example `ROSY_CONFIG` for the device; hardware readiness gate is required |
 
 ## Subdirectories
 

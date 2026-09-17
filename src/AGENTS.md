@@ -1,11 +1,11 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-13 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-14 -->
 
 # src
 
 ## Purpose
 
-ROS 2 colcon workspace. Build with `colcon build --symlink-install` from this directory (or `source env.sh && colcon build --base-paths src` from repo root). Mix of ament_python (`rosy_core`, `rosy_bringup`, `rosy_emotion`, `rosy_led`) and ament_cmake (description, gz_sim, navigation, C++ drivers, interfaces).
+ROS 2 colcon workspace. Build with `colcon build --symlink-install` from this directory (or `source env.sh && colcon build --base-paths src` from repo root). Mix of ament_python (`rosy_core`, `rosy_bringup`, `rosy_emotion`, `rosy_led`, `rosy_omx_adapter`) and ament_cmake (description, gz_sim, navigation, C++ drivers, interfaces).
 
 ## Key Files
 
@@ -26,7 +26,8 @@ No files at this level. Each child is a ROS 2 package with its own `package.xml`
 | `rosy_led/` | Python LED service (`set_led`, `set_brightness`) (see `rosy_led/AGENTS.md`) |
 | `rosy_emotion/` | LCD GIF emotions + info-screen renderer (see `rosy_emotion/AGENTS.md`) |
 | `rosy_lamp_control/` | C++ WS2811 lamp + SetLamp service — aarch64 only (see `rosy_lamp_control/AGENTS.md`) |
-| `rosy_control/` | Absorbed Pinky sensing, camera/OpenCV, calibration, planning, safety-policy, and navigation-session code; final external API and motor command ownership remain in `rosy_core` |
+| `rosy_control/` | Absorbed Pinky sensing, camera/OpenCV, calibration, planning, safety-policy, and navigation-session code; final external API and motor command ownership remain in `rosy_core` (see `rosy_control/AGENTS.md`) |
+| `rosy_omx_adapter/` | Disabled-by-default OMX model profile and ROS-native ros2_control/MoveIt contract boundary (see `rosy_omx_adapter/AGENTS.md`) |
 | `rosy_fleet/` | Fleet seed: formation geometry, slot assignment, reference-stream relay, FOR-004 session, CLI (see `rosy_fleet/AGENTS.md`) |
 
 ## For AI Agents
@@ -42,7 +43,7 @@ No files at this level. Each child is a ROS 2 package with its own `package.xml`
 
 ```bash
 cd src && colcon build --symlink-install --event-handlers console_direct+
-python3 -m pytest rosy_core/test/ -v
+python3 -m pytest rosy_core/test/ rosy_control/test/ rosy_fleet/test rosy_omx_adapter/test -q
 # ament linters live in each Python package's test/ (copyright, flake8, pep257)
 ```
 

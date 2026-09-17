@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-14 -->
 
 # release
 
@@ -25,7 +25,9 @@ Release packaging and the privileged Host Agent. Modules are scripts (not an ins
 
 ## Subdirectories
 
-None (ignore `__pycache__/`).
+| Directory | Purpose |
+|-----------|---------|
+| `public-keys/` | Committed Ed25519 **public** trust anchors only (see `public-keys/AGENTS.md`) |
 
 ## For AI Agents
 

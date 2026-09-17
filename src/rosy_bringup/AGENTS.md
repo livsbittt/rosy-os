@@ -13,6 +13,11 @@ Physical robot bringup: Dynamixel differential drive, odometry/TF, optional LiDA
 |------|-------------|
 | `package.xml` | ament_python; exec depends include sllidar_ros2, robot_state_publisher |
 | `setup.py` / `setup.cfg` | Package install |
+| `config/pinky_pro_adapter.yaml` | ROS parameter source for the Pinky Pro board adapter |
+| `rosy_bringup/pinky_pro_adapter.py` | ROS-free validation boundary before Dynamixel I/O |
+| `progress.md` | Current gate snapshot (SOURCE…FIELD). Overwrite; state of record over this file |
+| `logs.md` | Append-only work journal, one entry per change |
+| `index.md` | Generated: ADRs, plans, solutions, tests, recent logs. Do not edit |
 
 ## Subdirectories
 
@@ -29,10 +34,13 @@ Physical robot bringup: Dynamixel differential drive, odometry/TF, optional LiDA
 
 ### Working In This Directory
 
+- Harness (D-61 Proposed): read `progress.md` and `index.md` first. After a change, append `logs.md`, overwrite `progress.md` if a gate moved, then run `python tools/harness/rosy_harness.py generate` from the repo root.
 - `motor_control.py` and `command_deadman.py` must remain importable without rclpy (repo `test/` uses them).
 - Default serial `/dev/ttyAMA4`, baud 1_000_000, IDs `[1, 2]` (left, right). Do not coerce IDs.
 - Driver enforces RPM limits and 32-bit encoder wrap even if CORE is down.
 - Stale `cmd_vel` → confirmed zero-RPM stop (`CommandDeadman`).
+- `PinkyProAdapter` validates the complete parameter mapping before the SDK is
+  constructed; it must not open a device or publish a command.
 
 ### Testing Requirements
 

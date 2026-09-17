@@ -12,6 +12,7 @@ Bringup parameters and a localhost CycloneDDS profile for isolated DDS (D-6).
 | File | Description |
 |------|-------------|
 | `rosy_params.yaml` | Node parameters for bringup |
+| `pinky_pro_adapter.yaml` | Pinky Pro board profile loaded by the ROS launch path |
 | `cyclonedds_localhost.xml` | Restrict DDS to localhost |
 
 ## Subdirectories

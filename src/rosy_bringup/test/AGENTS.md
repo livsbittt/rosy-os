@@ -12,6 +12,7 @@ Package pytest: deadman unit test plus ament copyright/flake8/pep257.
 | File | Description |
 |------|-------------|
 | `test_command_deadman.py` | CommandDeadman arm/timeout/stop |
+| `test_pinky_pro_adapter.py` | Pinky Pro ROS parameter boundary; no device I/O |
 | `test_copyright.py` | ament_copyright |
 | `test_flake8.py` | ament_flake8 |
 | `test_pep257.py` | ament_pep257 |

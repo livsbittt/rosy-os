@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-03 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-14 -->
 
 # fleet_agent
 
@@ -14,7 +14,13 @@ Outbound Fleet WebSocket (D-5) is **disabled**. `FleetAgent.start()` does not op
 | `__init__.py` | Package marker |
 | `agent.py` | `FleetAgent`: `enabled`/`connected` stay false |
 
+## Subdirectories
+
+None.
+
 ## For AI Agents
+
+### Working In This Directory
 
 - Do not add a connection, URL, token, or heartbeat here until a Fleet server exists.
 - Teleop, navigation, and safety must not import or wait on this agent.
@@ -23,3 +29,19 @@ Outbound Fleet WebSocket (D-5) is **disabled**. `FleetAgent.start()` does not op
 ### Testing Requirements
 
 `src/rosy_core/test/test_fleet_agent.py`, commissioning fields in `test_host_cards.py`.
+
+### Common Patterns
+
+Stub agent with flags only. Live formation uses `src/rosy_fleet` as an external client of CORE, not this outbound socket.
+
+## Dependencies
+
+### Internal
+
+- CORE node may construct `FleetAgent` but must not block on it
+
+### External
+
+None while disabled.
+
+<!-- MANUAL: -->

@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{ python3 \"$CLAUDE_PROJECT_DIR/tools/harness/rosy_harness.py\" brief || python \"$CLAUDE_PROJECT_DIR/tools/harness/rosy_harness.py\" brief; } 2>/dev/null || true",
+            "timeout": 20,
+            "statusMessage": "Loading module harness status"
+          }
+        ]
+      }
+    ]
+  }
+}
