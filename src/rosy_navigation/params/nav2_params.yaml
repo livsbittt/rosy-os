@@ -100,7 +100,7 @@ controller_server:
       # 제자리 회전 (고개 먼저 돌리기)
       use_rotate_to_heading: true            # 경로 방향과 로봇 헤딩이 다를 때 제자리 회전 먼저 하기
       rotate_to_heading_min_angle: 0.35      # [rad] 약 20도 이상 차이나면 제자리 회전 모드 진입
-      rotate_to_heading_angular_vel: 1.0     # [rad/s] 제자리 회전할 때의 회전 속도
+      rotate_to_heading_angular_vel: 0.8     # [rad/s] 제자리 회전할 때의 회전 속도
 
       # 커브길 감속 (Regulated)
       use_regulated_linear_velocity_scaling: false  # 급커브에서 속도 줄이기
@@ -321,7 +321,7 @@ behavior_server:
     robot_base_frame: base_footprint
     transform_tolerance: 0.1
     simulate_ahead_time: 2.0
-    max_rotational_vel: 1.0
+    max_rotational_vel: 0.8
     min_rotational_vel: 0.4
     rotational_acc_lim: 3.2
     enable_stamped_cmd_vel: false
@@ -342,8 +342,8 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: False
     feedback: "OPEN_LOOP"
-    max_velocity: [0.25, 0.0, 1.5]
-    min_velocity: [-0.25, 0.0, -1.5]
+    max_velocity: [0.20, 0.0, 0.80]
+    min_velocity: [-0.20, 0.0, -0.80]
     max_accel: [2.5, 0.0, 3.2]
     max_decel: [-2.5, 0.0, -3.2]
     odom_topic: "odom"

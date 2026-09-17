@@ -21,7 +21,13 @@ from launch.launch_description_sources import (
 )
 from launch.substitutions import LaunchConfiguration
 
+from rosy_navigation.footprint_profile import load_footprint_profile
 from rosy_navigation.params_rewrite import write_prefixed_nav2_params
+from rosy_navigation.profile_limits import (
+    load_motion_limits,
+    validate_nav2_parameters,
+    validate_requested_limits,
+)
 from rosy_navigation.site_map import resolve_occupancy_map
 
 
@@ -29,10 +35,50 @@ def _include_nav2(context, *args, **kwargs):
     nav_share = get_package_share_directory("rosy_navigation")
     namespace = LaunchConfiguration("namespace").perform(context)
     source = LaunchConfiguration("params_file").perform(context)
+    profile_path = LaunchConfiguration("profile_file").perform(context)
+    limits = load_motion_limits(profile_path)
+    footprint_file = LaunchConfiguration("footprint_profile_file").perform(context).strip()
+    footprint_state = LaunchConfiguration("footprint_state").perform(context).strip().lower()
+    require_footprint = LaunchConfiguration("require_measured_footprint").perform(context).lower()
+    if require_footprint not in {"true", "false"}:
+        raise ValueError("require_measured_footprint must be true or false")
+    footprint_points = None
+    state_unknown = footprint_state in {"", "unknown"}
+    if require_footprint == "true" and (not footprint_file or state_unknown):
+        raise ValueError(
+            "a measured footprint file and non-unknown state are required"
+        )
+    if footprint_file and not state_unknown:
+        selected_footprint = load_footprint_profile(footprint_file, footprint_state)
+        if not selected_footprint.operational:
+            raise ValueError(
+                f"footprint state {footprint_state!r} is not measured and operational"
+            )
+        footprint_points = selected_footprint.footprint
+        if selected_footprint.max_linear_mps is not None:
+            limits = type(limits)(
+                max_linear_mps=min(limits.max_linear_mps, selected_footprint.max_linear_mps),
+                max_angular_rps=limits.max_angular_rps,
+            )
+        if selected_footprint.max_angular_rps is not None:
+            limits = type(limits)(
+                max_linear_mps=limits.max_linear_mps,
+                max_angular_rps=min(limits.max_angular_rps, selected_footprint.max_angular_rps),
+            )
+    validate_requested_limits(
+        limits,
+        max_linear_mps=LaunchConfiguration("max_linear_mps").perform(context),
+        max_angular_rps=LaunchConfiguration("max_angular_rps").perform(context),
+    )
+    validate_nav2_parameters(source, limits)
     fallback_map = os.path.join(nav_share, "map", "my_map.yaml")
+    allow_demo_map = LaunchConfiguration("allow_demo_map").perform(context).lower()
+    if allow_demo_map not in {"true", "false"}:
+        raise ValueError("allow_demo_map must be true or false")
     map_yaml = resolve_occupancy_map(
         LaunchConfiguration("map").perform(context),
         fallback_map,
+        allow_fallback=allow_demo_map == "true",
     )
     return [
         IncludeLaunchDescription(
@@ -43,7 +89,9 @@ def _include_nav2(context, *args, **kwargs):
                 "namespace": namespace,
                 "use_sim_time": LaunchConfiguration("use_sim_time").perform(context),
                 "map": map_yaml,
-                "params_file": write_prefixed_nav2_params(source, namespace),
+                "params_file": write_prefixed_nav2_params(
+                    source, namespace, footprint_points=footprint_points
+                ),
                 "use_composition": "True",
             }.items(),
         )
@@ -84,8 +132,8 @@ def generate_launch_description():
         DeclareLaunchArgument("motor_device", default_value="/dev/ttyAMA4"),
         DeclareLaunchArgument("motor_baudrate", default_value="1000000"),
         DeclareLaunchArgument("motor_ids", default_value="[1,2]"),
-        DeclareLaunchArgument("max_linear_mps", default_value="0.25"),
-        DeclareLaunchArgument("max_angular_rps", default_value="2.5"),
+        DeclareLaunchArgument("max_linear_mps", default_value="0.20"),
+        DeclareLaunchArgument("max_angular_rps", default_value="0.80"),
         DeclareLaunchArgument("max_wheel_rpm", default_value="100.0"),
         DeclareLaunchArgument("motor_profile_acceleration", default_value="200"),
         DeclareLaunchArgument(
@@ -93,6 +141,22 @@ def generate_launch_description():
             default_value=os.environ.get("ROSY_MAP", "/var/lib/rosy/maps/site.yaml"),
         ),
         DeclareLaunchArgument("params_file", default_value=default_params),
+        DeclareLaunchArgument("allow_demo_map", default_value="false"),
+        DeclareLaunchArgument(
+            "footprint_profile_file",
+            default_value=os.environ.get(
+                "ROSY_MOTION_PROFILE_FILE", ""
+            ),
+        ),
+        DeclareLaunchArgument(
+            "footprint_state",
+            default_value=os.environ.get("ROSY_FOOTPRINT_STATE", "unknown"),
+        ),
+        DeclareLaunchArgument("require_measured_footprint", default_value="false"),
+        DeclareLaunchArgument(
+            "profile_file",
+            default_value=os.environ.get("ROSY_PROFILE", "/etc/rosy/profile.yaml"),
+        ),
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(

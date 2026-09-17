@@ -1,7 +1,8 @@
 """Choose a host site occupancy map, or the packaged demo map.
 
 Nav2 map_server needs the YAML and the image it names. Hardware mode may
-bind-mount /var/lib/rosy/maps; until a site pair is present, fall back.
+bind-mount /var/lib/rosy/maps. Field hardware can require the site pair and
+fail closed; simulation and bench callers may keep the demo fallback.
 """
 
 from __future__ import annotations
@@ -11,11 +12,20 @@ from pathlib import Path
 import yaml
 
 
-def resolve_occupancy_map(preferred: str | Path, fallback: str | Path) -> str:
+def resolve_occupancy_map(
+    preferred: str | Path,
+    fallback: str | Path,
+    *,
+    allow_fallback: bool = True,
+) -> str:
     preferred_path = Path(preferred)
     fallback_path = Path(fallback)
     if _is_loadable(preferred_path):
         return str(preferred_path)
+    if not allow_fallback:
+        raise ValueError(
+            "site occupancy map is missing or unloadable: " f"{preferred_path}"
+        )
     return str(fallback_path)
 
 

@@ -3,6 +3,7 @@
 import sys
 from pathlib import Path
 
+import pytest
 import yaml
 
 from robot_contracts import DEPLOY, NAV_LAUNCH, NAV_PARAMS, ROOT, board_caps, board_profile, compose
@@ -41,6 +42,36 @@ def test_hardware_mode_advertises_lidar_and_goal_navigation():
     assert health.count("ros2 node list") == 1
 
 
+def test_hardware_config_requires_runtime_readiness_evidence():
+    config = yaml.safe_load(
+        (DEPLOY / "config" / "rosy.pi5.example.yaml").read_text(encoding="utf-8")
+    )
+    readiness = config["navigation"]["readiness"]
+
+    assert readiness["required"] is True
+    assert readiness["stale_after_s"] == 2.0
+    assert readiness["required_components"] == [
+        "amcl", "map_server", "controller_server", "local_costmap",
+        "global_costmap", "motor_adapter",
+    ]
+
+
+def test_core_bridge_subscribes_to_lifecycle_and_motor_readiness_sources():
+    bridge = (ROOT / "src" / "rosy_core" / "rosy_core" / "bridge" / "ros_bridge.py").read_text(
+        encoding="utf-8"
+    )
+    for topic in (
+        '"amcl/transition_event"',
+        '"map_server/transition_event"',
+        '"controller_server/transition_event"',
+        '"local_costmap/local_costmap/transition_event"',
+        '"global_costmap/global_costmap/transition_event"',
+        '"motor/ready"',
+    ):
+        assert topic in bridge
+    assert "NavigationReadinessGate" in bridge or "_readiness" in bridge
+
+
 def test_motor_profile_does_not_launch_nav2():
     command = compose()["services"]["rosy-motor"]["command"]
 
@@ -75,6 +106,12 @@ def test_hardware_launch_composes_bringup_and_imports_nav_policy():
     assert "bringup_launch.xml" in launch
     assert "my_map.yaml" in launch
     assert "from rosy_navigation.params_rewrite import write_prefixed_nav2_params" in launch
+    assert "from rosy_navigation.profile_limits import" in launch
+    assert "validate_requested_limits" in launch
+    assert "DeclareLaunchArgument" in launch
+    assert '"profile_file"' in launch
+    assert '"allow_demo_map"' in launch
+    assert "state_unknown" in launch
     assert "from rosy_navigation.site_map import resolve_occupancy_map" in launch
     assert "sys.path.insert" not in launch
     assert "map_building" not in launch
@@ -88,7 +125,9 @@ def test_hardware_io_mounts_a_host_site_map_directory():
 
     assert io["environment"]["ROSY_MAP"] == "${ROSY_MAP:-/var/lib/rosy/maps/site.yaml}"
     assert "${ROSY_DATA_PATH:-/var/lib/rosy}/maps:/var/lib/rosy/maps:ro" in io["volumes"]
-    assert "volumes" not in motor
+    assert "./config/profile.${ROSY_RUNTIME_MODE:-core}.yaml:/etc/rosy/profile.yaml:ro" in motor[
+        "volumes"
+    ]
     installer = (DEPLOY / "install-pi.sh").read_text(encoding="utf-8")
     assert '"$ROSY_DATA/maps"' in installer
 
@@ -110,6 +149,17 @@ def test_resolve_occupancy_map_uses_site_yaml_only_when_the_image_exists(tmp_pat
 
     (tmp_path / "maps" / "site.pgm").write_bytes(b"P5\n")
     assert resolve_occupancy_map(site, fallback) == str(site)
+
+
+def test_resolve_occupancy_map_can_fail_closed_for_field_mode(tmp_path):
+    from rosy_navigation.site_map import resolve_occupancy_map
+
+    missing = tmp_path / "maps" / "site.yaml"
+    fallback = tmp_path / "demo.yaml"
+    fallback.write_text("image: demo.pgm\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="site occupancy map"):
+        resolve_occupancy_map(missing, fallback, allow_fallback=False)
 
 
 def test_nav2_frame_prefix_module_prefixes_odom_not_map():

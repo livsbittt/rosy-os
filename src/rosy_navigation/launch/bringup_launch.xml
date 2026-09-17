@@ -31,6 +31,14 @@
 
         </node>
 
+    </group>
+
+    <!-- localization 과 navigation 은 각자 <group> 안에 둔다. 하나의 group 안에 두 개의
+         <include> 를 나란히 두면 launch 가 첫 번째 것만 실행하고 두 번째는 조용히 건너뛴다
+         (오류도 남지 않는다). 그 상태에서는 map_server/amcl 만 뜨고 controller_server·
+         planner_server·bt_navigator 가 없어 목표를 줘도 아무 일도 일어나지 않는다. -->
+    <group>
+        <push-ros-namespace namespace="$(var namespace)"/>
         <include file="$(find-pkg-share rosy_navigation)/launch/localization_launch.xml">
             <arg name="params_file" value="$(var params_file)"/>
             <arg name="map" value="$(var map)"/>
@@ -42,6 +50,10 @@
             <arg name='lifecycle_nodes' value="$(var lifecycle_nodes_local)"/>
         </include>
 
+    </group>
+
+    <group>
+        <push-ros-namespace namespace="$(var namespace)"/>
         <include file="$(find-pkg-share rosy_navigation)/launch/navigation_launch.xml">
             <arg name="params_file" value="$(var params_file)"/>
             <arg name="use_sim_time" value="$(var use_sim_time)"/>

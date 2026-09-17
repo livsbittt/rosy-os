@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 from pathlib import Path
+from typing import Sequence
 
 import yaml
 
@@ -15,9 +17,23 @@ def write_prefixed_nav2_params(
     namespace: str,
     *,
     directory: str | Path = "/tmp",
+    footprint_points: Sequence[Sequence[float]] | None = None,
 ) -> str:
     params = yaml.safe_load(Path(source).read_text(encoding="utf-8"))
     prefix = f"{namespace}/" if namespace else ""
+    if footprint_points is not None:
+        footprint = json.dumps(
+            [[float(point[0]), float(point[1])] for point in footprint_points],
+            separators=(",", ":"),
+        )
+        for path in (
+            ("local_costmap", "local_costmap", "ros__parameters"),
+            ("global_costmap", "global_costmap", "ros__parameters"),
+        ):
+            target = params
+            for key in path:
+                target = target[key]
+            target["footprint"] = footprint
     dest = tempfile.NamedTemporaryFile(
         prefix="rosy_nav2_params_",
         suffix=".yaml",
