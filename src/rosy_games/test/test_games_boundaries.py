@@ -30,3 +30,10 @@ def test_pure_layers_do_not_import_runtime_or_vision():
             names = _imports(path)
             hits = names & set(FORBIDDEN)
             assert not hits, f"{path.name} imports {hits}"
+
+
+def test_host_loop_does_not_import_runtime_or_vision():
+    path = ROOT / "rosy_games" / "host" / "loop.py"
+    assert path.is_file()
+    hits = _imports(path) & set(FORBIDDEN)
+    assert not hits, f"loop.py imports {hits}"

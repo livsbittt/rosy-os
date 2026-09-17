@@ -22,12 +22,15 @@ def gate(
     state: MatchState,
     field: Field,
 ) -> CommandSet:
+    roster = (field.home_id, field.away_id)
+    ids = tuple(dict.fromkeys((*twists, *roster)))
     if state.phase is not Phase.PLAY:
-        return CommandSet(twists={robot_id: ZERO for robot_id in twists}, estop=False)
+        return CommandSet(twists={robot_id: ZERO for robot_id in ids}, estop=False)
 
     close = _too_close(obs, field.min_spacing_m)
     out: dict[str, Twist] = {}
-    for robot_id, twist in twists.items():
+    for robot_id in ids:
+        twist = twists.get(robot_id, ZERO)
         if not math.isfinite(twist.linear) or not math.isfinite(twist.angular):
             out[robot_id] = ZERO
             continue

@@ -1,39 +1,42 @@
-"""Match loop: observe → referee → policy → gate → twist sink.
+"""Match loop: observe → referee → policy → gate → PlayerClient.
 
-OpenCV belongs in an ObservationSource implementation, not here. The sink is
+OpenCV belongs in an Observer implementation, not here. PlayerClient is
 whatever talks to CORE teleop; this module does not import rosy_core.
 """
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Iterable, Protocol
 
-from rosy_games.field import Twist
-from rosy_games.game import MatchState, Observation, SoccerGame
-from rosy_games.game.gate import gate
+from rosy_games.field import ZERO
+from rosy_games.game import MatchState, SoccerGame
+from rosy_games.game.gate import CommandSet, gate
+from rosy_games.host.observer import Observer
 from rosy_games.policy.heuristic import HeuristicPolicy
 from rosy_games.policy.protocol import Policy
 
 
-class ObservationSource(Protocol):
-    def capture(self) -> Observation: ...
+class PlayerClient(Protocol):
+    robot_id: str
 
+    def set_manual(self) -> None: ...
 
-class TwistSink(Protocol):
-    def send(self, robot_id: str, action: Twist) -> None: ...
+    def teleop(self, linear: float, angular: float) -> None: ...
+
+    def estop(self) -> None: ...
 
 
 class MatchHost:
     def __init__(
         self,
-        source: ObservationSource,
-        sink: TwistSink,
+        observer: Observer,
+        clients: Iterable[PlayerClient],
         *,
         game: SoccerGame | None = None,
         policy: Policy | None = None,
     ) -> None:
-        self.source = source
-        self.sink = sink
+        self.observer = observer
+        self.clients = tuple(clients)
         self.game = game or SoccerGame()
         self.policy = policy or HeuristicPolicy(self.game.field)
 
@@ -41,10 +44,24 @@ class MatchHost:
         return self.game.reset()
 
     def tick(self) -> MatchState:
-        observation = self.source.capture()
-        result = self.game.step(observation)
-        twists = self.policy.act(observation, result)
-        commands = gate(twists, observation, result, self.game.field)
-        for robot_id, twist in commands.twists.items():
-            self.sink.send(robot_id, twist)
-        return result
+        obs = self.observer.observe()
+        state = self.game.step(obs)
+        twists = self.policy.act(obs, state)
+        commands = gate(twists, obs, state, self.game.field)
+        if not commands.estop:
+            try:
+                self._teleop_all(commands)
+            except Exception:
+                commands = CommandSet(twists=dict(commands.twists), estop=True)
+        if commands.estop:
+            self._estop_all()
+        return state
+
+    def _teleop_all(self, commands: CommandSet) -> None:
+        for client in self.clients:
+            twist = commands.twists.get(client.robot_id, ZERO)
+            client.teleop(twist.linear, twist.angular)
+
+    def _estop_all(self) -> None:
+        for client in self.clients:
+            client.estop()

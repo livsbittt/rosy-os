@@ -2,6 +2,12 @@
 
 추가만 한다. 형식: [module harness 설계](../../docs/plans/2026-09-15-module-harness-design.md) §4.2.
 
+## 2026-09-18 · uncommitted · feat(games): run the match loop against fake robots
+
+- 변경: `MatchHost`가 `Observer.observe` → `game.step` → `policy.act` → `gate` → `PlayerClient.teleop`/`estop`. 킥오프 미준비·유실 HOLD도 roster 양쪽에 teleop 0. `teleop` 예외면 양쪽 `estop`. TwistSink 제거.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q`
+- gate 변화: 없음 (LOCAL GO 유지)
+
 ## 2026-09-18 · uncommitted · feat(games): policy returns twists for both robots
 
 - 변경: `Policy.act(obs, state) -> dict[str, Twist]`. 휴리스틱은 PLAY에서 관측된 두 로봇 모두에 추적·골 바이어스·이격을 내고, 그 외 phase는 빈 dict. MatchHost.tick이 dict를 gate에 넘긴다.
