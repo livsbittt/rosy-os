@@ -238,6 +238,8 @@ export function createFieldMap(options) {
     syncEmpty();
     syncCursor();
     if (!grid) setStatus("맵 수신 대기");
+    else if (!Number.isFinite(Number(grid.width)) || !Number.isFinite(Number(grid.height)))
+      setStatus(grid.map_id || "크기 미상");
     else setStatus(`${grid.width}×${grid.height}${grid.map_id ? ` · ${grid.map_id}` : ""}`);
     rebuildRaster();
     paint();

@@ -72,6 +72,17 @@ function renderRobotInfo(info) {
 
 let triageSeen = {};
 
+// 두 문법은 한 화면에 섞이지 않는다(concept 16 §4 L2). 운용은 공간이고
+// 스크롤하지 않으며, 점검은 절차이고 스크롤이 곧 절차다.
+function showView(view) {
+  const operate = view !== "inspect";
+  elements["view-operate-panel"].hidden = !operate;
+  elements["view-inspect-panel"].hidden = operate;
+  elements["view-operate"].setAttribute("aria-pressed", String(operate));
+  elements["view-inspect"].setAttribute("aria-pressed", String(!operate));
+  document.body.dataset.view = operate ? "operate" : "inspect";
+}
+
 function renderTriage() {
   const node = elements["triage"];
   if (!node) return;
@@ -781,6 +792,10 @@ window.addEventListener("pagehide", () => stopTeleop("페이지를 벗어나 정
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) stopTeleop("화면이 숨겨져 정지했습니다.");
 });
+
+elements["view-operate"].addEventListener("click", () => showView("operate"));
+elements["view-inspect"].addEventListener("click", () => showView("inspect"));
+showView("operate");
 
 elements["emergency-stop"].addEventListener("click", async () => {
   if (!window.confirm("Rosy를 즉시 정지할까요?")) return;

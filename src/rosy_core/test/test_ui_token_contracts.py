@@ -189,7 +189,11 @@ def test_no_decoration_effects_in_surfaces():
             stripped = line.strip()
             if any(token in stripped for token in banned):
                 hits.append(stripped[:80])
-            elif "box-shadow:" in stripped and "inset" not in stripped:
+            elif "box-shadow:" in stripped and not any(
+                ok in stripped for ok in ("inset", "none")
+            ):
+                # `inset`은 면 위계이고 `none`은 그림자를 **없애는** 선언이다.
+                # 둘 다 이 게이트가 막으려는 장식이 아니다.
                 hits.append(stripped[:80])
         if hits:
             offenders[path.name] = hits
@@ -305,4 +309,20 @@ def test_touch_targets_clear_the_floor():
         if hits:
             offenders[path.name] = hits
     assert not offenders, f"44px 미만 터치 타겟: {offenders}"
+
+
+def test_a_danger_fill_carries_ink_not_dark_text():
+    """D-82는 위험을 어두운 빨강으로 바꿨다. 옛 옅은 빨강에 맞춰진 어두운
+    잉크를 그대로 두면 대비가 2.86:1로 떨어진다 — 실제로 그랬고, 값만 보는
+    게이트는 CSS 안의 **짝**을 보지 못해 놓쳤다.
+    """
+    rules = re.findall(r"([^{}]+)\{([^}]*)\}", surface_stylesheets()[0].read_text(encoding="utf-8"))
+    offenders = []
+    for selector, body in rules:
+        if "background: var(--status-crit)" not in body:
+            continue
+        ink = re.search(r"(?<![-a-z])color:\s*var\((--[a-z0-9-]+)\)", body)
+        if ink and ink.group(1) not in ("--paper", "--ink", "--nominal"):
+            offenders.append(f"{selector.strip()[:50]} -> color {ink.group(1)}")
+    assert not offenders, f"위험 면 위에 잉크가 아닌 색을 얹는다: {offenders}"
 
