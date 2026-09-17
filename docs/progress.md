@@ -1,0 +1,45 @@
+---
+module: docs
+logical_modules: []
+owner: 거버넌스
+last_verified: { commit: "8fdd8d2", date: 2026-09-17 }
+gates:
+  SOURCE:
+    state: GO
+    evidence: "D-61 Accepted, D-72/D-77 본문·색인 일치. lint 0 errors, 16 warnings — 경고는 last_verified uncommitted 모듈이며 docs 오류가 아니다 (2026-09-17 Windows, python 3.14.5)"
+    cmd: "python tools/harness/rosy_harness.py lint"
+  LOCAL:
+    state: GO
+    evidence: "75 passed, 16 warnings (2026-09-17 Windows). test_network_topology_contracts + test_harness_contracts + test_control_launch_boundary"
+    cmd: "python -m pytest test/test_network_topology_contracts.py test/test_harness_contracts.py -q"
+  ROS-SIM:
+    state: N/A
+  ARTIFACT:
+    state: N/A
+  DEVICE:
+    state: N/A
+  FIELD:
+    state: N/A
+adrs: [D-17, D-18, D-45, D-61, D-72, D-75, D-77]
+plans:
+  - docs/plans/2026-09-15-module-harness-design.md
+  - docs/plans/2026-09-17-interface-design-implementation-design.md
+---
+## 지금 상태
+
+- ROS-SIM/ARTIFACT/DEVICE/FIELD는 docs가 문서 모듈이라 N/A다.
+- D-61 Accepted. 모듈 progress/logs와 생성 index/STATUS가 계약 시험으로 산다.
+- concept 16과 D-72 L1·증거·capability 계약이 live다. 운용자 콘솔은 CORE `/dashboard` 하나(D-77). G4 DEVICE는 HOLD.
+- ADR 로그 분리(개별 `docs/adr/D-NNN-*.md`)는 보류한다.
+
+## 다음 gate
+
+1. ARTIFACT/DEVICE는 deploy·rosy_core gate가 소유한다. docs가 GO로 옮기지 않는다.
+2. ADR 개별 파일 분리는 후속이며 이 Log 본문은 유지한다.
+
+## 현재 유효한 금지사항
+
+- ADR은 append-only다: 기존 D-n 본문을 고쳐 쓰지 않고 `Superseded`로 표시한 뒤 새 ID를 만든다. 어휘 정정(D-72 S7)은 예외로 기록했다.
+- API 경로·envelope 변경은 `reference/ROSY API & Protocol Reference.md`와 `rosy_core/protocol/schemas.py`를 함께 바꾼다(D-18).
+- `docs/`에 구현 코드를 두지 않는다.
+- 모듈 `index.md`와 루트 `STATUS.md`는 생성물이다. `tools/harness/rosy_harness.py generate`로만 갱신한다.

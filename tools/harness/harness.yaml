@@ -1,5 +1,5 @@
 # Module harness registry.
-# Design: docs/plans/2026-09-15-module-harness-design.md (ADR D-61 Proposed).
+# Design: docs/plans/2026-09-15-module-harness-design.md (ADR D-61 Accepted).
 # Regenerate after editing any progress.md / logs.md:
 #   python tools/harness/rosy_harness.py generate
 

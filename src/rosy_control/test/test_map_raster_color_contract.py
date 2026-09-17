@@ -70,13 +70,28 @@ class MapRasterColorContractTest(unittest.TestCase):
         )
 
     def test_the_javascript_mirror_agrees_with_its_own_css_token(self):
-        """콘솔이 같은 값을 CSS와 JS 두 곳에 들고 있다(S8까지 남는 중복)."""
+        """`const T`는 :root 사본이다. 교차 패키지 시험은 D-73 거처가 없고,
+        이 파일 안의 CSS↔JS만 이 모듈이 지킨다(D-77)."""
         text = CONSOLE.read_text(encoding='utf-8')
-        css = console_tokens()
-        mirror = re.search(r"unk:\s*'#([0-9a-fA-F]{6})'", text)
-
-        assert mirror, 'dashboard.html의 JS 색 표에 unk가 없다'
-        self.assertEqual(mirror.group(1).lower(), css['unk'])
+        css = {
+            name: value.lower()
+            for name, value in re.findall(r'--([a-z0-9-]+):\s*#([0-9a-fA-F]{6})', text)
+        }
+        block = re.search(r'const T = \{([^}]+)\}', text)
+        self.assertIsNotNone(block, 'dashboard.html에 const T 표가 없다')
+        js = dict(re.findall(r"(\w+):\s*'#([0-9a-fA-F]{6})'", block.group(1)))
+        alias = {'ink2': 'ink-2'}
+        missing = []
+        mismatch = []
+        for name, value in js.items():
+            token = alias.get(name, name)
+            if token not in css:
+                missing.append(name)
+                continue
+            if css[token] != value.lower():
+                mismatch.append((name, value.lower(), css[token]))
+        self.assertFalse(missing, f':root에 없는 T 키: {missing}')
+        self.assertFalse(mismatch, f'CSS와 JS 값이 다른 T 키: {mismatch}')
 
 
 if __name__ == '__main__':

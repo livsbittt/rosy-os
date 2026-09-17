@@ -1,7 +1,7 @@
 # D-72 인터페이스 원칙 이행 설계
 
 작성일: 2026-09-17
-상태: **pending approval** — 실행 승인 전. 이 문서는 아직 어느 모듈의 `progress.md`에도 등록하지 않았다.
+상태: **executed** — S0–S8 HOST 완료 (2026-09-17). DEVICE/ARTIFACT GO가 아니다.
 
 관련: [D-72](../reference/ROSY%20ADR%20Log.md) (Accepted) · [D-77](../reference/ROSY%20ADR%20Log.md) · [concept 16](../concept/16_ROSY_Interface_Design_Principles.md) ·
 D-7, D-11, D-18, D-23, D-32, D-55, D-61, D-68, D-71, D-73 ·
@@ -321,5 +321,5 @@ S1과 같이 압축 뒤 L1 여유가 있고 계약 시험이 우선이라 되돌
 - Architect 지적 7건 중 v2에서 RESOLVED 4건, PARTIAL 2건, NOT RESOLVED 1건(서버 판정 부재)이었고 v3이 전부 반영했다.
 - **v3은 아직 Critic 검토를 받지 않았다.** 승인 전 한 바퀴 더 돌릴지는 승인자 결정이다.
 - **범위 결정 2026-09-17: Option A 확정.** S0~S7 전 단계를 실행 범위로 두고 S8(콘솔 통합)만 보류한다. S5·S6은 §10-3의 D-7/D-23 위험을 고지받은 뒤 포함하기로 했다.
-- 실행 승인은 범위 결정과 별개다. 이 문서는 실행 승인을 받기 전까지 `pending approval`이며, 그때까지 소스 변경·커밋·실행 스킬 위임을 하지 않는다.
+- 실행 범위 S0–S8은 2026-09-17에 닫혔다. 이 문서는 더 이상 pending approval이 아니다.
 - 리뷰가 제기한 사실 주장은 전부 저장소에서 직접 재확인했다(바이트·gzip·스키마·색 값·직렬화 여부·D-73).

@@ -68,7 +68,7 @@
 | D-58 | Hardware motion requires an authoritative readiness gate | Accepted |
 | D-59 | 사이트 패브릭은 역할별 계약 버스다 | Accepted |
 | D-60 | 추종은 navigation이 아니라 swarm 패키지다 | Accepted |
-| D-61 | 모듈 상태는 progress·logs·생성 index로 기록하고 계약 시험으로 지킨다 | Proposed |
+| D-61 | 모듈 상태는 progress·logs·생성 index로 기록하고 계약 시험으로 지킨다 | Accepted |
 | D-62 | CORE는 필수이고 나머지 런타임은 선택 슬라이스다 | Accepted |
 | D-63 | 모듈형 미들웨어 목표 — CORE는 얇고 슬라이스는 선택이다 | Accepted |
 | D-64 | CORE 생산 코드의 rosy_control import는 센서 어댑터뿐이다 | Accepted |
@@ -1575,7 +1575,8 @@ import하지 않는다. 매핑 세션 C7, Hub listen, 동작 변경은 이번 �
 
 ## D-61 모듈 상태는 progress·logs·생성 index로 기록하고 계약 시험으로 지킨다
 
-**Status:** Proposed (2026-09-15). `src/rosy_core`, `deploy` 파일럿만 적용했다.
+**Status:** Accepted (2026-09-17). 기록 구조이며 ARTIFACT/DEVICE/FIELD 판정과
+구분한다.
 
 **Context:** AGENTS.md 96개 중 70개가 2026-09-02에서 멈췄다. 진행 상태는 날짜별
 plan 말미, `*-results.md`, git 밖 작업 폴더 `progress.md`에 흩어졌고 같은 항목이
@@ -1599,8 +1600,10 @@ SRS·API·ADR > progress > logs > AGENTS 순이다. 형식과 생성물 최신�
 바꾸지 않는다. ADR의 개별 파일 분리는 후속 단계이며, 분리 후에도 이 Log는 전체
 본문을 담은 생성 파일로 유지해 기존 링크와 시험을 보존한다.
 
-**Validation / Transition:** 파일럿 두 모듈에서 실제 작업 한 사이클을 기록하고 계약
-시험이 통과하면 Accepted로 올린 뒤 나머지 모듈에 적용한다.
+**Validation / Transition:** `python tools/harness/rosy_harness.py lint` ·
+`python -m pytest test/test_harness_contracts.py test/test_network_topology_contracts.py -q`.
+harness.yaml 모듈마다 `progress.md`/`logs.md`와 생성 `index.md`가 있다. 루트
+`STATUS.md`는 generate만 고친다. last_verified가 `uncommitted`이면 lint 경고.
 
 **References:** [module harness 설계](../plans/2026-09-15-module-harness-design.md), [폴더 구조 정리](../plans/2026-09-13-folder-structure-governance.md).
 
