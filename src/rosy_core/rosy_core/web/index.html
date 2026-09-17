@@ -131,10 +131,10 @@
                 <button type="button" data-map-click="pose" aria-pressed="true">초기 자세</button>
                 <button type="button" data-map-click="goal" aria-pressed="false">목표</button>
               </div>
+              <p class="map-hint">먼저 로봇이 있는 칸을 찍어 AMCL 초기 자세를 맞춘 뒤, 목표로 전환하세요. 목표는 NAVIGATION 모드로 들어가 바퀴에 속도가 나갑니다.</p>
             </div>
             <canvas id="map-canvas" width="800" height="480" role="img" aria-label="점유 격자 지도"></canvas>
             <p id="map-empty" class="map-empty">맵 토픽을 기다리는 중입니다.</p>
-          </div>
           <ul id="map-legend" class="map-legend">
             <li data-swatch="free">자유</li>
             <li data-swatch="occupied">점유</li>
@@ -143,7 +143,7 @@
             <li data-swatch="path">경로</li>
             <li data-swatch="robot">로봇</li>
           </ul>
-          <p class="map-hint">먼저 로봇이 있는 칸을 찍어 AMCL 초기 자세를 맞춘 뒤, 목표로 전환하세요. 목표는 NAVIGATION 모드로 들어가 바퀴에 속도가 나갑니다.</p>
+          </div>
         </section>
         </div>
 
@@ -154,6 +154,8 @@
             <div>
               <h2 id="control-heading">운영 제어</h2>
             </div>
+            <a class="docs-link" href="/docs" target="_blank" rel="noreferrer">API 문서 ↗</a>
+          </div>
           <div class="safety-actions">
             <button id="emergency-stop" class="stop-button" type="button">
               <span>즉시 정지</span><small>모든 역할에서 실행 가능</small>
@@ -161,8 +163,6 @@
             <button id="release-stop" class="release-button" type="button">
               <span>정지 해제</span><small>관리자 권한 필요</small>
             </button>
-          </div>
-            <a class="docs-link" href="/docs" target="_blank" rel="noreferrer">API 문서 ↗</a>
           </div>
           <div class="mode-control" role="group" aria-label="로봇 운전 모드">
             <button type="button" data-mode="IDLE">IDLE</button>
