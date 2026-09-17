@@ -83,6 +83,8 @@
   --series-primary: #49affd;
   --series-primary-a08: rgba(73, 175, 253, 0.08);
   --route-dim: #0777bb;
+  /* 같은 계열 쌍의 두 번째 — 형태가 같을 때 밝기로 가른다. */
+  --series-secondary: var(--route-dim);
   --series-goal: #12bb81;
 
   /* ---- 지도 래스터 — 무채색 --------------------------------------------
@@ -95,4 +97,66 @@
   --raster-free: #1f2123;
   --raster-uncertain: #45484d;
   --raster-occupied: #d7d7d8;
+
+  /* ---- 치수 — 4의 배수 여섯 단계 -------------------------------------
+   * 임의 값을 쓰지 않는다. 단계가 많으면 아무도 같은 값을 고르지 않는다.
+   */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-control: 6px;
+  --radius-button: 8px;
+  --radius-panel: 12px;
+  --radius-flag: 999px;
+
+  /* 크기가 위험도를 말한다. 되돌릴 수 없는 것이 가장 크다. */
+  --target-secondary: 44px;
+  --target-primary: 48px;
+  --target-irreversible: 58px;
+
+  /* ---- 면 — 표면이 위계다(concept 16 Law 2) ---------------------------
+   * 보고하는 것은 평평하고, 세상을 바꾸는 것은 솟아 있다.
+   */
+  --surface-flat: var(--ground-soft);
+  --surface-raised: var(--ground-card);
+  --surface-line: var(--line-14);
+  --surface-sheen: var(--line-06);
+
+  /* ---- 정상 — 색이 아니다(D-82) ---------------------------------------
+   * 계기의 안전 구간에는 아무것도 칠하지 않는다. status 집합은 임계에만
+   * 쓰이므로, '정상'을 말할 때는 이 둘을 쓴다.
+   */
+  --nominal: var(--paper);
+  --nominal-quiet: var(--muted);
+
+  /* ---- 컴포넌트 — 콘솔의 어휘 ------------------------------------------
+   * 주 명령은 초록이 아니라 가장 밝은 중립이다. 초록은 경보 예산이고,
+   * 정상에는 색이 없다.
+   */
+  --button-primary-bg: var(--paper);
+  --button-primary-ink: var(--ground);
+  --button-secondary-bg: var(--ground);
+  --button-secondary-ink: var(--paper);
+  --button-irreversible-bg: var(--status-crit);
+  --button-irreversible-ink: var(--paper);
+
+  --field-bg: var(--ground);
+  --field-line: var(--line-14);
+  --field-invalid: var(--status-crit);
+
+  /* 포커스는 상태가 아니라 상호작용이다 — status 색을 쓰지 않는다. */
+  --focus-ring: var(--series-primary);
+
+  --flag-line: var(--line-14);
+  --flag-caution: var(--status-warn);
+  --flag-danger-bg: var(--status-crit);
+  --flag-danger-ink: var(--paper);
+
+  /* 게이지는 여유로 읽힌다 — 임계를 넘기 전까지 중립이다. */
+  --gauge-track: var(--line-08);
+  --gauge-fill: var(--muted-line);
 }

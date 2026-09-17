@@ -154,3 +154,84 @@ def test_tokens_css_is_served():
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/css")
     assert "--status-crit" in response.text
+
+
+def test_nominal_carries_no_colour():
+    """D-82: 정상에는 색이 없다.
+
+    계기의 안전 구간에는 아무것도 칠하지 않는다. 초록을 status로 쓰면 화면
+    대부분이 색을 갖게 되고, 임계 경보가 눈에 띌 대비 예산이 남지 않는다.
+    초록은 `--series-goal`(지도의 목표 표식)로만 살아남는다.
+    """
+    offenders: dict[str, list[str]] = {}
+    for path in surface_stylesheets() + surface_scripts():
+        hits = [
+            line.strip()[:80]
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if "--status-good" in line or "--status-ok" in line or "--signal-lime" in line
+        ]
+        if hits:
+            offenders[path.name] = hits
+    assert not offenders, f"정상을 초록으로 칠한 자리: {offenders}"
+
+
+def test_no_decoration_effects_in_surfaces():
+    """장식은 임계 경보가 쓸 대비를 먼저 써버린다.
+
+    gradient wash, glow, drop-shadow는 concept 16 Law 1이 금지하는 장식이다.
+    깊이를 주는 그림자(`box-shadow: inset ...`)는 면 위계이므로 대상이 아니다.
+    """
+    banned = ("linear-gradient", "radial-gradient", "drop-shadow(")
+    offenders: dict[str, list[str]] = {}
+    for path in surface_stylesheets():
+        hits = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if any(token in stripped for token in banned):
+                hits.append(stripped[:80])
+            elif "box-shadow:" in stripped and "inset" not in stripped:
+                hits.append(stripped[:80])
+        if hits:
+            offenders[path.name] = hits
+    assert not offenders, f"장식 효과가 남아 있다: {offenders}"
+
+
+def test_component_token_layer_exists():
+    """컴포넌트와 치수도 토큰이다. 임의 값을 쓰면 다음 사람이 다른 값을 고른다."""
+    declared = set(DECLARATION.findall(tokens_text()))
+    required = {
+        "--space-1", "--space-2", "--space-3", "--space-4", "--space-5", "--space-6",
+        "--radius-control", "--radius-button", "--radius-panel", "--radius-flag",
+        "--target-secondary", "--target-primary", "--target-irreversible",
+        "--surface-flat", "--surface-raised", "--surface-line",
+        "--nominal", "--nominal-quiet",
+        "--button-primary-bg", "--button-primary-ink",
+        "--button-irreversible-bg", "--button-irreversible-ink",
+        "--field-bg", "--field-line", "--field-invalid",
+        "--focus-ring", "--gauge-track", "--gauge-fill",
+    }
+    missing = required - declared
+    assert not missing, f"tokens.css에 없는 컴포넌트 토큰: {sorted(missing)}"
+
+
+def test_focus_is_interaction_not_status():
+    """포커스 링은 상태가 아니다. status 색을 쓰면 '주의'와 헷갈린다."""
+    text = tokens_text()
+    match = re.search(r"--focus-ring:\s*var\((--[a-z0-9-]+)\)", text)
+    assert match, "tokens.css에 --focus-ring 선언이 없다"
+    assert not match.group(1).startswith("--status-"), (
+        f"--focus-ring이 status 토큰({match.group(1)})을 가리킨다"
+    )
+
+
+def test_irreversible_actions_are_a_fill_not_text():
+    """concept 16 Law 3 — 되돌릴 수 없는 것은 종류가 다르다.
+
+    빨간 글자가 아니라 채운 면이므로, 토큰은 배경과 그 위 잉크가 짝을 이룬다.
+    """
+    declared = dict(
+        re.findall(r"(--[a-z0-9-]+):\s*var\((--[a-z0-9-]+)\)", tokens_text())
+    )
+    assert declared.get("--button-irreversible-bg", "").startswith("--status-crit")
+    assert declared.get("--button-irreversible-ink") in ("--paper", "--ink")
+
