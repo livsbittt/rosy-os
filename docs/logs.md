@@ -101,3 +101,10 @@
 - 결정: D-54–D-56 Accepted (소스/아키텍처). D-91
 - 교훈: 없음
 
+## 2026-09-18 · uncommitted · docs(c6): rule the profile velocity reaches a seam lie, not an accepted duck-type
+- 변경: `docs/plans/2026-09-06-module-split-criteria.md` C6 판정 표에 `safety/manager.py — profile → max_linear_velocity, max_angular_velocity` 행 추가. 판정은 **seam lie**이며 `ALLOWED` 항목 추가가 아니라 삭제로 닫혔다
+- 증거: `RobotProfile`은 `rosy_core/profile.py:11`이 소유하고 두 멤버는 `@property -> Optional[float]`다(`:24`, `:29`). `services.py:195`가 같은 객체에 `profile.model`을 직접 읽으므로 `profile`은 None일 수 없다. `test_core_logic.py:29` 스텁 둘 다 속성을 명시 선언해 `getattr` 기본값은 어떤 시험도 타지 않았다. 코드 수정은 피어 커밋 `73f0128`이 같은 형태로 반영했고, `python -m pytest src/rosy_core/test -q` 857 passed, 10 skipped, 0 failed (2026-09-18 Windows)
+- gate 변화: 없음
+- 결정: 승인된 D-64 덕타이핑(`policy`/`calibration`)과 범주가 다르다. 그쪽은 `safety/`가 `rosy_control`을 import하지 않으려고 외부 객체를 덕타이핑하는 것이고, 이쪽은 자기 패키지가 소유한 타입에 방어적으로 접근한 것이다
+- 교훈: `getattr(owned_type, "field", None)`은 안전해 보이지만 침묵을 산다. 프로퍼티 이름이 바뀌면 예외 대신 기본 속도 상한으로 조용히 떨어지는데, 그게 하필 속도 제한을 계산하는 경로다. 방어가 필요 없는 자리의 방어는 결함을 감추는 장치다
+

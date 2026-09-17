@@ -50,8 +50,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · docs(c6): rule the profile velocity reaches a seam lie, not an accepted duck-type
 - 2026-09-17 · uncommitted · docs(adr): accept D-54–D-56 source gates, park Device ADRs (D-91)
 - 2026-09-17 · uncommitted · docs(adr): lock soccer as a game host (D-90)
 - 2026-09-17 · uncommitted · docs(adr): lock remaining execution as D-87–D-89
 - 2026-09-17 · uncommitted · docs(adr): lock remaining runtime as D-83–D-86
-- 2026-09-17 · dc89264 · docs(harness): stamp last_verified after SOURCE re-run
