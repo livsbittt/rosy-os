@@ -26,6 +26,39 @@ def safety(bus):
     )
 
 
+def test_speed_limits_from_config_prefer_profile_then_yaml():
+    class Profile:
+        max_linear_velocity = 0.21
+        max_angular_velocity = 0.81
+
+    limits = SpeedLimits.from_config(
+        profile=Profile(),
+        nav_cfg={"max_linear_velocity": 0.10, "max_angular_velocity": 0.20},
+        safety_cfg={
+            "manual_linear": 0.05,
+            "manual_angular": 0.07,
+            "fleet_linear": 0.09,
+            "fleet_angular": 0.11,
+        },
+    )
+    assert limits.max_linear == 0.21
+    assert limits.max_angular == 0.81
+    assert limits.manual_linear == 0.05
+    assert limits.fleet_linear == 0.09
+
+    class Empty:
+        max_linear_velocity = None
+        max_angular_velocity = None
+
+    fallback = SpeedLimits.from_config(
+        profile=Empty(),
+        nav_cfg={"max_linear_velocity": 0.20, "max_angular_velocity": 0.80},
+        safety_cfg={},
+    )
+    assert fallback.max_linear == 0.20
+    assert fallback.fleet_linear == 0.20
+
+
 class TestArbitration:
     def test_registry_rejects_unknown_source(self):
         reg = SourceRegistry()

@@ -182,14 +182,7 @@ class CoreServices:
             stale_after_s=readiness_cfg.get("stale_after_s", 2.0),
             required_components=readiness_components,
         )
-        limits = SpeedLimits(
-            max_linear=float(profile.max_linear_velocity or nav_cfg.get("max_linear_velocity", 0.20)),
-            max_angular=float(profile.max_angular_velocity or nav_cfg.get("max_angular_velocity", 0.80)),
-            manual_linear=float(safety_cfg.get("manual_linear", 0.15)),
-            manual_angular=float(safety_cfg.get("manual_angular", 0.60)),
-            fleet_linear=float(safety_cfg.get("fleet_linear", nav_cfg.get("max_linear_velocity", 0.20))),
-            fleet_angular=float(safety_cfg.get("fleet_angular", nav_cfg.get("max_angular_velocity", 0.80))),
-        )
+        limits = SpeedLimits.from_config(profile=profile, nav_cfg=nav_cfg, safety_cfg=safety_cfg)
         battery_policy = BatteryPolicy(
             warning_percent=float(safety_cfg.get("battery_warning_percent", 20)),
             critical_percent=float(safety_cfg.get("battery_critical_percent", 10)),
