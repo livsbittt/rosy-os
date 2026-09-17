@@ -6,7 +6,16 @@ from pathlib import Path
 import pytest
 import yaml
 
-from robot_contracts import DEPLOY, NAV_LAUNCH, NAV_PARAMS, ROOT, board_caps, board_profile, compose
+from robot_contracts import (
+    DEPLOY,
+    NAV_LAUNCH,
+    NAV_PARAMS,
+    ROOT,
+    board_caps,
+    board_profile,
+    compose,
+    hardware_packages,
+)
 
 _PKG = str(ROOT / "src" / "rosy_navigation")
 if _PKG not in sys.path:
@@ -91,11 +100,8 @@ def test_io_image_packages_nav2_without_slam_or_aux_drivers():
     assert "ros-jazzy-nav2-bringup" in dockerfile
     assert "python3-yaml" in dockerfile
     assert "ros-jazzy-slam-toolbox" not in dockerfile
-    assert "rosy_imu_bno055" not in dockerfile
-    assert "rosy_sensor_adc" not in dockerfile
-    assert "rosy_led" not in dockerfile
-    assert "rosy_lamp_control" not in dockerfile
-    assert "rosy_emotion" not in dockerfile
+    for package in hardware_packages():
+        assert package not in dockerfile, package
     assert "!src/rosy_navigation/" in dockerignore
 
 

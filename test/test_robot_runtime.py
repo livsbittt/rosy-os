@@ -1,5 +1,7 @@
 """Static contract tests for the Raspberry Pi robot runtime."""
 
+import sys
+
 import yaml
 
 from robot_contracts import (
@@ -10,6 +12,14 @@ from robot_contracts import (
     compose,
     runtime_launch_closure,
 )
+
+sys.path.insert(0, str(ROOT / "src" / "rosy_navigation"))
+from rosy_navigation.profile_limits import load_motion_limits
+
+
+def _hardware_motion_tokens() -> tuple[str, str]:
+    limits = load_motion_limits(DEPLOY / "config" / "profile.hardware.yaml")
+    return f"{limits.max_linear_mps:.2f}", f"{limits.max_angular_rps:.2f}"
 
 
 def test_runtime_separates_core_from_hardware_devices():
@@ -149,8 +159,9 @@ def test_motor_only_profile_excludes_lidar_and_passes_uart_parameters():
     assert "motor_device:=/dev/rosy-motor" in command
     assert "motor_baudrate:=${ROSY_MOTOR_BAUDRATE:-1000000}" in command
     assert "motor_ids:=${ROSY_MOTOR_IDS:-[1,2]}" in command
-    assert "max_linear_mps:=${ROSY_MAX_LINEAR_MPS:-0.20}" in command
-    assert "max_angular_rps:=${ROSY_MAX_ANGULAR_RPS:-0.80}" in command
+    linear, angular = _hardware_motion_tokens()
+    assert f"max_linear_mps:=${{ROSY_MAX_LINEAR_MPS:-{linear}}}" in command
+    assert f"max_angular_rps:=${{ROSY_MAX_ANGULAR_RPS:-{angular}}}" in command
     assert "max_wheel_rpm:=${ROSY_MAX_WHEEL_RPM:-100.0}" in command
     assert (
         "motor_profile_acceleration:=${ROSY_MOTOR_PROFILE_ACCELERATION:-200}"
@@ -161,9 +172,10 @@ def test_motor_only_profile_excludes_lidar_and_passes_uart_parameters():
 
 def test_hardware_profile_passes_the_same_motor_safety_limits():
     command = compose()["services"]["rosy-io"]["command"]
+    linear, angular = _hardware_motion_tokens()
 
-    assert "max_linear_mps:=${ROSY_MAX_LINEAR_MPS:-0.20}" in command
-    assert "max_angular_rps:=${ROSY_MAX_ANGULAR_RPS:-0.80}" in command
+    assert f"max_linear_mps:=${{ROSY_MAX_LINEAR_MPS:-{linear}}}" in command
+    assert f"max_angular_rps:=${{ROSY_MAX_ANGULAR_RPS:-{angular}}}" in command
     assert "max_wheel_rpm:=${ROSY_MAX_WHEEL_RPM:-100.0}" in command
     assert (
         "motor_profile_acceleration:=${ROSY_MOTOR_PROFILE_ACCELERATION:-200}"
@@ -173,9 +185,10 @@ def test_hardware_profile_passes_the_same_motor_safety_limits():
 
 def test_example_environment_exposes_motor_limits_as_data_only_values():
     environment = (DEPLOY / ".env.example").read_text(encoding="utf-8")
+    linear, angular = _hardware_motion_tokens()
 
-    assert "ROSY_MAX_LINEAR_MPS=0.20" in environment
-    assert "ROSY_MAX_ANGULAR_RPS=0.80" in environment
+    assert f"ROSY_MAX_LINEAR_MPS={linear}" in environment
+    assert f"ROSY_MAX_ANGULAR_RPS={angular}" in environment
     assert "ROSY_MAX_WHEEL_RPM=100.0" in environment
     assert "ROSY_MOTOR_PROFILE_ACCELERATION=200" in environment
     assert "ROSY_MAP=/var/lib/rosy/maps/site.yaml" in environment

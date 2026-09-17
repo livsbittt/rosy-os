@@ -15,6 +15,15 @@ def compose() -> dict:
     return yaml.safe_load((DEPLOY / "compose.yaml").read_text(encoding="utf-8"))
 
 
+def board() -> dict:
+    return yaml.safe_load((DEPLOY / "config" / "board.yaml").read_text(encoding="utf-8"))
+
+
+def hardware_packages() -> tuple[str, ...]:
+    packages = board().get("hardware_packages") or []
+    return tuple(str(item) for item in packages)
+
+
 def board_caps(mode: str) -> dict:
     return yaml.safe_load(
         (DEPLOY / "config" / f"capabilities.{mode}.yaml").read_text(encoding="utf-8")

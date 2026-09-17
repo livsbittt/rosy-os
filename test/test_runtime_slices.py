@@ -5,19 +5,17 @@ import os
 import shlex
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 import yaml
 
-from robot_contracts import DEPLOY, ROOT, board_caps
+from robot_contracts import DEPLOY, ROOT, board, board_caps, hardware_packages
 
 CORE = ROOT / "src" / "rosy_core" / "rosy_core"
 FORBIDDEN = ("rosy_omx_adapter", "rosy_control.camera", "moveit")
-
-
-def board():
-    return yaml.safe_load((DEPLOY / "config" / "board.yaml").read_text(encoding="utf-8"))
+sys.path.insert(0, str(ROOT / "src" / "rosy_core"))
 
 
 def test_core_is_the_only_required_slice():
@@ -26,6 +24,14 @@ def test_core_is_the_only_required_slice():
     available = set(data["slices"]["available"])
     assert available >= {"motor", "io", "nav", "vision", "omx", "ai"}
     assert "core" not in available
+
+
+def test_core_slice_fallback_matches_board_presets():
+    from rosy_core.domain.model import _SLICES_BY_MODE
+
+    presets = board()["presets"]
+    for mode, slices in presets.items():
+        assert _SLICES_BY_MODE[mode] == tuple(slices)
 
 
 def test_presets_match_current_runtime_modes():
@@ -83,11 +89,15 @@ def test_only_control_sensor_adapter_imports_rosy_control():
             raise AssertionError(f"{path.relative_to(CORE)} imports {hits}")
 
 
-def test_core_dockerfile_does_not_copy_omx_or_imu():
+def test_core_and_io_images_do_not_copy_hardware_packages():
     text = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
     core = text.split("FROM runtime-common AS io-runtime")[0]
     assert "rosy_omx_adapter" not in core
-    assert "rosy_imu_bno055" not in core
+    packages = hardware_packages()
+    assert packages, "board.yaml hardware_packages is empty"
+    for package in packages:
+        assert package not in core
+        assert f"COPY src/{package}" not in text
 
 
 def test_core_dockerfile_does_not_copy_rosy_control_or_opencv():
