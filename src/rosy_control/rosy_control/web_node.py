@@ -218,9 +218,14 @@ class MapControl:
 
 
 def render_png(msg, epoch=None):
-    """OccupancyGrid -> PNG for /map.png. Colors match the canvas tokens
-    (unknown #161615 / free #232322 / wall #e1e0d9) so overlays blend —
-    dark unknown recedes, light walls read as structure."""
+    """OccupancyGrid -> PNG for /map.png.
+
+    Colours live in `sensing.map_raster.OCCUPANCY_RGB` and are checked against
+    the console canvas by `test_map_raster_color_contract.py`. Restating them
+    here is what let the two drift apart, so this docstring names the source
+    instead of repeating the values. Dark unknown recedes, light walls read as
+    structure, and the overlays blend because both sides agree.
+    """
     try:
         from rosy_control.sensing.map_raster import occupancy_bgr
         import cv2
