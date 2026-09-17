@@ -31,6 +31,7 @@ worlds:
   rosy_map.world:
     map: rosy_demo_room.yaml
     inflation_radius: 0.15
-    spawn_x: 0.0
+    # 방이 2 x 1 m 다. 기본 (0,0)+1.5 를 쓰면 둘째 로봇이 x=1.5 - 벽 바깥 - 에 놓인다.
+    spawn_x: -0.5
     spawn_y: 0.0
-    spawn_spacing: 1.5
+    spawn_spacing: 1.0
