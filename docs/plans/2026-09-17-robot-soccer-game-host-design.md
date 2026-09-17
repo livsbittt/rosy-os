@@ -37,62 +37,216 @@ Pinky Pro 두 대로 **차체 푸시볼 1v1**을 한다. CORE에 `SOCCER` 모드
 
 ## 3. 층과 패키지
 
-세 층이다.  squatting하지 않는다.
+세 층이다. squatting하지 않는다.
 
 | 층 | 패키지 | 소유 | 기본 이미지 |
 |---|---|---|---|
 | 관제 | `rosy_fleet` | 로봇 명단, 토큰, 일괄 stop. 나중에 “매치 시작” 버튼은 여기, `reset()`은 아님 | 관제 PC |
-| 경기 | `src/rosy_games` | 규칙, 점수, 정책 프로토콜, soccer 플러그인 | 안 넣음 |
-| 학습/시뮬 | `rosy_games.isaac` (나중) | Isaac 월드 + Lab env가 `game.reset`/`step`만 호출 | 워크스테이션 |
+| 경기 | `src/rosy_games` | 규칙, 점수, 정책, soccer 플러그인, 실기 호스트 | 안 넣음 |
+| 학습/시뮬 | 아직 디렉터리 없음 | Isaac Lab env가 `game.reset`/`step`만 호출. 1단계에서 폴더를 만들지 않는다 | 워크스테이션 |
 | 로봇 | `rosy_core` | `MANUAL`, 워치독, E-stop, 유일한 `cmd_vel` | 로봇 |
 
-물리 필드는 네 번째 덩어리로 바닥에만 있다. 전자가 아니다.
+물리 필드는 바닥에만 있다. 전자가 아니다.
 
-### 3.1 `rosy_games` 안쪽
+`rosy_games`는 `rosy_fleet`처럼 ROS 없는 ament_python이다. `board.yaml` 슬라이스가 아니고, compose 기본 서비스도 아니고, `rosy_core`를 import하지 않는다. Fleet의 `RobotClient`는 follow/goal/pose 스트림용이라 축구가 재사용하지 않는다. 호스트는 `mode` / `teleop` / `safety/stop`만 아는 얇은 `PlayerClient`를 둔다.
 
-```text
-src/rosy_games/                    # ROS 없음. 선택 ament_python. 논외
-  rosy_games/
-    field/                         # 구장·골·좌표·호모그래피 숫자. 순수
-    game/                          # 심판 상태기계 + Policy 프로토콜. 순수
-      soccer.py                    # 첫 게임 플러그인
-    policy/                        # HeuristicPolicy 지금, NeuralPolicy 나중
-    host/                          # 실기 루프: 관측 → game → RobotClient
-    isaac/                         # 예약. 1단계에서 비움
-  test/                            # cv2·Isaac 없이 game 시험
-```
-
-의존은 한 방향이다.
+1단계 의존:
 
 ```text
 policy  →  game  →  field
-host    →  game, 관측 어댑터, RobotClient
-isaac   →  game
+host    →  game, policy, field, Observer, PlayerClient
 ```
 
-`game`은 `cv2`도 Isaac도 모른다. 인터페이스는 학습 env와 같다.
+나중에 `isaac`은 `game`만 호출한다. `field`/`game`/`policy`는 `host`를 모른다.
 
-- `reset()` → 킥오프
-- `observe()` → 공·로봇 pose
-- `step(actions)` → 심판 + 다음 상태
-- `reward`는 나중에 붙는 필드. 1단계는 비워 둔다
+### 3.1 1단계 파일 트리
 
-관측 소스만 갈아 끼운다. 천장 카메라, Isaac 그라운드 트루스, 나중 온보드 blob. `host`의 로봇 호출은 `rosy_fleet` `RobotClient`를 재사용하거나 같은 프로토콜만 복제한다. `rosy_games`가 `rosy_core`를 import하지 않는다. 스키마가 필요하면 `rosy_core.protocol.schemas`만 (D-18과 같은 선).
-
-명령 경로:
+이 목록이 구현 계약이다. 여기 없는 파일을 1단계에서 만들지 않는다. `isaac/` 디렉터리도 만들지 않는다.
 
 ```text
-rosy_games.host  →  RobotClient (명단·토큰·일괄 stop)
-                 →  각 CORE  teleop / mode / safety/stop
-                 →  Command Manager 만 cmd_vel
+src/rosy_games/
+  package.xml
+  setup.py
+  setup.cfg
+  resource/rosy_games
+  config/match.yaml
+  rosy_games/
+    __init__.py
+    cli.py                         # rosy_games match --config ...
+    field/
+      __init__.py
+      types.py                     # Pose2D, Twist, ZERO, Side
+      geometry.py                  # Field: in_bounds, in_goal
+      homography.py                # 픽셀 네 점 → m
+    game/
+      __init__.py
+      state.py                     # Phase, Observation, MatchState, CommandSet
+      protocol.py                  # Game
+      soccer.py                    # SoccerGame
+      gate.py                      # HOLD/GOAL이면 0, 이격 강제
+    policy/
+      __init__.py
+      protocol.py                  # Policy
+      heuristic.py                 # HeuristicPolicy
+    host/
+      __init__.py
+      observer.py                  # Observer
+      overhead.py                  # 천장 카메라. 패키지에서 유일한 cv2
+      robots.py                    # match.yaml 엔드포인트
+      transport.py                 # PlayerClient, HttpPlayerClient
+      loop.py                      # MatchHost
+  test/
+    conftest.py
+    fakes.py
+    test_boundaries.py
+    test_field.py
+    test_homography.py
+    test_soccer.py
+    test_gate.py
+    test_heuristic.py
+    test_loop.py                   # FakeObserver + FakePlayerClient
 ```
 
-Fleet 콘솔에 축구 버튼을 나중에 달 수 있다. 버튼을 누르는 쪽은 Fleet, `reset()`을 하는 쪽은 `rosy_games`다.
+`overhead.py`는 OpenCV를 import한다. LOCAL 기본 시험은 이 파일을 로드하지 않는다. `test_boundaries.py`가 `field`/`game`/`policy`/`loop.py`/`transport.py`에 `cv2`가 없음을 본다.
+
+### 3.2 타입
+
+`field/types.py`
+
+```text
+Pose2D(x, y, yaw)          # m, rad. 공은 yaw=0
+Twist(linear, angular)     # m/s, rad/s
+ZERO = Twist(0, 0)
+Side = POSITIVE_X | NEGATIVE_X
+```
+
+`field/geometry.py`
+
+```text
+Field(width_m, height_m, goal_width_m, min_spacing_m=0.35)
+  in_bounds(x, y) -> bool
+  in_goal(x, y, side) -> bool
+```
+
+원점은 구장 중앙. +x는 `rosy_01`이 공격하는 골. 호모그래피의 네 모서리는 이 프레임의 네 코너다.
+
+`game/state.py`
+
+```text
+Phase = KICKOFF | PLAY | HOLD | GOAL
+Observation(t, ball, robots, lost_ball, lost_robots)
+  ball: Pose2D | None
+  robots: mapping robot_id -> Pose2D
+MatchState(phase, score, reason)
+CommandSet(twists, estop)
+  twists: mapping robot_id -> Twist
+  estop: true 이면 host가 양쪽 safety/stop
+```
+
+`reward` 필드는 1단계 `MatchState`에 두지 않는다. 학습 env가 나중에 같은 `step` 결과에서 계산한다.
+
+### 3.3 프로토콜과 루프
+
+```text
+Game
+  reset() -> MatchState
+  step(obs: Observation) -> MatchState
+
+Policy
+  act(obs, state) -> dict[robot_id, Twist]
+
+Observer
+  observe() -> Observation
+
+PlayerClient
+  robot_id
+  set_manual()
+  teleop(linear, angular)
+  estop()
+```
+
+`MatchHost` 한 틱:
+
+```text
+obs = observer.observe()
+state = game.step(obs)
+twists = policy.act(obs, state)
+commands = gate(twists, obs, state)     # HOLD/GOAL/유실 → 0, 이격 강제
+if commands.estop:
+    양쪽 estop
+else:
+    각 PlayerClient.teleop(...)
+```
+
+`gate`는 정책이 신경망이 되어도 로봇끼리 박지 못하게 하는 마지막 클램프다. 휴리스틱이 이격을 해도 `gate`는 남는다.
+
+`HttpPlayerClient`가 부르는 경로만:
+
+- `POST /api/v1/mode` `{mode: MANUAL}`
+- WS `{type: teleop, linear, angular}` (또는 REST `POST /api/v1/teleop`)
+- `POST /api/v1/safety/stop`
+
+follow / navigation / swarm 경로는 없다.
+
+### 3.4 import 경계
+
+`test_boundaries.py`가 AST로 강제한다. fleet `test_boundaries.py`와 같은 방식.
+
+| 디렉터리 | 허용 | 금지 |
+|---|---|---|
+| `field/` | stdlib, 자기 패키지 | `cv2`, `httpx`, `websockets`, `rclpy`, `rosy_games.host`, `rosy_games.policy`, `rosy_core`, `rosy_fleet` |
+| `game/` | stdlib, `rosy_games.field` | `cv2`, `httpx`, `websockets`, `rclpy`, `rosy_games.host`, `rosy_core`, `rosy_fleet` |
+| `policy/` | stdlib, `rosy_games.field`, `rosy_games.game` | `cv2`, `httpx`, `websockets`, `rclpy`, `rosy_games.host`, `rosy_core`, `rosy_fleet` |
+| `host/` except `overhead.py` | `httpx`, `websockets`, PyYAML, 위 세 모듈 | `cv2`, `rclpy`, `rosy_core`, `rosy_fleet`, Isaac |
+| `host/overhead.py` | `cv2` + 위 | `rclpy`, `rosy_core.command`, Isaac |
+
+패키지 전체: `rclpy` 없음. `rosy_core.*` 없음. `rosy_fleet.*` 없음. Fleet이 나중에 매치를 켤 때는 **Fleet → games** 한 방향이다.
+
+### 3.5 `config/match.yaml`
+
+```yaml
+field:
+  width_m: 2.0
+  height_m: 1.4
+  goal_width_m: 0.35
+  min_spacing_m: 0.35
+robots:
+  - id: rosy_01
+    url: http://rosy-01.local:8080
+    token: ""
+    aruco_id: 1
+    attacks: positive_x
+  - id: rosy_02
+    url: http://rosy-02.local:8080
+    token: ""
+    aruco_id: 2
+    attacks: negative_x
+ball:
+  hsv_low: [5, 120, 80]
+  hsv_high: [25, 255, 255]
+limits:
+  linear: 0.08
+  angular: 0.40
+camera:
+  index: 0
+watchdog:
+  lost_hold_s: 0.5
+```
+
+토큰은 커밋하지 않는다. 로컬 오버라이드(`match.local.yaml`, gitignore)가 실기 URL을 덮는다.
+
+### 3.6 패키지 메타
+
+- `package.xml` ament_python. `exec_depend`: `python3-httpx`, `python3-websockets`, `python3-yaml`. OpenCV는 `host/overhead.py`만 쓰므로 **exec_depend로 올리지 않는다** — 노트북에 있으면 실기 호스트가 되고, 없으면 LOCAL 시험은 그대로 통과한다.
+- `console_scripts`: `rosy_games=rosy_games.cli:main`
+- `deploy/robot` compose, `board.yaml` available slices, CORE 이미지 COPY에 이 패키지를 추가하지 않는다.
+
+Fleet 콘솔에 축구 버튼을 나중에 달 수 있다. 버튼을 누르는 쪽은 Fleet, `Game.reset()`을 하는 쪽은 `rosy_games`다.
 
 ## 4. 1단계 — 천장 카메라 1v1
 
-만드는 것: `field` + `game.soccer` + `HeuristicPolicy` + `host`(천장 카메라).  
-안 만드는 것: Isaac 패키지, 신경망, CORE 변경, D-62 슬라이스.
+만드는 것: §3.1 트리 전부.  
+안 만드는 것: `isaac/` 디렉터리, `NeuralPolicy`, CORE 변경, D-62 슬라이스, `rosy_fleet` import.
 
 ### 4.1 필드
 
@@ -214,9 +368,10 @@ Isaac은 심판 UI이자 학습장이다. 실기 Command Manager가 아니다.
 
 이 문서는 실행 계획이 아니다. 구현을 열려면 별도 execute plan이 필요하고, 최소한 다음이 빠져 있으면 안 된다.
 
-- LOCAL 시험이 있는 `src/rosy_games` 골격 (`field` / `game` / `policy` / `host`)
-- `game`이 카메라·Isaac 없이 득점·이격·쌍정지를 돌리는지
-- 호스트가 쓰는 CORE 경로가 API Ref §5.5 / §6.1 그대로인지
+- §3.1 트리가 그대로 있고, `isaac/`이 없음
+- `test_boundaries.py`가 §3.4를 통과
+- `test_soccer.py` / `test_gate.py` / `test_heuristic.py` / `test_loop.py`가 카메라 없이 득점·이격·쌍정지
+- `HttpPlayerClient`가 부르는 경로가 API Ref §5.5 / §6.1의 mode·teleop·stop 뿐인지
 - 한 대 명령 경로 증거가 Device 검증 계획의 안전 게이트와 모순되지 않는지
 - `rosy_games`가 기본 compose·board.yaml 슬라이스에 없는지
 
