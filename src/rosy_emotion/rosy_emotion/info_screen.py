@@ -11,12 +11,21 @@ from PIL import Image, ImageDraw, ImageFont
 
 DEFAULT_SIZE = (320, 240)
 
-_BG = (12, 14, 20)
-_FG = (236, 240, 245)
-_MUTED = (140, 150, 165)
-_OK = (64, 200, 120)
-_WARN = (240, 180, 60)
-_CRIT = (232, 80, 80)
+# concept 16 L1 / D-82 — 색은 네 표면이 공유한다. 값은 rosy_core의
+# `web/tokens.css`와 같은 OKLCH 생성본이며, 여기서는 D-73에 따라 이 모듈이
+# 자기 사본과 자기 시험을 갖는다(교차 패키지 단언은 harness에 거처가 없다).
+#
+# 이전 값은 적록 색약 시야에서 _WARN 대 _CRIT 대비가 1.26:1이었다 — 얼굴은
+# 1.5m 밖에서 0.5초에 읽히는 화면인데 주의와 위험이 구분되지 않았다.
+#
+# 정상에는 색이 없다: 배터리가 넉넉할 때는 잉크로 쓴다. 초록을 쓰면 화면
+# 대부분이 색을 갖게 되고 임계 경보가 눈에 띌 대비 예산이 남지 않는다.
+_BG = (16, 18, 20)          # --ground   #101214
+_FG = (238, 238, 239)       # --paper    #eeeeef
+_MUTED = (148, 153, 160)    # --muted    #9499a0
+_NOMINAL = _FG              # --nominal  정상은 잉크다
+_WARN = (254, 180, 50)      # --status-warn #feb432
+_CRIT = (196, 9, 33)        # --status-crit #c40921
 
 _FONT_CANDIDATES = (
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -39,7 +48,7 @@ def _font(size: int) -> ImageFont.ImageFont:
 
 def battery_color(percent: float) -> tuple[int, int, int]:
     if percent >= 60.0:
-        return _OK
+        return _NOMINAL
     if percent >= 30.0:
         return _WARN
     return _CRIT

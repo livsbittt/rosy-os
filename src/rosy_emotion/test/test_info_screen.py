@@ -18,12 +18,12 @@ def test_package_declares_emotion_servers():
 
 class TestBatteryColor:
     @pytest.mark.parametrize("percent,expected", [
-        (100.0, (64, 200, 120)),
-        (60.0, (64, 200, 120)),
-        (59.9, (240, 180, 60)),
-        (30.0, (240, 180, 60)),
-        (29.9, (232, 80, 80)),
-        (0.0, (232, 80, 80)),
+        (100.0, (238, 238, 239)),
+        (60.0, (238, 238, 239)),
+        (59.9, (254, 180, 50)),
+        (30.0, (254, 180, 50)),
+        (29.9, (196, 9, 33)),
+        (0.0, (196, 9, 33)),
     ])
     def test_thresholds(self, percent, expected):
         assert battery_color(percent) == expected
