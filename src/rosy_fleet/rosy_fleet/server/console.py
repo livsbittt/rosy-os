@@ -24,6 +24,7 @@ import time
 from typing import Any, Callable, Optional, Sequence
 
 from rosy_fleet.hub.hub import HubError, SiteHub
+from rosy_fleet.server import traffic
 from rosy_fleet.swarm.robots import RobotEndpoint
 from rosy_fleet.swarm.transport import RobotApiError, RobotClient
 
@@ -50,6 +51,7 @@ class FleetConsole:
         clock: Callable[[], float] = time.monotonic,
         map_ttl_s: float = MAP_TTL_S,
         fleet_name: str = "rosy-site",
+        clearance_m: float = traffic.DEFAULT_CLEARANCE_M,
     ) -> None:
         if len(endpoints) != len(clients):
             raise ValueError("endpoints and clients must line up one for one")
@@ -65,6 +67,11 @@ class FleetConsole:
         # — 미션은 Fleet 쪽 개념이고 로봇은 원자 액션만 받는다 (D-12). 화면의 목표 표시는
         # "내가 무엇을 시켰는가"이지 로봇이 되돌려 준 값이 아니다.
         self._goals: dict[str, dict] = {}
+        #: 달리는 로봇이 점유한 경로. 교행 판정의 재료이자, 왜 기다리는지의 근거다.
+        self._claims: dict[str, list] = {}
+        #: 남의 경로와 부딪혀 아직 못 내려간 미션. 앞이 비면 그대로 다시 내려간다.
+        self._queued: dict[str, dict] = {}
+        self._clearance_m = clearance_m
         self.fleet_name = fleet_name
         # e-stop 은 hub 의 scatter 를 그대로 쓴다 — 흩뿌림의 규칙을 두 군데 두지 않는다.
         self._hub = SiteHub(list(endpoints), dict(self._clients), fleet_name=fleet_name)
@@ -90,12 +97,19 @@ class FleetConsole:
         robots = []
         for robot_id, result in zip(self._order, results):
             goal = self._goals.get(robot_id)
+            queued = self._queued.get(robot_id)
             if isinstance(result, BaseException):
                 robots.append({"robot_id": robot_id, "online": False, "goal": goal,
-                               "error": _error_of(result), "state": None})
+                               "queued": queued, "error": _error_of(result), "state": None})
             else:
                 robots.append({"robot_id": robot_id, "online": True, "goal": goal,
-                               "error": None, "state": result})
+                               "queued": queued, "error": None, "state": result})
+        await self._run_traffic(robots)
+        # 교통 정리가 대기 미션을 내려보냈으면 이 스냅샷이 이미 그 뒤다. 행을 다시 읽지
+        # 않으면 화면은 방금 출발한 미션을 한 주기 동안 계속 "대기 중"으로 보여 준다.
+        for row in robots:
+            row["queued"] = self._queued.get(row["robot_id"])
+            row["goal"] = self._goals.get(row["robot_id"])
         online = sum(1 for r in robots if r["online"])
         return {
             "fleet": {"name": self.fleet_name, "online": online, "total": len(robots)},
@@ -126,16 +140,63 @@ class FleetConsole:
     # --- scatter --------------------------------------------------------------
 
     async def goal(self, robot_id: str, x: float, y: float, yaw: float = 0.0) -> dict:
-        """한 대에 목표 하나. 로봇은 원자 액션만 받는다 (D-12)."""
+        """한 대에 목표 하나. 로봇은 원자 액션만 받는다 (D-12).
+
+        내려간 뒤 그 로봇의 계획 경로를 읽어, 이미 달리는 다른 로봇의 경로와 부딪히면
+        취소하고 대기열에 넣는다. 경로는 목표를 받은 뒤에야 생기므로 순서가 이렇다 —
+        되돌리는 비용은 로봇이 아직 거의 움직이지 않았을 때 취소 한 번이다.
+
+        양보는 늘 **나중에 내려온 미션** 쪽이다. 달리던 로봇을 세우면 좁은 통로 한가운데
+        멈춘 장애물이 하나 생길 뿐이고, 그 로봇이 비켜설 자리는 애초에 없다.
+        """
         result = await self._client(robot_id).navigation_goal(x, y, yaw)
         # 로봇이 받아들인 뒤에만 기억한다 — 거절된 목표가 화면에 남으면 운영자는 가지도
         # 않을 곳으로 로봇이 간다고 읽는다.
         self._goals[robot_id] = {"x": x, "y": y, "yaw": yaw}
-        return result
+        self._queued.pop(robot_id, None)
+
+        route = await self._route_of(robot_id)
+        blocker = traffic.blocking_robot(route, self._claims, self._clearance_m, skip=(robot_id,))
+        if blocker is None:
+            self._claims[robot_id] = route
+            return result
+
+        await self._client(robot_id).navigation_cancel()
+        self._goals.pop(robot_id, None)
+        self._claims.pop(robot_id, None)
+        self._queued[robot_id] = {"x": x, "y": y, "yaw": yaw, "blocked_by": blocker}
+        return {"accepted": True, "queued": True, "blocked_by": blocker}
+
+    async def _route_of(self, robot_id: str) -> list:
+        """계획 경로. 읽지 못하면 빈 목록이다 — 모른다는 이유로 미션을 막지 않는다."""
+        try:
+            return traffic.route_points(await self._client(robot_id).navigation_path())
+        except Exception:
+            return []
+
+    async def _run_traffic(self, robots: list) -> None:
+        """스냅샷마다 한 번: 끝난 로봇의 점유를 풀고, 풀린 자리의 대기 미션을 내려보낸다."""
+        for row in robots:
+            state = row.get("state") or {}
+            if state.get("navigation") != "NAVIGATING":
+                self._claims.pop(row["robot_id"], None)
+        for robot_id in sorted(self._queued):
+            mission = self._queued[robot_id]
+            if mission["blocked_by"] in self._claims:
+                continue
+            self._queued.pop(robot_id, None)
+            try:
+                await self.goal(robot_id, mission["x"], mission["y"], mission["yaw"])
+            except Exception:
+                # 재하달이 실패하면 대기열에 되돌린다. 조용히 사라지면 운영자는 자기가
+                # 내린 미션이 어디로 갔는지 알 수 없다.
+                self._queued[robot_id] = mission
 
     async def cancel(self, robot_id: str) -> dict:
         result = await self._client(robot_id).navigation_cancel()
         self._goals.pop(robot_id, None)
+        self._claims.pop(robot_id, None)
+        self._queued.pop(robot_id, None)
         return result
 
     async def estop_all(self) -> dict:
@@ -157,6 +218,8 @@ class FleetConsole:
                 rows.append({"robot_id": robot_id, "stopped": False, "error": _error_of(result)})
             else:
                 self._goals.pop(robot_id, None)
+                self._claims.pop(robot_id, None)
+                self._queued.pop(robot_id, None)
                 rows.append({"robot_id": robot_id, "stopped": True, "result": result})
         return {"stopped": sum(1 for r in rows if r["stopped"]), "total": len(rows), "robots": rows}
 

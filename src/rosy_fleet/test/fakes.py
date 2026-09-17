@@ -75,6 +75,9 @@ class FakeRobot:
         self._map = map
         #: 설정돼 있으면 map() 이 이것을 raise 한다 — 한 대가 못 줘도 다음 대로 넘어가는지 본다.
         self.map_error: Optional[BaseException] = None
+        #: Fleet 교통 정리가 읽는 계획 경로. (x, y) 목록이다.
+        self._path: list = []
+        self.path_error: Optional[BaseException] = None
         #: RobotApiError 든 평범한 ConnectionError 든 그대로 raise 된다.
         self.follow_error = follow_error
         #: 잡혀 있으면 follow 가 여기서 기다린다 — 무장이 여러 await 짜리 구간임을 드러낸다.
@@ -145,6 +148,12 @@ class FakeRobot:
     async def navigation_cancel(self) -> dict:
         self._record("navigation_cancel")
         return {"canceled": True}
+
+    async def navigation_path(self) -> dict:
+        self._record("navigation_path")
+        if self.path_error is not None:
+            raise self.path_error
+        return {"poses": [{"x": x, "y": y} for x, y in self._path]}
 
     async def navigation_goal(self, x: float, y: float, yaw: float) -> dict:
         self._record("navigation_goal", x, y, yaw)
