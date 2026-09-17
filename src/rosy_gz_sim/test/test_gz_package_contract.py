@@ -12,3 +12,13 @@ def test_package_and_multi_robot_launch_exist():
     launch = (ROOT / "launch" / "gz_multi.launch.py").read_text(encoding="utf-8")
     assert "gz_multi" in launch or "core" in launch
     assert "rosy_core" in launch
+    assert "spawn_x" in launch
+
+
+def test_world_to_map_is_installed_and_bench_worlds_exist():
+    """HOST에서 도는 정답 맵 생성기가 패키지 표면이다. launch skip이 SOURCE가 아니다."""
+    cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+    assert "scripts/world_to_map.py" in cmake
+    assert (ROOT / "scripts" / "world_to_map.py").is_file()
+    assert (ROOT / "worlds" / "rosy_swarm_bench.world").is_file()
+    assert (ROOT / "worlds" / "rosy_maze.world").is_file()

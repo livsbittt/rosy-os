@@ -38,6 +38,7 @@ endif()
 install(
   PROGRAMS
     scripts/swarm_bench.py
+    scripts/world_to_map.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

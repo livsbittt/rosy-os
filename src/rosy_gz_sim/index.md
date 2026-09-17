@@ -12,6 +12,7 @@
 | D-4 | Namespace + frame_prefix 조합 |
 | D-33 | 로봇 신원은 하나의 로봇 번호에서 나온다 |
 | D-49 | Gazebo motion provenance hashes use the absorbed package root |
+| D-79 | 게이트 GO는 현재 트리 재실행만 인정한다 |
 
 ## 계획·결과 문서
 
@@ -30,4 +31,5 @@
 
 ## 최근 기록
 
+- 2026-09-17 · uncommitted · feat(sim): host-contract for world_to_map
 - 2026-09-15 · uncommitted · docs(harness): start the rosy_gz_sim harness record
