@@ -21,6 +21,14 @@ PROFILE = ROOT / "deploy" / "robot" / "config" / "profile.hardware.yaml"
 NAV2 = ROOT / "src" / "rosy_navigation" / "params" / "nav2_params.yaml"
 
 
+def test_global_planner_is_smac_and_rejects_unknown():
+    """긴 통로에서 NavFn 역추적이 실패한다. 미지 공간은 지름길이 아니다."""
+    data = yaml.safe_load(NAV2.read_text(encoding="utf-8"))
+    grid = data["planner_server"]["ros__parameters"]["GridBased"]
+    assert grid["plugin"] == "nav2_smac_planner::SmacPlanner2D"
+    assert grid["allow_unknown"] is False
+
+
 def test_hardware_profile_is_the_source_of_motion_ceilings():
     limits = load_motion_limits(PROFILE)
 

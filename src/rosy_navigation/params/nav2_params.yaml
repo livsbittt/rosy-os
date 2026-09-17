@@ -195,7 +195,13 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.15
+        # 팽창 반경은 통로 반폭보다 커야 한다. 0.15 m 면 1.4 m 통로의 가운데 1.1 m 가
+        # 전부 cost 0 이라 플래너가 중앙으로 붙을 이유가 없고, 최단거리로 칸막이 끝을
+        # 스치는 경로를 낸다 - 미로에서 pinky 가 벽면 4.7 cm 까지 붙어 끼었다(풋프린트
+        # 반폭 6 cm). 0.55 m 면 양쪽 팽창이 통로 가운데서 겹쳐 비용 골짜기가 생기고,
+        # 경로가 중앙을 따라가며 모서리를 넓게 돈다. 치명값은 여전히 내접 반경(6 cm)
+        # 안쪽뿐이라 0.55 m 문은 계속 지나갈 수 있다.
+        inflation_radius: 0.55
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: True
@@ -261,7 +267,13 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.15
+        # 팽창 반경은 통로 반폭보다 커야 한다. 0.15 m 면 1.4 m 통로의 가운데 1.1 m 가
+        # 전부 cost 0 이라 플래너가 중앙으로 붙을 이유가 없고, 최단거리로 칸막이 끝을
+        # 스치는 경로를 낸다 - 미로에서 pinky 가 벽면 4.7 cm 까지 붙어 끼었다(풋프린트
+        # 반폭 6 cm). 0.55 m 면 양쪽 팽창이 통로 가운데서 겹쳐 비용 골짜기가 생기고,
+        # 경로가 중앙을 따라가며 모서리를 넓게 돈다. 치명값은 여전히 내접 반경(6 cm)
+        # 안쪽뿐이라 0.55 m 문은 계속 지나갈 수 있다.
+        inflation_radius: 0.55
       always_send_full_costmap: True
 
 # The yaml_filename does not need to be specified since it going to be set by defaults in launch.
@@ -284,15 +296,28 @@ planner_server:
     planner_plugins: ["GridBased"]
     costmap_update_timeout: 1.0
     GridBased:
-      plugin: "nav2_navfn_planner::NavfnPlanner"
-      tolerance: 0.5
-      use_astar: false
-      # global_costmap 이 `track_unknown_space: true` 인데 플래너까지 미지 영역을 허용하면,
-      # 맵 바깥(로봇이 본 적 없는 곳)이 플래너에게는 뻥 뚫린 지름길이 된다. 방을 빙 돌아
-      # 나가는 경로가 벽을 따라가는 경로보다 싸지고, NavFn 은 그 전위장에서 경로를 되짚지
-      # 못해 "Failed to create a plan from potential" 로 끝난다 — 6x6 미로에서 실제로
-      # 모든 장거리 목표가 이렇게 실패했고, false 로 바꾸자 그대로 주파했다.
+      # NavFn 대신 Smac 2D 를 쓴다. NavFn 은 전위장까지는 만들어 놓고 길고 구불구불한
+      # 통로에서 경로 역추적에 실패한다 - 6x6 뱀형 미로에서 모든 장거리 목표가
+      # "Failed to create a plan from potential when a legal potential was found" 로
+      # 끝났고, 같은 맵/같은 코스트맵에서 Smac 2D 는 4 m 통로를 그대로 풀었다.
+      # 짧은 목표만 보면 둘 다 멀쩡해 보이므로 넓은 방 시험으로는 드러나지 않는다.
+      plugin: "nav2_smac_planner::SmacPlanner2D"
+      tolerance: 0.25
+      downsample_costmap: false
+      downsampling_factor: 1
+      # global_costmap 이 track_unknown_space 라 맵 바깥은 미지다. 허용하면 플래너가
+      # 본 적 없는 벽 너머로 질러가는 경로를 찾다가 실패한다.
       allow_unknown: false
+      max_iterations: 1000000
+      max_on_approach_iterations: 1000
+      max_planning_time: 2.0
+      cost_travel_multiplier: 2.0
+      use_final_approach_orientation: false
+      smoother:
+        max_iterations: 1000
+        w_smooth: 0.3
+        w_data: 0.2
+        tolerance: 1.0e-10
 
 smoother_server:
   ros__parameters:
