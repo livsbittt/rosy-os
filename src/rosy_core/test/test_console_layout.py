@@ -105,6 +105,12 @@ def test_the_map_controls_ride_on_the_map_instead_of_stealing_its_height():
     assert rule, ".map-controls 규칙이 없다"
     body = rule.group(1)
     assert "position: absolute" in body, "겹치지 않으면 지도 높이를 다시 가져간다"
-    # 겹친 칩은 지도 픽셀 위에 뜬다. 배경 없이 두면 점유 격자와 섞여 못 읽는다.
-    chip = re.search(r"\.map-controls \.map-toolbar\s*\{([^}]*)\}", css())
-    assert chip and "background:" in chip.group(1), "겹친 툴바에 바탕이 없다"
+    # 겹친 칩은 지도 픽셀 위에 뜬다. 바탕 없이 두면 점유 격자와 섞여 못 읽는다.
+    # 어느 셀렉터가 주는지는 묻지 않는다 — 규칙을 다시 쓸 때마다 시험이 같이
+    # 깨지면, 시험이 설계가 아니라 그때의 셀렉터 이름을 지키고 있는 것이다.
+    backed = [
+        selector.strip()[:60]
+        for selector, body in re.findall(r"([^{}]+)\{([^}]*)\}", css())
+        if ".map-toolbar" in selector and "background:" in body
+    ]
+    assert backed, "겹친 툴바에 바탕을 주는 규칙이 없다"

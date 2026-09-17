@@ -1,18 +1,31 @@
-:root {
-  color-scheme: dark;
-  --ink: var(--ground);
-  --ink-soft: var(--ground-soft);
-  --panel: var(--panel-fill);
-  --line: var(--line-14);
-  --line-strong: var(--line-30);
-  --signal-danger: var(--status-crit);
-  --signal-amber: var(--status-warn);
-  --signal-blue: var(--series-primary);
-}
+/* rosy_core 표면 규칙 — concept 16, D-72, D-82.
+ *
+ * 이 파일의 법:
+ *
+ *   1. 색은 tokens.css가 소유한다. 여기에 원시 색은 없다. 별칭 층도 두지
+ *      않는다 — `--line`, `--signal-danger` 같은 두 번째 어휘가 있으면 같은
+ *      것을 부르는 이름이 둘이 되고, 게이트는 한쪽만 본다.
+ *   2. 치수는 여섯 단계(--space-*), 모서리는 네 단계, 글자는 다섯 단계다.
+ *      임의 값을 쓰지 않는다.
+ *   3. 장식하지 않는다. 그라디언트·글로우·드롭섀도·등장 애니메이션은 임계
+ *      경보가 쓸 대비와 주의를 먼저 써버린다. 깊이는 면과 실선으로만 준다.
+ *   4. 표면마다 문법이 다르다(D-72). 운용 콘솔은 **공간**이고 점검은
+ *      **절차**다. 그래서 콘솔 규칙은 `.console .x`로 덮어쓰지 않고 제자리에
+ *      쓴다 — 콘솔이 이 화면의 기본형이고, 카드는 카드가 맞는 점검 뷰에만
+ *      준다. 덮어쓰기로 쌓으면 어느 규칙이 사는지 아무도 모른다.
+ *   5. 제목은 상자의 뚜껑이 아니라 **줄**이다. 콘솔에 있는 것은 전부 같은
+ *      로봇의 같은 순간이므로 테두리로 조각내지 않고 면과 실선으로 나눈다.
+ */
+
+:root { color-scheme: dark; }
+
+/* ===========================================================================
+   0. 기본
+   ======================================================================== */
 
 * { box-sizing: border-box; }
 
-html { min-width: 320px; background: var(--ink); }
+html { min-width: 320px; background: var(--ground-deep); }
 
 body {
   margin: 0;
@@ -21,26 +34,223 @@ body {
   color: var(--paper);
   background: var(--ground);
   font-family: var(--body);
+  font-size: var(--text-body);
   text-rendering: optimizeLegibility;
 }
 
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { color: inherit; }
 
+/* 포커스는 상태가 아니라 상호작용이다 — 어디서나 같은 링이다. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* `display`를 지정한 요소에는 [hidden]의 display:none이 지고 만다. 숨긴 뷰가
+   그대로 레이아웃을 차지해 콘솔이 스크롤하게 되는 고전적 버그다. */
+[hidden] { display: none !important; }
+
+/* ---- 증거 — 값은 자기가 얼마나 믿을 만한지 같이 말한다(D-72 S4) ---------- */
 [data-evidence="delayed"] { color: var(--status-warn); }
 [data-evidence="disconnected"],
 [data-evidence="unavailable"] { color: var(--muted); }
+/* 낡은 값은 나이를 달고 다닌다. 임계값은 title에 있고 신선한 값에는 아무것도
+   붙지 않는다. 블록으로 쌓이면 칸이 무너지므로 인라인이다. */
+[data-evidence="delayed"][data-age]::after {
+  content: " " attr(data-age) "초";
+  display: inline;
+  color: var(--status-warn);
+  font-size: 0.78em;
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+/* ===========================================================================
+   1. 공용 어휘 — 이 화면이 아는 조작과 표시는 이게 전부다
+   ======================================================================== */
+
+/* 라벨: 작은 대문자. 값이 아니라 값의 이름이다. */
+.hero-label,
+.region-head h2,
+.panel-heading h2,
+.panel-heading h3,
+.telemetry-grid span,
+.navigation-line span,
+.system-identity span,
+.ros-network-facts span,
+.traffic-card span,
+.settings-card label,
+.host-card label,
+.auth-drawer label {
+  color: var(--nominal-quiet);
+  font: 600 var(--text-micro)/1 var(--body);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+/* 값: 변하는 숫자는 전부 등폭이다. 갱신될 때 자릿수가 흔들리면 못 읽는다. */
+.telemetry-grid strong,
+.navigation-line b,
+.meter header b,
+.temperature-card strong,
+.traffic-card strong,
+.hero-state strong,
+.hero-safety strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 버튼 셋 — 크기가 위험도다(Law 3) ------------------------------------
+   주 명령은 초록이 아니라 가장 밝은 중립이다. 초록은 경보 예산이고, 정상에는
+   색이 없다(D-82). */
+.primary-button {
+  min-height: var(--target-primary);
+  padding: 0 var(--space-5);
+  border: 0;
+  border-radius: var(--radius-button);
+  color: var(--button-primary-ink);
+  background: var(--button-primary-bg);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 조용한 조작: 테두리 하나. 누를 수 있다고만 말한다. */
+.quiet-button, .docs-link, .host-actions button, .waypoint-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--target-secondary);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-button);
+  color: var(--nominal-quiet);
+  background: transparent;
+  font-size: var(--text-label);
+  text-decoration: none;
+  cursor: pointer;
+}
+.quiet-button:hover, .docs-link:hover,
+.host-actions button:hover, .waypoint-actions button:hover {
+  color: var(--paper);
+  border-color: var(--paper);
+}
+.host-actions button:disabled, .waypoint-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* ---- 필드 — 입력은 파인 면이다 ------------------------------------------ */
+.auth-row input,
+.settings-card input,
+.settings-card select,
+.host-card input {
+  min-height: var(--target-secondary);
+  min-width: 0;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius-control);
+  color: var(--paper);
+  background: var(--field-bg);
+  font-family: var(--mono);
+  font-size: var(--text-body);
+}
+.auth-row input:focus-visible,
+.settings-card input:focus-visible,
+.settings-card select:focus-visible,
+.host-card input:focus-visible { border-color: var(--focus-ring); }
+.auth-row input:invalid { border-color: var(--field-invalid); }
+
+/* ---- 태그 — 기계가 말한 짧은 값 ----------------------------------------- */
+.status-badge, .machine-tag, .mode-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-flag);
+  color: var(--nominal-quiet);
+  font: var(--text-micro)/1.4 var(--mono);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.status-badge i { width: var(--space-2); height: var(--space-2); border-radius: 50%; background: currentColor; }
+/* 상태 어휘는 셋뿐이다: 중립(기본) · 주의(글자) · 위험(글자).
+   같은 셋을 뱃지·기계 태그·모드 칩·[data-status]가 함께 쓴다 — 표면마다
+   다른 색 규칙을 만들면 그게 곧 세 번째 팔레트다. */
+.status-online, [data-status="OK"] { color: var(--nominal); }
+.status-error,
+[data-status="ERROR"], [data-status="UNAVAILABLE"] { color: var(--status-crit); border-color: var(--status-crit-a45); }
+[data-status="WARNING"] { color: var(--status-warn); border-color: var(--status-warn-a45); }
+
+.mode-chip[data-mode="SITE_STA"],
+.mode-chip[data-mode="ACTIVATED_CORE_ONLY"],
+.mode-chip[data-mode="core"] { color: var(--nominal); }
+.mode-chip[data-mode="RELAY_AP_STA"],
+.mode-chip[data-mode="PROVISIONING_AP"],
+.mode-chip[data-mode="RECOVERY_AP"] { color: var(--status-warn); border-color: var(--status-warn-a45); }
+.mode-chip[data-mode="NETWORK_HOLD"],
+.mode-chip[data-mode="RECOVERY_HOLD"],
+.mode-chip[data-mode="motor"],
+.mode-chip[data-mode="hardware"] { color: var(--status-crit); border-color: var(--status-crit-a45); }
+
+.empty-state { margin: 0; color: var(--nominal-quiet); font: var(--text-label)/1.5 var(--body); }
+
+/* ---- 묶음 제목 — 줄이지 상자의 뚜껑이 아니다 -----------------------------
+   작은 대문자 라벨, 이어지는 실선, 오른쪽 끝의 기계 값. 아래 내용과 붙어
+   하나로 읽힌다. 제목이 상자를 만들면 화면이 목차처럼 읽힌다. */
+.panel-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  min-height: var(--space-4);
+}
+.panel-heading > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.panel-heading > div::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--surface-line);
+}
+.panel-heading h2, .panel-heading h3 { margin: 0; flex: none; }
+.panel-heading .machine-tag { flex: none; }
+
+/* 패널은 기본적으로 그릇이 아니다 — 같은 면 위의 묶음일 뿐이다.
+   카드 대접은 카드가 맞는 점검 뷰에서만 준다(§4). */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.panel > * { margin: 0; }
+
+/* ===========================================================================
+   2. 껍질 — 두 문법이 공유하는 테두리
+   ======================================================================== */
 
 .skip-link {
   position: fixed;
   z-index: 20;
-  top: 8px;
-  left: 8px;
-  padding: 10px 14px;
+  top: var(--space-2);
+  left: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-button);
   transform: translateY(-150%);
-  color: var(--ink);
-  background: var(--paper);
+  color: var(--button-primary-ink);
+  background: var(--button-primary-bg);
 }
 .skip-link:focus { transform: translateY(0); }
 
@@ -51,675 +261,26 @@ button { color: inherit; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: var(--topbar-height);
-  padding: 14px clamp(18px, 4vw, 64px);
-  border-bottom: 1px solid var(--line);
-  background: var(--scrim-top);
-  backdrop-filter: blur(20px);
-}
-
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 13px;
-  color: var(--paper);
-  text-decoration: none;
-}
-.brand b { display: block; font: 700 1.18rem/1 var(--mono); letter-spacing: 0.18em; }
-.brand small { display: block; margin-top: 6px; color: var(--muted); font: 0.61rem/1 var(--mono); letter-spacing: 0.14em; }
-.brand-mark { display: grid; grid-template-columns: repeat(3, 6px); align-items: end; gap: 3px; height: 25px; }
-.brand-mark i { display: block; width: 6px; border-radius: 5px; background: var(--signal-danger); }
-.brand-mark i:nth-child(1) { height: 12px; }
-.brand-mark i:nth-child(2) { height: 24px; background: var(--nominal); }
-.brand-mark i:nth-child(3) { height: 17px; background: var(--signal-amber); }
-
-.topbar-status { display: flex; align-items: center; gap: 12px; }
-.clock { color: var(--muted); font: 0.72rem/1 var(--mono); letter-spacing: 0.1em; }
-.status-badge, .machine-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 31px;
-  padding: 0 11px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  color: var(--muted);
-  font: 0.69rem/1 var(--mono);
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-.status-badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
-.status-online { color: var(--nominal); border-color: var(--surface-line); }
-.status-online i { background: var(--nominal); }
-.status-error { color: var(--signal-danger); border-color: var(--status-crit-a45); }
-.status-error i { background: var(--signal-danger); }
-
-.quiet-button, .docs-link {
-  border: 0;
-  border-bottom: 1px solid var(--line-strong);
-  padding: 7px 2px;
-  color: var(--muted);
-  background: transparent;
-  font: 0.72rem/1 var(--mono);
-  text-decoration: none;
-  cursor: pointer;
-}
-.quiet-button:hover, .docs-link:hover { color: var(--paper); border-color: var(--paper); }
-
-.auth-drawer {
-  position: fixed;
-  z-index: 30;
-  top: 88px;
-  right: clamp(14px, 4vw, 64px);
-  display: none;
-  width: min(480px, calc(100vw - 28px));
-  padding: 28px;
-  border: 1px solid var(--line-strong);
-  background: var(--ground-card);
-}
-.auth-drawer.open { display: grid; gap: 25px; animation: drawer-in 220ms ease-out both; }
-.auth-drawer h2 { margin: 3px 0 8px; font: 2rem/1 var(--body); }
-.auth-drawer p { margin: 0; color: var(--muted); line-height: 1.55; }
-.auth-drawer label { display: block; margin-bottom: 8px; color: var(--muted); font: 0.68rem var(--mono); letter-spacing: 0.08em; }
-.auth-row { display: flex; gap: 8px; }
-.auth-row input {
-  min-width: 0;
-  flex: 1;
-  border: 1px solid var(--line-strong);
-  border-radius: 0;
-  padding: 12px 13px;
-  color: var(--paper);
-  background: var(--ink);
-  outline: none;
-  font-family: var(--mono);
-}
-.auth-row input:focus { border-color: var(--focus-ring); }
-.primary-button { border: 0; padding: 0 20px; color: var(--button-primary-ink); background: var(--button-primary-bg); cursor: pointer; font-weight: 700; }
-.drawer-close { position: absolute; top: 8px; right: 12px; border: 0; color: var(--muted); background: none; font-size: 1.6rem; cursor: pointer; }
-.form-message { min-height: 1.4em; margin-top: 8px !important; font: 0.7rem var(--mono); }
-
-/* 레이아웃은 뷰가 소유한다 — 운용은 고정 3분할이고 점검은 수직 절차다.
-   컨테이너가 열을 정하면 두 문법이 섞인다(concept 16 §4 L2). */
-.dashboard {
-  display: block;
-  width: 100%;
-  margin: 0;
-}
-
-.hero-strip {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: 1.5fr 0.65fr 0.65fr;
-  min-height: 210px;
-  border: 1px solid var(--line-strong);
-  background: var(--surface-flat);
-  animation: reveal 420ms ease-out both;
-}
-.hero-strip > div { padding: clamp(24px, 4vw, 50px); }
-.hero-copy { display: flex; flex-direction: column; justify-content: center; }
-.hero-copy h1 { margin: 0; font: clamp(3rem, 7vw, 6.7rem)/0.82 var(--body); letter-spacing: -0.06em; }
-.hero-copy h1 em { display: block; margin: 16px 0 0 5px; color: var(--muted); font: normal 0.72rem/1 var(--mono); letter-spacing: 0.12em; }
-.hero-copy > p:last-child { max-width: 52ch; margin: 24px 0 0; color: var(--muted); line-height: 1.55; }
-.hero-state, .hero-safety { display: flex; flex-direction: column; justify-content: space-between; border-left: 1px solid var(--line); }
-.hero-label { color: var(--muted); font: 0.63rem/1 var(--mono); letter-spacing: 0.12em; }
-.hero-state strong, .hero-safety strong { font: clamp(1.4rem, 3vw, 2.45rem)/1 var(--mono); word-break: break-word; }
-.hero-state .sequence, .hero-safety > span:last-child { color: var(--muted); font: 0.68rem/1.3 var(--mono); }
-.hero-safety.safe strong { color: var(--nominal); }
-.hero-safety.danger { background: var(--status-crit-a12); }
-.hero-safety.danger strong { color: var(--signal-danger); }
-
-.panel {
-  position: relative;
-  overflow: hidden;
-  scroll-margin-top: 88px;
-  border: 1px solid var(--line);
-  padding: clamp(20px, 3vw, 34px);
-  background: var(--panel);
-  box-shadow: inset 0 1px 0 var(--surface-sheen);
-  animation: reveal 500ms ease-out both;
-}
-.panel::before { content: ""; position: absolute; top: 0; left: 0; width: 80px; height: 2px; background: var(--signal-danger); }
-.motion-panel::before { background: var(--signal-blue); }
-.control-panel::before { background: var(--signal-amber); }
-.capability-panel::before { background: var(--surface-line); }
-.event-panel::before { background: var(--paper); }
-.panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 28px; }
-.panel-heading h2 { margin: 0; font: 1.8rem/1 var(--body); }
-
-.system-identity { display: grid; grid-template-columns: 1fr 1fr; gap: 17px 24px; margin-bottom: 30px; }
-.system-identity div { min-width: 0; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
-.system-identity span, .system-identity strong { display: block; }
-.system-identity span { margin-bottom: 7px; color: var(--muted); font: 0.62rem var(--mono); }
-.system-identity strong { overflow: hidden; text-overflow: ellipsis; font: 0.77rem var(--mono); white-space: nowrap; }
-.meter-stack { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.meter { padding: 16px; border: 1px solid var(--line); }
-.meter header { display: flex; align-items: baseline; justify-content: space-between; }
-.meter header span { color: var(--muted); font: 0.65rem var(--mono); }
-.meter header b { font: 1.25rem var(--mono); font-variant-numeric: tabular-nums; }
-.meter-rail { height: 5px; margin: 16px 0 11px; overflow: hidden; background: var(--line-10); }
-.meter-rail i { display: block; width: var(--meter, 0%); height: 100%; background: var(--paper); transition: width 500ms ease; }
-.meter footer { overflow: hidden; color: var(--muted); font: 0.61rem var(--mono); text-overflow: ellipsis; white-space: nowrap; }
-.temperature-card { display: flex; flex-direction: column; justify-content: center; min-height: 128px; border: 1px solid var(--line); padding: 16px; background: var(--paper); color: var(--ink); }
-.temperature-card span, .temperature-card small { font: 0.62rem var(--mono); }
-.temperature-card strong { margin: 7px 0; font: 2.3rem/1 var(--mono); font-variant-numeric: tabular-nums; }
-.temperature-card[data-level="warn"] strong { color: var(--status-warn); }
-.temperature-card[data-level="crit"] strong { color: var(--status-crit); }
-.runtime-warning { min-height: 1.2em; margin: 18px 0 0; color: var(--signal-amber); font: 0.65rem/1.5 var(--mono); }
-
-.ros-network-panel { grid-column: 1 / -1; overflow: hidden; }
-.ros-network-panel::before { width: 160px; background: var(--surface-line); }
-.ros-network-facts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
-.ros-network-facts article { min-width: 0; padding: 17px 18px; background: var(--scrim-solid); }
-.ros-network-facts span, .traffic-card span { display: block; color: var(--muted); font: 0.62rem/1 var(--mono); letter-spacing: 0.12em; }
-.ros-network-facts strong { display: block; margin-top: 10px; overflow: hidden; color: var(--paper); font: 1.15rem/1.1 var(--body); text-overflow: ellipsis; white-space: nowrap; }
-.ros-network-facts small { display: block; margin-top: 7px; color: var(--muted); font: 0.65rem/1.2 var(--mono); }
-[data-status="OK"] { color: var(--nominal); border-color: var(--surface-line); }
-[data-status="WARNING"] { color: var(--signal-amber); border-color: var(--status-warn-a45); }
-[data-status="ERROR"], [data-status="UNAVAILABLE"] { color: var(--signal-danger); border-color: var(--status-crit-a45); }
-.network-traffic-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 12px; }
-.traffic-card { position: relative; min-height: 106px; padding: 16px 18px 10px; overflow: hidden; border: 1px solid var(--line); background: var(--scrim); }
-.traffic-card header { position: relative; z-index: 1; display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
-.traffic-card strong { color: var(--paper); font: 1.15rem/1 var(--mono); }
-.network-sparkline { position: absolute; inset: 42px 12px 6px; width: calc(100% - 24px); height: 58px; overflow: visible; }
-.network-sparkline polyline { fill: none; stroke-width: 2; stroke-linecap: square; stroke-linejoin: bevel; }
-.traffic-rx .network-sparkline polyline { stroke: var(--series-primary); }
-.traffic-tx .network-sparkline polyline { stroke: var(--series-secondary); }
-.ros-graph-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(230px, 0.72fr); gap: 12px; margin-top: 12px; }
-.graph-stage, .risk-tape { border: 1px solid var(--line); background: var(--scrim); }
-.graph-stage { position: relative; min-height: 330px; padding: 24px 10px 6px; }
-.graph-legend { position: absolute; top: 11px; left: 18px; display: flex; align-items: center; gap: 8px; color: var(--muted); font: 0.58rem/1 var(--mono); letter-spacing: 0.1em; }
-.graph-legend i { width: 32px; height: 1px; background: var(--line-strong); }
-.ros-graph-map { width: 100%; height: 300px; }
-.graph-edge { stroke: var(--muted-line); stroke-width: 1; }
-.graph-edge.publishes { stroke: var(--series-primary); }
-.graph-edge.subscribes { stroke-dasharray: 4 4; }
-.graph-node { fill: var(--ground-raise); stroke: var(--surface-line); stroke-width: 1; }
-.graph-node.foreign { fill: var(--status-crit-a10); stroke: var(--signal-danger); }
-.graph-topic { fill: var(--signal-amber); stroke: var(--ground); stroke-width: 3; }
-.graph-node-label, .graph-topic-label, .graph-empty { fill: var(--paper); font: 11px var(--mono); text-anchor: middle; }
-.graph-topic-label { fill: var(--muted); text-anchor: end; }
-.graph-empty { fill: var(--muted); }
-.risk-tape { padding: 20px; }
-.risk-tape h3 { margin: 0 0 14px; color: var(--paper); font: 1rem/1 var(--body); }
-.risk-tape ul { display: grid; gap: 8px; min-height: 150px; margin: 0; padding: 0; list-style: none; }
-.risk-tape li { padding: 10px; border-left: 2px solid var(--signal-danger); background: var(--status-crit-a07); }
-.risk-tape li strong, .risk-tape li span { display: block; }
-.risk-tape li strong { color: var(--signal-danger); font: 0.6rem/1 var(--mono); letter-spacing: 0.08em; }
-.risk-tape li span { margin-top: 5px; color: var(--paper); font: 0.7rem/1.45 var(--mono); }
-.risk-tape li.risk-clear { color: var(--nominal); border-left-color: var(--surface-line); background: transparent; font: 0.7rem/1.5 var(--mono); }
-.risk-tape > p { margin: 18px 0 0; color: var(--muted); font: 0.65rem/1.5 var(--mono); }
-
-.telemetry-grid { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
-.telemetry-grid article { min-width: 0; padding: 18px 14px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-.telemetry-grid span, .telemetry-grid strong, .telemetry-grid small { display: block; }
-.telemetry-grid span { color: var(--muted); font: 0.6rem var(--mono); }
-.telemetry-grid strong { margin: 13px 0 5px; overflow: hidden; font: clamp(1.1rem, 2vw, 1.55rem) var(--mono); font-variant-numeric: tabular-nums; text-overflow: ellipsis; }
-.telemetry-grid small { color: var(--muted); font: 0.58rem var(--mono); }
-.navigation-line { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 18px; margin-top: 22px; }
-.navigation-line span { color: var(--muted); font: 0.65rem var(--mono); }
-.navigation-line b { color: var(--signal-blue); font: 0.83rem var(--mono); }
-.navigation-line small { color: var(--muted); font: 0.62rem var(--mono); }
-
-.field-map-panel::before { background: var(--signal-blue); }
-.map-toolbar { display: flex; gap: 8px; margin: 4px 0 12px; }
-.map-toolbar button {
-  min-height: var(--target-secondary);
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--muted);
-  font: 0.62rem var(--mono);
-  letter-spacing: 0.08em;
-  cursor: pointer;
-}
-.map-toolbar button[aria-pressed="true"] { color: var(--ink); background: var(--paper); }
-.map-stage {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  background: var(--ground-deep);
-  aspect-ratio: 5 / 3;
-}
-#map-canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-.map-empty {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  margin: 0;
-  color: var(--muted);
-  font: 0.72rem/1.5 var(--mono);
-  pointer-events: none;
-}
-.map-empty[hidden] { display: none; }
-.map-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 18px;
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-  color: var(--muted);
-  font: 0.58rem var(--mono);
-}
-.map-legend li { display: flex; align-items: center; gap: 8px; }
-.map-legend li::before { content: ""; width: 10px; height: 10px; border: 1px solid var(--line); }
-.map-legend [data-swatch="free"]::before { background: var(--raster-free); }
-.map-legend [data-swatch="occupied"]::before { background: var(--raster-occupied); }
-.map-legend [data-swatch="unknown"]::before { background: var(--raster-unknown); }
-.map-legend [data-swatch="cost"]::before { background: var(--signal-amber); }
-.map-legend [data-swatch="path"]::before { background: var(--signal-blue); }
-.map-legend [data-swatch="robot"]::before { background: var(--paper); }
-.map-hint { margin: 12px 0 0; color: var(--muted); font: 0.65rem/1.5 var(--mono); }
-
-.mode-control { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line-strong); }
-.mode-control button { min-height: 50px; border: 0; border-right: 1px solid var(--line); background: transparent; color: var(--muted); font: 0.7rem var(--mono); cursor: pointer; }
-.mode-control button:last-child { border-right: 0; }
-.mode-control button:hover { background: var(--line-06); color: var(--paper); }
-.mode-control button.active { background: var(--paper); color: var(--ink); }
-.mode-control button:disabled { cursor: not-allowed; opacity: 0.35; background: transparent; color: var(--muted); }
-.teleop-commissioning { margin-top: 20px; border: 1px solid var(--line); padding: 18px; }
-.teleop-copy { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.teleop-copy h3 { margin: 0; font: 1.25rem/1 var(--body); }
-.teleop-copy > span { color: var(--muted); font: 0.58rem/1.4 var(--mono); text-align: right; }
-.bench-confirmation { display: flex; align-items: flex-start; gap: 10px; margin: 18px 0; color: var(--muted); font: 0.68rem/1.45 var(--mono); cursor: pointer; }
-.bench-confirmation input { width: 18px; height: 18px; margin: 0; accent-color: var(--focus-ring); }
-.teleop-pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.teleop-pad button {
-  min-height: 72px;
-  border: 1px solid var(--line-strong);
-  color: var(--paper);
-  background: var(--series-primary-a08);
-  font: 1.45rem/1 var(--mono);
-  cursor: pointer;
-  touch-action: none;
-  user-select: none;
-}
-.teleop-pad button small { display: block; margin-top: 8px; color: var(--muted); font: 0.55rem/1 var(--mono); }
-.teleop-pad button.active { color: var(--ink); background: var(--signal-blue); }
-.teleop-pad button.active small { color: var(--ink); }
-.teleop-pad button:disabled { cursor: not-allowed; opacity: 0.3; }
-.teleop-message { min-height: 1.4em; margin: 12px 0 0; color: var(--muted); font: 0.62rem/1.4 var(--mono); }
-.safety-actions { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 12px; margin-top: 20px; }
-.stop-button, .release-button { min-height: 92px; border: 1px solid transparent; padding: 18px; text-align: left; cursor: pointer; }
-.stop-button { color: var(--paper); background: var(--status-crit); }
-.release-button { color: var(--paper); border-color: var(--line-strong); background: transparent; }
-.stop-button span, .release-button span, .stop-button small, .release-button small { display: block; }
-.stop-button span, .release-button span { margin-bottom: 9px; font: 1.1rem var(--mono); font-weight: 700; }
-.stop-button small, .release-button small { opacity: 0.7; font: 0.6rem var(--mono); }
-.action-message { margin: 16px 0 0; color: var(--muted); font: 0.65rem/1.4 var(--mono); }
-
-.capability-list { display: grid; gap: 8px; }
-.capability-item { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; min-height: var(--target-secondary); border-bottom: 1px solid var(--line); }
-.capability-item span { font: 0.7rem var(--mono); }
-.capability-item b { font: 0.62rem var(--mono); color: var(--paper); }
-.capability-item small { grid-column: 1 / -1; color: var(--muted); font: 0.6rem/1.3 var(--mono); }
-.capability-item[data-state="constrained"] b { color: var(--status-warn); }
-.capability-item[data-state="blocked"] b { color: var(--status-crit); }
-
-.field-settings-panel { grid-column: 1 / -1; }
-.field-settings-panel::before { background: var(--surface-line); }
-.settings-grid {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
-}
-.settings-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 1rem 1.1rem 1.15rem;
-  border: 1px solid var(--line);
-  background: var(--scrim);
-}
-.settings-card > header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-.settings-card h3 { margin: 0; font: 1.05rem/1.1 var(--body); }
-.settings-card form { display: grid; gap: 0.45rem; }
-.settings-card label { color: var(--muted); font: 0.62rem var(--mono); letter-spacing: 0.08em; }
-.settings-card input {
-  min-height: var(--target-secondary);
-  padding: 0 12px;
-  color: var(--paper);
-  background: var(--scrim-raise);
-  border: 1px solid var(--line);
-}
-.settings-card input:focus, .settings-card select:focus { outline: 0; border-color: var(--focus-ring); }
-.settings-card select {
-  min-height: var(--target-secondary);
-  padding: 0 12px;
-  color: var(--paper);
-  background: var(--scrim-raise);
-  border: 1px solid var(--line);
-}
-.settings-row { display: flex; gap: 8px; }
-.settings-row input { flex: 1 1 auto; min-width: 0; }
-.waypoint-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.waypoint-list li:not(.empty-state) {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 4px 12px;
-  padding: 10px 0;
-  border-top: 1px solid var(--line);
-}
-.waypoint-list strong { font: 0.82rem var(--mono); }
-.waypoint-list span { grid-column: 1; color: var(--muted); font: 0.62rem var(--mono); }
-.waypoint-actions { display: flex; gap: 6px; align-items: start; }
-.waypoint-actions button {
-  min-height: var(--target-secondary);
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--paper);
-  font: 0.62rem var(--mono);
-  cursor: pointer;
-}
-.waypoint-actions button:hover { border-color: var(--paper); }
-
-.event-panel { grid-column: 1 / -1; }
-.event-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 24px; margin: 0; padding: 0; list-style: none; }
-.event-list li:not(.empty-state) { display: grid; grid-template-columns: 76px 1fr auto; gap: 12px; align-items: start; min-width: 0; border-top: 1px solid var(--line); padding: 14px 0; }
-.event-time, .event-severity { color: var(--muted); font: 0.6rem var(--mono); }
-.event-type { overflow: hidden; font: 0.72rem var(--mono); text-overflow: ellipsis; white-space: nowrap; }
-.event-severity.error, .event-severity.critical { color: var(--signal-danger); }
-.event-severity.warning { color: var(--signal-amber); }
-.empty-state { grid-column: 1 / -1; margin: 0; color: var(--muted); font: 0.72rem/1.5 var(--mono); }
-
-.page-footer { display: flex; justify-content: space-between; width: min(1500px, calc(100% - clamp(28px, 6vw, 100px))); margin: 0 auto; padding: 18px 0 35px; color: var(--muted); font: 0.58rem var(--mono); letter-spacing: 0.08em; }
-
-@keyframes reveal { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes drawer-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-
-@media (max-width: 1040px) {
-  .ros-network-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .ros-graph-layout { grid-template-columns: 1fr; }
-  .dashboard { grid-template-columns: 1fr; }
-  .hero-strip { grid-template-columns: 1.2fr 0.8fr; }
-  .hero-safety { grid-column: 1 / -1; min-height: 115px; border-top: 1px solid var(--line); border-left: 0; }
-  .field-settings-panel, .event-panel { grid-column: auto; }
-  .event-list { grid-template-columns: 1fr; }
-}
-
-@media (max-width: 680px) {
-  .ros-network-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .network-traffic-grid { grid-template-columns: 1fr; }
-  .graph-stage { min-height: 260px; }
-  .ros-graph-map { height: 240px; }
-  .topbar { min-height: 66px; }
-  .clock, .status-badge span { display: none; }
-  .status-badge { min-width: 31px; justify-content: center; padding: 0; }
-  .dashboard { width: calc(100% - 24px); margin-top: 18px; gap: 12px; }
-  .hero-strip { grid-template-columns: 1fr; }
-  .hero-state, .hero-safety { min-height: 115px; border-top: 1px solid var(--line); border-left: 0; }
-  .hero-strip > div { padding: 24px; }
-  .hero-copy h1 { font-size: 3.5rem; }
-  .panel { padding: 22px 18px; }
-  .system-identity, .meter-stack { grid-template-columns: 1fr; }
-  .telemetry-grid { grid-template-columns: repeat(2, 1fr); }
-  .navigation-line { grid-template-columns: 1fr auto; }
-  .navigation-line small { grid-column: 1 / -1; }
-  .safety-actions { grid-template-columns: 1fr; }
-  .teleop-copy { display: grid; }
-  .teleop-copy > span { text-align: left; }
-  .teleop-pad { grid-template-columns: repeat(2, 1fr); }
-  .event-list li:not(.empty-state) { grid-template-columns: 62px 1fr; }
-  .event-severity { grid-column: 2; }
-  .page-footer { width: calc(100% - 24px); gap: 15px; flex-direction: column; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
-}
-
-
-/* --- Device Runtime cards (WP-5) ------------------------------------------
-   A card whose data did not arrive is dimmed and says so. It must not look
-   like a card reporting that everything is fine with nothing to add. */
-
-.host-card-grid {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: 1fr;
-}
-
-.host-card {
-  background: var(--surface-raised, var(--sheen-04));
-  border: 1px solid var(--surface-line, var(--sheen-09));
-  border-radius: 0.9rem;
-  padding: 1rem 1.1rem 1.15rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.host-card[data-step]::before {
-  content: attr(data-step);
-  color: var(--muted);
-  font: 0.62rem/1 var(--mono);
-  letter-spacing: 0.14em;
-}
-.host-card > header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.host-card h3 {
-  font-size: 0.95rem;
-  margin: 0;
-}
-
-.host-card[data-available="false"] {
-  border-style: dashed;
-  opacity: 0.72;
-}
-
-.host-card[data-available="false"] .host-facts {
-  /* Hidden rather than dimmed: an em dash in a field reads as "measured, and
-     it is nothing", which is the opposite of what an unreachable agent means. */
-  display: none;
-}
-
-.mode-chip {
-  border-radius: 999px;
-  padding: 0.15rem 0.6rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-  border: 1px solid currentColor;
-}
-
-.mode-chip[data-mode="SITE_STA"],
-.mode-chip[data-mode="ACTIVATED_CORE_ONLY"],
-.mode-chip[data-mode="core"] { color: var(--nominal); }
-
-.mode-chip[data-mode="RELAY_AP_STA"],
-.mode-chip[data-mode="PROVISIONING_AP"],
-.mode-chip[data-mode="RECOVERY_AP"] { color: var(--signal-warn, var(--status-warn-2)); }
-
-.mode-chip[data-mode="NETWORK_HOLD"],
-.mode-chip[data-mode="RECOVERY_HOLD"],
-.mode-chip[data-mode="motor"],
-.mode-chip[data-mode="hardware"] { color: var(--signal-danger, var(--status-crit-2)); }
-
-.mode-chip[data-mode="UNKNOWN"] { color: var(--text-muted, var(--muted-cool)); }
-
-.host-facts {
-  display: grid;
-  gap: 0.4rem;
-  margin: 0;
-}
-
-.host-facts > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  font-size: 0.82rem;
-}
-
-.host-facts dt { color: var(--text-muted, var(--muted-cool)); }
-.host-facts dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
-
-.host-note {
-  margin: 0;
-  font-size: 0.78rem;
-  line-height: 1.5;
-  color: var(--text-muted, var(--muted-cool));
-}
-
-.host-card[data-available="false"] .host-note { color: var(--signal-warn, var(--status-warn-2)); }
-
-.host-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: auto;
-}
-
-.host-actions button {
-  flex: 1 1 auto;
-  padding: 0.45rem 0.6rem;
-  font-size: 0.78rem;
-  border-radius: 0.55rem;
-  border: 1px solid var(--surface-line, var(--sheen-14));
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.host-actions button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.host-card form { display: grid; gap: 0.45rem; margin-top: 0.4rem; }
-.host-card label { color: var(--muted); font: 0.62rem var(--mono); letter-spacing: 0.08em; }
-.host-card input {
-  min-height: var(--target-secondary);
-  padding: 0 12px;
-  color: var(--paper);
-  background: var(--scrim-raise);
-  border: 1px solid var(--line);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .host-card { transition: opacity 120ms ease; }
-}
-
-/* 분류 — 머리에 하나, 아래는 맥락(concept 16 Law 1, D-72).
-   색을 가진 것은 언제나 하나다. `.triage-context`는 status 토큰을 쓰지 않는다. */
-.triage {
-  border-radius: var(--radius-panel);
-  padding: var(--space-4) var(--space-5);
-  margin-bottom: var(--space-4);
-  background: var(--surface-flat);
-  border: 1px solid var(--surface-line);
-}
-/* 물리적 위험과 이동 차단은 채운다 — 되돌릴 수 없는 것과 같은 범주다(Law 3). */
-.triage[data-category="hazard"], .triage[data-category="blocked"] {
-  background: var(--status-crit);
-  border-color: var(--status-crit);
-  color: var(--paper);
-}
-/* 임무 위협은 글자다. 아직 갈 수는 있다. */
-.triage[data-category="mission"] {
-  border-color: var(--status-warn);
-  color: var(--status-warn);
-}
-.triage-copy h2 { margin: 0; font: 700 1.05rem/1.2 var(--body); }
-.triage-copy p { margin: var(--space-2) 0 0; font-size: 0.82rem; line-height: 1.55; opacity: 0.92; }
-.triage-context {
-  list-style: none;
-  margin: var(--space-3) 0 0;
-  padding: var(--space-3) 0 0;
-  border-top: 1px solid var(--surface-line);
-  display: grid;
-  gap: var(--space-2);
-}
-.triage-context li { display: flex; gap: var(--space-3); font-size: 0.78rem; color: var(--nominal-quiet); }
-.triage-context b { font-weight: 600; flex-shrink: 0; }
-.triage-context:empty { display: none; }
-
-/* 여유 — 낡은 값은 나이를 달고 다닌다. 임계값은 title에 있다.
-   신선한 값에는 아무것도 붙지 않는다(D-72 S4). */
-[data-evidence="delayed"][data-age]::after {
-  content: " " attr(data-age) "초";
-  color: var(--status-warn);
-  font-size: 0.78em;
-  font-family: var(--mono);
-}
-
-/* ---- 운용 뷰 — 공간 문법(concept 16 §7.1) ---------------------------------
-   고정 3분할. 페이지는 스크롤하지 않는다 — 운용자가 외우는 것은 값이 아니라
-   자리다. 넘치면 감지만 스크롤하고 관측·조작은 그대로 있다. */
-.console {
-  height: calc(100vh - var(--topbar-height));
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-.console .hero-strip { flex: none; }
-.console .triage { flex: none; margin-bottom: 0; }
-.regions {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: 264px minmax(0, 1fr) 340px;
-}
-.region {
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  box-sizing: border-box;
-}
-/* 보고하는 것은 평평하고, 세상을 바꾸는 것은 솟아 있다(Law 2). */
-.region-sense { background: var(--surface-flat); border-right: 1px solid var(--surface-line); overflow-y: auto; }
-.region-observe { background: var(--ground); }
-.region-act {
-  background: var(--surface-raised);
-  border-left: 1px solid var(--surface-line);
-  box-shadow: inset 1px 0 0 var(--surface-sheen);
-  overflow-y: auto;
-}
-.region-head { display: flex; align-items: baseline; gap: var(--space-3); flex: none; }
-.region-head h2 { margin: 0; font: 600 0.92rem/1.2 var(--body); }
-.region-head span { font-size: 0.72rem; color: var(--nominal-quiet); }
-
-/* 영역 안에서 패널은 카드를 그만둔다 — 테두리가 아니라 바탕이 나눈다. */
-.region .panel {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  padding: 0;
-  margin: 0;
-  min-height: 0;
-}
-.region .panel::before { display: none; }
-/* 지도는 남는 높이를 전부 먹는다. 관측이 콘솔의 심장이다. */
-.region-observe .field-map-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.region-observe .field-map-panel .map-stage { flex: 1; min-height: 0; }
-
-/* ---- 점검 뷰 — 절차 문법(concept 16 §7.2) ---------------------------------
-   여기서만 스크롤이 허용된다. 스크롤이 곧 절차이고 순서는 기동 순서다. */
-.inspect {
-  display: flex;
-  flex-direction: column;
   gap: var(--space-4);
-  padding: var(--space-4);
-  max-width: 1100px;
+  min-height: var(--topbar-height);
+  padding: 0 var(--space-5);
+  border-bottom: 1px solid var(--surface-line);
+  background: var(--ground-deep);
 }
+
+.brand { display: inline-flex; align-items: center; gap: var(--space-3); color: var(--paper); text-decoration: none; }
+.brand b { display: block; font: 700 var(--text-value)/1 var(--mono); letter-spacing: 0.18em; }
+.brand small { display: block; margin-top: var(--space-1); color: var(--muted); font: var(--text-micro)/1 var(--mono); letter-spacing: var(--track-label); }
+/* 마크는 로고이지 계기가 아니다 — 상태색을 쓰지 않는다. 화면에서 유일하게
+   색이 있어야 할 것은 지금 잘못된 것 하나다. */
+.brand-mark { display: grid; grid-template-columns: repeat(3, 4px); align-items: end; gap: 3px; height: 22px; }
+.brand-mark i { display: block; width: 4px; border-radius: var(--radius-flag); background: var(--muted); }
+.brand-mark i:nth-child(1) { height: 10px; }
+.brand-mark i:nth-child(2) { height: 22px; background: var(--paper); }
+.brand-mark i:nth-child(3) { height: 15px; }
+
+.topbar-status { display: flex; align-items: center; gap: var(--space-3); }
+.clock { color: var(--muted); font: var(--text-label)/1 var(--mono); letter-spacing: 0.1em; font-variant-numeric: tabular-nums; }
 
 .view-switch { display: inline-flex; border: 1px solid var(--surface-line); border-radius: var(--radius-button); overflow: hidden; }
 .view-tab {
@@ -728,129 +289,659 @@ button { color: inherit; }
   border: 0;
   background: transparent;
   color: var(--nominal-quiet);
-  font: inherit;
-  font-size: 0.8rem;
+  font-size: var(--text-label);
   cursor: pointer;
 }
-.view-tab[aria-pressed="true"] { background: var(--paper); color: var(--ground); font-weight: 700; }
+.view-tab[aria-pressed="true"] { background: var(--paper); color: var(--button-primary-ink); font-weight: 700; }
 
-/* 콘솔 안의 상태줄은 카드가 아니라 한 줄이다 — 210px를 쓰면 지도를 먹는다. */
-.console .hero-strip {
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  min-height: 0;
+.auth-drawer {
+  position: fixed;
+  z-index: 30;
+  top: calc(var(--topbar-height) + var(--space-3));
+  right: var(--space-5);
+  display: none;
+  width: min(460px, calc(100vw - var(--space-6)));
+  padding: var(--space-5);
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+}
+.auth-drawer.open { display: grid; gap: var(--space-4); }
+.auth-drawer h2 { margin: 0 0 var(--space-2); font: 600 var(--text-title)/1.2 var(--body); }
+.auth-drawer p { margin: 0; color: var(--muted); font-size: var(--text-body); line-height: 1.55; }
+.auth-drawer label { display: block; margin-bottom: var(--space-2); }
+.auth-row { display: flex; gap: var(--space-2); }
+.auth-row input { flex: 1; }
+.drawer-close {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  min-height: var(--target-secondary);
+  min-width: var(--target-secondary);
   border: 0;
-  border-bottom: 1px solid var(--surface-line);
-  border-radius: 0;
-  padding: var(--space-3) var(--space-4);
-  gap: var(--space-5);
+  border-radius: var(--radius-button);
+  color: var(--muted);
+  background: none;
+  font-size: var(--text-title);
+  cursor: pointer;
 }
-.console .hero-strip h1 { font-size: 1.05rem; }
-.console .hero-strip p { display: none; }
-.console .hero-state, .console .hero-safety { text-align: right; }
+.form-message { min-height: 1.4em; margin: var(--space-2) 0 0; font: var(--text-label)/1.4 var(--mono); }
 
-/* `display`를 지정한 요소에는 [hidden]의 display:none이 지고 만다. 숨긴 뷰가
-   그대로 레이아웃을 차지해 콘솔이 스크롤하게 되는 고전적 버그다. */
-[hidden] { display: none !important; }
+/* 레이아웃은 뷰가 소유한다 — 컨테이너가 열을 정하면 두 문법이 섞인다. */
+.dashboard { display: block; width: 100%; margin: 0; }
 
-/* 상태줄은 한 줄이다. 라벨은 작게, 설명은 콘솔에서 쓰지 않는다. */
-.console .hero-strip { padding: var(--space-2) var(--space-4); gap: var(--space-4); }
-.console .hero-strip h1 { font-size: 1rem; margin: 0; }
-.console .hero-label { font-size: 0.6rem; }
-.console .hero-state strong, .console .hero-safety strong { font-size: 1rem; }
-.console .sequence { font-size: 0.62rem; }
-
-/* 되돌릴 수 없는 것은 언제나 같은 자리에 있다 — 조작 영역 맨 위, 스크롤 밖. */
-.region-act .control-panel { display: flex; flex-direction: column; gap: var(--space-3); min-height: 0; }
-.region-act .stop-row { flex: none; }
-
-/* 콘솔에서는 카드 여백을 쓰지 않는다 — 50px 패딩이 상태줄을 141px로 만든다. */
-.console .hero-copy { padding: 0; }
-.console .hero-copy h1 { line-height: 1.2; }
-/* `aspect-ratio`가 `flex: 1`과 싸워 지도를 54px로 눌렀다. 관측에서는 남는
-   높이를 전부 쓴다 — 지도가 콘솔의 심장이다. */
-.region-observe .map-stage { aspect-ratio: auto; }
-
-/* 상태줄의 세 칸도 같은 50px 카드 여백을 갖고 있었다. 콘솔에서는 한 줄이다. */
-.console .hero-state, .console .hero-safety {
-  padding: 0 0 0 var(--space-4);
-  justify-content: center;
-  gap: var(--space-1);
+.page-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-6);
+  color: var(--muted);
+  font: var(--text-micro)/1.4 var(--mono);
+  letter-spacing: 0.08em;
 }
-/* 영역 안에서는 간격을 좁힌다 — 패널 하나에 gap 16px이 다섯 번이면 80px이고,
-   그만큼 지도가 줄어든다. */
-.region .panel { gap: var(--space-2); }
-/* 지도 아래 보조 줄은 지도가 먹고 남은 것을 쓴다. */
-.region-observe .map-legend, .region-observe .map-hint { flex: none; }
-
 /* 콘솔은 고정 프레임이다. 꼬리말은 스크롤하는 점검 뷰의 것이므로 운용에서는
-   자리를 내주지 않는다 — 64px이면 지도가 그만큼 줄어든다. */
+   자리를 내주지 않는다 — 64px이면 지도가 그만큼 줄어든다. 클래스 셀렉터여야
+   한다(`#page-footer`는 존재하지 않는다). */
 body[data-view="operate"] .page-footer { display: none; }
 
-/* 영역 안에서는 카드 리듬(자식 margin)을 쓰지 않는다. 간격은 gap이 정한다 —
-   margin이 남으면 지도가 받을 높이를 조용히 먹는다. */
-.region .panel > * { margin: 0; }
+/* ===========================================================================
+   3. 운용 콘솔 — 공간 문법(concept 16 §7.1)
+   ---------------------------------------------------------------------------
+   고정 프레임. 페이지는 스크롤하지 않는다 — 운용자가 외우는 것은 값이 아니라
+   자리다. 넘치면 감지만 스크롤하고 관측·조작은 그대로 있다.
+   ======================================================================== */
 
-/* ---- 콘솔 타이포 --------------------------------------------------------
-   넓은 카드용 clamp() 크기가 264px 칸에서 제목을 두 줄로 깨고 값을 잘랐다.
-   좁은 칸에는 좁은 칸의 한 벌이 필요하다(Layout 아트보드의 6단계). */
-.region { font-size: 0.78rem; }
-.region .panel h2 { font: 600 0.9rem/1.25 var(--body); letter-spacing: 0; }
-.region .panel h3 { font: 600 0.8rem/1.3 var(--body); letter-spacing: 0; }
-.region .panel-heading { align-items: baseline; gap: var(--space-2); }
+.console {
+  height: calc(100vh - var(--topbar-height));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
 
-.region .telemetry-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
-.region .telemetry-grid article { padding: var(--space-2); min-width: 0; }
-.region .telemetry-grid span { font-size: 0.58rem; letter-spacing: 0.06em; }
-.region .telemetry-grid strong {
-  display: block;
-  font: 600 0.95rem/1.25 var(--mono);
+/* ---- 분류 — 한 줄이다(Law 1) ---------------------------------------------
+   머리에 하나, 나머지는 색 없는 맥락. 세로로 쌓으면 160px을 가져가고 그만큼
+   지도가 준다 — 고장 하나가 화면의 1/4을 먹을 이유는 없다. */
+.triage {
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--surface-line);
+  background: var(--surface-flat);
+}
+/* 물리적 위험과 이동 차단은 채운다 — 되돌릴 수 없는 것과 같은 범주다(Law 3). */
+.triage[data-category="hazard"], .triage[data-category="blocked"] {
+  color: var(--paper);
+  background: var(--status-crit);
+  border-bottom-color: var(--status-crit);
+}
+/* 임무 위협은 글자다. 아직 갈 수는 있다. */
+.triage[data-category="mission"] {
+  color: var(--status-warn);
+  border-bottom-color: var(--status-warn);
+}
+.triage-head { min-width: 0; }
+.triage-copy { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
+.triage-copy h2 { flex: none; margin: 0; font: 700 var(--text-body)/1.4 var(--body); }
+/* 설명은 제목 옆에 붙는다. 넘치면 자른다 — 전문은 분류 머리가 아니라 이벤트
+   기록의 몫이다. */
+.triage-copy p {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: 1.4;
+  opacity: 0.9;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.region .telemetry-grid small { font-size: 0.56rem; }
-
-/* 나이는 값 옆에 붙는 작은 글자다 — 블록으로 쌓이면 칸이 무너진다. */
-[data-evidence="delayed"][data-age]::after { display: inline; white-space: nowrap; }
-
-/* 되돌릴 수 없는 것은 가로로 넓다. 글자가 세로로 눕는 순간 못 읽는다. */
-.region-act .safety-actions { display: grid; grid-template-columns: 1fr; gap: var(--space-2); }
-.region-act .stop-button, .region-act .release-button {
-  min-height: var(--target-irreversible);
-  padding: var(--space-3);
-  text-align: left;
-  white-space: normal;
+.triage-context {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-.region-act .stop-button span, .region-act .release-button span {
-  font: 700 0.95rem/1.2 var(--mono);
-  margin-bottom: var(--space-1);
+.triage-context li { display: flex; gap: var(--space-2); font-size: var(--text-micro); line-height: 1.3; opacity: 0.72; white-space: nowrap; }
+.triage-context b { flex-shrink: 0; font-weight: 600; }
+.triage-context:empty { display: none; }
+/* 맥락이 셋을 넘으면 읽지 않는다. 자리를 늘리는 대신 접는다. */
+.triage-context li:nth-child(n + 4) { display: none; }
+
+/* ---- 상태 레일 — 로봇이 지금 무엇인가 -------------------------------------
+   넓은 카드용 hero가 아니라 계기 레일이다. 라벨과 값이 가로로 붙고 칸마다
+   실선으로 갈린다. 세로로 쌓으면 210px이고 그건 지도에서 빼 온 높이다. */
+.hero-strip {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  padding: 0 var(--space-5);
+  border-bottom: 1px solid var(--surface-line);
+  background: var(--ground-deep);
 }
-.region-act .stop-button small, .region-act .release-button small { font-size: 0.6rem; line-height: 1.35; }
-.region-act .mode-control button { font-size: 0.7rem; }
+.hero-strip > div { padding: var(--space-3) var(--space-4); }
+.hero-copy { flex: 1; min-width: 0; display: flex; align-items: center; padding-left: 0; }
+.hero-copy h1 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  font: 600 var(--text-value)/1.25 var(--body);
+}
+/* 식별자는 제목 아래가 아니라 옆이다 — 한 줄에서 이름과 계보를 같이 읽는다. */
+.hero-copy h1 em {
+  min-width: 0;
+  color: var(--muted);
+  font: var(--text-label)/1 var(--mono);
+  letter-spacing: 0.06em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 설명 문장은 콘솔에 두지 않는다. 읽는 글은 점검 뷰의 것이다. */
+.hero-strip p { display: none; }
+.hero-state, .hero-safety {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  border-left: 1px solid var(--surface-line);
+}
+.hero-label { flex: none; }
+.hero-state strong, .hero-safety strong { font-size: var(--text-value); font-weight: 600; letter-spacing: 0.02em; }
+.hero-state .sequence, .hero-safety > span:last-child { color: var(--muted); font: var(--text-micro)/1.3 var(--mono); }
+.hero-safety.safe strong { color: var(--nominal); }
+.hero-safety.danger strong { color: var(--status-crit); }
 
-/* 값은 세 자리까지 칸에 들어가야 한다 — 잘린 좌표는 좌표가 아니다. */
-.region .telemetry-grid strong { font-size: 0.86rem; }
-/* 머리는 한 눈에 읽히되 지도의 높이를 가져가지 않는다. */
-.console .triage { padding: var(--space-3) var(--space-4); }
-.console .triage-copy p { margin-top: var(--space-1); }
-
-/* 지도 컨트롤은 지도 위에 얹는다. 흐름에 두면 툴바 두 줄이 88px을 가져가고
-   그만큼 관측이 줄어든다 — 관측이 콘솔의 심장이다. */
-.map-controls {
-  position: absolute;
-  z-index: 2;
-  top: var(--space-2);
-  left: var(--space-2);
+/* ---- 영역 셋 --------------------------------------------------------------
+   폭은 역할이 정한다. 감지는 숫자 세 칸이 들어갈 만큼, 조작은 되돌릴 수 없는
+   버튼이 가로로 눕지 않을 만큼, 나머지는 전부 관측이다. */
+.regions {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 272px minmax(0, 1fr) 320px;
+}
+.region {
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  font-size: var(--text-label);
 }
-.map-controls .map-toolbar {
-  background: var(--scrim);
-  border: 1px solid var(--surface-line);
-  border-radius: var(--radius-button);
-  padding: var(--space-1);
+/* 보고하는 것은 평평하고, 세상을 바꾸는 것은 솟아 있다(Law 2).
+   관측은 창이므로 가장 어둡다 — 지도 래스터가 그 위에 뜬다. */
+.region-sense { background: var(--surface-flat); border-right: 1px solid var(--surface-line); overflow-y: auto; }
+.region-observe { background: var(--ground-deep); }
+.region-act {
+  background: var(--surface-raised);
+  border-left: 1px solid var(--surface-line);
+  box-shadow: inset 1px 0 0 var(--surface-sheen);
+  overflow-y: auto;
 }
 
+/* 영역 머리는 제목이 아니라 레일이다 — 이름과 역할이 한 줄에 붙고 아래로
+   실선이 지난다. 이 한 줄이 "여기는 무엇을 보는 칸인가"를 고정한다. */
+.region-head {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--surface-line);
+}
+.region-head h2 { margin: 0; color: var(--paper); font-size: var(--text-label); letter-spacing: 0.14em; }
+.region-head span {
+  min-width: 0;
+  color: var(--nominal-quiet);
+  font-size: var(--text-micro);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- 감지 — 값 격자는 선으로 짠다 -----------------------------------------
+   칸마다 테두리와 모서리를 주면 여섯 개의 작은 카드가 된다. 1px 간격에 바탕을
+   깔아 진짜 격자로 만든다 — 자릿수가 세로로 정렬되고 눈이 표로 읽는다. */
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-control);
+  background: var(--surface-line);
+  overflow: hidden;
+}
+.telemetry-grid article { min-width: 0; padding: var(--space-2); background: var(--ground); }
+.telemetry-grid span, .telemetry-grid strong, .telemetry-grid small { display: block; }
+.telemetry-grid strong {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-value);
+  font-weight: 600;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.telemetry-grid small { margin-top: 2px; color: var(--nominal-quiet); font: var(--text-micro)/1 var(--mono); }
+
+/* 한 줄짜리 값도 같은 격자다 — 라벨 왼쪽, 값 오른쪽, 위로 실선. */
+.navigation-line {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--surface-line);
+}
+.navigation-line b { color: var(--series-primary); font-size: var(--text-body); text-align: right; }
+.navigation-line small { color: var(--nominal-quiet); font: var(--text-micro)/1 var(--mono); }
+
+.capability-list { display: grid; }
+.capability-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0 var(--space-3);
+  min-height: var(--target-secondary);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--surface-line);
+}
+.capability-item span { min-width: 0; overflow: hidden; font-size: var(--text-label); text-overflow: ellipsis; white-space: nowrap; }
+.capability-item b { font: var(--text-micro)/1 var(--mono); letter-spacing: 0.06em; }
+.capability-item small { grid-column: 1 / -1; color: var(--nominal-quiet); font-size: var(--text-micro); line-height: 1.4; }
+/* 가용은 정상이므로 색이 없다. 제약과 차단만 색을 쓴다(D-82). */
+.capability-item[data-state="constrained"] b { color: var(--status-warn); }
+.capability-item[data-state="blocked"] b { color: var(--status-crit); }
+
+/* ---- 관측 — 지도가 영역을 전부 쓴다 ---------------------------------------
+   보조 요소는 전부 지도 위로 올린다. 흐름에 두면 툴바 두 줄·범례·안내가
+   264px을 먼저 가져가고 지도는 남는 것을 받는다 — 순서가 거꾸로다. */
+.field-map-panel { flex: 1; min-height: 0; }
+.map-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-control);
+  background: var(--ground-deep);
+  overflow: hidden;
+}
+#map-canvas { display: block; width: 100%; height: 100%; }
+.map-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--muted);
+  font: var(--text-label)/1.5 var(--mono);
+  pointer-events: none;
+}
+
+/* 지도 위에 얹는 것은 전부 같은 칩이다 — 장막 바탕에 실선 테두리. 점유 격자가
+   밝든 어둡든 그 위에서 읽힌다. */
+.map-controls { position: absolute; z-index: 2; top: var(--space-2); left: var(--space-2); display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
+.map-toolbar, .map-hint, .map-legend {
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-button);
+  background: var(--scrim);
+}
+.map-toolbar { display: flex; gap: var(--space-1); margin: 0; padding: var(--space-1); }
+.map-toolbar button {
+  min-height: var(--target-secondary);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  color: var(--nominal-quiet);
+  background: transparent;
+  font: var(--text-micro)/1 var(--mono);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.map-toolbar button[aria-pressed="true"] { color: var(--button-primary-ink); background: var(--button-primary-bg); }
+/* 안내는 클릭 모드 툴바를 설명하는 글이다 — 그 아래 붙여 둔다. */
+.map-hint { max-width: 236px; margin: 0; padding: var(--space-2); color: var(--muted); font-size: var(--text-micro); line-height: 1.5; }
+/* 범례는 지도의 색을 설명한다 — 지도 위가 제자리다. */
+.map-legend {
+  position: absolute;
+  z-index: 2;
+  left: var(--space-2);
+  bottom: var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  list-style: none;
+  color: var(--muted);
+  font: var(--text-micro)/1.4 var(--mono);
+}
+.map-legend li { display: flex; align-items: center; gap: var(--space-2); }
+.map-legend li::before { content: ""; width: 10px; height: 10px; border: 1px solid var(--surface-line); }
+/* 견본은 map.js가 실제로 칠하는 토큰과 같아야 한다. 다르면 범례가 거짓말이다. */
+.map-legend [data-swatch="free"]::before { background: var(--raster-free); }
+.map-legend [data-swatch="occupied"]::before { background: var(--raster-occupied); }
+.map-legend [data-swatch="unknown"]::before { background: var(--raster-unknown); }
+.map-legend [data-swatch="cost"]::before { background: var(--status-warn); }
+.map-legend [data-swatch="path"]::before { background: var(--series-primary); }
+.map-legend [data-swatch="robot"]::before { background: var(--paper); }
+
+/* ---- 조작 — 크기가 위험도다(Law 3) ----------------------------------------
+   되돌릴 수 없는 것이 가장 크고 맨 위이며 언제나 같은 자리에 있다.
+   가로로 넓다 — 글자가 세로로 눕는 순간 못 읽는다. */
+.control-panel { gap: var(--space-3); }
+.safety-actions { display: grid; gap: var(--space-2); }
+.stop-button, .release-button {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-button);
+  text-align: left;
+  cursor: pointer;
+}
+.stop-button { min-height: var(--target-irreversible); color: var(--paper); background: var(--status-crit); }
+.release-button { min-height: var(--target-secondary); color: var(--paper); border-color: var(--surface-line); background: transparent; }
+.stop-button span, .release-button span, .stop-button small, .release-button small { display: block; }
+.stop-button span, .release-button span { margin-bottom: var(--space-1); font: 700 var(--text-value)/1.2 var(--mono); letter-spacing: 0.04em; }
+.stop-button small, .release-button small { font: var(--text-micro)/1.3 var(--mono); opacity: 0.75; }
+
+/* 모드는 셋 중 하나다 — 분절 제어. 지금 어디에 있는지가 채운 칸으로 보인다. */
+.mode-control {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+.mode-control button {
+  min-height: var(--target-secondary);
+  border: 0;
+  border-right: 1px solid var(--surface-line);
+  color: var(--nominal-quiet);
+  background: transparent;
+  font: var(--text-label)/1 var(--mono);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.mode-control button:last-child { border-right: 0; }
+.mode-control button:hover:not(:disabled) { color: var(--paper); background: var(--surface-sheen); }
+.mode-control button.active { color: var(--button-primary-ink); background: var(--button-primary-bg); font-weight: 700; }
+.mode-control button:disabled { color: var(--muted); cursor: not-allowed; opacity: 0.35; }
+
+/* 저속 직접 제어도 카드가 아니다 — 같은 면 위의 묶음이다. */
+.teleop-commissioning { display: flex; flex-direction: column; gap: var(--space-2); }
+.teleop-copy { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.teleop-copy > div { flex: none; }
+.teleop-copy h3 { margin: 0; }
+.teleop-copy > span { color: var(--nominal-quiet); font: var(--text-micro)/1.3 var(--mono); text-align: right; }
+.bench-confirmation {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--target-secondary);
+  color: var(--nominal-quiet);
+  font-size: var(--text-micro);
+  line-height: 1.4;
+  cursor: pointer;
+}
+.bench-confirmation input { width: 20px; height: 20px; flex: none; margin: 0; accent-color: var(--focus-ring); }
+.teleop-pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-1); }
+.teleop-pad button {
+  min-height: var(--target-secondary);
+  padding: var(--space-1);
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-control);
+  color: var(--paper);
+  background: transparent;
+  font: var(--text-value)/1 var(--mono);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+.teleop-pad button small { display: block; margin-top: 2px; color: var(--nominal-quiet); font: var(--text-micro)/1 var(--mono); }
+/* 눌려 있는 동안만 움직인다 — 그 사실이 계열색 채움으로 보인다. */
+.teleop-pad button.active { color: var(--button-primary-ink); background: var(--series-primary); }
+.teleop-pad button.active small { color: var(--button-primary-ink); }
+.teleop-pad button:disabled { cursor: not-allowed; opacity: 0.3; }
+
+.teleop-message, .action-message { min-height: 1.4em; margin: 0; color: var(--nominal-quiet); font: var(--text-micro)/1.4 var(--mono); }
+
+/* ===========================================================================
+   4. 점검 — 절차 문법(concept 16 §7.2)
+   ---------------------------------------------------------------------------
+   여기서만 스크롤이 허용된다. 스크롤이 곧 절차이고 순서는 기동 순서다.
+   카드를 그만두는 것은 운용의 규칙이다 — 점검은 한 항목씩 확인하고 넘어가는
+   화면이라 카드가 맞다. 두 문법을 섞지 않는다.
+   ======================================================================== */
+
+.inspect {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  max-width: 1100px;
+}
+.inspect .panel {
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-panel);
+  background: var(--surface-flat);
+  box-shadow: inset 0 1px 0 var(--surface-sheen);
+  scroll-margin-top: calc(var(--topbar-height) + var(--space-3));
+}
+.inspect .panel h2 { font-size: var(--text-title); letter-spacing: 0; text-transform: none; color: var(--paper); }
+.inspect .panel h3 { font-size: var(--text-body); letter-spacing: 0; text-transform: none; color: var(--paper); }
+
+.system-identity { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3) var(--space-5); }
+.system-identity div { min-width: 0; padding-bottom: var(--space-2); border-bottom: 1px solid var(--surface-line); }
+.system-identity span, .system-identity strong { display: block; }
+.system-identity span { margin-bottom: var(--space-1); }
+.system-identity strong { overflow: hidden; font: var(--text-body)/1.3 var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+
+.meter-stack { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.meter { padding: var(--space-3); border: 1px solid var(--surface-line); border-radius: var(--radius-control); }
+.meter header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.meter header b { font-size: var(--text-title); }
+/* 게이지는 여유로 읽힌다 — 임계를 넘기 전까지 중립이다(D-82). */
+.meter-rail { height: 4px; margin: var(--space-3) 0 var(--space-2); border-radius: var(--radius-flag); background: var(--gauge-track); overflow: hidden; }
+.meter-rail i { display: block; width: var(--meter, 0%); height: 100%; background: var(--paper); }
+.meter footer { overflow: hidden; color: var(--nominal-quiet); font: var(--text-micro)/1.4 var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.temperature-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--space-3);
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-control);
+}
+.temperature-card span, .temperature-card small { color: var(--nominal-quiet); font: var(--text-micro)/1.4 var(--mono); }
+.temperature-card strong { margin: var(--space-1) 0; font-size: var(--text-title); }
+.temperature-card[data-level="warn"] strong { color: var(--status-warn); }
+.temperature-card[data-level="crit"] strong { color: var(--status-crit); }
+.runtime-warning { min-height: 1.2em; margin: 0; color: var(--status-warn); font: var(--text-micro)/1.5 var(--mono); }
+
+.host-card-grid { display: grid; gap: var(--space-3); }
+.host-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+}
+/* 절차에는 번호가 있다 — 이 카드가 몇 번째인지가 곧 순서다. */
+.host-card[data-step]::before { content: attr(data-step); color: var(--nominal-quiet); font: var(--text-micro)/1 var(--mono); letter-spacing: 0.14em; }
+.host-card > header, .settings-card > header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.host-card h3, .settings-card h3 { margin: 0; font: 600 var(--text-body)/1.3 var(--body); }
+/* 값이 오지 않은 카드는 흐려지고 그렇게 말한다. 아무 말 없는 정상 카드처럼
+   보이면 안 된다. */
+.host-card[data-available="false"] { border-style: dashed; opacity: 0.72; }
+.host-card[data-available="false"] .host-facts { display: none; }
+.host-card[data-available="false"] .host-note { color: var(--status-warn); }
+.host-facts { display: grid; gap: var(--space-1); margin: 0; }
+.host-facts > div { display: flex; justify-content: space-between; gap: var(--space-3); font-size: var(--text-label); }
+.host-facts dt { color: var(--nominal-quiet); }
+.host-facts dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+.host-note { margin: 0; color: var(--nominal-quiet); font-size: var(--text-label); line-height: 1.5; }
+.host-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: auto; }
+.host-actions button { flex: 1 1 auto; }
+.host-card form { display: grid; gap: var(--space-2); }
+
+.ros-network-facts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-control);
+  background: var(--surface-line);
+  overflow: hidden;
+}
+.ros-network-facts article { min-width: 0; padding: var(--space-3); background: var(--ground); }
+.ros-network-facts strong { display: block; margin-top: var(--space-2); overflow: hidden; font: var(--text-value)/1.2 var(--body); text-overflow: ellipsis; white-space: nowrap; }
+.ros-network-facts small { display: block; margin-top: var(--space-1); color: var(--nominal-quiet); font: var(--text-micro)/1.3 var(--mono); }
+
+.network-traffic-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
+.traffic-card {
+  position: relative;
+  min-height: 106px;
+  padding: var(--space-3);
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+.traffic-card header { position: relative; z-index: 1; display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.traffic-card strong { font-size: var(--text-value); }
+.network-sparkline { position: absolute; inset: auto var(--space-3) var(--space-2) var(--space-3); height: 52px; overflow: visible; }
+.network-sparkline polyline { fill: none; stroke-width: 2; stroke-linecap: square; stroke-linejoin: bevel; }
+/* 받는 것과 보내는 것은 다른 종류가 아니라 같은 계열의 둘이다 — 색상이 아니라
+   밝기로 가른다(D-82). */
+.traffic-rx .network-sparkline polyline { stroke: var(--series-primary); }
+.traffic-tx .network-sparkline polyline { stroke: var(--series-secondary); }
+
+.ros-graph-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(230px, 0.72fr); gap: var(--space-3); }
+.graph-stage, .risk-tape { border: 1px solid var(--surface-line); border-radius: var(--radius-control); background: var(--ground); }
+.graph-stage { position: relative; min-height: 330px; padding: var(--space-5) var(--space-2) var(--space-2); }
+.graph-legend { position: absolute; top: var(--space-2); left: var(--space-4); display: flex; align-items: center; gap: var(--space-2); color: var(--nominal-quiet); font: var(--text-micro)/1 var(--mono); letter-spacing: 0.1em; }
+.graph-legend i { width: 32px; height: 1px; background: var(--surface-line); }
+.ros-graph-map { width: 100%; height: 300px; }
+.graph-edge { stroke: var(--muted-line); stroke-width: 1; }
+.graph-edge.publishes { stroke: var(--series-primary); }
+.graph-edge.subscribes { stroke-dasharray: 4 4; }
+.graph-node { fill: var(--ground-raise); stroke: var(--surface-line); stroke-width: 1; }
+.graph-node.foreign { fill: var(--status-crit-a10); stroke: var(--status-crit); }
+.graph-topic { fill: var(--status-warn); stroke: var(--ground); stroke-width: 3; }
+.graph-node-label, .graph-topic-label, .graph-empty { fill: var(--paper); font: 11px var(--mono); text-anchor: middle; }
+.graph-topic-label { fill: var(--muted); text-anchor: end; }
+.graph-empty { fill: var(--muted); }
+
+.risk-tape { padding: var(--space-4); }
+.risk-tape h3 { margin: 0 0 var(--space-3); font: 600 var(--text-body)/1.3 var(--body); }
+.risk-tape ul { display: grid; gap: var(--space-2); min-height: 150px; margin: 0; padding: 0; list-style: none; }
+.risk-tape li { padding: var(--space-2); border-left: 2px solid var(--status-crit); background: var(--status-crit-a07); }
+.risk-tape li strong, .risk-tape li span { display: block; }
+.risk-tape li strong { color: var(--status-crit); font: var(--text-micro)/1 var(--mono); letter-spacing: 0.08em; }
+.risk-tape li span { margin-top: var(--space-1); color: var(--paper); font: var(--text-label)/1.45 var(--mono); }
+/* 위험이 없을 때는 색도 테두리도 쓰지 않는다 — 정상에는 색이 없다. */
+.risk-tape li.risk-clear { color: var(--nominal); border-left-color: var(--surface-line); background: transparent; font: var(--text-label)/1.5 var(--mono); }
+.risk-tape li.risk-unavailable { color: var(--nominal-quiet); border-left-color: var(--surface-line); background: transparent; font: var(--text-label)/1.5 var(--mono); }
+.risk-tape > p { margin: var(--space-4) 0 0; color: var(--nominal-quiet); font: var(--text-micro)/1.5 var(--mono); }
+
+.settings-grid { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); }
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-control);
+  background: var(--ground);
+}
+.settings-card form { display: grid; gap: var(--space-2); }
+.settings-row { display: flex; gap: var(--space-2); }
+.settings-row input { flex: 1 1 auto; }
+
+.waypoint-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.waypoint-list li:not(.empty-state) {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--surface-line);
+}
+.waypoint-list strong { font: var(--text-body)/1.3 var(--mono); }
+.waypoint-list span { grid-column: 1; color: var(--nominal-quiet); font: var(--text-micro)/1.4 var(--mono); }
+.waypoint-actions { display: flex; align-items: start; gap: var(--space-1); }
+
+.event-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 var(--space-5); margin: 0; padding: 0; list-style: none; }
+.event-list li:not(.empty-state) {
+  display: grid;
+  grid-template-columns: 76px 1fr auto;
+  align-items: start;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--surface-line);
+}
+.event-time, .event-severity { color: var(--nominal-quiet); font: var(--text-micro)/1.4 var(--mono); }
+.event-type { overflow: hidden; font: var(--text-label)/1.4 var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+/* info는 정상이므로 색이 없다. 경고와 오류만 색을 쓴다. */
+.event-severity.error, .event-severity.critical { color: var(--status-crit); }
+.event-severity.warning { color: var(--status-warn); }
+
+/* ===========================================================================
+   5. 좁은 화면
+   ---------------------------------------------------------------------------
+   고정 3분할은 현장 콘솔의 약속이다. 휴대폰에는 그 프레임 자체가 없으므로
+   운용 뷰도 세로로 쌓고 스크롤을 허용한다 — 규칙을 어기는 게 아니라, 규칙이
+   전제하는 화면이 아니라는 뜻이다.
+   ======================================================================== */
+
+@media (max-width: 1080px) {
+  .regions { grid-template-columns: 240px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  .region-observe { grid-column: 2; grid-row: 1; }
+  .region-act { grid-column: 1 / -1; grid-row: 2; border-left: 0; border-top: 1px solid var(--surface-line); }
+  .safety-actions { grid-template-columns: 1fr 1fr; }
+  .ros-network-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ros-graph-layout { grid-template-columns: 1fr; }
+  .event-list { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+  .console { height: auto; overflow: visible; }
+  .regions { grid-template-columns: 1fr; grid-template-rows: none; }
+  .region { grid-column: auto; grid-row: auto; overflow: visible; }
+  .region-observe { min-height: 60vh; }
+  .region-act { border-top: 1px solid var(--surface-line); }
+  body[data-view="operate"] .page-footer { display: flex; }
+  .topbar { min-height: 66px; padding: 0 var(--space-4); }
+  .clock, .status-badge span { display: none; }
+  .status-badge { justify-content: center; }
+  .hero-strip { flex-wrap: wrap; padding: 0 var(--space-4); }
+  .hero-copy { flex: 1 0 100%; }
+  .hero-state, .hero-safety { flex: 1 0 auto; border-left: 0; padding-left: 0; }
+  .system-identity, .meter-stack, .network-traffic-grid, .settings-grid { grid-template-columns: 1fr; }
+  .telemetry-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ros-network-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .teleop-pad { grid-template-columns: repeat(2, 1fr); }
+  .event-list li:not(.empty-state) { grid-template-columns: 62px 1fr; }
+  .event-severity { grid-column: 2; }
+  .page-footer { flex-direction: column; gap: var(--space-3); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -174,4 +174,19 @@
    * 플랫폼마다 하나씩 두어 어디서도 Courier로 떨어지지 않게 한다. */
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Roboto Mono",
           "DejaVu Sans Mono", "Noto Sans Mono", monospace;
+
+  /* 크기도 닫힌 집합이다. 예전 표면 규칙에는 0.55 ~ 6.7rem 사이의 크기가
+   * 마흔 가지 있었고 그중 스물여섯은 한 번만 쓰였다 — 계단이 없으면 아무도
+   * 같은 값을 고르지 않는다. 다섯 단계면 위계를 말하기에 충분하다.
+   *   micro 단위·각주.      label 대문자 머리·라벨.   body 읽는 글.
+   *   value 계기 값(등폭).  title 화면 하나의 이름.
+   * 콘솔은 micro~value만 쓴다. 큰 글자는 위계가 아니라 소음이다. */
+  --text-micro: 0.58rem;
+  --text-label: 0.68rem;
+  --text-body: 0.8rem;
+  --text-value: 0.95rem;
+  --text-title: 1.15rem;
+
+  /* 대문자 라벨은 자간이 없으면 뭉친다. 한 값으로 고정한다. */
+  --track-label: 0.12em;
 }
