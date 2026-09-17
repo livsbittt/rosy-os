@@ -28,3 +28,4 @@
 ## 최근 기록
 
 - 2026-09-18 · uncommitted · chore(games): bootstrap pytest path and drop empty isaac
+- 2026-09-18 · uncommitted · feat(games): clamp non-play and ramming twists in the referee gate

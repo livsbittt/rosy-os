@@ -13,6 +13,7 @@ class Field:
     home_id: str = "rosy_01"
     away_id: str = "rosy_02"
     kickoff_radius_m: float = 0.12
+    min_spacing_m: float = 0.35
 
     def in_bounds(self, x: float, y: float) -> bool:
         return abs(x) <= self.length_m / 2 and abs(y) <= self.width_m / 2
