@@ -1,5 +1,5 @@
-from rosy_games.field import Pose2D
-from rosy_games.game import Observation
+from rosy_games.field import ZERO, Pose2D
+from rosy_games.game import MatchState, Observation, Phase
 from rosy_games.policy import HeuristicPolicy
 
 
@@ -13,11 +13,25 @@ def _obs(ball, robots):
     )
 
 
+def _play() -> MatchState:
+    return MatchState(phase=Phase.PLAY, score={"rosy_01": 0, "rosy_02": 0}, reason="")
+
+
 def test_policy_turns_toward_the_ball_and_stops_when_the_other_robot_is_close():
     policy = HeuristicPolicy()
+    play = _play()
     far = _obs((0.5, 0.0), {"rosy_01": (0.0, 0.0, 0.0), "rosy_02": (0.0, 1.0, 0.0)})
-    chase = policy.act("rosy_01", far)
-    assert chase.linear > 0
+    chase = policy.act(far, play)
+    assert chase["rosy_01"].linear > 0
+    assert "rosy_02" in chase
     close = _obs((0.5, 0.0), {"rosy_01": (0.0, 0.0, 0.0), "rosy_02": (0.1, 0.0, 0.0)})
-    hold = policy.act("rosy_01", close)
-    assert hold.linear <= 0
+    hold = policy.act(close, play)
+    assert hold["rosy_01"].linear <= 0
+
+
+def test_policy_idles_when_phase_is_not_play():
+    policy = HeuristicPolicy()
+    obs = _obs((0.5, 0.0), {"rosy_01": (0.0, 0.0, 0.0), "rosy_02": (0.0, 1.0, 0.0)})
+    state = MatchState(phase=Phase.HOLD, score={"rosy_01": 0, "rosy_02": 0}, reason="lost")
+    out = policy.act(obs, state)
+    assert out == {} or all(twist == ZERO for twist in out.values())

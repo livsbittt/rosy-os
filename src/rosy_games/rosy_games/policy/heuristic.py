@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 
 from rosy_games.field import ZERO, Field, Twist
-from rosy_games.game import Observation
+from rosy_games.game import MatchState, Observation, Phase
 
 
 class HeuristicPolicy:
@@ -14,7 +14,12 @@ class HeuristicPolicy:
         self.speed = speed
         self.avoid_m = 0.35
 
-    def act(self, robot_id: str, observation: Observation) -> Twist:
+    def act(self, obs: Observation, state: MatchState) -> dict[str, Twist]:
+        if state.phase is not Phase.PLAY:
+            return {}
+        return {robot_id: self._twist(robot_id, obs) for robot_id in obs.robots}
+
+    def _twist(self, robot_id: str, observation: Observation) -> Twist:
         pose = observation.robots.get(robot_id)
         if pose is None or observation.ball is None:
             return ZERO

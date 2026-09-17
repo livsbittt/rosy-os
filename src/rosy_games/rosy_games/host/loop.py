@@ -12,6 +12,7 @@ from rosy_games.field import Twist
 from rosy_games.game import MatchState, Observation, SoccerGame
 from rosy_games.game.gate import gate
 from rosy_games.policy.heuristic import HeuristicPolicy
+from rosy_games.policy.protocol import Policy
 
 
 class ObservationSource(Protocol):
@@ -29,7 +30,7 @@ class MatchHost:
         sink: TwistSink,
         *,
         game: SoccerGame | None = None,
-        policy: HeuristicPolicy | None = None,
+        policy: Policy | None = None,
     ) -> None:
         self.source = source
         self.sink = sink
@@ -42,10 +43,7 @@ class MatchHost:
     def tick(self) -> MatchState:
         observation = self.source.capture()
         result = self.game.step(observation)
-        twists = {
-            robot_id: self.policy.act(robot_id, observation)
-            for robot_id in observation.robots
-        }
+        twists = self.policy.act(observation, result)
         commands = gate(twists, observation, result, self.game.field)
         for robot_id, twist in commands.twists.items():
             self.sink.send(robot_id, twist)
