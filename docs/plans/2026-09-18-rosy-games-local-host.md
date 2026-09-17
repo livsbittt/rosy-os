@@ -20,15 +20,15 @@
 
 | 설계 §3 | 지금 |
 |---|---|
-| `test/conftest.py` | 없음 → 루트 pytest가 `ModuleNotFoundError` |
+| `test/conftest.py` | **있음** (Task 1). 루트 pytest 수집됨 |
 | `field/types.py`, `geometry.py`, `homography.py` | `Field`가 `field/__init__.py`에 몰려 있음 |
 | `Phase.HOLD` / `GOAL`, `lost_*`, `Game.step(obs)`만 | `KICKOFF`/`IN_PLAY`, `step(obs, actions)`가 정책 속도를 통과 |
 | `game/gate.py` | 없음. 이격은 휴리스틱만 |
 | `host/loop.py`, `transport.py`, `robots.py` | `host/` 빈 `__init__.py` |
 | `cli.py`, `config/match.yaml` | 없음 |
-| `isaac/` 없음 | **빈 `isaac/` 패키지가 있음 — 지운다** |
-| harness `progress.md` / `logs.md` | 없음. `harness.yaml`에도 없음 |
-| `src/AGENTS.md` pytest 목록 | `rosy_games` 빠짐 |
+| `isaac/` 없음 | **삭제함** (Task 1) |
+| harness `progress.md` / `logs.md` | **있음** (Task 1). SOURCE/LOCAL HOLD |
+| `src/AGENTS.md` pytest 목록 | **`rosy_games/test` 포함** |
 
 하지 않는 것 (이 계획 밖): Isaac, `NeuralPolicy`, CORE 변경, D-62 슬라이스, 현장 두 대 충돌 속도, Fleet 콘솔 버튼.
 
@@ -47,7 +47,7 @@
 - Modify: `src/AGENTS.md` Testing Requirements
 - Modify: `docs/plans/AGENTS.md`
 
-- [ ] **Step 1: 실패하는 수집을 고정하는 테스트가 이미 있다**
+- [x] **Step 1: 실패하는 수집을 고정하는 테스트가 이미 있다**
 
 루트에서:
 
@@ -57,7 +57,7 @@ python -m pytest src/rosy_games/test/test_soccer_game.py -q
 
 Expected: ERROR `ModuleNotFoundError: No module named 'rosy_games'`
 
-- [ ] **Step 2: conftest — colcon 없이 패키지를 sys.path에 얹는다**
+- [x] **Step 2: conftest — colcon 없이 패키지를 sys.path에 얹는다**
 
 `src/rosy_games/test/conftest.py`:
 
@@ -75,11 +75,11 @@ if entry not in sys.path:
     sys.path.insert(0, entry)
 ```
 
-- [ ] **Step 3: `isaac/`을 지운다**
+- [x] **Step 3: `isaac/`을 지운다**
 
 설계 §3: 1단계에서 `isaac/` 디렉터리를 만들지 않는다. 빈 예약 패키지는 학습이 있는 것처럼 보인다.
 
-- [ ] **Step 4: 시험이 수집되고 스켈레톤 4개가 통과하는지 본다**
+- [x] **Step 4: 시험이 수집되고 스켈레톤 4개가 통과하는지 본다**
 
 ```
 python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q
@@ -87,7 +87,7 @@ python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q
 
 Expected: PASS (스켈레톤 3 + surface 2; boundaries 포함이면 4+2). `isaac` 폴더가 없어도 boundaries는 `field`/`game`/`policy`만 본다.
 
-- [ ] **Step 5: harness 기록**
+- [x] **Step 5: harness 기록**
 
 `progress.md` 게이트: SOURCE HOLD (트리 미완), LOCAL HOLD (호스트 루프 없음), ROS-SIM/ARTIFACT N/A, DEVICE/FIELD PARKED. `adrs: [D-90]`. plans는 설계와 이 파일.
 
@@ -112,9 +112,9 @@ python -m pytest test/test_harness_contracts.py -q
 
 Expected: PASS
 
-- [ ] **Step 6: `src/AGENTS.md` pytest 줄에 `rosy_games/test`를 넣는다**
+- [x] **Step 6: `src/AGENTS.md` pytest 줄에 `rosy_games/test`를 넣는다**
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit** (`06c0b22` / 계획 본문 `663a379`)
 
 ```
 git add src/rosy_games tools/harness/harness.yaml src/AGENTS.md docs/plans/AGENTS.md
