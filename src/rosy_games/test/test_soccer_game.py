@@ -40,3 +40,43 @@ def test_missing_ball_in_play_holds():
     held = game.step(_obs(ball=None, lost_ball=True))
     assert held.phase is Phase.HOLD
     assert held.score["rosy_01"] == 0
+
+
+def test_lost_robots_or_missing_id_holds_with_reason():
+    game = SoccerGame()
+    game.step(_obs())
+    flagged = game.step(_obs(lost=("rosy_02",)))
+    assert flagged.phase is Phase.HOLD
+    assert flagged.reason
+    missing = Observation(
+        t=0.0,
+        ball=Pose2D(0.0, 0.0, 0.0),
+        robots={"rosy_01": Pose2D(-0.4, 0.0, 0.0)},
+        lost_ball=False,
+        lost_robots=frozenset(),
+    )
+    held = game.step(missing)
+    assert held.phase is Phase.HOLD
+    assert held.reason
+
+
+def test_hold_recovery_does_not_score_a_ball_in_the_away_goal():
+    game = SoccerGame()
+    field = Field()
+    game.step(_obs())
+    game.step(_obs(ball=None, lost_ball=True))
+    mouth = _obs(ball=(field.length_m / 2, 0.0), r1=(0.2, 0.0, 0.0), r2=(0.6, 0.0, 0.0))
+    recovered = game.step(mouth)
+    assert recovered.phase in (Phase.KICKOFF, Phase.HOLD)
+    assert recovered.score["rosy_01"] == 0
+    assert recovered.scorer is None
+
+
+def test_hold_recovery_plays_only_when_kickoff_ready():
+    game = SoccerGame()
+    game.step(_obs())
+    game.step(_obs(ball=None, lost_ball=True))
+    off_centre = game.step(_obs(ball=(0.5, 0.0)))
+    assert off_centre.phase is Phase.KICKOFF
+    centred = game.step(_obs())
+    assert centred.phase is Phase.PLAY

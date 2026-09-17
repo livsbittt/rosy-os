@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from rosy_games.field import Twist
-from rosy_games.game import MatchState, Observation, SoccerGame
+from rosy_games.field import ZERO, Twist
+from rosy_games.game import MatchState, Observation, Phase, SoccerGame
 from rosy_games.policy.heuristic import HeuristicPolicy
 
 
@@ -42,5 +42,10 @@ class MatchHost:
         observation = self.source.capture()
         result = self.game.step(observation)
         for robot_id in observation.robots:
-            self.sink.send(robot_id, self.policy.act(robot_id, observation))
+            twist = (
+                self.policy.act(robot_id, observation)
+                if result.phase is Phase.PLAY
+                else ZERO
+            )
+            self.sink.send(robot_id, twist)
         return result

@@ -33,7 +33,7 @@ class SoccerGame:
                     score=dict(self.score),
                     reason=self._lost_reason(obs),
                 )
-            self.phase = Phase.PLAY
+            self.phase = Phase.KICKOFF
         if self.phase is Phase.KICKOFF:
             if self._kickoff_ready(obs):
                 self.phase = Phase.PLAY
