@@ -29,6 +29,7 @@ No files at this level. Each child is a ROS 2 package with its own `package.xml`
 | `rosy_control/` | Absorbed Pinky sensing, camera/OpenCV, calibration, planning, safety-policy, and navigation-session code; final external API and motor command ownership remain in `rosy_core` (see `rosy_control/AGENTS.md`) |
 | `rosy_omx_adapter/` | Disabled-by-default OMX model profile and ROS-native ros2_control/MoveIt contract boundary (see `rosy_omx_adapter/AGENTS.md`) |
 | `rosy_fleet/` | Fleet seed: formation geometry, slot assignment, reference-stream relay, FOR-004 session, CLI (see `rosy_fleet/AGENTS.md`) |
+| `rosy_games/` | Laptop game host (D-90). Soccer referee/policy. Not a CORE slice. No ROS, no cmd_vel |
 
 ## For AI Agents
 
