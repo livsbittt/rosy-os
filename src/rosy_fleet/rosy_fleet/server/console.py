@@ -20,12 +20,13 @@ outbound WS(heartbeat/event)지만, 그 에이전트는 Fleet 서버가 생긴 �
 from __future__ import annotations
 
 import asyncio
+import math
 import time
 from typing import Any, Callable, Optional, Sequence
 
 from rosy_fleet.formation.geometry import DEFAULT_SPACING, Formation
 from rosy_fleet.hub.hub import HubError, SiteHub
-from rosy_fleet.server import traffic
+from rosy_fleet.server import bays, traffic
 from rosy_fleet.swarm.session import (
     FormationSession,
     FormationSpec,
@@ -59,6 +60,8 @@ class FleetConsole:
         map_ttl_s: float = MAP_TTL_S,
         fleet_name: str = "rosy-site",
         clearance_m: float = traffic.DEFAULT_CLEARANCE_M,
+        passing_width_m: float = bays.PASSING_WIDTH_M,
+        yield_keep_out_m: float = bays.YIELD_KEEP_OUT_M,
         relay_factory=None,
     ) -> None:
         if len(endpoints) != len(clients):
@@ -80,6 +83,14 @@ class FleetConsole:
         #: 남의 경로와 부딪혀 아직 못 내려간 미션. 앞이 비면 그대로 다시 내려간다.
         self._queued: dict[str, dict] = {}
         self._clearance_m = clearance_m
+        self._passing_width_m = passing_width_m
+        self._yield_keep_out_m = yield_keep_out_m
+        #: 비켜서 있는 로봇 → 어디로, 누구를 위해. 화면이 "왜 저리로 갔는지"를 말하려면
+        #: 필요하고, 비켜서기가 끝났는지 판단하는 데도 쓴다.
+        self._yielding: dict[str, dict] = {}
+        #: 마지막으로 본 로봇의 pose 와 주행 상태. 길을 막고 선 로봇을 찾으려면 좌표가
+        #: 있어야 하는데, 로봇 상태는 스냅샷으로 들어온다.
+        self._seen: dict[str, dict] = {}
         #: 열려 있는 대형 세션. 한 사이트에 하나다 - 같은 로봇이 두 대형에 들어가면
         #: 어느 리더를 따라야 하는지 로봇 쪽에서 정할 방법이 없다.
         self._formation = None
@@ -118,12 +129,14 @@ class FleetConsole:
             else:
                 robots.append({"robot_id": robot_id, "online": True, "goal": goal,
                                "queued": queued, "error": None, "state": result})
+        self._remember(robots)
         await self._run_traffic(robots)
         # 교통 정리가 대기 미션을 내려보냈으면 이 스냅샷이 이미 그 뒤다. 행을 다시 읽지
         # 않으면 화면은 방금 출발한 미션을 한 주기 동안 계속 "대기 중"으로 보여 준다.
         for row in robots:
             row["queued"] = self._queued.get(row["robot_id"])
             row["goal"] = self._goals.get(row["robot_id"])
+            row["yielding"] = self._yielding.get(row["robot_id"])
         online = sum(1 for r in robots if r["online"])
         return {
             "fleet": {"name": self.fleet_name, "online": online, "total": len(robots)},
@@ -162,12 +175,24 @@ class FleetConsole:
 
         양보는 늘 **나중에 내려온 미션** 쪽이다. 달리던 로봇을 세우면 좁은 통로 한가운데
         멈춘 장애물이 하나 생길 뿐이고, 그 로봇이 비켜설 자리는 애초에 없다.
+
+        달리는 로봇이 아니라 **서 있는 로봇**이 길을 막고 있으면 순서로는 풀리지 않는다.
+        그때는 `bays` 로 비켜설 자리를 찾아 그 로봇을 먼저 치운다 (`_make_room`).
         """
         if robot_id in self._formation_members():
             # 팔로워는 리더 pose 를 따라가는 중이다. 여기에 목표를 따로 내리면 로봇 안에서
             # 두 임자가 같은 바퀴를 두고 다툰다 - 대형을 풀고 보내라고 돌려준다.
             raise HubError("FORMATION_ACTIVE",
                            f"{robot_id} is in the running formation; stop it first")
+        yielding = self._yielding.get(robot_id)
+        if yielding is not None:
+            # 이 로봇은 남을 지나가게 하려고 비켜서는 중이다. 지금 다른 데로 보내면 방금
+            # 비운 통로를 다시 막고, 그 통로를 기다리던 미션은 영영 못 나간다. 세워 둔다.
+            self._queued[robot_id] = {"x": x, "y": y, "yaw": yaw,
+                                      "blocked_by": yielding["for"],
+                                      "waiting_on": [yielding["for"]], "reason": "YIELDED"}
+            return {"accepted": True, "queued": True, "blocked_by": yielding["for"],
+                    "reason": "YIELDED"}
         result = await self._client(robot_id).navigation_goal(x, y, yaw)
         # 로봇이 받아들인 뒤에만 기억한다 — 거절된 목표가 화면에 남으면 운영자는 가지도
         # 않을 곳으로 로봇이 간다고 읽는다.
@@ -176,15 +201,119 @@ class FleetConsole:
 
         route = await self._route_of(robot_id)
         blocker = traffic.blocking_robot(route, self._claims, self._clearance_m, skip=(robot_id,))
-        if blocker is None:
-            self._claims[robot_id] = route
-            return result
+        if blocker is not None:
+            await self._client(robot_id).navigation_cancel()
+            self._goals.pop(robot_id, None)
+            self._claims.pop(robot_id, None)
+            self._queued[robot_id] = {"x": x, "y": y, "yaw": yaw, "blocked_by": blocker,
+                                      "waiting_on": [blocker], "reason": "ROUTE_CONFLICT"}
+            return {"accepted": True, "queued": True, "blocked_by": blocker}
 
-        await self._client(robot_id).navigation_cancel()
-        self._goals.pop(robot_id, None)
+        standing = await self._standing_in_the_way(robot_id, route)
+        if standing:
+            return await self._make_room(robot_id, x, y, yaw, route, standing)
+        self._claims[robot_id] = route
+        return result
+
+    async def _standing_in_the_way(self, mover: str, route: Sequence) -> list[str]:
+        """이 경로 위에 **서서** 길을 막은 로봇들. 순서로는 풀리지 않는 쪽이다.
+
+        거르는 조건이 둘이다. 달리는 로봇은 뺀다 - 그쪽은 경로 대 경로 판정이 이미 봤고,
+        곧 지나갈 것을 붙잡고 비켜서라 할 이유가 없다. 그리고 **그냥 지나갈 수 있으면
+        뺀다** - 넓은 방에서는 로봇 안의 지역 코스트맵이 알아서 돌아 간다. Fleet 이
+        끼어들어야 하는 곳은 돌아 갈 자리 자체가 없는 좁은 데뿐이다.
+
+        "길을 막았다"의 반경은 `_route_still_occupied` 가 "이제 비켰다"를 판단하는 반경과
+        **같은 값**이어야 한다. 경로 대 경로의 `clearance_m`(0.7) 을 여기 쓰면, 0.45 만
+        비켜선 로봇이 다시 "막고 있다"로 잡혀 벽감에서 또 밀려난다 - 로봇 하나가 맵
+        바깥으로 밀려날 때까지 이 왕복이 이어진다.
+        """
+        if not route:
+            return []
+        await self._observe()
+        grid = bays.Grid.from_payload(await self.map())
+        thinned = traffic.thin(list(route))
+        out = []
+        for robot_id in self._order:
+            if robot_id == mover or robot_id in self._claims:
+                continue
+            pose = self._pose_of(robot_id)
+            if pose is None:
+                continue
+            nearest = bays.nearest_on_route(thinned, pose)
+            if nearest is None or math.dist(nearest, pose) >= self._yield_keep_out_m:
+                continue
+            if bays.passing_is_possible(grid, thinned, pose, self._passing_width_m):
+                continue
+            out.append(robot_id)
+        return out
+
+    async def _make_room(self, mover: str, x: float, y: float, yaw: float,
+                         route: Sequence, standing: Sequence[str]) -> dict:
+        """길을 막고 선 로봇들을 비켜세우고, 미션은 자리가 날 때까지 세워 둔다.
+
+        미션을 실패로 돌려주지 않는 이유가 있다. 비켜서기는 몇 초짜리 동작이고, 그 몇 초
+        때문에 운영자가 같은 미션을 다시 내려야 한다면 관제가 일을 떠넘기는 것이다.
+        비켜설 자리가 없을 때도 마찬가지로 세워 둔다 - 다만 이유를 `NO_YIELD_SPACE` 로
+        적어, 사람이 손을 대야 풀린다는 것을 화면이 말하게 한다.
+        """
+        grid = bays.Grid.from_payload(await self.map())
+        thinned = traffic.thin(list(route))
+        yielded, no_space = [], []
+        for robot_id in standing:
+            pose = self._pose_of(robot_id)
+            bay = None if pose is None else bays.best_bay(
+                grid, thinned, pose, keep_out_m=self._yield_keep_out_m)
+            if bay is None:
+                no_space.append(robot_id)
+                continue
+            await self._send_to_bay(robot_id, bay, mover)
+            yielded.append(robot_id)
+
+        await self._client(mover).navigation_cancel()
+        self._goals.pop(mover, None)
+        self._claims.pop(mover, None)
+        reason = "NO_YIELD_SPACE" if no_space else "YIELDING"
+        blocked_by = (no_space or yielded)[0]
+        self._queued[mover] = {"x": x, "y": y, "yaw": yaw, "blocked_by": blocked_by,
+                               "waiting_on": list(standing), "reason": reason,
+                               "route": thinned}
+        return {"accepted": True, "queued": True, "blocked_by": blocked_by,
+                "reason": reason, "yielding": yielded, "no_space": no_space}
+
+    async def _send_to_bay(self, robot_id: str, bay: tuple, mover: str) -> None:
+        """한 대를 비켜설 자리로. 제 미션이 있었다면 대기열에 넣어 돌아오게 한다."""
+        own = self._goals.pop(robot_id, None)
+        if own is not None and robot_id not in self._queued:
+            # 비켜서는 것은 잠깐 물러나는 것이지 미션 취소가 아니다. 지나가는 대가 끝나면
+            # 제 목표로 돌아간다 - 그러지 않으면 운영자가 보낸 곳에서 로봇이 사라진다.
+            self._queued[robot_id] = {**own, "blocked_by": mover, "waiting_on": [mover],
+                                      "reason": "YIELDED"}
         self._claims.pop(robot_id, None)
-        self._queued[robot_id] = {"x": x, "y": y, "yaw": yaw, "blocked_by": blocker}
-        return {"accepted": True, "queued": True, "blocked_by": blocker}
+        await self._client(robot_id).navigation_goal(bay[0], bay[1], 0.0)
+        self._yielding[robot_id] = {"bay": {"x": bay[0], "y": bay[1]}, "for": mover}
+
+    async def _observe(self) -> None:
+        """로봇 좌표를 새로 읽는다. 미션을 내리는 순간에만 부른다 - 폴링은 스냅샷이 한다."""
+        results = await asyncio.gather(
+            *(self._client(rid).state() for rid in self._order), return_exceptions=True)
+        self._remember([
+            {"robot_id": rid, "state": None if isinstance(r, BaseException) else r}
+            for rid, r in zip(self._order, results)])
+
+    def _remember(self, robots: Sequence[dict]) -> None:
+        for row in robots:
+            state = row.get("state") or {}
+            if state:
+                self._seen[row["robot_id"]] = state
+
+    def _pose_of(self, robot_id: str) -> Optional[tuple]:
+        pose = (self._seen.get(robot_id) or {}).get("pose") or {}
+        try:
+            return float(pose["x"]), float(pose["y"])
+        except (KeyError, TypeError, ValueError):
+            # 좌표를 모르는 로봇은 길을 막았다고도 비켰다고도 말할 수 없다.
+            return None
 
     async def _route_of(self, robot_id: str) -> list:
         """계획 경로. 읽지 못하면 빈 목록이다 — 모른다는 이유로 미션을 막지 않는다."""
@@ -199,9 +328,15 @@ class FleetConsole:
             state = row.get("state") or {}
             if state.get("navigation") != "NAVIGATING":
                 self._claims.pop(row["robot_id"], None)
+        for robot_id in sorted(self._yielding):
+            # 비켜설 이유가 사라졌으면 표시도 지운다. 남겨 두면 그 로봇은 다음 미션을
+            # 계속 대기열로 돌리고, 화면은 끝난 양보를 계속 진행 중으로 보여 준다.
+            waiting_for = self._yielding[robot_id]["for"]
+            if waiting_for not in self._claims and waiting_for not in self._queued:
+                self._yielding.pop(robot_id, None)
         for robot_id in sorted(self._queued):
             mission = self._queued[robot_id]
-            if mission["blocked_by"] in self._claims:
+            if self._still_blocked(robot_id, mission):
                 continue
             self._queued.pop(robot_id, None)
             try:
@@ -211,11 +346,43 @@ class FleetConsole:
                 # 내린 미션이 어디로 갔는지 알 수 없다.
                 self._queued[robot_id] = mission
 
+    def _still_blocked(self, robot_id: str, mission: dict) -> bool:
+        """이 대기 미션이 아직 나가면 안 되는가.
+
+        **비켜서기를 기다리는 미션은 기하로만 판단한다.** 남이 비켜 주기를 기다리는 A 와
+        A 가 지나가기를 기다리는 B 는 서로를 블로커로 가리킨다 - "앞이 대기열에 있으면
+        기다린다"를 양쪽에 걸면 둘 다 영원히 선다. A 는 "내 경로가 비었는가"만 보고,
+        B 는 A 가 나간 뒤 A 의 점유가 풀리기를 기다린다. 그래서 고리가 끊긴다.
+        """
+        if mission.get("reason") in ("YIELDING", "NO_YIELD_SPACE"):
+            return self._route_still_occupied(mission)
+        blocker = mission["blocked_by"]
+        # 앞이 아직 못 나갔으면 그 뒤도 못 나간다. 점유만 보면, 대기열에 들어간 순간
+        # 점유가 없는 블로커를 "끝났다"고 읽고 뒤가 먼저 튀어 나간다.
+        return blocker in self._claims or blocker in self._queued
+
+    def _route_still_occupied(self, mission: dict) -> bool:
+        """비켜서라고 한 로봇들이 아직 내 경로 위에 있는가."""
+        route = mission.get("route") or []
+        if not route:
+            return False
+        for robot_id in mission.get("waiting_on", []):
+            if (self._seen.get(robot_id) or {}).get("navigation") == "NAVIGATING":
+                return True          # 아직 비켜서는 중이다
+            pose = self._pose_of(robot_id)
+            if pose is None:
+                continue
+            nearest = bays.nearest_on_route(route, pose)
+            if nearest is not None and math.dist(nearest, pose) < self._yield_keep_out_m:
+                return True
+        return False
+
     async def cancel(self, robot_id: str) -> dict:
         result = await self._client(robot_id).navigation_cancel()
         self._goals.pop(robot_id, None)
         self._claims.pop(robot_id, None)
         self._queued.pop(robot_id, None)
+        self._yielding.pop(robot_id, None)
         return result
 
     async def estop_all(self) -> dict:
@@ -247,6 +414,7 @@ class FleetConsole:
                 self._goals.pop(robot_id, None)
                 self._claims.pop(robot_id, None)
                 self._queued.pop(robot_id, None)
+                self._yielding.pop(robot_id, None)
                 rows.append({"robot_id": robot_id, "stopped": True, "result": result})
         return {"stopped": sum(1 for r in rows if r["stopped"]), "total": len(rows), "robots": rows}
 

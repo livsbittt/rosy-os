@@ -160,6 +160,23 @@ function navTag(state) {
   return { text: nav, cls: "" };
 }
 
+// 대기에는 세 가지 이유가 있고, 운영자가 할 일이 저마다 다르다. "대기 중" 한 마디로
+// 뭉뜽그리면, 손대야 풀리는 상황에서도 사람이 저절로 풀리기를 기다린다.
+function queuedReason(queued) {
+  const who = queued.blocked_by;
+  if (queued.reason === "NO_YIELD_SPACE") {
+    return `${who} 가 길을 막았는데 비켜설 자리가 없습니다 — 맵이 좁습니다. `
+      + `${who} 를 직접 다른 곳으로 보내 주세요`;
+  }
+  if (queued.reason === "YIELDING") {
+    return `${who} 가 비켜서기를 기다리는 중 — 물러나면 자동 출발합니다`;
+  }
+  if (queued.reason === "YIELDED") {
+    return `${who} 가 지나가기를 기다리는 중 — 지나가면 제 미션으로 돌아갑니다`;
+  }
+  return `${who} 경로와 겹쳐 대기 중 — 앞이 비면 자동 출발합니다`;
+}
+
 function card(robot, index) {
   const node = document.createElement("article");
   node.className = `robot s${index % view.colors.length}`;
@@ -180,8 +197,10 @@ function card(robot, index) {
   if (!robot.online) mode.classList.add("crit");
   head.appendChild(mode);
   const navEl = document.createElement("span");
-  navEl.className = `tag ${robot.queued ? "warn" : nav.cls}`;
-  navEl.textContent = robot.queued ? "대기" : nav.text;
+  const blocked = robot.queued && robot.queued.reason === "NO_YIELD_SPACE";
+  navEl.className = `tag ${blocked ? "crit" : robot.queued ? "warn" : nav.cls}`;
+  // 비켜서는 중인 로봇은 "주행 중"이 맞다 — 다만 제 미션을 가는 것이 아니라서 따로 적는다.
+  navEl.textContent = robot.yielding ? "비켜서는 중" : robot.queued ? "대기" : nav.text;
   head.appendChild(navEl);
   node.appendChild(head);
 
@@ -202,11 +221,20 @@ function card(robot, index) {
   });
   node.appendChild(facts);
 
+  if (robot.yielding) {
+    // 운영자가 보내지 않은 좌표로 로봇이 움직인다. 이유를 적지 않으면 오작동으로 읽힌다.
+    const why = document.createElement("p");
+    why.className = "hint";
+    why.textContent = `${robot.yielding.for} 가 지나가도록 비켜서는 중 — `
+      + `(${robot.yielding.bay.x.toFixed(2)}, ${robot.yielding.bay.y.toFixed(2)}) 로 물러납니다`;
+    node.appendChild(why);
+  }
+
   if (robot.queued) {
     // 왜 안 가는지 화면이 말하지 않으면 운영자는 미션이 사라졌다고 읽는다.
     const why = document.createElement("p");
     why.className = "hint";
-    why.textContent = `${robot.queued.blocked_by} 경로와 겹쳐 대기 중 — 앞이 비면 자동 출발합니다`;
+    why.textContent = queuedReason(robot.queued);
     node.appendChild(why);
   }
 
@@ -295,7 +323,9 @@ el("map-canvas").addEventListener("click", async (event) => {
     });
     const where = `(${point.x.toFixed(2)}, ${point.y.toFixed(2)})`;
     if (result && result.queued) {
-      log(`${robotId} → ${where} 대기 — ${result.blocked_by} 경로와 겹침`, "");
+      // 자리가 없어 못 가는 것과, 곧 비켜 줄 것을 기다리는 것은 운영자가 할 일이 다르다.
+      log(`${robotId} → ${where} ${queuedReason(result)}`,
+          result.reason === "NO_YIELD_SPACE" ? "bad" : "");
     } else {
       log(`${robotId} → ${where} 미션 하달`, "good");
     }

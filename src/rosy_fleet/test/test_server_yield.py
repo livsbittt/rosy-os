@@ -1,0 +1,305 @@
+"""양보 — 관제가 서 있는 로봇을 치워 실제로 공간을 만드는지.
+
+`test_server_traffic` 은 **순서**를 시험한다(늦게 온 미션이 기다리는가). 여기는 순서로
+풀리지 않는 장면이다 — 서 있는 로봇이 상대의 목표 자리를 깔고 앉았을 때. 대기열만으로는
+A 가 B 를 기다리고 B 가 A 를 기다리며 둘 다 영원히 선다.
+
+맵은 기하 시험(`test_server_bays`)과 같은 그림을 쓴다. 두 벌이면 한쪽만 통과하는 일이
+생기고, 그것은 알아채기 어렵다.
+"""
+
+from __future__ import annotations
+
+from fakes import FakeRobot, run
+from test_server_bays import ALCOVE, CORRIDOR, HALL, payload
+from rosy_fleet.server import bays
+from rosy_fleet.server.console import FleetConsole
+from rosy_fleet.swarm.robots import RobotEndpoint
+
+
+def _line(x0, y0, x1, y1, n=30):
+    return [(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n) for i in range(n + 1)]
+
+
+class SimRobot(FakeRobot):
+    """목표를 받으면 제 자리에서 목표까지 직선 경로를 내고 NAVIGATING 이 된다.
+
+    `arrive()` 로 도착시킨다. 진짜 주행은 아니지만 관제가 보는 것 — 경로, 주행 상태,
+    pose — 은 전부 실제와 같은 자리에서 온다. 여기 쓰는 맵의 통로는 직선이라 직선 경로가
+    계획기가 낼 경로와 크게 다르지 않다.
+    """
+
+    def __init__(self, robot_id: str, xy, grid) -> None:
+        super().__init__(robot_id, map=grid,
+                         state={"robot_id": robot_id, "navigation": "IDLE", "map_id": "m1",
+                                "pose": {"x": xy[0], "y": xy[1], "yaw": 0.0}})
+        self._target = None
+
+    @property
+    def xy(self):
+        pose = self._state["pose"]
+        return pose["x"], pose["y"]
+
+    async def navigation_goal(self, x: float, y: float, yaw: float) -> dict:
+        result = await super().navigation_goal(x, y, yaw)
+        self._path = _line(self.xy[0], self.xy[1], x, y)
+        self._state = {**self._state, "navigation": "NAVIGATING"}
+        self._target = (x, y)
+        return result
+
+    async def navigation_cancel(self) -> dict:
+        result = await super().navigation_cancel()
+        self._path = []
+        self._state = {**self._state, "navigation": "IDLE"}
+        self._target = None
+        return result
+
+    def arrive(self) -> None:
+        assert self._target is not None, f"{self.robot_id} 는 아무 데도 가고 있지 않다"
+        x, y = self._target
+        self._state = {"robot_id": self.robot_id, "navigation": "ARRIVED", "map_id": "m1",
+                       "pose": {"x": x, "y": y, "yaw": 0.0}}
+        self._path = []
+        self._target = None
+
+
+def _console(*robots):
+    endpoints = [RobotEndpoint(robot_id=r.robot_id, base_url=f"http://127.0.0.1:808{i}",
+                               token="t") for i, r in enumerate(robots)]
+    return FleetConsole(endpoints, list(robots))
+
+
+def _corridor(art=ALCOVE):
+    """통로 양 끝에 한 대씩. 맵은 폭 1.0 m 라 서로를 지나갈 수 없다."""
+    grid = payload(art)
+    left = SimRobot("rosy_01", (0.4, 0.6), grid)
+    right = SimRobot("rosy_02", (2.2, 0.6), grid)
+    return left, right, _console(left, right)
+
+
+def _goals(robot):
+    return [(c[1], c[2]) for c in robot.calls if c[0] == "navigation_goal"]
+
+
+# --- 공간 만들기 -----------------------------------------------------------------
+
+
+def test_the_robot_in_the_way_is_sent_to_a_bay_and_the_mission_waits():
+    left, right, console = _corridor()
+
+    result = run(console.goal("rosy_01", 2.2, 0.6))
+
+    assert result["queued"] is True and result["reason"] == "YIELDING"
+    assert result["yielding"] == ["rosy_02"]
+    bay = _goals(right)[-1]
+    assert bay != (2.2, 0.6)                         # 제자리에 있지 않다
+    assert bay[1] > 1.0                              # 벽감 쪽으로 물러났다
+    # 미션을 낸 쪽은 취소되고 대기열에 있다 — 통로가 빌 때까지 들어가지 않는다.
+    assert ("navigation_cancel",) in left.calls
+
+
+def test_the_mission_goes_out_once_the_other_robot_has_reached_its_bay():
+    left, right, console = _corridor()
+    run(console.goal("rosy_01", 2.2, 0.6))
+
+    run(console.snapshot())                           # 아직 비켜서는 중
+    assert _goals(left) == [(2.2, 0.6)]               # 아직 다시 나가지 않았다
+
+    right.arrive()
+    row = _row(run(console.snapshot()), "rosy_01")
+
+    assert row["queued"] is None
+    assert row["goal"] == {"x": 2.2, "y": 0.6, "yaw": 0.0}
+    assert _goals(left) == [(2.2, 0.6), (2.2, 0.6)]   # 같은 목표로 다시 나갔다
+
+
+def test_two_robots_swap_ends_of_a_single_lane_corridor():
+    """이 파일의 이유. 대기열만으로는 절대 끝나지 않는 미션 쌍이다."""
+    left, right, console = _corridor()
+
+    run(console.goal("rosy_01", 2.2, 0.6))            # rosy_02 가 벽감으로 비켜선다
+    run(console.goal("rosy_02", 0.4, 0.6))            # 비켜서는 중이라 대기열로
+    right.arrive()                                     # 벽감 도착
+    run(console.snapshot())                            # rosy_01 출발
+    left.arrive()                                      # 반대편 끝 도착
+    run(console.snapshot())                            # rosy_02 출발
+    right.arrive()
+
+    assert left.xy == (2.2, 0.6)
+    assert right.xy == (0.4, 0.6)
+    snapshot = run(console.snapshot())
+    assert all(r["queued"] is None for r in snapshot["robots"])
+    assert all(r["yielding"] is None for r in snapshot["robots"])
+
+
+def test_the_swap_works_in_either_order():
+    """운영자가 어느 쪽 미션을 먼저 내리든 같아야 한다."""
+    left, right, console = _corridor()
+
+    run(console.goal("rosy_02", 0.4, 0.6))
+    run(console.goal("rosy_01", 2.2, 0.6))
+    left.arrive()
+    run(console.snapshot())
+    right.arrive()
+    run(console.snapshot())
+    left.arrive()
+
+    assert left.xy == (2.2, 0.6)
+    assert right.xy == (0.4, 0.6)
+
+
+def test_the_yielder_goes_back_to_its_own_goal_afterwards():
+    """비켜서는 것은 잠깐 물러나는 것이지 미션 취소가 아니다."""
+    left, right, console = _corridor()
+    run(console.goal("rosy_02", 2.2, 0.6))            # 제자리 근처가 목표
+    right.arrive()
+    run(console.snapshot())
+
+    run(console.goal("rosy_01", 2.2, 0.6))            # rosy_02 가 비켜선다
+    right.arrive()
+    run(console.snapshot())
+    left.arrive()
+    run(console.snapshot())
+
+    # 지나간 뒤 제 목표로 돌아간다 — 운영자가 보낸 곳에서 로봇이 사라지지 않는다.
+    assert _goals(right)[-1] == (2.2, 0.6)
+
+
+# --- 자리가 없을 때 --------------------------------------------------------------
+
+
+def test_a_corridor_without_a_bay_says_so_instead_of_pretending():
+    """폭 1 m 방의 정직한 답이다. 실측에서 두 대가 자리를 맞바꾸지 못한 그 맵이다."""
+    left, right, console = _corridor(CORRIDOR)
+
+    result = run(console.goal("rosy_01", 2.2, 0.6))
+
+    assert result["queued"] is True
+    assert result["reason"] == "NO_YIELD_SPACE"
+    assert result["no_space"] == ["rosy_02"]
+    assert _goals(right) == []                        # 아무 데로도 보내지 않았다
+
+
+def test_a_mission_blocked_with_no_space_is_released_when_the_way_clears():
+    """사람이 손을 대 로봇을 치우면 미션은 저절로 나가야 한다 — 다시 내리게 하면 안 된다."""
+    left, right, console = _corridor(CORRIDOR)
+    run(console.goal("rosy_01", 2.2, 0.6))
+
+    # 운영자가 rosy_02 를 통로 밖으로 뺐다고 하자 (여기서는 좌표만 옮긴다).
+    right._state = {"robot_id": "rosy_02", "navigation": "ARRIVED", "map_id": "m1",
+                    "pose": {"x": 2.2, "y": 3.0, "yaw": 0.0}}
+    row = _row(run(console.snapshot()), "rosy_01")
+
+    assert row["queued"] is None
+    assert _goals(left) == [(2.2, 0.6), (2.2, 0.6)]
+
+
+# --- 끼어들지 않아야 할 때 --------------------------------------------------------
+
+
+def test_nobody_yields_in_a_hall_wide_enough_to_pass():
+    """넓은 방에서까지 양보를 시키면 로봇이 근거 없이 구석으로 물러난다.
+
+    서 있는 로봇이 경로 **옆**에 있는 경우다 - 돌아 갈 자리가 있으면 로봇 안의 지역
+    코스트맵이 알아서 돌아 간다. Fleet 이 끼어들 이유가 없다.
+    """
+    grid = payload(HALL)
+    left = SimRobot("rosy_01", (0.4, 1.05), grid)
+    beside = SimRobot("rosy_02", (1.3, 1.35), grid)
+    console = _console(left, beside)
+
+    result = run(console.goal("rosy_01", 2.2, 1.05))
+
+    assert "queued" not in result
+    assert _goals(beside) == []
+
+
+def test_a_robot_parked_on_the_goal_is_moved_even_in_a_wide_hall():
+    """폭과 무관하다 — 목표 자리를 깔고 앉은 로봇이 있으면 그 자리에는 아무도 못 선다."""
+    grid = payload(HALL)
+    left = SimRobot("rosy_01", (0.4, 1.05), grid)
+    on_goal = SimRobot("rosy_02", (2.2, 1.05), grid)
+    console = _console(left, on_goal)
+
+    result = run(console.goal("rosy_01", 2.2, 1.05))
+
+    assert result["reason"] == "YIELDING"
+    assert _goals(on_goal), "넓은 방에는 비켜설 자리가 얼마든지 있다"
+
+
+def test_without_a_map_the_console_does_not_move_anyone_aside():
+    """맵을 못 읽었다는 이유로 로봇을 옮기면, 그 좌표에 무엇이 있는지 아무도 모른다."""
+    left = SimRobot("rosy_01", (0.4, 0.6), None)
+    right = SimRobot("rosy_02", (2.2, 0.6), None)
+    console = _console(left, right)
+
+    result = run(console.goal("rosy_01", 2.2, 0.6))
+
+    assert "queued" not in result
+    assert _goals(right) == []
+
+
+def test_a_robot_without_a_pose_is_never_ordered_to_yield():
+    """좌표를 모르는 로봇은 길을 막았다고도 비켰다고도 말할 수 없다."""
+    grid = payload(ALCOVE)
+    left = SimRobot("rosy_01", (0.4, 0.6), grid)
+    right = SimRobot("rosy_02", (2.2, 0.6), grid)
+    right._state = {"robot_id": "rosy_02", "navigation": "IDLE", "map_id": "m1"}
+    console = _console(left, right)
+
+    result = run(console.goal("rosy_01", 2.2, 0.6))
+
+    assert "queued" not in result
+    assert _goals(right) == []
+
+
+def test_a_robot_that_is_already_driving_is_not_told_to_yield():
+    """곧 지나갈 로봇을 붙잡아 비켜세우면 통로에 멈춘 장애물이 하나 더 생긴다."""
+    left, right, console = _corridor()
+    run(console.goal("rosy_02", 0.4, 0.6))            # rosy_02 가 달리며 통로를 점유
+    right._state = {**right._state, "pose": {"x": 1.5, "y": 0.6, "yaw": 0.0}}
+
+    result = run(console.goal("rosy_01", 2.2, 0.6))
+
+    assert result["queued"] is True
+    assert result.get("reason") != "YIELDING"          # 경로 충돌로 기다리는 것이다
+    assert _goals(right) == [(0.4, 0.6)]               # 벽감으로 보내지 않았다
+
+
+# --- 운영자가 끼어들 때 ----------------------------------------------------------
+
+
+def test_an_estop_forgets_the_yields():
+    """전체 정지 뒤 비켜서기가 남아 있으면, 다음 미션이 이유 없이 대기열로 간다."""
+    left, right, console = _corridor()
+    run(console.goal("rosy_01", 2.2, 0.6))
+
+    run(console.estop_all())
+
+    assert _row(run(console.snapshot()), "rosy_02")["yielding"] is None
+
+
+def test_cancelling_the_yielder_clears_its_yield():
+    left, right, console = _corridor()
+    run(console.goal("rosy_01", 2.2, 0.6))
+
+    run(console.cancel("rosy_02"))
+
+    assert _row(run(console.snapshot()), "rosy_02")["yielding"] is None
+
+
+def test_the_snapshot_says_who_is_yielding_and_for_whom():
+    """화면이 말하지 못하면 운영자는 로봇이 왜 엉뚱한 데로 갔는지 알 수 없다."""
+    left, right, console = _corridor()
+    run(console.goal("rosy_01", 2.2, 0.6))
+
+    row = _row(run(console.snapshot()), "rosy_02")
+
+    assert row["yielding"]["for"] == "rosy_01"
+    assert row["yielding"]["bay"]["y"] > 1.0
+    waiting = _row(run(console.snapshot()), "rosy_01")
+    assert waiting["queued"]["reason"] == "YIELDING"
+
+
+def _row(snapshot, robot_id):
+    return [r for r in snapshot["robots"] if r["robot_id"] == robot_id][0]
