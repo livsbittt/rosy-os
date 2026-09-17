@@ -48,6 +48,7 @@ install(
     models
     launch
     params
+    config
   DESTINATION share/${PROJECT_NAME}
 )
 

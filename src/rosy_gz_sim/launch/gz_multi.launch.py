@@ -20,7 +20,13 @@ N대의 로봇을 rosy_01 .. rosy_NN namespace로 시뮬레이션한다.
 """
 
 import os
+import sys
 import tempfile
+
+_LAUNCH_DIR = os.path.dirname(os.path.abspath(__file__))
+if _LAUNCH_DIR not in sys.path:
+    sys.path.insert(0, _LAUNCH_DIR)
+from world_profiles import resolve_world
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -191,24 +197,44 @@ def _bridge_config(namespace: str, with_clock: bool = False) -> list:
     return entries
 
 
+def _optional_float(raw: str):
+    text = (raw or "").strip()
+    if text == "":
+        return None
+    return float(text)
+
+
 def _launch_setup(context):
     robots = int(LaunchConfiguration("robots").perform(context))
     prefix = LaunchConfiguration("prefix").perform(context)
     world_name = LaunchConfiguration("world_name").perform(context)
     mode = LaunchConfiguration("mode").perform(context)
     headless = LaunchConfiguration("headless").perform(context).lower() in ("true", "1")
-    spacing = float(LaunchConfiguration("spawn_spacing").perform(context))
     core = LaunchConfiguration("core").perform(context).lower() in ("true", "1")
     api_port_base = int(LaunchConfiguration("api_port_base").perform(context))
     map_yaml = LaunchConfiguration("map").perform(context)
-    spawn_x = float(LaunchConfiguration("spawn_x").perform(context))
-    spawn_y = float(LaunchConfiguration("spawn_y").perform(context))
-    inflation_radius = float(LaunchConfiguration("inflation_radius").perform(context))
+    spawn_spacing_raw = LaunchConfiguration("spawn_spacing").perform(context)
+    profile = resolve_world(
+        world_name,
+        inflation_radius=_optional_float(LaunchConfiguration("inflation_radius").perform(context)),
+        spawn_x=_optional_float(LaunchConfiguration("spawn_x").perform(context)),
+        spawn_y=_optional_float(LaunchConfiguration("spawn_y").perform(context)),
+        spawn_spacing=_optional_float(spawn_spacing_raw),
+        map_yaml=map_yaml.strip() or None,
+    )
+    spawn_x = profile.spawn_x
+    spawn_y = profile.spawn_y
+    spacing = profile.spawn_spacing
+    inflation_radius = profile.inflation_radius
 
     gz_sim_share = get_package_share_directory("ros_gz_sim")
     rosy_gz_share = get_package_share_directory("rosy_gz_sim")
     rosy_nav_share = get_package_share_directory("rosy_navigation")
     rosy_desc_share = get_package_share_directory("rosy_description")
+    if not (map_yaml or "").strip() and profile.map:
+        map_yaml = os.path.join(rosy_nav_share, "map", profile.map)
+    else:
+        map_yaml = (map_yaml or "").strip()
 
     actions = [
         SetEnvironmentVariable(
@@ -427,19 +453,18 @@ def generate_launch_description():
                               description="로봇별 상위 스택. none=spawn만, nav=기존 맵 주행, "
                                           "slam=맵 작성만, slam_nav=맵을 만들면서 그 맵 위로 주행"),
         DeclareLaunchArgument("headless", default_value="false"),
-        DeclareLaunchArgument("inflation_radius", default_value="0.0",
-                              description="코스트맵 팽창 반경 덮어쓰기 (0 이면 nav2_params.yaml 값). "
-                                          "좁은 통로 월드는 통로 반폭보다 크게"),
-        DeclareLaunchArgument("spawn_x", default_value="0.0",
-                              description="첫 로봇의 spawn x. 원점에 구조물이 있는 월드(미로 등)에서 쓴다"),
-        DeclareLaunchArgument("spawn_y", default_value="0.0",
-                              description="모든 로봇의 spawn y"),
+        DeclareLaunchArgument("inflation_radius", default_value="",
+                              description="비면 config/worlds.yaml. 숫자면 그 월드만 덮어쓴다"),
+        DeclareLaunchArgument("spawn_x", default_value="",
+                              description="비면 월드 카탈로그"),
+        DeclareLaunchArgument("spawn_y", default_value="",
+                              description="비면 월드 카탈로그"),
         DeclareLaunchArgument("spawn_spacing", default_value="1.5",
                               description="로봇 간 x축 배치 간격 (m)"),
         DeclareLaunchArgument("core", default_value="false",
                               description="로봇별 rosy_core 기동 (포트 api_port_base + i - 1)"),
         DeclareLaunchArgument("map", default_value="",
-                              description="mode:=nav 이 쓸 맵 yaml (빈 값이면 rosy_navigation 기본 맵)"),
+                              description="mode:=nav 맵 yaml. 비면 월드 카탈로그"),
         DeclareLaunchArgument("api_port_base", default_value="8080",
                               description="첫 로봇의 rosy_core API 포트"),
         OpaqueFunction(function=_launch_setup),

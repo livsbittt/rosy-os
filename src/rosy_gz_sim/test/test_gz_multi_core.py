@@ -57,6 +57,7 @@ def _setup(mod, **overrides):
     context.launch_configurations.update({
         "robots": "3", "prefix": "rosy", "world_name": "rosy_factory.world", "mode": "none",
         "headless": "true", "spawn_spacing": "1.5", "core": "true", "api_port_base": "8080",
+        "inflation_radius": "", "spawn_x": "", "spawn_y": "", "map": "",
         **overrides,
     })
     try:

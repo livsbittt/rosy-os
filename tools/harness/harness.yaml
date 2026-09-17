@@ -40,7 +40,7 @@ modules:
     path: src/rosy_gz_sim
     tests: [src/rosy_gz_sim/test]
     functional_kind: host-contract
-    functional: [src/rosy_gz_sim/test/test_gz_package_contract.py, src/rosy_gz_sim/test/test_world_to_map.py]
+    functional: [src/rosy_gz_sim/test/test_gz_package_contract.py, src/rosy_gz_sim/test/test_world_to_map.py, src/rosy_gz_sim/test/test_world_profiles.py]
   - name: rosy_navigation
     path: src/rosy_navigation
     tests: [test/test_nav2_hardware_slice.py, test/test_footprint_profiles.py, test/test_nav2_profile_limits.py, test/test_nav2_bandwidth_contracts.py, test/test_flask_launch_removed.py]

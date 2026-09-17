@@ -1,0 +1,27 @@
+# gz_multi 월드 카탈로그. 월드마다 다른 숫자는 여기만 적는다.
+# 런치 인자가 비면 이 값을 쓰고, 인자가 있으면 덮어쓴다.
+worlds:
+  rosy_factory.world:
+    map: rosy_factory.yaml
+    inflation_radius: 0.15
+    spawn_x: 0.0
+    spawn_y: 0.0
+    spawn_spacing: 1.5
+  rosy_maze.world:
+    map: rosy_maze.yaml
+    inflation_radius: 0.55
+    spawn_x: 0.0
+    spawn_y: 0.0
+    spawn_spacing: 1.5
+  rosy_swarm_bench.world:
+    map: rosy_swarm_bench.yaml
+    inflation_radius: 0.15
+    spawn_x: 0.0
+    spawn_y: 0.0
+    spawn_spacing: 1.5
+  rosy_map.world:
+    map: rosy_demo_room.yaml
+    inflation_radius: 0.15
+    spawn_x: 0.0
+    spawn_y: 0.0
+    spawn_spacing: 1.5
