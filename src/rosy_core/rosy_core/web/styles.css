@@ -835,3 +835,22 @@ body[data-view="operate"] .page-footer { display: none; }
 .console .triage { padding: var(--space-3) var(--space-4); }
 .console .triage-copy p { margin-top: var(--space-1); }
 
+/* 지도 컨트롤은 지도 위에 얹는다. 흐름에 두면 툴바 두 줄이 88px을 가져가고
+   그만큼 관측이 줄어든다 — 관측이 콘솔의 심장이다. */
+.map-controls {
+  position: absolute;
+  z-index: 2;
+  top: var(--space-2);
+  left: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+.map-controls .map-toolbar {
+  background: var(--scrim);
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-button);
+  padding: var(--space-1);
+}
+

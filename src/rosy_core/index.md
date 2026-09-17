@@ -44,8 +44,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · refactor(web): float the map controls so the map gets the observe region back
 - 2026-09-18 · uncommitted · refactor(web): give the dashboard the spatial grammar it was designed for
 - 2026-09-18 · uncommitted · fix(core): 보고 pose 의 임자를 map 프레임으로 못박는다
 - 2026-09-18 · uncommitted · feat(web): triage the console, age stale values, stop shipping em dashes
 - 2026-09-17 · uncommitted · feat(web): finish the D-82 pass — component tokens, typography, touch targets
-- 2026-09-17 · uncommitted · feat(web): regenerate the palette from OKLCH and gate its values

@@ -87,3 +87,24 @@ def test_the_view_switch_is_wired_and_defaults_to_operate():
     assert 'showView("operate")' in app, "기본 뷰를 운용으로 두지 않는다"
     assert 'elements["view-inspect"].addEventListener' in app
     assert 'document.body.dataset.view' in app, "꼬리말 규칙이 기대는 페이지 상태가 없다"
+
+
+def test_the_map_controls_ride_on_the_map_instead_of_stealing_its_height():
+    """관측 영역은 높이가 고정이다 — 툴바가 흐름에 있으면 그만큼 지도가 줄어든다.
+
+    실측으로 지도는 191px이었고 툴바 두 줄·범례·안내가 나머지를 먹고 있었다.
+    두 툴바를 `.map-stage` 안으로 넣고 겹쳐 띄워 307px로 되돌렸다. 되돌아가면
+    (툴바가 다시 `.map-stage` 밖으로 나가면) 이 게이트가 잡는다.
+    """
+    markup = html()
+    stage = markup.split('class="map-stage"')[1].split("<canvas")[0]
+    assert markup.count('class="map-toolbar"') == 2, "지도 툴바가 둘이 아니다"
+    assert stage.count('class="map-toolbar"') == 2, "툴바가 지도 무대 밖에 있다"
+
+    rule = re.search(r"\.map-controls\s*\{([^}]*)\}", css())
+    assert rule, ".map-controls 규칙이 없다"
+    body = rule.group(1)
+    assert "position: absolute" in body, "겹치지 않으면 지도 높이를 다시 가져간다"
+    # 겹친 칩은 지도 픽셀 위에 뜬다. 배경 없이 두면 점유 격자와 섞여 못 읽는다.
+    chip = re.search(r"\.map-controls \.map-toolbar\s*\{([^}]*)\}", css())
+    assert chip and "background:" in chip.group(1), "겹친 툴바에 바탕이 없다"
