@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111614">
+  <title>Rosy Fleet — 사이트 관제</title>
+  <link rel="stylesheet" href="/console/assets/tokens.css">
+  <link rel="stylesheet" href="/console/assets/styles.css">
+  <script type="module" src="/console/assets/console.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><b>ROSY FLEET</b><small id="fleet-name">SITE CONSOLE</small></div>
+    <div class="spacer"></div>
+    <span id="online-pill" class="pill">연결 대기</span>
+    <span id="clock" class="pill">--:--:--</span>
+    <button id="estop" class="estop" type="button">전체 정지</button>
+  </header>
+
+  <main>
+    <section class="panel" aria-labelledby="map-heading">
+      <div class="map-head">
+        <div>
+          <p class="eyebrow">SITE MAP</p>
+          <h2 id="map-heading">현장 지도</h2>
+        </div>
+        <div class="spacer"></div>
+        <span id="map-tag" class="pill">맵 대기</span>
+      </div>
+      <canvas id="map-canvas" class="idle" width="800" height="600"
+              aria-label="현장 점유 지도와 로봇 위치"></canvas>
+      <!-- 색은 클래스로만 준다. CSP 가 `style-src 'self'` 라 style 속성은 적용되지 않는다. -->
+      <div class="legend">
+        <span><i class="sw free"></i>자유</span>
+        <span><i class="sw occupied"></i>점유</span>
+        <span><i class="sw unknown"></i>미지</span>
+        <span><i class="sw robot"></i>로봇</span>
+        <span><i class="sw goal"></i>목표</span>
+      </div>
+      <p class="hint" id="hint">오른쪽에서 로봇의 <b>목표 지정</b>을 누른 뒤 지도를 찍으면 그 로봇에게만 목표가 갑니다.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="roster-heading">
+      <p class="eyebrow">ROBOTS</p>
+      <h2 id="roster-heading">등록 로봇</h2>
+      <div id="roster" class="roster"></div>
+      <div id="log" class="log" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <p class="note">
+    이 화면은 사이트 관제입니다. 로봇 한 대의 현장 화면·수동 조작·비상정지는 그 로봇의
+    대시보드에 그대로 있고, 관제 PC가 꺼져도 살아 있습니다. 여기서 내리는 것은 목표·취소·
+    정지 같은 원자 액션뿐이며, 바퀴 속도는 로봇 안에서만 만들어집니다.
+  </p>
+</body>
+</html>

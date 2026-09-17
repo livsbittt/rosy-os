@@ -102,6 +102,7 @@ class RobotClient(Protocol):
     robot_id: str
 
     async def state(self) -> dict: ...
+    async def map(self) -> dict: ...
     async def swarm_state(self) -> dict: ...
     async def follow(self, params: SwarmFollowParams) -> dict: ...
     async def swarm_cancel(self) -> dict: ...
@@ -167,6 +168,10 @@ class HttpRobotClient:
 
     async def state(self) -> dict:
         return await self._get("/api/v1/robot/state")
+
+    async def map(self) -> dict:
+        """점유 격자. 관제 화면이 N대를 한 좌표계 위에 그리려면 이것 하나가 필요하다."""
+        return await self._get("/api/v1/map")
 
     async def swarm_state(self) -> dict:
         return await self._get("/api/v1/swarm/state")

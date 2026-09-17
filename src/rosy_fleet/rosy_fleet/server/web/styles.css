@@ -1,0 +1,201 @@
+* { box-sizing: border-box; }
+
+html { min-width: 320px; background: var(--ground); }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--paper);
+  font-family: var(--body);
+  background:
+    radial-gradient(circle at 12% 6%, var(--status-good-a09), transparent 28rem),
+    linear-gradient(145deg, var(--ground-grad-1) 0%, var(--ground-grad-2) 48%, var(--ground-deep) 100%);
+  text-rendering: optimizeLegibility;
+}
+
+button, input, select { font: inherit; color: inherit; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1.4rem;
+  border-bottom: 1px solid var(--line-10);
+  background: var(--scrim);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.brand { display: flex; flex-direction: column; line-height: 1.15; }
+.brand b { font-family: var(--display); font-size: 1.25rem; letter-spacing: 0.04em; }
+.brand small { font-family: var(--mono); font-size: 0.66rem; color: var(--muted); letter-spacing: 0.16em; }
+
+.topbar .spacer { flex: 1; }
+
+.pill {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--line-14);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pill.good { color: var(--status-good); border-color: var(--status-good-a45); }
+.pill.bad { color: var(--status-crit); border-color: var(--status-crit-a45); }
+
+.estop {
+  padding: 0.55rem 1.3rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--status-crit-a45);
+  background: var(--status-crit-a10);
+  color: var(--status-crit);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.estop:hover { background: var(--status-crit); color: var(--ground-deep); }
+
+main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24rem;
+  gap: 1.1rem;
+  padding: 1.1rem 1.4rem 2rem;
+  align-items: start;
+}
+
+.panel {
+  background: var(--panel-fill);
+  border: 1px solid var(--line-10);
+  border-radius: 0.9rem;
+  box-shadow: 0 24px 60px var(--shade-28);
+  padding: 1rem 1.1rem 1.2rem;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.2em;
+  color: var(--status-good);
+  margin: 0 0 0.15rem;
+}
+.panel h2 { font-family: var(--display); font-weight: 400; font-size: 1.35rem; margin: 0 0 0.8rem; }
+
+.map-head { display: flex; align-items: baseline; gap: 0.8rem; }
+.map-head .spacer { flex: 1; }
+
+#map-canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  /* 격자 한 칸은 5 cm 다. 보간하면 벽이 번져 어디가 통로인지 읽을 수 없다. */
+  image-rendering: pixelated;
+  border-radius: 0.6rem;
+  border: 1px solid var(--line-14);
+  background: var(--ground-deep);
+  cursor: crosshair;
+}
+#map-canvas.idle { cursor: default; }
+
+.hint {
+  margin: 0.7rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.legend { display: flex; flex-wrap: wrap; gap: 0.9rem; margin-top: 0.7rem; font-family: var(--mono); font-size: 0.66rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.legend i { width: 0.7rem; height: 0.7rem; border-radius: 0.2rem; border: 1px solid var(--line-14); }
+.sw.free { background: var(--paper); }
+.sw.occupied { background: var(--ground-deep); }
+.sw.unknown { background: var(--ground-soft); }
+.sw.robot { background: var(--series-primary); }
+.sw.goal { background: var(--status-warn); }
+
+.roster { display: flex; flex-direction: column; gap: 0.8rem; }
+
+.robot {
+  border: 1px solid var(--line-10);
+  border-left: 3px solid var(--series-primary);
+  border-radius: 0.7rem;
+  background: var(--ground-card);
+  padding: 0.85rem 0.9rem;
+}
+/* 로봇 정체색은 클래스로 돈다 — CSP 아래에서 style 속성은 적용되지 않는다. 지도의
+   삼각형도 같은 순서로 색을 고르므로 카드의 띠와 지도의 로봇이 맞물린다. */
+.robot.s0 { border-left-color: var(--series-primary); }
+.robot.s1 { border-left-color: var(--series-2); }
+.robot.s2 { border-left-color: var(--series-3); }
+.robot.s3 { border-left-color: var(--series-4); }
+.robot.selected { background: var(--ground-card-2); border-color: var(--line-30); }
+.robot.offline { opacity: 0.55; }
+
+.robot-head { display: flex; align-items: center; gap: 0.5rem; }
+.robot-head b { font-family: var(--mono); font-size: 0.95rem; letter-spacing: 0.04em; }
+.robot-head .spacer { flex: 1; }
+
+.tag {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.3rem;
+  border: 1px solid var(--line-14);
+  color: var(--muted);
+}
+.tag.nav { color: var(--series-primary); border-color: var(--series-primary); }
+.tag.ok { color: var(--status-good); border-color: var(--status-good-a45); }
+.tag.warn { color: var(--status-warn); border-color: var(--status-warn); }
+.tag.crit { color: var(--status-crit); border-color: var(--status-crit-a45); }
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 0.8rem;
+  margin: 0.6rem 0 0.7rem;
+}
+.facts div { display: flex; flex-direction: column; gap: 0.1rem; }
+.facts span { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.12em; color: var(--muted); }
+.facts strong { font-family: var(--mono); font-size: 0.86rem; font-weight: 500; }
+
+.robot-actions { display: flex; gap: 0.4rem; }
+.robot-actions button {
+  flex: 1;
+  padding: 0.45rem 0.4rem;
+  border-radius: 0.45rem;
+  border: 1px solid var(--line-14);
+  background: var(--sheen-04);
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+.robot-actions button:hover:not(:disabled) { border-color: var(--status-good-a45); color: var(--status-good); }
+.robot-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
+.robot-actions button.arming { background: var(--status-good); color: var(--ground-deep); border-color: var(--status-good); }
+
+.log {
+  margin-top: 1rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+  max-height: 11rem;
+  overflow-y: auto;
+  line-height: 1.7;
+}
+.log div { border-bottom: 1px solid var(--line-06); padding: 0.2rem 0; }
+.log .bad { color: var(--status-crit); }
+.log .good { color: var(--status-good); }
+
+.note {
+  margin: 1rem 1.4rem 2rem;
+  padding: 0.8rem 1rem;
+  border-left: 2px solid var(--line-14);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 62rem) {
+  main { grid-template-columns: minmax(0, 1fr); }
+}

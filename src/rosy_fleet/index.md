@@ -39,6 +39,7 @@
 
 ## 최근 기록
 
+- 2026-09-17 · uncommitted · feat(server): Fleet 서버 v1 — N대 관제 UI와 로봇별 미션 하달
 - 2026-09-16 · uncommitted · docs(harness): park the site-PC deployment gates
 - 2026-09-16 · uncommitted · docs(harness): hold the unrun formation sim bench
 - 2026-09-15 · uncommitted · docs(harness): start the rosy_fleet harness record

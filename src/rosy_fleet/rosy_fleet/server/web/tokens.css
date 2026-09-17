@@ -1,0 +1,54 @@
+/* rosy_fleet 관제 표면 토큰.
+ *
+ * 값은 rosy_core 의 `web/tokens.css` 와 같다 — 운영자는 로봇 대시보드와 이 화면을
+ * 번갈아 본다. 두 화면의 색이 다르면 같은 제품으로 읽히지 않는다.
+ *
+ * 복사인 이유: rosy_fleet 은 rosy_core 자산을 import 하지 않는다. 관제 PC 는 로봇
+ * 패키지 없이도 뜬다(설계 §2, 두 역할은 다른 기계에 산다). 색이 갈라지면 그때
+ * 공용 토큰 패키지를 만드는 것이 맞지, 여기서 로봇 패키지를 끌어오는 것이 아니다.
+ *
+ *   ground  바탕·글자·선          status  임계를 넘었을 때만
+ *   series  계열 정체성 (로봇 구분에 쓴다 — 상태색과 섞지 않는다)
+ */
+:root {
+  /* ---- ground ---------------------------------------------------------- */
+  --ground: #111614;
+  --ground-deep: #0d1210;
+  --ground-grad-1: #101512;
+  --ground-grad-2: #141b18;
+  --ground-soft: #18201d;
+  --ground-card: #202924;
+  --ground-card-2: #242e29;
+  --paper: #eee9dc;
+  --muted: #9fa99f;
+
+  --panel-fill: rgba(29, 38, 34, 0.88);
+  --scrim: rgba(9, 14, 12, 0.84);
+  --shade-28: rgba(0, 0, 0, 0.28);
+
+  --line-06: rgba(238, 233, 220, 0.06);
+  --line-10: rgba(238, 233, 220, 0.1);
+  --line-14: rgba(238, 233, 220, 0.14);
+  --line-30: rgba(238, 233, 220, 0.3);
+  --sheen-04: rgba(255, 255, 255, 0.04);
+
+  /* ---- status: 임계에만 ------------------------------------------------- */
+  --status-good: #c4db76;
+  --status-good-a09: rgba(196, 219, 118, 0.09);
+  --status-good-a45: rgba(196, 219, 118, 0.45);
+  --status-warn: #f2c46d;
+  --status-crit: #ff6b6f;
+  --status-crit-a10: rgba(255, 107, 111, 0.1);
+  --status-crit-a45: rgba(255, 107, 111, 0.45);
+
+  /* ---- series: 로봇 정체성 ---------------------------------------------- */
+  --series-primary: #75b8c8;
+  --series-2: #d8a0d0;
+  --series-3: #e0b184;
+  --series-4: #9ec6a0;
+
+  /* ---- 글꼴 ------------------------------------------------------------- */
+  --display: Georgia, "Times New Roman", serif;
+  --body: Aptos, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
+  --mono: "Cascadia Mono", Consolas, "Noto Sans Mono", monospace;
+}

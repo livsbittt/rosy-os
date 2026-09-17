@@ -45,6 +45,13 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     formation.add_argument("--max-speed", type=float, default=0.15)
     formation.add_argument("--stream-timeout-ms", type=int, default=1000)
     formation.add_argument("--policy", default="HOLD", choices=[p.value for p in HoldPolicy])
+
+    console = sub.add_parser("console", help="사이트 관제 서버 (웹 UI + 로봇별 미션 하달)")
+    console.add_argument("--robots", required=True, type=Path, help="robots.yaml")
+    console.add_argument("--host", default="127.0.0.1")
+    console.add_argument("--port", type=int, default=8090)
+    console.add_argument("--token", default=None,
+                         help="관제 UI 접속 토큰. 루프백 밖으로 열 때는 필수다")
     return parser.parse_args(argv)
 
 
@@ -224,8 +231,36 @@ async def run_formation(args: argparse.Namespace) -> None:
                             lambda: print(_stats_line(session.relay, session), flush=True))
 
 
+#: 이 포트에 닿는 사람은 robots.yaml 의 운영자 토큰으로 현장의 모든 로봇을 움직일 수 있다.
+LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+
+
+def run_console(args: argparse.Namespace) -> None:
+    """관제 서버를 연다. uvicorn 이 자기 루프를 돌리므로 여기는 async 가 아니다."""
+    import uvicorn
+
+    from rosy_fleet.server.app import create_app
+    from rosy_fleet.server.console import FleetConsole
+
+    if args.host not in LOOPBACK_HOSTS and not args.token:
+        sys.exit("--token 없이 루프백 밖으로 열 수 없다: 이 포트는 현장의 모든 로봇을 움직인다")
+    endpoints = load_robots(args.robots)
+    _warn_if_world_readable(args.robots)
+    console = FleetConsole(endpoints, [HttpRobotClient(ep) for ep in endpoints])
+    app = create_app(console, console_token=args.token)
+    print(f"fleet console: http://{args.host}:{args.port}/console  ({len(endpoints)} robots)",
+          flush=True)
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+
+
 def main(argv: Optional[Sequence[str]] = None) -> None:
     args = parse_args(argv)
+    if args.command == "console":
+        try:
+            run_console(args)
+        except KeyboardInterrupt:
+            pass
+        return
     runner = run_relay if args.command == "relay" else run_formation
     try:
         asyncio.run(runner(args))

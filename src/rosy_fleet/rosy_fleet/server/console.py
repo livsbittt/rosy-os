@@ -1,0 +1,167 @@
+"""사이트 오케스트레이터의 관제 표면 — 모음(gather)과 흩뿌림(scatter).
+
+역할 경계는 [사이트 미들웨어 역할 패브릭 설계](../../../../docs/plans/2026-09-14-site-middleware-role-fabric-design.md)
+§2 가 정한다. 이 모듈이 하는 일은 등록된 로봇의 상태를 모으고, 원자 액션
+(goal / cancel / e-stop)을 내리는 것뿐이다. 하지 않는 일:
+
+- 로봇 ROS 토픽 구독, `cmd_vel` 생산 — 최종 속도는 로봇 안 CORE 만 낸다 (D-59 §5).
+- 미션 DSL 을 로봇에 내려보내기 — 미션은 Fleet 쪽에 남는다 (D-12).
+- 로봇 로컬 대시보드를 대신하는 척하기 — 그쪽은 한 대의 현장 화면이다 (D-23).
+
+**v1 의 gather 는 폴링이다.** 설계 §3 의 최종 모음 경로는 로봇 `FleetAgent` 가 여는
+outbound WS(heartbeat/event)지만, 그 에이전트는 Fleet 서버가 생긴 뒤에야 소켓을 연다
+(설계 §7 3단계). 그때까지는 같은 계약의 REST 상태를 주기적으로 읽는다. 읽기만 하므로
+역할 경계는 같고, 에이전트가 붙으면 `snapshot()` 의 출처만 바뀐다.
+
+전송은 `rosy_fleet.swarm.transport` 의 `RobotClient` 하나만 쓴다 — 로봇 계약을 부르는
+자리는 거기 한 곳이다.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import time
+from typing import Any, Callable, Optional, Sequence
+
+from rosy_fleet.hub.hub import HubError, SiteHub
+from rosy_fleet.swarm.robots import RobotEndpoint
+from rosy_fleet.swarm.transport import RobotApiError, RobotClient
+
+#: 맵은 로봇마다 다시 받을 이유가 없다 — 한 사이트는 한 맵을 공유한다. 그래도 SLAM 으로
+#: 맵이 바뀔 수 있으므로 무한정 붙들지는 않는다.
+MAP_TTL_S = 10.0
+
+
+def _error_of(exc: BaseException) -> dict:
+    """예외를 UI 가 그대로 읽을 수 있는 모양으로. 로봇이 거절한 것과 닿지 못한 것을 가른다."""
+    if isinstance(exc, RobotApiError):
+        return {"reachable": True, "code": exc.code, "message": str(exc)}
+    return {"reachable": False, "code": type(exc).__name__, "message": str(exc) or type(exc).__name__}
+
+
+class FleetConsole:
+    """robots.yaml 한 장에 적힌 N대를 하나의 관제 표면으로 묶는다."""
+
+    def __init__(
+        self,
+        endpoints: Sequence[RobotEndpoint],
+        clients: Sequence[RobotClient],
+        *,
+        clock: Callable[[], float] = time.monotonic,
+        map_ttl_s: float = MAP_TTL_S,
+        fleet_name: str = "rosy-site",
+    ) -> None:
+        if len(endpoints) != len(clients):
+            raise ValueError("endpoints and clients must line up one for one")
+        self._clients: dict[str, RobotClient] = {
+            ep.robot_id: client for ep, client in zip(endpoints, clients)
+        }
+        self._order = [ep.robot_id for ep in endpoints]
+        self._clock = clock
+        self._map_ttl_s = map_ttl_s
+        self._map: Optional[dict] = None
+        self._map_at = 0.0
+        # 하달한 목표는 Fleet 이 기억한다. 로봇 상태 스냅샷에는 목표가 없고, 있어서도 안 된다
+        # — 미션은 Fleet 쪽 개념이고 로봇은 원자 액션만 받는다 (D-12). 화면의 목표 표시는
+        # "내가 무엇을 시켰는가"이지 로봇이 되돌려 준 값이 아니다.
+        self._goals: dict[str, dict] = {}
+        self.fleet_name = fleet_name
+        # e-stop 은 hub 의 scatter 를 그대로 쓴다 — 흩뿌림의 규칙을 두 군데 두지 않는다.
+        self._hub = SiteHub(list(endpoints), dict(self._clients), fleet_name=fleet_name)
+
+    @property
+    def robot_ids(self) -> list[str]:
+        return list(self._order)
+
+    def _client(self, robot_id: str) -> RobotClient:
+        client = self._clients.get(robot_id)
+        if client is None:
+            raise HubError("UNKNOWN_ROBOT", robot_id)
+        return client
+
+    # --- gather ---------------------------------------------------------------
+
+    async def snapshot(self) -> dict:
+        """N대 상태를 한 번에 모은다. 한 대가 죽어도 나머지는 그대로 온다."""
+        results = await asyncio.gather(
+            *(self._client(rid).state() for rid in self._order),
+            return_exceptions=True,
+        )
+        robots = []
+        for robot_id, result in zip(self._order, results):
+            goal = self._goals.get(robot_id)
+            if isinstance(result, BaseException):
+                robots.append({"robot_id": robot_id, "online": False, "goal": goal,
+                               "error": _error_of(result), "state": None})
+            else:
+                robots.append({"robot_id": robot_id, "online": True, "goal": goal,
+                               "error": None, "state": result})
+        online = sum(1 for r in robots if r["online"])
+        return {
+            "fleet": {"name": self.fleet_name, "online": online, "total": len(robots)},
+            "robots": robots,
+            "ts": self._clock(),
+        }
+
+    async def map(self) -> Optional[dict]:
+        """사이트가 공유하는 점유 격자. 응답한 첫 로봇 것을 쓰고 잠깐 물고 있는다.
+
+        격자를 로봇마다 받아 오면 N배의 트래픽이 되고, 어차피 같은 맵이면 같은 그림이다.
+        누구도 주지 못하면 `None` 이다 — UI 는 맵 없이도 목록을 띄워야 한다.
+        """
+        now = self._clock()
+        if self._map is not None and now - self._map_at < self._map_ttl_s:
+            return self._map
+        for robot_id in self._order:
+            try:
+                grid = await self._client(robot_id).map()
+            except Exception:
+                continue
+            if grid:
+                self._map = grid
+                self._map_at = now
+                return grid
+        return None
+
+    # --- scatter --------------------------------------------------------------
+
+    async def goal(self, robot_id: str, x: float, y: float, yaw: float = 0.0) -> dict:
+        """한 대에 목표 하나. 로봇은 원자 액션만 받는다 (D-12)."""
+        result = await self._client(robot_id).navigation_goal(x, y, yaw)
+        # 로봇이 받아들인 뒤에만 기억한다 — 거절된 목표가 화면에 남으면 운영자는 가지도
+        # 않을 곳으로 로봇이 간다고 읽는다.
+        self._goals[robot_id] = {"x": x, "y": y, "yaw": yaw}
+        return result
+
+    async def cancel(self, robot_id: str) -> dict:
+        result = await self._client(robot_id).navigation_cancel()
+        self._goals.pop(robot_id, None)
+        return result
+
+    async def estop_all(self) -> dict:
+        """전 대상 정지. 한 대가 거절해도 나머지에 계속 내린다.
+
+        빨리 실패하면 안 된다 — 닿지 않는 한 대 때문에 멈출 수 있었던 나머지가 계속
+        움직이는 것이 이 버튼에서 가장 나쁜 결과다. 로봇 쪽 e-stop 과 deadman 은 관제와
+        무관하게 살아 있다(설계 §3).
+        """
+        results = await asyncio.gather(
+            *(self._hub.scatter_estop(rid) for rid in self._order),
+            return_exceptions=True,
+        )
+        rows = []
+        for robot_id, result in zip(self._order, results):
+            if isinstance(result, BaseException):
+                # 이 대는 서지 않았다. 목표를 지우면 화면에서 "아무 데도 안 간다"로 보이지만
+                # 실제로는 아직 가고 있을 수 있다 — 남겨 둔다.
+                rows.append({"robot_id": robot_id, "stopped": False, "error": _error_of(result)})
+            else:
+                self._goals.pop(robot_id, None)
+                rows.append({"robot_id": robot_id, "stopped": True, "result": result})
+        return {"stopped": sum(1 for r in rows if r["stopped"]), "total": len(rows), "robots": rows}
+
+    async def aclose(self) -> None:
+        for client in self._clients.values():
+            closer: Any = getattr(client, "aclose", None)
+            if closer is not None:
+                await closer()

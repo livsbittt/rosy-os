@@ -62,7 +62,8 @@ class FakeSink:
 class FakeRobot:
     def __init__(self, robot_id: str, *, state: Optional[dict] = None,
                  follow_error: Optional[BaseException] = None,
-                 swarm_state: Optional[dict] = None, log: Optional[list] = None) -> None:
+                 swarm_state: Optional[dict] = None, log: Optional[list] = None,
+                 map: Optional[dict] = None) -> None:
         self.robot_id = robot_id
         self.calls: list[tuple] = []
         #: 여러 로봇의 호출 순서를 한 줄로 보고 싶을 때 같은 리스트를 넘긴다.
@@ -70,6 +71,10 @@ class FakeRobot:
         self._state = state or {"robot_id": robot_id, "map_id": "m1",
                                 "pose": {"x": 0.0, "y": 0.0, "yaw": 0.0}}
         self._swarm_state = swarm_state or {"active": True, "holding": False}
+        #: 관제 콘솔이 읽는 점유 격자. `None` 이면 빈 dict 를 돌려준다(맵 없는 로봇).
+        self._map = map
+        #: 설정돼 있으면 map() 이 이것을 raise 한다 — 한 대가 못 줘도 다음 대로 넘어가는지 본다.
+        self.map_error: Optional[BaseException] = None
         #: RobotApiError 든 평범한 ConnectionError 든 그대로 raise 된다.
         self.follow_error = follow_error
         #: 잡혀 있으면 follow 가 여기서 기다린다 — 무장이 여러 await 짜리 구간임을 드러낸다.
@@ -110,6 +115,12 @@ class FakeRobot:
         if self.state_error is not None:
             raise self.state_error
         return dict(self._state)
+
+    async def map(self) -> dict:
+        self._record("map")
+        if self.map_error is not None:
+            raise self.map_error
+        return dict(self._map) if self._map is not None else {}
 
     async def swarm_state(self) -> dict:
         self._record("swarm_state")

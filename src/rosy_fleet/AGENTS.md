@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-09 | Updated: 2026-09-14 -->
+<!-- Generated: 2026-09-09 | Updated: 2026-09-17 -->
 
 # rosy_fleet
 
@@ -7,9 +7,11 @@
 
 Fleet-side seed (ROSY-FLEET-SRS-001 FOR-001~004). Formation geometry (FOR-001), slot
 assignment (FOR-002), a reference-stream relay from one leader to N followers (D-31), and
-the FOR-004 formation session (arm → relay → watch → hold), plus the CLI that opens a
-session until the Fleet server exists (Phase 4). No Fleet server yet. SiteHub는 계약
-gather/scatter이며 ROS가 없다. Fleet 서버 UI가 아니다. Consumes the robot contract
+the FOR-004 formation session (arm → relay → watch → hold), the CLI that opens a
+session, and the **Fleet 서버 v1** (`rosy_fleet console`) — 관제 PC 에서 N대를 한 화면에
+모으고 로봇별 목표·취소·전체 정지를 내리는 사이트 오케스트레이터다(site-fabric 설계 §2,
+전환 순서 3단계). SiteHub는 계약 gather/scatter이며 ROS가 없다. SiteHub 자체는 UI가
+아니다 — UI 는 `server/` 가 들고, scatter 는 SiteHub 를 통해 나간다. Consumes the robot contract
 only — it never modifies `rosy_core` — and imports `rosy_core.protocol.schemas` for
 schema reuse (D-18). No ROS imports anywhere in this package.
 
@@ -28,7 +30,10 @@ schema reuse (D-18). No ROS imports anywhere in this package.
 | `rosy_fleet/swarm/session.py` | `FormationSession`: arm → relay → watch → FOR-004 (HOLD/ABORT policy) |
 | `rosy_fleet/hub/registry.py` | Online snapshot and event seq |
 | `rosy_fleet/hub/hub.py` | Envelope handle + scatter_estop |
-| `rosy_fleet/cli.py` | `rosy_fleet relay ...` / `rosy_fleet formation ...` |
+| `rosy_fleet/cli.py` | `rosy_fleet relay ...` / `formation ...` / `console ...` |
+| `rosy_fleet/server/console.py` | `FleetConsole`: N대 상태 gather + goal/cancel/e-stop scatter. 하달한 목표를 기억하는 곳(D-12) |
+| `rosy_fleet/server/app.py` | FastAPI 표면 — `/api/fleet/*` 와 `/console` UI |
+| `rosy_fleet/server/web/` | 관제 UI 정적 자산 (CSP `style-src 'self'` — 인라인 스타일 금지) |
 | `test/fakes.py` | Fake `RobotClient` + `FakeClock` shared by relay/session tests — no network |
 | `test/conftest.py` | Puts `src/rosy_fleet` and `src/rosy_core` on `sys.path` so pytest runs without colcon install |
 | `progress.md` | Current gate snapshot (SOURCE…FIELD). Overwrite; state of record over this file |
@@ -42,6 +47,7 @@ schema reuse (D-18). No ROS imports anywhere in this package.
 | `rosy_fleet/formation/` | Pure geometry and slot-assignment functions — no transport, no ROS (see `rosy_fleet/formation/AGENTS.md`) |
 | `rosy_fleet/swarm/` | Robot endpoints, transport, relay, arming, and the formation session (see `rosy_fleet/swarm/AGENTS.md`) |
 | `rosy_fleet/hub/` | D-59 SiteHub: hello/heartbeat/event gather, REST scatter — no rclpy, no cmd_vel, no Image (see `rosy_fleet/hub/AGENTS.md`) |
+| `rosy_fleet/server/` | 관제 PC 의 Fleet 서버와 UI (see `rosy_fleet/server/AGENTS.md`) |
 | `test/` | pytest for geometry, assignment, robots, transport, relay, arming, session, CLI, hub, and the import-boundary check (see `test/AGENTS.md`) |
 | `resource/` | ament index marker `rosy_fleet` |
 
@@ -80,6 +86,7 @@ No ROS required — `conftest.py` puts `src/rosy_core` on `sys.path` for the sch
 
 ### External
 
+- fastapi + uvicorn (`rosy_fleet console` 만 쓴다 — 릴레이·대형 CLI 는 없이도 돈다)
 - httpx
 - websockets ≥ 14 (`InvalidStatus`, new asyncio client; 17 in dev)
 - PyYAML
