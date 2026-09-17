@@ -3,7 +3,7 @@ rosy_bringup:
     wheel_radius: 0.027
     wheel_separation: 0.0961
     cmd_vel_timeout_s: 0.5
-    max_linear_mps: 0.25
-    max_angular_rps: 2.5
+    max_linear_mps: 0.20
+    max_angular_rps: 0.80
     max_wheel_rpm: 100.0
     motor_profile_acceleration: 200
