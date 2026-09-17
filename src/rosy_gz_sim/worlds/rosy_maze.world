@@ -1,0 +1,116 @@
+<?xml version="1.0" ?>
+<!--
+  어려운 항법 월드. 넓은 방에서는 드러나지 않는 것을 보려고 만든다.
+
+  - 뱀형 통로 4개(폭 1.5 m). 끝마다 U턴이 강제된다.
+  - 폭 0.55 m 문 하나. 코스트맵 팽창 반경이 0.15 m 이고 pinky 풋프린트 반폭이 0.06 m 라,
+    문 한가운데를 지나도 양쪽 팽창이 겹친다 — 플래너가 비용을 무릅쓰고 지나는지, 아니면
+    포기하는지가 여기서 갈린다.
+  - 문 뒤는 막다른 주머니다. 들어갔다가 제자리 회전으로 나와야 한다.
+
+  벽 두께 0.08 m: gpu_lidar 는 렌더링이라 1 cm 벽을 비스듬한 각도에서 놓친다.
+-->
+<sdf version="1.8">
+  <world name="rosy_maze">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"></plugin>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"></plugin>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"></plugin>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"></plugin>
+
+    <light type="directional" name="sun">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 3 0 0 0</pose>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>1 1 1 1</specular>
+      <attenuation>
+        <range>1000</range><constant>1</constant><linear>0</linear><quadratic>0</quadratic>
+      </attenuation>
+      <direction>0 0 -1</direction>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="ground_link">
+        <collision name="ground_collision">
+          <geometry><plane><normal>0 0 1</normal><size>12 12</size></plane></geometry>
+        </collision>
+        <visual name="ground_visual">
+          <geometry><plane><normal>0 0 1</normal><size>12 12</size></plane></geometry>
+          <material>
+            <diffuse>0.55 0.56 0.54 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 바깥 벽 6 x 6 -->
+    <model name="wall_front">
+      <static>true</static><pose>0 3 0.22 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><box><size>6 0.08 0.44</size></box></geometry>
+        <material><diffuse>0.7 0.7 0.7 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>6 0.08 0.44</size></box></geometry></collision></link>
+    </model>
+    <model name="wall_back">
+      <static>true</static><pose>0 -3 0.22 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><box><size>6 0.08 0.44</size></box></geometry>
+        <material><diffuse>0.7 0.7 0.7 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>6 0.08 0.44</size></box></geometry></collision></link>
+    </model>
+    <model name="wall_left">
+      <static>true</static><pose>-3 0 0.22 0 0 1.5708</pose>
+      <link name="l"><visual name="v"><geometry><box><size>6 0.08 0.44</size></box></geometry>
+        <material><diffuse>0.7 0.7 0.7 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>6 0.08 0.44</size></box></geometry></collision></link>
+    </model>
+    <model name="wall_right">
+      <static>true</static><pose>3 0 0.22 0 0 1.5708</pose>
+      <link name="l"><visual name="v"><geometry><box><size>6 0.08 0.44</size></box></geometry>
+        <material><diffuse>0.7 0.7 0.7 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>6 0.08 0.44</size></box></geometry></collision></link>
+    </model>
+
+    <!-- 뱀형 칸막이. V1/V3 은 위가 열리고 V2 는 아래가 열린다 -->
+    <model name="maze_v1">
+      <static>true</static><pose>-1.5 -0.7 0.22 0 0 1.5708</pose>
+      <link name="l"><visual name="v"><geometry><box><size>4.6 0.08 0.44</size></box></geometry>
+        <material><diffuse>0.62 0.64 0.62 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>4.6 0.08 0.44</size></box></geometry></collision></link>
+    </model>
+    <model name="maze_v2">
+      <static>true</static><pose>0 0.7 0.22 0 0 1.5708</pose>
+      <link name="l"><visual name="v"><geometry><box><size>4.6 0.08 0.44</size></box></geometry>
+        <material><diffuse>0.62 0.64 0.62 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>4.6 0.08 0.44</size></box></geometry></collision></link>
+    </model>
+    <model name="maze_v3">
+      <static>true</static><pose>1.5 -0.7 0.22 0 0 1.5708</pose>
+      <link name="l"><visual name="v"><geometry><box><size>4.6 0.08 0.44</size></box></geometry>
+        <material><diffuse>0.62 0.64 0.62 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>4.6 0.08 0.44</size></box></geometry></collision></link>
+    </model>
+
+    <!-- 폭 0.55 m 문: y=-2.0 에서 x 2.0..2.55 만 비운다 -->
+    <model name="door_wall_left">
+      <static>true</static><pose>1.75 -2.0 0.22 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><box><size>0.5 0.08 0.44</size></box></geometry>
+        <material><diffuse>0.62 0.64 0.62 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>0.5 0.08 0.44</size></box></geometry></collision></link>
+    </model>
+    <model name="door_wall_right">
+      <static>true</static><pose>2.775 -2.0 0.22 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><box><size>0.45 0.08 0.44</size></box></geometry>
+        <material><diffuse>0.62 0.64 0.62 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>0.45 0.08 0.44</size></box></geometry></collision></link>
+    </model>
+
+  </world>
+</sdf>

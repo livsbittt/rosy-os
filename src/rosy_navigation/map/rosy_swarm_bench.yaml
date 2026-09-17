@@ -1,0 +1,7 @@
+image: rosy_swarm_bench.pgm
+mode: trinary
+resolution: 0.05000000074505806
+origin: [-3.1050614985742557, -3.0306760946328333, 0]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.25

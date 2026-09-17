@@ -1,0 +1,186 @@
+<?xml version="1.0" ?>
+<!--
+  군집 대형 계측용 월드 (swarm-formation-slice 설계 §8.2, Task 14).
+
+  rosy_factory 는 4x3 m 에 선반 넷과 로봇팔 박스가 들어찬 현장 재현이라, 2대 종대
+  대형이 설 자리가 없다 — 계측하려는 relay_tx_hz·slot_err_m·HOLD 지연 대신 팔로워가
+  선반에 끼는 것만 본다. 여기는 6x6 m 열린 방이고, 기둥 둘은 대칭을 깨 AMCL 과 스캔
+  매칭에 붙잡을 것을 준다. 장애물 시나리오(`stuck`)는 벤치가 런타임에 스폰한다.
+
+  벽 두께는 0.08 m 다. gpu_lidar 는 렌더링이라 1 cm 벽은 비스듬한 각도에서 놓치고,
+  그러면 맵에 방 밖으로 뻗는 부채꼴이 남는다.
+-->
+<sdf version="1.8">
+  <world name="rosy_swarm_bench">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin
+      filename="gz-sim-physics-system"
+      name="gz::sim::systems::Physics">
+    </plugin>
+    <plugin
+      filename="gz-sim-sensors-system"
+      name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin
+      filename="gz-sim-user-commands-system"
+      name="gz::sim::systems::UserCommands">
+    </plugin>
+    <plugin
+      filename="gz-sim-scene-broadcaster-system"
+      name="gz::sim::systems::SceneBroadcaster">
+    </plugin>
+    <plugin filename="gz-sim-imu-system"
+        name="gz::sim::systems::Imu">
+    </plugin>
+
+    <light type="directional" name="sun">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 3 0 0 0</pose>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>1 1 1 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>1</constant>
+        <linear>0</linear>
+        <quadratic>0</quadratic>
+      </attenuation>
+      <direction>0 0 -1</direction>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="ground_link">
+        <collision name="ground_collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>12 12</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="ground_visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>12 12</size>
+            </plane>
+          </geometry>
+          <material>
+            <diffuse>0.55 0.56 0.54 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_front">
+      <static>true</static>
+      <pose>0 3 0.22 0 0 0</pose>
+      <link name="wall_link_front">
+        <visual name="wall_visual_front">
+          <geometry><box><size>6 0.08 0.44</size></box></geometry>
+          <material>
+            <diffuse>0.7 0.7 0.7 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_collision_front">
+          <geometry><box><size>6 0.08 0.44</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+    <model name="wall_back">
+      <static>true</static>
+      <pose>0 -3 0.22 0 0 0</pose>
+      <link name="wall_link_back">
+        <visual name="wall_visual_back">
+          <geometry><box><size>6 0.08 0.44</size></box></geometry>
+          <material>
+            <diffuse>0.7 0.7 0.7 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_collision_back">
+          <geometry><box><size>6 0.08 0.44</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+    <model name="wall_left">
+      <static>true</static>
+      <pose>-3 0 0.22 0 0 1.5708</pose>
+      <link name="wall_link_left">
+        <visual name="wall_visual_left">
+          <geometry><box><size>6 0.08 0.44</size></box></geometry>
+          <material>
+            <diffuse>0.7 0.7 0.7 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_collision_left">
+          <geometry><box><size>6 0.08 0.44</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+    <model name="wall_right">
+      <static>true</static>
+      <pose>3 0 0.22 0 0 1.5708</pose>
+      <link name="wall_link_right">
+        <visual name="wall_visual_right">
+          <geometry><box><size>6 0.08 0.44</size></box></geometry>
+          <material>
+            <diffuse>0.7 0.7 0.7 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_collision_right">
+          <geometry><box><size>6 0.08 0.44</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 대칭을 깨는 기둥 둘. 빈 정사각 방은 90도씩 돌려도 스캔이 같아서 AMCL 이
+         엉뚱한 사분면에 수렴할 수 있다. 대형이 도는 가운데 고리는 비워 둔다. -->
+    <model name="pillar_a">
+      <static>true</static>
+      <pose>2.0 -1.3 0.25 0 0 0</pose>
+      <link name="pillar_a_link">
+        <visual name="pillar_a_visual">
+          <geometry><box><size>0.3 0.3 0.5</size></box></geometry>
+          <material>
+            <diffuse>0.45 0.5 0.48 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+          </material>
+        </visual>
+        <collision name="pillar_a_collision">
+          <geometry><box><size>0.3 0.3 0.5</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+    <model name="pillar_b">
+      <static>true</static>
+      <pose>-1.7 2.1 0.25 0 0 0</pose>
+      <link name="pillar_b_link">
+        <visual name="pillar_b_visual">
+          <geometry><box><size>0.3 0.6 0.5</size></box></geometry>
+          <material>
+            <diffuse>0.45 0.5 0.48 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+          </material>
+        </visual>
+        <collision name="pillar_b_collision">
+          <geometry><box><size>0.3 0.6 0.5</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+  </world>
+</sdf>

@@ -192,6 +192,8 @@ def _launch_setup(context):
     core = LaunchConfiguration("core").perform(context).lower() in ("true", "1")
     api_port_base = int(LaunchConfiguration("api_port_base").perform(context))
     map_yaml = LaunchConfiguration("map").perform(context)
+    spawn_x = float(LaunchConfiguration("spawn_x").perform(context))
+    spawn_y = float(LaunchConfiguration("spawn_y").perform(context))
 
     gz_sim_share = get_package_share_directory("ros_gz_sim")
     rosy_gz_share = get_package_share_directory("rosy_gz_sim")
@@ -249,8 +251,8 @@ def _launch_setup(context):
             )
         )
 
-        # 2) spawn — x축으로 spacing 간격 배치
-        x = (i - 1) * spacing
+        # 2) spawn — spawn_x/spawn_y 에서 x축으로 spacing 간격 배치
+        x = spawn_x + (i - 1) * spacing
         group_actions.append(
             Node(
                 package="ros_gz_sim",
@@ -260,7 +262,7 @@ def _launch_setup(context):
                 arguments=[
                     "-name", ns,
                     "-topic", f"{ns}/robot_description",
-                    "-x", str(x), "-y", "0.0", "-z", "0.1",
+                    "-x", str(x), "-y", str(spawn_y), "-z", "0.1",
                 ],
                 parameters=[{"use_sim_time": True}],
             )
@@ -378,6 +380,10 @@ def generate_launch_description():
                               choices=["none", "nav", "slam"],
                               description="로봇별 상위 스택 (none=spawn만)"),
         DeclareLaunchArgument("headless", default_value="false"),
+        DeclareLaunchArgument("spawn_x", default_value="0.0",
+                              description="첫 로봇의 spawn x. 원점에 구조물이 있는 월드(미로 등)에서 쓴다"),
+        DeclareLaunchArgument("spawn_y", default_value="0.0",
+                              description="모든 로봇의 spawn y"),
         DeclareLaunchArgument("spawn_spacing", default_value="1.5",
                               description="로봇 간 x축 배치 간격 (m)"),
         DeclareLaunchArgument("core", default_value="false",
