@@ -3,35 +3,42 @@
 from __future__ import annotations
 
 import math
+from typing import Mapping
 
-from rosy_games.field import Field
-from rosy_games.game.soccer import Action, Observation
+from rosy_games.field import ZERO, Field, Twist
+from rosy_games.game.protocol import Observation, Phase
+from rosy_games.game.state import MatchState
 
 
 class HeuristicPolicy:
     def __init__(self, field: Field | None = None, *, speed: float = 0.08) -> None:
         self.field = field or Field()
         self.speed = speed
-        self.avoid_m = 0.35
 
-    def act(self, robot_id: str, observation: Observation) -> Action:
+    def act(self, observation: Observation, state: MatchState) -> Mapping[str, Twist]:
+        if state.phase is not Phase.PLAY or observation.ball is None:
+            return {robot_id: ZERO for robot_id in observation.robots}
+        return {
+            robot_id: self._one(robot_id, observation)
+            for robot_id in observation.robots
+        }
+
+    def _one(self, robot_id: str, observation: Observation) -> Twist:
         pose = observation.robots.get(robot_id)
         if pose is None or observation.ball is None:
-            return Action(0.0, 0.0)
-        x, y, yaw = pose
-        bx, by = observation.ball
-        heading = math.atan2(by - y, bx - x)
-        err = _wrap(heading - yaw)
+            return ZERO
+        heading = math.atan2(observation.ball.y - pose.y, observation.ball.x - pose.x)
+        err = _wrap(heading - pose.yaw)
         turn = max(-1.0, min(1.0, err * 2.0))
         drive = self.speed if abs(err) < 0.4 else 0.0
         goal_x = self.field.opponent_goal_x(robot_id)
-        drive += 0.02 if (goal_x - x) * math.cos(yaw) > 0 else 0.0
+        drive += 0.02 if (goal_x - pose.x) * math.cos(pose.yaw) > 0 else 0.0
         other = next((rid for rid in observation.robots if rid != robot_id), None)
         if other is not None:
-            ox, oy, _ = observation.robots[other]
-            if math.hypot(ox - x, oy - y) < self.avoid_m:
+            opp = observation.robots[other]
+            if math.hypot(opp.x - pose.x, opp.y - pose.y) < self.field.avoid_m:
                 drive = min(drive, 0.0)
-        return Action(linear=max(-self.speed, min(self.speed, drive)), angular=turn)
+        return Twist(linear=max(-self.speed, min(self.speed, drive)), angular=turn)
 
 
 def _wrap(angle: float) -> float:

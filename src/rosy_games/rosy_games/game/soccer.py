@@ -1,38 +1,10 @@
-"""1v1 push-ball referee. Pure numbers."""
+"""1v1 push-ball referee. Eats observations only."""
 
 from __future__ import annotations
 
-import enum
-from dataclasses import dataclass, field
-from typing import Mapping, Optional
-
-from rosy_games.field import Field
-
-
-class Phase(str, enum.Enum):
-    KICKOFF = "kickoff"
-    IN_PLAY = "in_play"
-
-
-@dataclass(frozen=True)
-class Observation:
-    ball: Optional[tuple[float, float]]
-    robots: Mapping[str, tuple[float, float, float]]
-
-
-@dataclass(frozen=True)
-class Action:
-    linear: float
-    angular: float
-
-
-@dataclass(frozen=True)
-class StepResult:
-    phase: Phase
-    observation: Observation
-    score: Mapping[str, int]
-    scorer: Optional[str] = None
-    actions: Mapping[str, Action] = field(default_factory=dict)
+from rosy_games.field import Field, Pose2D
+from rosy_games.game.protocol import Observation, Phase
+from rosy_games.game.state import MatchState
 
 
 class SoccerGame:
@@ -40,54 +12,73 @@ class SoccerGame:
         self.field = field or Field()
         self.phase = Phase.KICKOFF
         self.score = {self.field.home_id: 0, self.field.away_id: 0}
+        self.reason = ""
+        self.scorer = None
 
-    def reset(self) -> StepResult:
+    def reset(self) -> MatchState:
         self.phase = Phase.KICKOFF
-        empty = Observation(ball=None, robots={})
-        return StepResult(phase=self.phase, observation=empty, score=dict(self.score))
+        self.reason = ""
+        self.scorer = None
+        return self._state()
 
-    def step(
-        self, observation: Observation, actions: Mapping[str, Action]
-    ) -> StepResult:
+    def step(self, observation: Observation) -> MatchState:
+        if self.phase is Phase.GOAL:
+            self.phase = Phase.KICKOFF
+            self.reason = ""
+            self.scorer = None
+            return self._state()
+        if self.phase is Phase.PLAY and self._lost(observation):
+            self.phase = Phase.HOLD
+            self.reason = "lost"
+            self.scorer = None
+            return self._state()
+        if self.phase is Phase.HOLD:
+            if not self._lost(observation):
+                self.phase = Phase.PLAY
+                self.reason = ""
+            return self._state()
         if self.phase is Phase.KICKOFF:
             if self._kickoff_ready(observation):
-                self.phase = Phase.IN_PLAY
-            return StepResult(
-                phase=self.phase,
-                observation=observation,
-                score=dict(self.score),
-                actions=_halt(observation.robots),
-            )
+                self.phase = Phase.PLAY
+                self.reason = ""
+            return self._state()
         scorer = self._goal_scorer(observation)
         if scorer is not None:
             self.score[scorer] += 1
-            self.phase = Phase.KICKOFF
-            return StepResult(
-                phase=self.phase,
-                observation=observation,
-                score=dict(self.score),
-                scorer=scorer,
-                actions=_halt(observation.robots),
-            )
-        return StepResult(
+            self.phase = Phase.GOAL
+            self.reason = "goal"
+            self.scorer = scorer
+            return self._state()
+        self.reason = ""
+        self.scorer = None
+        return self._state()
+
+    def _state(self) -> MatchState:
+        return MatchState(
             phase=self.phase,
-            observation=observation,
             score=dict(self.score),
-            actions=dict(actions),
+            reason=self.reason,
+            scorer=self.scorer,
         )
 
+    def _lost(self, observation: Observation) -> bool:
+        if observation.lost_ball or observation.ball is None:
+            return True
+        if observation.lost_robots:
+            return True
+        needed = {self.field.home_id, self.field.away_id}
+        return not needed <= set(observation.robots)
+
     def _kickoff_ready(self, observation: Observation) -> bool:
-        if observation.ball is None:
+        if self._lost(observation) or observation.ball is None:
             return False
-        if set(observation.robots) < {self.field.home_id, self.field.away_id}:
-            return False
-        x, y = observation.ball
+        x, y = observation.ball.x, observation.ball.y
         return (x * x + y * y) ** 0.5 <= self.field.kickoff_radius_m
 
-    def _goal_scorer(self, observation: Observation) -> Optional[str]:
+    def _goal_scorer(self, observation: Observation) -> str | None:
         if observation.ball is None:
             return None
-        x, y = observation.ball
+        x, y = observation.ball.x, observation.ball.y
         if self.field.in_away_goal(x, y):
             return self.field.home_id
         if self.field.in_home_goal(x, y):
@@ -95,5 +86,7 @@ class SoccerGame:
         return None
 
 
-def _halt(robots: Mapping[str, tuple[float, float, float]]) -> dict[str, Action]:
-    return {robot_id: Action(0.0, 0.0) for robot_id in robots}
+def pose(*xyz: float) -> Pose2D:
+    if len(xyz) == 2:
+        return Pose2D(xyz[0], xyz[1], 0.0)
+    return Pose2D(xyz[0], xyz[1], xyz[2])

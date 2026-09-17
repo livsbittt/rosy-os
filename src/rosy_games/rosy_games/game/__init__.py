@@ -1,5 +1,13 @@
-"""Referee protocol. cv2 and Isaac stay out."""
+from rosy_games.game.gate import CommandSet, gate
+from rosy_games.game.protocol import Observation, Phase
+from rosy_games.game.soccer import SoccerGame
+from rosy_games.game.state import MatchState
 
-from rosy_games.game.soccer import Action, Observation, Phase, SoccerGame, StepResult
-
-__all__ = ["Action", "Observation", "Phase", "SoccerGame", "StepResult"]
+__all__ = [
+    "CommandSet",
+    "MatchState",
+    "Observation",
+    "Phase",
+    "SoccerGame",
+    "gate",
+]
