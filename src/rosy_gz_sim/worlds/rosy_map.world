@@ -87,7 +87,7 @@
       <visual name="wall_visual_front">
         <geometry>
           <box>
-            <size>2 0.01 0.22</size>
+            <size>2 0.08 0.22</size>
           </box>
         </geometry>
         <material>
@@ -98,7 +98,7 @@
       <collision name="wall_collision_front">
         <geometry>
           <box>
-            <size>2 0.01 0.22</size>
+            <size>2 0.08 0.22</size>
           </box>
         </geometry>
       </collision>
@@ -113,7 +113,7 @@
       <visual name="wall_visual_back">
         <geometry>
           <box>
-            <size>2 0.01 0.22</size>
+            <size>2 0.08 0.22</size>
           </box>
         </geometry>
         <material>
@@ -124,7 +124,7 @@
       <collision name="wall_collision_back">
         <geometry>
           <box>
-            <size>2 0.01 0.22</size>
+            <size>2 0.08 0.22</size>
           </box>
         </geometry>
       </collision>
@@ -139,7 +139,7 @@
       <visual name="wall_visual_left">
         <geometry>
           <box>
-            <size>1 0.01 0.22</size>
+            <size>1 0.08 0.22</size>
           </box>
         </geometry>
         <material>
@@ -150,7 +150,7 @@
       <collision name="wall_collision_left">
         <geometry>
           <box>
-            <size>1 0.01 0.22</size>
+            <size>1 0.08 0.22</size>
           </box>
         </geometry>
       </collision>
@@ -165,7 +165,7 @@
       <visual name="wall_visual_right">
         <geometry>
           <box>
-            <size>1 0.01 0.22</size>
+            <size>1 0.08 0.22</size>
           </box>
         </geometry>
         <material>
@@ -176,7 +176,7 @@
       <collision name="wall_collision_right">
         <geometry>
           <box>
-            <size>1 0.01 0.22</size>
+            <size>1 0.08 0.22</size>
           </box>
         </geometry>
       </collision>

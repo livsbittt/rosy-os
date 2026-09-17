@@ -33,7 +33,7 @@ from launch.actions import (
     OpaqueFunction,
     SetEnvironmentVariable,
 )
-from launch_ros.actions import Node, PushRosNamespace
+from launch_ros.actions import Node, PushRosNamespace, SetRemap
 from launch.launch_description_sources import AnyLaunchDescriptionSource, PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
@@ -60,6 +60,71 @@ def _core_config(ns: str, api_port: int) -> dict:
     }
 
 
+def _slam_config(ns: str, rosy_nav_share: str) -> dict:
+    """로봇별 slam_toolbox 파라미터.
+
+    저장소의 mapper_params.yaml 은 단일 로봇용이다(`scan_topic: /scan`, 접두 없는
+    프레임). 네임스페이스로 N대를 띄우면 스캔은 `/rosy_XX/scan` 으로 오고 TF 는
+    robot_state_publisher 의 frame_prefix 때문에 `rosy_XX/` 가 붙으므로, 그대로 쓰면
+    slam_toolbox 는 스캔도 TF 도 찾지 못한다. 기본값을 읽어 로봇별로만 덮어쓴다.
+
+    `/**` 로 감싸는 이유: 노드가 `/rosy_XX/slam_toolbox` 라 파일의 최상위 키가
+    `slam_toolbox` 이면 이름이 맞지 않아 파라미터가 하나도 적용되지 않는다.
+    """
+    defaults_path = os.path.join(rosy_nav_share, "params", "mapper_params.yaml")
+    with open(defaults_path, encoding="utf-8") as f:
+        defaults = yaml.safe_load(f)
+    params = dict(defaults["slam_toolbox"]["ros__parameters"])
+    params.update({
+        "scan_topic": f"/{ns}/scan",
+        "odom_frame": f"{ns}/odom",
+        "base_frame": f"{ns}/base_footprint",
+        # map 은 공유 루트 프레임으로 둔다(rosy_core 가 `map` 기준으로 목표를 낸다).
+        # 로봇별 맵 내용은 SetRemap 으로 나눈 `/rosy_XX/map` 토픽이 구분한다.
+        "map_frame": "map",
+        "use_sim_time": True,
+        # 기본값(0.5 m / 0.5 rad)은 실기 기준이다. 시뮬 월드는 4x3 m 남짓이고 pinky 는
+        # 12 cm 라, 0.5 rad 마다 키프레임을 잡으면 제자리 회전 중 스캔 사이 각도차가
+        # coarse_search_angle_offset(0.349 rad)를 넘겨 매칭이 어긋나고 맵에 회전 중복상이
+        # 남는다. 로봇·월드 크기에 맞춰 키프레임을 촘촘히 잡는다.
+        "minimum_travel_distance": 0.2,
+        "minimum_travel_heading": 0.2,
+        "scan_buffer_size": 20,
+        "transform_timeout": 0.5,
+    })
+    return {"/**": {"ros__parameters": params}}
+
+
+def _nav_config(ns: str, rosy_nav_share: str) -> dict:
+    """로봇별 nav2 파라미터.
+
+    프레임 접두는 rosy_navigation 의 `apply_nav2_frame_prefix` 를 그대로 쓴다 — `map` 은
+    전역으로 남기고 odom/base_* 만 `rosy_XX/` 로 바꾸는 규칙이 거기 한 곳에 있다.
+
+    여기서 두 가지를 더 얹는다:
+    - use_sim_time: 저장소 파일은 실기 기준이라 collision_monitor 등이 false 로 못박혀 있다.
+    - 네임스페이스 루트 키: 노드의 완전한 이름은 `/rosy_XX/controller_server` 라, 파일
+      최상위가 `controller_server` 면 매칭되지 않아 파라미터가 통째로 무시되고 nav2 가
+      기본값으로 뜬다("No critics defined for FollowPath" 가 그 증상이다).
+      nav2_bringup 의 RewrittenYaml(root_key=namespace) 과 같은 형태다.
+    """
+    from rosy_navigation.frame_prefix import apply_nav2_frame_prefix
+
+    defaults_path = os.path.join(rosy_nav_share, "params", "nav2_params.yaml")
+    with open(defaults_path, encoding="utf-8") as f:
+        defaults = yaml.safe_load(f)
+
+    def force_sim_time(value):
+        if isinstance(value, dict):
+            return {k: (True if k == "use_sim_time" else force_sim_time(v))
+                    for k, v in value.items()}
+        if isinstance(value, list):
+            return [force_sim_time(v) for v in value]
+        return value
+
+    return {ns: force_sim_time(apply_nav2_frame_prefix(defaults, ns))}
+
+
 def _robots_manifest(namespaces: list, api_port_base: int) -> list:
     """rosy_fleet CLI 가 읽는 robots.yaml 의 `robots` 목록."""
     return [
@@ -72,7 +137,6 @@ def _robots_manifest(namespaces: list, api_port_base: int) -> list:
 # per-robot bridge 매핑 템플릿 (rosy_bridge.yaml 기반, prefix 적용)
 BRIDGE_TEMPLATE = [
     # (ros_topic, gz_topic, ros_type, gz_type, direction)
-    ("tf", "tf", "tf2_msgs/msg/TFMessage", "gz.msgs.Pose_V", "GZ_TO_ROS"),
     ("scan", "scan", "sensor_msgs/msg/LaserScan", "gz.msgs.LaserScan", "GZ_TO_ROS"),
     ("cmd_vel", "cmd_vel", "geometry_msgs/msg/Twist", "gz.msgs.Twist", "ROS_TO_GZ"),
     ("joint_states", "joint_states", "sensor_msgs/msg/JointState", "gz.msgs.Model", "GZ_TO_ROS"),
@@ -88,11 +152,25 @@ CLOCK_ENTRY = {
     "direction": "GZ_TO_ROS",
 }
 
+#: TF 는 로봇마다 나누지 않는다. DiffDrive 플러그인이 `<tf_topic>/tf</tf_topic>` 로 gz 의
+#: 전역 `/tf` 에 쓰고, robot_state_publisher 도 (네임스페이스와 무관하게) ROS 의 전역
+#: `/tf` 에 쓴다. 프레임 이름은 frame_prefix 로 이미 `rosy_XX/` 가 붙어 충돌하지 않는다.
+#: 로봇별로 `rosy_XX/tf` 를 브리지하면 구독자만 생기고 발행자가 없어 odom→base_footprint
+#: 가 ROS 로 넘어오지 않는다(맵이 안 생기던 원인).
+TF_ENTRY = {
+    "ros_topic_name": "/tf",
+    "gz_topic_name": "/tf",
+    "ros_type_name": "tf2_msgs/msg/TFMessage",
+    "gz_type_name": "gz.msgs.Pose_V",
+    "direction": "GZ_TO_ROS",
+}
+
 
 def _bridge_config(namespace: str, with_clock: bool = False) -> list:
     entries = []
     if with_clock:
         entries.append(dict(CLOCK_ENTRY))
+        entries.append(dict(TF_ENTRY))
     for ros_topic, gz_topic, ros_type, gz_type, direction in BRIDGE_TEMPLATE:
         entries.append({
             "ros_topic_name": f"{namespace}{ros_topic}",
@@ -113,6 +191,7 @@ def _launch_setup(context):
     spacing = float(LaunchConfiguration("spawn_spacing").perform(context))
     core = LaunchConfiguration("core").perform(context).lower() in ("true", "1")
     api_port_base = int(LaunchConfiguration("api_port_base").perform(context))
+    map_yaml = LaunchConfiguration("map").perform(context)
 
     gz_sim_share = get_package_share_directory("ros_gz_sim")
     rosy_gz_share = get_package_share_directory("rosy_gz_sim")
@@ -203,23 +282,40 @@ def _launch_setup(context):
 
         # 4) Nav2 / SLAM (mode)
         if mode == "nav":
+            nav_cfg = os.path.join(bridge_dir, f"nav2_{ns}.yaml")
+            with open(nav_cfg, "w", encoding="utf-8") as f:
+                yaml.safe_dump(_nav_config(ns, rosy_nav_share), f, sort_keys=False)
+            nav_args = {"namespace": ns, "params_file": nav_cfg}
+            if map_yaml:
+                nav_args["map"] = map_yaml
             group_actions.append(
                 IncludeLaunchDescription(
                     AnyLaunchDescriptionSource(
                         os.path.join(rosy_nav_share, "launch", "gz_bringup_launch.xml")
                     ),
-                    launch_arguments={"namespace": ns}.items(),
+                    launch_arguments=nav_args.items(),
                 )
             )
         elif mode == "slam":
+            slam_cfg = os.path.join(bridge_dir, f"mapper_{ns}.yaml")
+            with open(slam_cfg, "w", encoding="utf-8") as f:
+                yaml.safe_dump(_slam_config(ns, rosy_nav_share), f, sort_keys=False)
             group_actions.append(
                 GroupAction([
                     PushRosNamespace(ns),
+                    # slam_toolbox 는 맵을 절대 토픽 `/map`·`/map_metadata` 로 발행한다
+                    # (네임스페이스를 push 해도 따라오지 않는다). N대를 띄우면 전부 같은
+                    # 토픽에 겹쳐 쓴다 — 로봇별로 되돌려 준다.
+                    SetRemap("/map", f"/{ns}/map"),
+                    SetRemap("/map_metadata", f"/{ns}/map_metadata"),
                     IncludeLaunchDescription(
                         AnyLaunchDescriptionSource(
                             os.path.join(rosy_nav_share, "launch", "gz_map_building.launch.xml")
                         ),
-                        launch_arguments={"use_sim_time": "True"}.items(),
+                        launch_arguments={
+                            "use_sim_time": "True",
+                            "slam_params_file": slam_cfg,
+                        }.items(),
                     ),
                 ])
             )
@@ -286,6 +382,8 @@ def generate_launch_description():
                               description="로봇 간 x축 배치 간격 (m)"),
         DeclareLaunchArgument("core", default_value="false",
                               description="로봇별 rosy_core 기동 (포트 api_port_base + i - 1)"),
+        DeclareLaunchArgument("map", default_value="",
+                              description="mode:=nav 이 쓸 맵 yaml (빈 값이면 rosy_navigation 기본 맵)"),
         DeclareLaunchArgument("api_port_base", default_value="8080",
                               description="첫 로봇의 rosy_core API 포트"),
         OpaqueFunction(function=_launch_setup),
