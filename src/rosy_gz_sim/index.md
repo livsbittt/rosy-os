@@ -31,5 +31,6 @@
 
 ## 최근 기록
 
+- 2026-09-17 · uncommitted · feat(sim): 어려운 월드·정답 맵 생성기·맵을 만들며 주행하는 모드
 - 2026-09-17 · uncommitted · feat(sim): host-contract for world_to_map
 - 2026-09-15 · uncommitted · docs(harness): start the rosy_gz_sim harness record

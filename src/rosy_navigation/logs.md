@@ -9,3 +9,10 @@
 - gate 변화: 없음. SOURCE/LOCAL GO, ROS-SIM/ARTIFACT/DEVICE HOLD, FIELD PARKED를 처음 기록
 - 결정: D-61 Proposed
 - 교훈: 없음
+
+## 2026-09-17 · uncommitted · fix(nav): 좁은 통로에서 실제로 완주하게 만든 네 가지
+- 변경: 전역 플래너를 NavFn → `nav2_smac_planner::SmacPlanner2D`, `allow_unknown: false`, 생성 맵 4종의 `free_thresh` 0.25 → 0.196, 새 맵 `rosy_maze`/`rosy_swarm_bench` 추가, `rosy_factory` 맵을 slam_nav 로 재작성(미지 1476 → 1016 셀)
+- 증거: WSL ROS 2 Jazzy + Gazebo. `gz_multi robots:=2 mode:=nav world_name:=rosy_maze.world` (인자 없이 월드 프로필만)로 두 대가 4구간 뱀형 미로를 완주 — `rosy_01` ARRIVED (1.98, 2.19), `rosy_02` 는 폭 0.55 m 문을 지나 ARRIVED (2.44, -2.34), 305 s. 공장 단독 8/8 목표 ARRIVED. 호스트 시험 2994 passed, 54 skipped (기존 rosy_control 실패 2건은 무관)
+- gate 변화: 없음. ROS-SIM 증거는 쌓였으나 gate 승격은 커밋 뒤 재실행으로 판정한다
+- 결정: 없음
+- 교훈: 네 가지가 각각 단독으로 전 구간 실패를 만들었고 증상이 모두 "경로를 못 만든다"로 같았다. (1) `free_thresh` 0.25 는 미지 픽셀 205(shade 0.196)를 자유로 읽어 맵 바깥을 뚫어 놓는다. (2) 그 상태에서 `allow_unknown: true` 면 플래너가 벽 너머 지름길을 고른다. (3) NavFn 은 전위장을 만들어 놓고 길고 구불구불한 통로에서 역추적에 실패한다. (4) 팽창 반경이 통로 반폭보다 작으면 통로 한가운데가 전부 cost 0 이라 경로가 최단으로 칸막이 끝을 스치고, pinky 는 벽면 4.7 cm 까지 붙어 끼인다. 넓은 방 시험으로는 넷 다 드러나지 않는다
