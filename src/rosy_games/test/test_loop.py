@@ -92,3 +92,15 @@ def test_teleop_failure_estops_both_clients():
     host.tick()
     assert home.estops >= 1
     assert away.estops >= 1
+
+
+def test_estop_all_still_stops_the_second_client_when_the_first_raises():
+    home = FakePlayerClient("rosy_01", fail_estop=True)
+    away = FakePlayerClient("rosy_02")
+    host = MatchHost(FakeObserver(_obs()), (home, away))
+    try:
+        host._estop_all()
+    except Exception:
+        pass
+    assert home.estops == 1
+    assert away.estops == 1

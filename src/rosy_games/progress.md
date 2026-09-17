@@ -10,7 +10,7 @@ gates:
     cmd: "python -m pytest src/rosy_games/test/test_games_boundaries.py test/test_rosy_games_surface.py -q"
   LOCAL:
     state: GO
-    evidence: "soccer + heuristic + MatchHost fake observer/clients (2026-09-18 Windows)"
+    evidence: "soccer + heuristic + MatchHost + HttpPlayerClient mode/teleop/stop (2026-09-18 Windows)"
     cmd: "python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q"
   ROS-SIM:
     state: N/A
@@ -29,9 +29,9 @@ plans:
 
 - 노트북 게임 호스트 (D-90). CORE 모드 아님. 최종 `cmd_vel` 없음.
 - 심판·휴리스틱·MatchHost 루프는 가짜 Observer/PlayerClient로 LOCAL pytest가 돈다. 빈 `isaac/` 패키지는 제거함.
-- 천장 카메라 어댑터와 HttpPlayerClient는 아직 없다.
+- `HttpPlayerClient`는 CORE mode/teleop/stop만 부른다. 천장 카메라 어댑터와 match.yaml CLI는 아직 없다.
 
 ## 다음 gate
 
-1. `docs/plans/2026-09-18-rosy-games-local-host.md`의 PlayerClient·config.
+1. `docs/plans/2026-09-18-rosy-games-local-host.md`의 match.yaml·CLI.
 2. DEVICE/FIELD는 노트북 1v1 실측. 호스트 pytest로 승격하지 않는다.

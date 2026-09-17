@@ -2,6 +2,12 @@
 
 추가만 한다. 형식: [module harness 설계](../../docs/plans/2026-09-15-module-harness-design.md) §4.2.
 
+## 2026-09-18 · uncommitted · feat(games): talk to CORE with mode, teleop, and stop only
+
+- 변경: `HttpPlayerClient`가 CORE `POST /api/v1/mode`·`/teleop`·`/safety/stop`만 부른다. 4xx/5xx는 예외. `MatchHost._estop_all`은 한쪽 `estop` 실패 후에도 나머지를 호출한다.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q`
+- gate 변화: 없음 (LOCAL GO 유지)
+
 ## 2026-09-18 · uncommitted · feat(games): run the match loop against fake robots
 
 - 변경: `MatchHost`가 `Observer.observe` → `game.step` → `policy.act` → `gate` → `PlayerClient.teleop`/`estop`. 킥오프 미준비·유실 HOLD도 roster 양쪽에 teleop 0. `teleop` 예외면 양쪽 `estop`. TwistSink 제거.

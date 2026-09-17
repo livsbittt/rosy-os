@@ -63,5 +63,11 @@ class MatchHost:
             client.teleop(twist.linear, twist.angular)
 
     def _estop_all(self) -> None:
+        errors: list[BaseException] = []
         for client in self.clients:
-            client.estop()
+            try:
+                client.estop()
+            except Exception as exc:
+                errors.append(exc)
+        if errors:
+            raise ExceptionGroup("estop failed", errors)

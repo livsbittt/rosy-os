@@ -17,9 +17,16 @@ class FakeObserver:
 
 
 class FakePlayerClient:
-    def __init__(self, robot_id: str, *, fail_teleop: bool = False) -> None:
+    def __init__(
+        self,
+        robot_id: str,
+        *,
+        fail_teleop: bool = False,
+        fail_estop: bool = False,
+    ) -> None:
         self.robot_id = robot_id
         self.fail_teleop = fail_teleop
+        self.fail_estop = fail_estop
         self.teleops: list[tuple[float, float]] = []
         self.estops = 0
         self.manual = 0
@@ -34,3 +41,5 @@ class FakePlayerClient:
 
     def estop(self) -> None:
         self.estops += 1
+        if self.fail_estop:
+            raise RuntimeError(f"{self.robot_id} estop failed")

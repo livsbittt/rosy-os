@@ -31,3 +31,4 @@
 - 2026-09-18 · uncommitted · feat(games): clamp non-play and ramming twists in the referee gate
 - 2026-09-18 · uncommitted · feat(games): policy returns twists for both robots
 - 2026-09-18 · uncommitted · feat(games): run the match loop against fake robots
+- 2026-09-18 · uncommitted · feat(games): talk to CORE with mode, teleop, and stop only
