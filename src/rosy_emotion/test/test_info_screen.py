@@ -2,7 +2,18 @@
 
 import pytest
 
+from pathlib import Path
+
 from rosy_emotion.info_screen import DEFAULT_SIZE, battery_color, render
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_package_declares_emotion_servers():
+    setup = (ROOT / "setup.py").read_text(encoding="utf-8")
+    assert "emotion_server=rosy_emotion.emotion_server:main" in setup
+    package = (ROOT / "package.xml").read_text(encoding="utf-8")
+    assert "<name>rosy_emotion</name>" in package
 
 
 class TestBatteryColor:

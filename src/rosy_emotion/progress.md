@@ -2,15 +2,16 @@
 module: rosy_emotion
 logical_modules: [M02]
 owner: 장치
-last_verified: { commit: "uncommitted", date: 2026-09-15 }
+last_verified: { commit: "uncommitted", date: 2026-09-17 }
 gates:
   SOURCE:
-    state: HOLD
-    blocker: "패키지 경계(서비스 노드·info_screen 계약)를 고정하는 host 계약 시험이 없다. test_nav2_hardware_slice.py의 이미지 제외 단언은 패키지 내용을 읽지 않으므로 SOURCE 증거가 아니다(ARTIFACT 근거로만 쓴다). 렌더러 동작은 LOCAL이 다룬다"
+    state: GO
+    evidence: "package.xml·entry_point 단언 포함 test_info_screen (2026-09-17 Windows)"
+    cmd: "PYTHONPATH=src/rosy_emotion python -m pytest src/rosy_emotion/test/test_info_screen.py -q"
   LOCAL:
     state: GO
-    evidence: "16 passed (2026-09-16 재실행, Windows, 미커밋 WIP 포함 작업 트리) — info_screen 렌더·battery_color 임계값"
-    cmd: "PYTHONPATH=src/rosy_emotion python3 -m pytest src/rosy_emotion/test/test_info_screen.py -q"
+    evidence: "info_screen 렌더·battery_color + 패키지 표면 (2026-09-17 Windows)"
+    cmd: "PYTHONPATH=src/rosy_emotion python -m pytest src/rosy_emotion/test/test_info_screen.py -q"
   ROS-SIM:
     state: HOLD
     blocker: "rclpy set_emotion 서비스 노드가 있음. ROS 2 Jazzy 컨테이너 재실행 필요, 미실행"

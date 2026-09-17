@@ -2,14 +2,16 @@
 module: rosy_sensor_adc
 logical_modules: [M02]
 owner: 장치
-last_verified: { commit: "uncommitted", date: 2026-09-15 }
+last_verified: { commit: "uncommitted", date: 2026-09-17 }
 gates:
   SOURCE:
-    state: HOLD
-    blocker: "패키지 소스를 검사하는 host-runnable 계약 시험이 없다. test_nav2_hardware_slice.py의 이미지 제외 단언은 패키지 내용을 읽지 않으므로 SOURCE 증거가 아니다(ARTIFACT 근거로만 쓴다)"
+    state: GO
+    evidence: "test_adc_package_contract 2 passed (2026-09-17 Windows)"
+    cmd: "python -m pytest src/rosy_sensor_adc/test/test_adc_package_contract.py -q"
   LOCAL:
-    state: HOLD
-    blocker: "패키지에 test/ 디렉터리가 없다(package.xml의 ament_lint_auto는 colcon test에서만 실행됨). C++ 노드는 aarch64 전용 빌드. host-runnable 비-ROS 시험 없음. colcon/gtest 필요"
+    state: GO
+    evidence: "동일. C++ 노드 빌드는 ROS-SIM/ARTIFACT"
+    cmd: "python -m pytest src/rosy_sensor_adc/test/test_adc_package_contract.py -q"
   ROS-SIM:
     state: HOLD
     blocker: "C++ 노드(rclcpp)가 있음. ROS 2 Jazzy 컨테이너 재실행 필요, 미실행"

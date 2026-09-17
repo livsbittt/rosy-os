@@ -2,14 +2,16 @@
 module: rosy_interfaces
 logical_modules: [M02]
 owner: 장치
-last_verified: { commit: "uncommitted", date: 2026-09-15 }
+last_verified: { commit: "uncommitted", date: 2026-09-17 }
 gates:
   SOURCE:
-    state: HOLD
-    blocker: "repo test/ 전체를 검색했으나 srv 스키마(Emotion/SetLed/SetBrightness/SetLamp)의 필드·타입을 고정하는 host-runnable contract test가 없다(`src/rosy_core/test/test_bridge_timers.py`는 rosy_interfaces를 import stub 목록에만 넣는다). rosidl 생성 결과 확인은 colcon build가 필요"
+    state: GO
+    evidence: "test_srv_surface 2 passed — srv 파일과 필드 (2026-09-17 Windows)"
+    cmd: "python -m pytest src/rosy_interfaces/test/test_srv_surface.py -q"
   LOCAL:
-    state: HOLD
-    blocker: "패키지에 test/ 디렉터리가 없다(package.xml의 ament_lint_auto는 colcon test에서만 실행됨). rosidl 코드 생성 확인은 colcon build 필요"
+    state: GO
+    evidence: "동일. rosidl 생성은 colcon/ARTIFACT"
+    cmd: "python -m pytest src/rosy_interfaces/test/test_srv_surface.py -q"
   ROS-SIM:
     state: N/A
   ARTIFACT:

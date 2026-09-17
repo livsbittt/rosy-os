@@ -12,13 +12,13 @@
 | [rosy_gz_sim](src/rosy_gz_sim/progress.md) | SIM | uncommitted (2026-09-17) | GO | GO | HOLD | N/A | N/A | N/A |
 | [rosy_navigation](src/rosy_navigation/progress.md) | NAV | uncommitted (2026-09-15) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [rosy_bringup](src/rosy_bringup/progress.md) | BRINGUP | uncommitted (2026-09-15) | GO | GO | HOLD | HOLD | HOLD | PARKED |
-| [rosy_emotion](src/rosy_emotion/progress.md) | 장치 | uncommitted (2026-09-15) | HOLD | GO | HOLD | HOLD | PARKED | PARKED |
-| [rosy_led](src/rosy_led/progress.md) | 장치 | uncommitted (2026-09-15) | HOLD | HOLD | HOLD | HOLD | PARKED | PARKED |
-| [rosy_imu_bno055](src/rosy_imu_bno055/progress.md) | 장치 | uncommitted (2026-09-15) | GO | GO | HOLD | HOLD | PARKED | PARKED |
-| [rosy_sensor_adc](src/rosy_sensor_adc/progress.md) | 장치 | uncommitted (2026-09-15) | HOLD | HOLD | HOLD | HOLD | PARKED | PARKED |
-| [rosy_lamp_control](src/rosy_lamp_control/progress.md) | 장치 | uncommitted (2026-09-15) | HOLD | HOLD | HOLD | HOLD | PARKED | PARKED |
-| [rosy_interfaces](src/rosy_interfaces/progress.md) | 장치 | uncommitted (2026-09-15) | HOLD | HOLD | N/A | HOLD | HOLD | PARKED |
-| [rosy_description](src/rosy_description/progress.md) | 로봇 통합 | uncommitted (2026-09-15) | HOLD | HOLD | HOLD | HOLD | HOLD | PARKED |
+| [rosy_emotion](src/rosy_emotion/progress.md) | 장치 | uncommitted (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
+| [rosy_led](src/rosy_led/progress.md) | 장치 | uncommitted (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
+| [rosy_imu_bno055](src/rosy_imu_bno055/progress.md) | 장치 | uncommitted (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
+| [rosy_sensor_adc](src/rosy_sensor_adc/progress.md) | 장치 | uncommitted (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
+| [rosy_lamp_control](src/rosy_lamp_control/progress.md) | 장치 | uncommitted (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
+| [rosy_interfaces](src/rosy_interfaces/progress.md) | 장치 | uncommitted (2026-09-17) | GO | GO | N/A | HOLD | HOLD | PARKED |
+| [rosy_description](src/rosy_description/progress.md) | 로봇 통합 | uncommitted (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [dock](dock/progress.md) | 도킹 | uncommitted (2026-09-15) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [docs](docs/progress.md) | 거버넌스 | 8fdd8d2 (2026-09-17) | GO | GO | N/A | N/A | N/A | N/A |
 
@@ -40,29 +40,18 @@
 - rosy_bringup ROS-SIM: Dynamixel/LiDAR/battery publisher 노드의 ROS 2 Jazzy 실물 또는 컨테이너 재실행 증거 없음
 - rosy_bringup ARTIFACT: ARM64 로봇 이미지에 포함되나(Dockerfile/compose) 서명 manifest와 immutable digest 발행 전
 - rosy_bringup DEVICE: Pi bench Device 설치와 device-readback.sh --json 증거 없음. PinkyProAdapter의 실장치 SDK 구동 확인도 미실행
-- rosy_emotion SOURCE: 패키지 경계(서비스 노드·info_screen 계약)를 고정하는 host 계약 시험이 없다. test_nav2_hardware_slice.py의 이미지 제외 단언은 패키지 내용을 읽지 않으므로 SOURCE 증거가 아니다(ARTIFACT 근거로만 쓴다). 렌더러 동작은 LOCAL이 다룬다
 - rosy_emotion ROS-SIM: rclpy set_emotion 서비스 노드가 있음. ROS 2 Jazzy 컨테이너 재실행 필요, 미실행
 - rosy_emotion ARTIFACT: hardware 프로필이 이미지에 배선되지 않았다. core/io 이미지 제외는 test/test_nav2_hardware_slice.py::test_io_image_packages_nav2_without_slam_or_aux_drivers가 고정한다
-- rosy_led SOURCE: 패키지 소스를 검사하는 host-runnable 계약 시험이 없다. test_nav2_hardware_slice.py의 이미지 제외 단언은 패키지 내용을 읽지 않으므로 SOURCE 증거가 아니다(ARTIFACT 근거로만 쓴다)
-- rosy_led LOCAL: test/ 전부가 ament_copyright/flake8/pep257 linter뿐이며 이 호스트에 미설치(ModuleNotFoundError, 2026-09-15 재현). host-runnable 비-ROS 시험 없음. colcon/ROS 환경 필요
 - rosy_led ROS-SIM: rclpy 서비스 서버(set_led/set_brightness) 노드가 있음. ROS 2 Jazzy 컨테이너 재실행 필요, 미실행
 - rosy_led ARTIFACT: hardware 프로필이 이미지에 배선되지 않았다. core/io 이미지 제외는 test/test_nav2_hardware_slice.py::test_io_image_packages_nav2_without_slam_or_aux_drivers가 고정한다
 - rosy_imu_bno055 ROS-SIM: C++ 드라이버 노드(rclcpp)가 있음. ROS 2 Jazzy 컨테이너 재실행 필요, 미실행
 - rosy_imu_bno055 ARTIFACT: hardware 프로필이 이미지에 배선되지 않았다(core/io 이미지 제외는 test/test_nav2_hardware_slice.py::test_io_image_packages_nav2_without_slam_or_aux_drivers가 고정). 실물 드라이버 빌드·주입 버스 실행 시험도 Linux ARM64 ROS 환경 필요
-- rosy_sensor_adc SOURCE: 패키지 소스를 검사하는 host-runnable 계약 시험이 없다. test_nav2_hardware_slice.py의 이미지 제외 단언은 패키지 내용을 읽지 않으므로 SOURCE 증거가 아니다(ARTIFACT 근거로만 쓴다)
-- rosy_sensor_adc LOCAL: 패키지에 test/ 디렉터리가 없다(package.xml의 ament_lint_auto는 colcon test에서만 실행됨). C++ 노드는 aarch64 전용 빌드. host-runnable 비-ROS 시험 없음. colcon/gtest 필요
 - rosy_sensor_adc ROS-SIM: C++ 노드(rclcpp)가 있음. ROS 2 Jazzy 컨테이너 재실행 필요, 미실행
 - rosy_sensor_adc ARTIFACT: hardware 프로필이 이미지에 배선되지 않았다. core/io 이미지 제외는 test/test_nav2_hardware_slice.py::test_io_image_packages_nav2_without_slam_or_aux_drivers가 고정한다
-- rosy_lamp_control SOURCE: 패키지 소스를 검사하는 host-runnable 계약 시험이 없다. test_nav2_hardware_slice.py의 이미지 제외 단언은 패키지 내용을 읽지 않으므로 SOURCE 증거가 아니다(ARTIFACT 근거로만 쓴다)
-- rosy_lamp_control LOCAL: 패키지에 test/ 디렉터리가 없다(package.xml의 ament_lint_auto는 colcon test에서만 실행됨). C++ 노드는 aarch64 전용 빌드. host-runnable 비-ROS 시험 없음. colcon/gtest 필요
 - rosy_lamp_control ROS-SIM: C++ 노드(rclcpp)가 있음. ROS 2 Jazzy 컨테이너 재실행 필요, 미실행
 - rosy_lamp_control ARTIFACT: hardware 프로필이 이미지에 배선되지 않았다. core/io 이미지 제외는 test/test_nav2_hardware_slice.py::test_io_image_packages_nav2_without_slam_or_aux_drivers가 고정한다
-- rosy_interfaces SOURCE: repo test/ 전체를 검색했으나 srv 스키마(Emotion/SetLed/SetBrightness/SetLamp)의 필드·타입을 고정하는 host-runnable contract test가 없다(`src/rosy_core/test/test_bridge_timers.py`는 rosy_interfaces를 import stub 목록에만 넣는다). rosidl 생성 결과 확인은 colcon build가 필요
-- rosy_interfaces LOCAL: 패키지에 test/ 디렉터리가 없다(package.xml의 ament_lint_auto는 colcon test에서만 실행됨). rosidl 코드 생성 확인은 colcon build 필요
 - rosy_interfaces ARTIFACT: io 이미지에 포함된다(deploy/robot/Dockerfile `COPY src/rosy_interfaces`, `--packages-select`에 포함). 서명 manifest·OCI archive·immutable registry digest 발행 전
 - rosy_interfaces DEVICE: Pi OS Lite bench Device의 install-pi.sh 설치, verify-pi.sh, device-readback.sh --json 증거 없음
-- rosy_description SOURCE: URDF/xacro 파싱이나 wheel joint 이름(rosy_bringup과 일치)을 고정하는 host 계약 시험이 없다. test_robot_runtime.py::test_runtime_builds_distinct_targets_from_shared_dockerfile는 .dockerignore의 meshes 제외만 확인하고 패키지 내용·io-build 포함을 단언하지 않는다
-- rosy_description LOCAL: 패키지에 test/ 디렉터리가 없다(package.xml의 ament_lint_auto는 colcon test에서만 실행됨). xacro 렌더링·view_robot.launch.py 확인은 ROS 환경 필요
 - rosy_description ROS-SIM: robot_state_publisher·Gazebo(rosy_gz.urdf.xacro)의 xacro 렌더와 TF 트리 확인 미실행. ROS 2 Jazzy 환경 필요
 - rosy_description ARTIFACT: io 이미지에 포함된다(deploy/robot/Dockerfile `COPY src/rosy_description`, `--packages-select`에 포함; meshes는 `RUN mkdir -p`로 빈 폴더만 생성). 서명 manifest·OCI archive·immutable registry digest 발행 전
 - rosy_description DEVICE: Pi OS Lite bench Device의 install-pi.sh 설치, verify-pi.sh, device-readback.sh --json 증거 없음

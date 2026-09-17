@@ -2,7 +2,7 @@
 module: rosy_imu_bno055
 logical_modules: [M02, M06]
 owner: 장치
-last_verified: { commit: "uncommitted", date: 2026-09-15 }
+last_verified: { commit: "uncommitted", date: 2026-09-17 }
 gates:
   SOURCE:
     state: GO

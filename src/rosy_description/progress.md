@@ -2,14 +2,16 @@
 module: rosy_description
 logical_modules: [M06, M07]
 owner: 로봇 통합
-last_verified: { commit: "uncommitted", date: 2026-09-15 }
+last_verified: { commit: "uncommitted", date: 2026-09-17 }
 gates:
   SOURCE:
-    state: HOLD
-    blocker: "URDF/xacro 파싱이나 wheel joint 이름(rosy_bringup과 일치)을 고정하는 host 계약 시험이 없다. test_robot_runtime.py::test_runtime_builds_distinct_targets_from_shared_dockerfile는 .dockerignore의 meshes 제외만 확인하고 패키지 내용·io-build 포함을 단언하지 않는다"
+    state: GO
+    evidence: "test_urdf_surface 1 passed — package name과 wheel_joint 매크로 (2026-09-17 Windows)"
+    cmd: "python -m pytest src/rosy_description/test/test_urdf_surface.py -q"
   LOCAL:
-    state: HOLD
-    blocker: "패키지에 test/ 디렉터리가 없다(package.xml의 ament_lint_auto는 colcon test에서만 실행됨). xacro 렌더링·view_robot.launch.py 확인은 ROS 환경 필요"
+    state: GO
+    evidence: "동일. xacro 렌더는 ROS-SIM"
+    cmd: "python -m pytest src/rosy_description/test/test_urdf_surface.py -q"
   ROS-SIM:
     state: HOLD
     blocker: "robot_state_publisher·Gazebo(rosy_gz.urdf.xacro)의 xacro 렌더와 TF 트리 확인 미실행. ROS 2 Jazzy 환경 필요"

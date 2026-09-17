@@ -14,3 +14,15 @@ def test_service_definitions_exist_and_are_nonempty():
         text = (SRV / name).read_text(encoding="utf-8").strip()
         assert text, f"{name} is empty"
         assert "---" in text
+
+
+def test_service_fields_match_the_device_contract():
+    led = (SRV / "SetLed.srv").read_text(encoding="utf-8")
+    assert "string command" in led
+    assert "int32 r" in led and "int32 g" in led and "int32 b" in led
+    emotion = (SRV / "Emotion.srv").read_text(encoding="utf-8")
+    assert "string emotion" in emotion
+    lamp = (SRV / "SetLamp.srv").read_text(encoding="utf-8")
+    assert "ColorRGBA color" in lamp
+    brightness = (SRV / "SetBrightness.srv").read_text(encoding="utf-8")
+    assert "int32 brightness" in brightness

@@ -16,3 +16,4 @@ def test_entry_point_declares_led_server_main():
 def test_package_xml_names_the_led_package():
     text = (ROOT / "package.xml").read_text(encoding="utf-8")
     assert "<name>rosy_led</name>" in text
+    assert "rosy_interfaces" in text

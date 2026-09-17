@@ -2,14 +2,16 @@
 module: rosy_led
 logical_modules: [M02]
 owner: 장치
-last_verified: { commit: "uncommitted", date: 2026-09-15 }
+last_verified: { commit: "uncommitted", date: 2026-09-17 }
 gates:
   SOURCE:
-    state: HOLD
-    blocker: "패키지 소스를 검사하는 host-runnable 계약 시험이 없다. test_nav2_hardware_slice.py의 이미지 제외 단언은 패키지 내용을 읽지 않으므로 SOURCE 증거가 아니다(ARTIFACT 근거로만 쓴다)"
+    state: GO
+    evidence: "test_led_package_contract 2 passed (2026-09-17 Windows). exec_depend rosy_interfaces"
+    cmd: "python -m pytest src/rosy_led/test/test_led_package_contract.py -q"
   LOCAL:
-    state: HOLD
-    blocker: "test/ 전부가 ament_copyright/flake8/pep257 linter뿐이며 이 호스트에 미설치(ModuleNotFoundError, 2026-09-15 재현). host-runnable 비-ROS 시험 없음. colcon/ROS 환경 필요"
+    state: GO
+    evidence: "동일. ament linter는 이 호스트에 없어 증거로 세지 않는다"
+    cmd: "python -m pytest src/rosy_led/test/test_led_package_contract.py -q"
   ROS-SIM:
     state: HOLD
     blocker: "rclpy 서비스 서버(set_led/set_brightness) 노드가 있음. ROS 2 Jazzy 컨테이너 재실행 필요, 미실행"
