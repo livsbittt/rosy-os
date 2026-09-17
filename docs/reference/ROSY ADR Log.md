@@ -94,6 +94,9 @@
 | D-84 | hardware 장치 패키지는 hardware 프로필 전까지 CORE/io에 없다 | Accepted |
 | D-85 | 도크 펌웨어 ARTIFACT는 ESP32 툴체인 증거다 | Accepted |
 | D-86 | POSIX identity 시험은 POSIX 호스트에서만 deploy를 찍는다 | Accepted |
+| D-87 | ROS-SIM은 그 트리의 colcon install이 있을 때만 시작한다 | Accepted |
+| D-88 | Fleet 소켓은 사이트 PC 산출물이며 D-83 뒤에 연다 | Accepted |
+| D-89 | D-35 대형 후보는 D-83 Task 14 재실행 전에는 열지 않는다 | Accepted |
 
 ---
 
@@ -2476,3 +2479,88 @@ Windows에서 이 시험이 깨져도 deploy SOURCE GO(다른 계약)를 뒤집�
 `deploy/progress.md` last_verified.
 
 **References:** D-33, D-61, D-79.
+
+---
+
+## D-87 ROS-SIM은 그 트리의 colcon install이 있을 때만 시작한다
+
+**Status:** Accepted (2026-09-17). D-83의 전제다.
+
+**Context:** WSL에 `/opt/ros/jazzy`와 `rclpy`가 있다. 워크스페이스
+`install/setup.bash`는 없다. 그 상태에서 `ros2 --help`나 호스트 pytest로
+ROS-SIM을 닫으려는 시도가 있다. x86 WSL colcon은 편하지만 D-78 ARTIFACT
+경로(네이티브 Pi)와 섞이기 쉽다.
+
+**Decision:** D-83 묶음은 **그 커밋이 가리키는 트리에서 colcon으로 만든
+`install/setup.bash`가 있는 Linux**에서만 시작한다.
+
+- Jazzy가 깔려 있기만 한 WSL은 전제가 아니다
+- Windows 호스트 pytest는 ROS-SIM이 아니다 (D-79)
+- x86 워크스페이스 빌드가 성공해도 ARTIFACT GO가 아니다 (D-78)
+
+**Alternatives:** `rclpy` import만으로 ROS-SIM GO는 계층을 속인다. 매번 소스
+트리에서 `python`으로 노드를 띄우는 안은 install overlay와 다른 그래프가 된다.
+
+**Consequences:** 지금 트리의 ROS-SIM은 HOLD. maze 로그는 역사이며 승격 증거가
+아니다.
+
+**Validation / Transition:** `test -f install/setup.bash` 뒤에 D-83 명령을
+progress에 적는다. 그 전 GO는 이 ADR 위반이다.
+
+**References:** D-78, D-79, D-83.
+
+---
+
+## D-88 Fleet 소켓은 사이트 PC 산출물이며 D-83 뒤에 연다
+
+**Status:** Accepted (2026-09-17). D-81의 다음 단계 순서다.
+
+**Context:** 콘솔 v1 gather는 CORE REST다 (D-81). 경로 충돌 대기열도 REST
+위에 있다. `rosy_fleet hub --listen`과 CORE `FleetAgent` outbound는 아직 없다.
+이것을 로봇 이미지에 넣거나, Task 14 없이 소켓을 열면 사이트 버스와 로봇
+런타임이 다시 섞인다 (D-59).
+
+**Decision:**
+
+- `hub --listen`과 `FleetAgent`는 **관제 PC 산출물**이다. `rosy-core` /
+  `rosy-io` 이미지에 넣지 않는다
+- D-83 `gz_multi robots:=2 mode:=nav core:=true` 증거가 커밋된 트리에서
+  다시 나오기 전에는 소켓을 열지 않는다
+- REST 콘솔과 경로 대기열은 그 전에도 유효하다 (D-81)
+
+**Alternatives:** 소켓을 로봇에 올리는 안은 D-59 위반이다. REST를 버리고 소켓만
+쓰는 안은 콘솔 v1을 멈춘다.
+
+**Consequences:** Fleet ARTIFACT/DEVICE는 PARKED. 로봇 이미지 대상이 아니다.
+
+**Validation / Transition:** `src/rosy_fleet/progress.md`. Dockerfile에
+`rosy_fleet hub` COPY가 생기면 이 ADR 위반이다. `test_runtime_slices.py`가
+core에 fleet 서버가 없음을 이미 본다.
+
+**References:** D-5, D-12, D-59, D-81, D-83.
+
+---
+
+## D-89 D-35 대형 후보는 D-83 Task 14 재실행 전에는 열지 않는다
+
+**Status:** Accepted (2026-09-17).
+
+**Context:** D-35는 대형 HOLD 실측 대기다. maze/`slam_nav` 로그에 두 대 주행이
+있으나 D-79가 말하는 현재 트리 재실행이 아니다. 그 로그로 D-35를 열면 옛
+증거가 게이트를 닫는다.
+
+**Decision:** D-35 후보(relay Hz, HOLD 지연, 대형 기하)는 **D-83 항목 3
+(`gz_multi robots:=2 mode:=nav core:=true`)을 현재 트리에서 재실행한 기록**이
+있을 때만 연다. 그 전 로그는 설계 입력이지 GO가 아니다.
+
+**Alternatives:** 호스트 pytest로 대형을 닫는 안은 그래프가 없다. 옛 WSL 로그로
+D-35를 Accepted 하는 안은 D-79 위반이다.
+
+**Consequences:** D-35는 결번/HOLD로 남는다. Fleet 콘솔 대기열 시험은 대형
+실측이 아니다.
+
+**Validation / Transition:** D-35 본문을 고치기 전에 D-83 항목 3의 progress
+증거를 요구한다.
+
+**References:** D-35, D-79, D-83,
+[swarm bench](../plans/2026-09-08-swarm-formation-slice.md).

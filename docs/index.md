@@ -25,11 +25,15 @@
 | D-84 | hardware 장치 패키지는 hardware 프로필 전까지 CORE/io에 없다 |
 | D-85 | 도크 펌웨어 ARTIFACT는 ESP32 툴체인 증거다 |
 | D-86 | POSIX identity 시험은 POSIX 호스트에서만 deploy를 찍는다 |
+| D-87 | ROS-SIM은 그 트리의 colcon install이 있을 때만 시작한다 |
+| D-88 | Fleet 소켓은 사이트 PC 산출물이며 D-83 뒤에 연다 |
+| D-89 | D-35 대형 후보는 D-83 Task 14 재실행 전에는 열지 않는다 |
 
 ## 계획·결과 문서
 
 - [2026-09-15-module-harness-design.md](plans/2026-09-15-module-harness-design.md)
 - [2026-09-17-interface-design-implementation-design.md](plans/2026-09-17-interface-design-implementation-design.md)
+- [2026-09-17-remaining-execution-adr-plan.md](plans/2026-09-17-remaining-execution-adr-plan.md)
 - [2026-09-17-remaining-gates-adr-plan.md](plans/2026-09-17-remaining-gates-adr-plan.md)
 - [2026-09-17-remaining-runtime-adr-plan.md](plans/2026-09-17-remaining-runtime-adr-plan.md)
 
@@ -44,8 +48,8 @@
 
 ## 최근 기록
 
+- 2026-09-17 · uncommitted · docs(adr): lock remaining execution as D-87–D-89
 - 2026-09-17 · uncommitted · docs(adr): lock remaining runtime as D-83–D-86
 - 2026-09-17 · dc89264 · docs(harness): stamp last_verified after SOURCE re-run
 - 2026-09-17 · uncommitted · docs(adr): accept D-82 after palette gate tests
 - 2026-09-17 · uncommitted · docs(adr): record the OKLCH palette decision as D-82
-- 2026-09-17 · uncommitted · docs(adr): lock leftover gates as D-78–D-81

@@ -20,12 +20,13 @@ gates:
     state: N/A
   FIELD:
     state: N/A
-adrs: [D-17, D-18, D-45, D-61, D-72, D-75, D-77, D-78, D-79, D-80, D-81, D-82, D-83, D-84, D-85, D-86]
+adrs: [D-17, D-18, D-45, D-61, D-72, D-75, D-77, D-78, D-79, D-80, D-81, D-82, D-83, D-84, D-85, D-86, D-87, D-88, D-89]
 plans:
   - docs/plans/2026-09-15-module-harness-design.md
   - docs/plans/2026-09-17-interface-design-implementation-design.md
   - docs/plans/2026-09-17-remaining-gates-adr-plan.md
   - docs/plans/2026-09-17-remaining-runtime-adr-plan.md
+  - docs/plans/2026-09-17-remaining-execution-adr-plan.md
 ---
 ## 지금 상태
 

@@ -80,3 +80,10 @@
 - 결정: D-83–D-86 Accepted (실행 순서). G0–G3는 D-41–D-56 Proposed 유지
 - 교훈: 없음
 
+## 2026-09-17 · uncommitted · docs(adr): lock remaining execution as D-87–D-89
+- 변경: colcon install 전제, Fleet 소켓은 사이트 PC·D-83 뒤, D-35는 Task 14 재실행 전 금지
+- 증거: `python -m pytest test/test_network_topology_contracts.py test/test_harness_contracts.py -q`
+- gate 변화: 없음
+- 결정: D-87–D-89 Accepted
+- 교훈: 없음
+
