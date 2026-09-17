@@ -27,11 +27,18 @@ def test_core_is_the_only_required_slice():
 
 
 def test_core_slice_fallback_matches_board_presets():
-    from rosy_core.domain.model import _SLICES_BY_MODE
+    from rosy_core.domain.model import _SLICES_BY_MODE, slices_from_config
 
     presets = board()["presets"]
+    default = yaml.safe_load(
+        (ROOT / "src" / "rosy_core" / "config" / "rosy_default.yaml").read_text(encoding="utf-8")
+    )
+    yaml_presets = default["runtime"]["presets"]
     for mode, slices in presets.items():
-        assert _SLICES_BY_MODE[mode] == tuple(slices)
+        expected = tuple(slices)
+        assert _SLICES_BY_MODE[mode] == expected
+        assert tuple(yaml_presets[mode]) == expected
+        assert slices_from_config({"runtime": {"mode": mode, "presets": yaml_presets}}) == expected
 
 
 def test_presets_match_current_runtime_modes():

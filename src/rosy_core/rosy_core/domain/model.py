@@ -65,6 +65,9 @@ def slices_from_config(config: dict[str, Any]) -> tuple[str, ...]:
     if raw:
         return tuple(str(item) for item in raw)
     mode = str(runtime.get("mode") or "core")
+    presets = runtime.get("presets")
+    if isinstance(presets, dict) and mode in presets:
+        return tuple(str(item) for item in presets[mode])
     return _SLICES_BY_MODE.get(mode, ("core",))
 
 

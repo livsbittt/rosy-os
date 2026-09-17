@@ -58,6 +58,25 @@ def test_deployed_motor_defaults_match_the_hardware_profile():
     assert f"ROSY_MAX_ANGULAR_RPS {angular}" in installer
 
 
+def test_pinky_profile_files_share_the_hardware_motion_ceilings():
+    limits = load_motion_limits(PROFILE)
+    paths = (
+        ROOT / "src" / "rosy_core" / "config" / "profile.pinky_pro.yaml",
+        ROOT / "deploy" / "robot" / "config" / "profile.core.yaml",
+        ROOT / "deploy" / "robot" / "config" / "profile.motor.yaml",
+        ROOT / "src" / "rosy_core" / "config" / "rosy_default.yaml",
+    )
+    for path in paths:
+        if path.name == "rosy_default.yaml":
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            nav = data["navigation"]
+            assert float(nav["max_linear_velocity"]) == limits.max_linear_mps, path
+            assert float(nav["max_angular_velocity"]) == limits.max_angular_rps, path
+            continue
+        other = load_motion_limits(path)
+        assert other == limits, path
+
+
 def test_hardware_profile_is_the_source_of_motion_ceilings():
     limits = load_motion_limits(PROFILE)
 

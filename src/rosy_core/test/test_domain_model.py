@@ -1,5 +1,27 @@
-from rosy_core.domain.model import Asset, Component, Device, DeviceState, RuntimeNode, inventory_from_config
+from rosy_core.domain.model import (
+    Asset,
+    Component,
+    Device,
+    DeviceState,
+    RuntimeNode,
+    inventory_from_config,
+    slices_from_config,
+)
 from rosy_core.command.arbitration import Mode
+
+
+def test_slices_come_from_runtime_presets_not_a_hidden_mode_table():
+    presets = {
+        "core": ["core"],
+        "hardware": ["core", "motor", "io", "nav"],
+    }
+    assert slices_from_config({"runtime": {"mode": "hardware", "presets": presets}}) == (
+        "core",
+        "motor",
+        "io",
+        "nav",
+    )
+    assert slices_from_config({"runtime": {"mode": "core", "presets": presets}}) == ("core",)
 
 
 def test_inventory_is_a_single_mobile_base_asset():

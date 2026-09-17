@@ -23,6 +23,10 @@ capabilities: capabilities.yaml
 
 runtime:
   mode: core                      # ROSY_RUNTIME_MODE overrides on the robot
+  presets:                        # board.yaml presets와 같아야 한다
+    core: [core]
+    motor: [core, motor]
+    hardware: [core, motor, io, nav]
 
 adapters:
   manifests: []                   # host default; device overlay may list YAML paths
