@@ -27,5 +27,6 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · feat(games): CORE mode/teleop/stop client and dry-run CLI
 - 2026-09-18 · uncommitted · feat(games): referee, gate, and match loop against fakes
 - 2026-09-18 · uncommitted · chore(games): bootstrap pytest path and drop empty isaac
