@@ -43,8 +43,8 @@ class SpeedLimits:
         """프로필이 있으면 그걸 쓰고, 없으면 rosy.yaml navigation/safety 폴백."""
         nav_cfg = nav_cfg or {}
         safety_cfg = safety_cfg or {}
-        max_linear = float(getattr(profile, "max_linear_velocity", None) or nav_cfg.get("max_linear_velocity") or cls.max_linear)
-        max_angular = float(getattr(profile, "max_angular_velocity", None) or nav_cfg.get("max_angular_velocity") or cls.max_angular)
+        max_linear = float(profile.max_linear_velocity or nav_cfg.get("max_linear_velocity") or cls.max_linear)
+        max_angular = float(profile.max_angular_velocity or nav_cfg.get("max_angular_velocity") or cls.max_angular)
         return cls(
             max_linear=max_linear,
             max_angular=max_angular,
