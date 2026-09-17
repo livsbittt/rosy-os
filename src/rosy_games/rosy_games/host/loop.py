@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from rosy_games.game.soccer import Action, Observation, SoccerGame, StepResult
+from rosy_games.field import Twist
+from rosy_games.game import MatchState, Observation, SoccerGame
 from rosy_games.policy.heuristic import HeuristicPolicy
 
 
@@ -17,7 +18,7 @@ class ObservationSource(Protocol):
 
 
 class TwistSink(Protocol):
-    def send(self, robot_id: str, action: Action) -> None: ...
+    def send(self, robot_id: str, action: Twist) -> None: ...
 
 
 class MatchHost:
@@ -34,21 +35,12 @@ class MatchHost:
         self.game = game or SoccerGame()
         self.policy = policy or HeuristicPolicy(self.game.field)
 
-    def reset(self) -> StepResult:
-        result = self.game.reset()
-        self._emit(result)
-        return result
+    def reset(self) -> MatchState:
+        return self.game.reset()
 
-    def tick(self) -> StepResult:
+    def tick(self) -> MatchState:
         observation = self.source.capture()
-        proposed = {
-            robot_id: self.policy.act(robot_id, observation)
-            for robot_id in observation.robots
-        }
-        result = self.game.step(observation, proposed)
-        self._emit(result)
+        result = self.game.step(observation)
+        for robot_id in observation.robots:
+            self.sink.send(robot_id, self.policy.act(robot_id, observation))
         return result
-
-    def _emit(self, result: StepResult) -> None:
-        for robot_id, action in result.actions.items():
-            self.sink.send(robot_id, action)

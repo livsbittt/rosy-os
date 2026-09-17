@@ -1,38 +1,11 @@
-"""1v1 push-ball referee. Pure numbers."""
+"""1v1 push-ball referee. Observation in, MatchState out."""
 
 from __future__ import annotations
 
-import enum
-from dataclasses import dataclass, field
-from typing import Mapping, Optional
+from typing import Optional
 
 from rosy_games.field import Field
-
-
-class Phase(str, enum.Enum):
-    KICKOFF = "kickoff"
-    IN_PLAY = "in_play"
-
-
-@dataclass(frozen=True)
-class Observation:
-    ball: Optional[tuple[float, float]]
-    robots: Mapping[str, tuple[float, float, float]]
-
-
-@dataclass(frozen=True)
-class Action:
-    linear: float
-    angular: float
-
-
-@dataclass(frozen=True)
-class StepResult:
-    phase: Phase
-    observation: Observation
-    score: Mapping[str, int]
-    scorer: Optional[str] = None
-    actions: Mapping[str, Action] = field(default_factory=dict)
+from rosy_games.game.state import MatchState, Observation, Phase
 
 
 class SoccerGame:
@@ -41,59 +14,71 @@ class SoccerGame:
         self.phase = Phase.KICKOFF
         self.score = {self.field.home_id: 0, self.field.away_id: 0}
 
-    def reset(self) -> StepResult:
+    def reset(self) -> MatchState:
         self.phase = Phase.KICKOFF
-        empty = Observation(ball=None, robots={})
-        return StepResult(phase=self.phase, observation=empty, score=dict(self.score))
+        return MatchState(phase=self.phase, score=dict(self.score), reason="")
 
-    def step(
-        self, observation: Observation, actions: Mapping[str, Action]
-    ) -> StepResult:
-        if self.phase is Phase.KICKOFF:
-            if self._kickoff_ready(observation):
-                self.phase = Phase.IN_PLAY
-            return StepResult(
+    def step(self, obs: Observation) -> MatchState:
+        if self.phase is Phase.PLAY and self._is_lost(obs):
+            self.phase = Phase.HOLD
+            return MatchState(
                 phase=self.phase,
-                observation=observation,
                 score=dict(self.score),
-                actions=_halt(observation.robots),
+                reason=self._lost_reason(obs),
             )
-        scorer = self._goal_scorer(observation)
+        if self.phase is Phase.HOLD:
+            if self._is_lost(obs):
+                return MatchState(
+                    phase=self.phase,
+                    score=dict(self.score),
+                    reason=self._lost_reason(obs),
+                )
+            self.phase = Phase.PLAY
+        if self.phase is Phase.KICKOFF:
+            if self._kickoff_ready(obs):
+                self.phase = Phase.PLAY
+            return MatchState(phase=self.phase, score=dict(self.score), reason="")
+        scorer = self._goal_scorer(obs)
         if scorer is not None:
             self.score[scorer] += 1
-            self.phase = Phase.KICKOFF
-            return StepResult(
-                phase=self.phase,
-                observation=observation,
+            scored = MatchState(
+                phase=Phase.GOAL,
                 score=dict(self.score),
+                reason="goal",
                 scorer=scorer,
-                actions=_halt(observation.robots),
             )
-        return StepResult(
-            phase=self.phase,
-            observation=observation,
-            score=dict(self.score),
-            actions=dict(actions),
-        )
+            self.phase = Phase.KICKOFF
+            return scored
+        return MatchState(phase=self.phase, score=dict(self.score), reason="")
 
-    def _kickoff_ready(self, observation: Observation) -> bool:
-        if observation.ball is None:
-            return False
-        if set(observation.robots) < {self.field.home_id, self.field.away_id}:
-            return False
-        x, y = observation.ball
-        return (x * x + y * y) ** 0.5 <= self.field.kickoff_radius_m
+    def _is_lost(self, obs: Observation) -> bool:
+        if obs.lost_ball or obs.ball is None:
+            return True
+        if obs.lost_robots:
+            return True
+        return self.field.home_id not in obs.robots or self.field.away_id not in obs.robots
 
-    def _goal_scorer(self, observation: Observation) -> Optional[str]:
-        if observation.ball is None:
+    def _lost_reason(self, obs: Observation) -> str:
+        if obs.lost_ball or obs.ball is None:
+            return "lost_ball"
+        if obs.lost_robots:
+            return "lost_robots"
+        return "lost_robots"
+
+    def _kickoff_ready(self, obs: Observation) -> bool:
+        if obs.lost_ball or obs.ball is None:
+            return False
+        if obs.lost_robots:
+            return False
+        if self.field.home_id not in obs.robots or self.field.away_id not in obs.robots:
+            return False
+        return (obs.ball.x ** 2 + obs.ball.y ** 2) ** 0.5 <= self.field.kickoff_radius_m
+
+    def _goal_scorer(self, obs: Observation) -> Optional[str]:
+        if obs.ball is None:
             return None
-        x, y = observation.ball
-        if self.field.in_away_goal(x, y):
+        if self.field.in_away_goal(obs.ball.x, obs.ball.y):
             return self.field.home_id
-        if self.field.in_home_goal(x, y):
+        if self.field.in_home_goal(obs.ball.x, obs.ball.y):
             return self.field.away_id
         return None
-
-
-def _halt(robots: Mapping[str, tuple[float, float, float]]) -> dict[str, Action]:
-    return {robot_id: Action(0.0, 0.0) for robot_id in robots}
