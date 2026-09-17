@@ -8,6 +8,7 @@ PURE = (
     ROOT / "rosy_games" / "field",
     ROOT / "rosy_games" / "game",
     ROOT / "rosy_games" / "policy",
+    ROOT / "rosy_games" / "host",
 )
 FORBIDDEN = ("rclpy", "cv2", "rosy_core", "rosy_fleet", "isaac", "torch")
 
