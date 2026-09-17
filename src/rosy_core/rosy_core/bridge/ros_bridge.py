@@ -161,6 +161,10 @@ class RosBridge:
         self._info_last_pub = 0.0
         self._voltage_topic_seen = False
         self._api_address: Optional[str] = None
+        #: map→base TF 를 마지막으로 읽은 시각. 이것이 신선하면 odom 은 pose 를 건드리지
+        #: 않는다. 지역화가 없는 구성(맵도 SLAM 도 없는 teleop)에서는 만료되고, 그때만
+        #: odom 이 화면에 무엇이라도 띄우는 폴백이 된다.
+        self._map_pose_ts: float = 0.0
 
         self._setup_diagnostics()
         self._svc.nav.executor = self
@@ -174,7 +178,9 @@ class RosBridge:
     def _on_odom(self, msg: Odometry) -> None:
         self._last_odom_ts = time.monotonic()
         sample = translate.odom_sample(msg)
-        self._svc.state.set_pose(sample["x"], sample["y"], sample["yaw"])
+        if odometry.odom_owns_pose(self._map_pose_ts, time.monotonic()):
+            # map 프레임 pose 가 없을 때만 odom 이 보고 pose 를 쓴다 (규칙은 odometry.py).
+            self._svc.state.set_pose(sample["x"], sample["y"], sample["yaw"])
         self._svc.state.set_velocity(sample["linear_x"], sample["angular_z"])
         self._last_odom_xy = (sample["x"], sample["y"])
         self._svc.nav.on_pose_progress(sample["x"], sample["y"])
@@ -248,6 +254,7 @@ class RosBridge:
             q = tf.transform.rotation
             yaw = math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y ** 2 + q.z ** 2))
             self._svc.state.set_pose(t.x, t.y, yaw)
+            self._map_pose_ts = time.monotonic()
         except tf2_ros.TransformException:
             pass
         snapshot = self._svc.state.snapshot()
