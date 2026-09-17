@@ -16,11 +16,16 @@
 | D-72 | 표면은 법을 공유하고 문법은 나눈다 |
 | D-75 | 로봇 로컬 화면은 손으로 쓴 정적 자산이다 — D-7 React 대체 |
 | D-77 | 운용자 콘솔은 CORE `/dashboard` 하나다 |
+| D-78 | ARTIFACT 빌더는 네이티브 ARM64 Pi다 |
+| D-79 | 게이트 GO는 현재 트리 재실행만 인정한다 |
+| D-80 | G4 GO는 Device 표면이다 |
+| D-81 | Fleet 콘솔 v1 gather는 CORE REST 폴링이다 |
 
 ## 계획·결과 문서
 
 - [2026-09-15-module-harness-design.md](plans/2026-09-15-module-harness-design.md)
 - [2026-09-17-interface-design-implementation-design.md](plans/2026-09-17-interface-design-implementation-design.md)
+- [2026-09-17-remaining-gates-adr-plan.md](plans/2026-09-17-remaining-gates-adr-plan.md)
 
 ## 교훈 (docs/solutions)
 
@@ -33,8 +38,8 @@
 
 ## 최근 기록
 
+- 2026-09-17 · uncommitted · docs(adr): lock leftover gates as D-78–D-81
 - 2026-09-17 · 8fdd8d2 · docs: lock G4 vocabulary, one operator console, and D-61 records
 - 2026-09-17 · uncommitted · docs(adr): supersede D-7 so the local screen has one standing decision
 - 2026-09-17 · uncommitted · docs(concept): fix interface design laws and per-surface grammar as D-72
 - 2026-09-16 · uncommitted · docs(harness): hold docs while the ADR log carries a conflict marker
-- 2026-09-15 · uncommitted · docs(harness): register docs and correct generated-file wording

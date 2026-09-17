@@ -85,6 +85,10 @@
 | D-75 | 로봇 로컬 화면은 손으로 쓴 정적 자산이다 — D-7 React 대체 | Accepted |
 | D-76 | 501 본문의 capability는 CAP-001이고 concept_id는 부가다 | Accepted |
 | D-77 | 운용자 콘솔은 CORE `/dashboard` 하나다 | Accepted |
+| D-78 | ARTIFACT 빌더는 네이티브 ARM64 Pi다 | Accepted |
+| D-79 | 게이트 GO는 현재 트리 재실행만 인정한다 | Accepted |
+| D-80 | G4 GO는 Device 표면이다 | Accepted |
+| D-81 | Fleet 콘솔 v1 gather는 CORE REST 폴링이다 | Accepted |
 
 ---
 
@@ -2150,3 +2154,137 @@ concept 16 §2 표면 표. HOST 시험이지 Device viewport가 아니다.
 **References:** D-23, D-38, D-72, D-73, D-75,
 [concept 16](../concept/16_ROSY_Interface_Design_Principles.md),
 [device-validation](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md).
+
+---
+
+## D-78 ARTIFACT 빌더는 네이티브 ARM64 Pi다
+
+**Status:** Accepted (2026-09-17). 경로 결정이다. digest·서명·Pi 인수는 아직 HOLD.
+
+**Context:** D-66 CORE 이미지(`rosy_control`/OpenCV 없음)의 ARTIFACT GO가 필요하다.
+호스트 QEMU로 Hub `ros:jazzy-ros-base` linux/arm64를 빌드하면 CPython/colcon/
+gcc가 0바이트인 hollow 레이어에서 죽었다. `ac81f2f` core/io digest는 D-66 이전이라
+재사용할 수 없다. 그런데도 ARTIFACT를 호스트에서 닫으려는 시도가 반복된다.
+
+**Decision:** ARTIFACT의 1순위 빌더는 **네이티브 linux/arm64 Pi**다.
+
+- 호스트 QEMU 성공은 ARTIFACT GO가 아니다.
+- Hub `jazzy-ros-base` arm64 현재 태그를 QEMU로 다시 돌리지 않는다.
+- D-66 이전 digest는 재사용하지 않는다.
+- 실행 순서는 [native Pi 계획](../plans/2026-09-17-arm64-artifact-native-pi-plan.md).
+
+**Alternatives:** 건강한 과거 Hub digest를 QEMU에 핀하는 안은 우회일 뿐 1순위가
+아니다. Windows 호스트 pytest로 ARTIFACT를 대체하는 안은 계층을 속인다.
+
+**Consequences:** 이 호스트에서 ARM64 이미지가 없어도 미들웨어 ADR은 진행한다.
+ARTIFACT/DEVICE는 deploy·rosy_core gate가 HOLD로 남는다. 이 결정이 이미지를
+만들지 않는다.
+
+**Validation / Transition:** `docs/deployment/arm64-build-notes.md`의 QEMU HOLD
+기록. native Pi에서 `uname -m` = aarch64 뒤에 core 타깃 빌드. 호스트
+`test/test_restore_hollow.py`는 restore 스크립트 가드이지 ARTIFACT GO가 아니다.
+
+**References:** D-36, D-46, D-53, D-66,
+[device-validation](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md),
+[native Pi 계획](../plans/2026-09-17-arm64-artifact-native-pi-plan.md).
+
+---
+
+## D-79 게이트 GO는 현재 트리 재실행만 인정한다
+
+**Status:** Accepted (2026-09-17). D-61의 증거 규칙이다.
+
+**Context:** device-validation 계획 §1 표는 ROS-SIM을 `GO(기존 증거)`로 적는다.
+같은 날 모듈 `progress.md`는 rosy_core ROS-SIM을 HOLD로 두고 "2026-09-13 이후
+현재 트리로 재실행하지 않음"을 blocker로 적는다. 옛 GO 행을 그대로 쓰면 호스트
+pytest나 지난 컨테이너 한 번이 Device 앞 계층을 닫은 것처럼 보인다.
+
+**Decision:** 모듈 게이트 GO는 **그 모듈 `progress.md`가 가리키는 명령의 현재
+트리 재실행**만 인정한다.
+
+- 계획 문서의 옛 GO 행은 대체 증거가 아니다. 충돌하면 progress가 이긴다.
+- 재실행하지 않은 과거 결과는 HOLD(blocker: 재실행 필요)다.
+- 상위 계층 결과로 하위 계층을 GO로 쓰지 않는다(호스트 pytest ≠ Device).
+
+**Alternatives:** 계획 표만 믿는 안은 지금 모순이다. 모든 옛 증거를 삭제하는 안은
+역사를 지운다. 채택하지 않는다.
+
+**Consequences:** rosy_core/control/nav ROS-SIM은 현재 트리 재실행 전까지 HOLD다.
+device-validation §1 ROS-SIM 칸은 이 결정을 따른다. ARTIFACT/DEVICE는 변하지
+않는다.
+
+**Validation / Transition:** `STATUS.md` HOLD blockers. `tools/harness` lint가
+`GO`에 evidence·cmd를 요구한다. 계획 §1 표의 ROS-SIM 행을 HOLD로 정정한다.
+
+**References:** D-39, D-61,
+[device-validation](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md),
+[module harness](../plans/2026-09-15-module-harness-design.md).
+
+---
+
+## D-80 G4 GO는 Device 표면이다
+
+**Status:** Accepted (2026-09-17). D-72 HOST 조각을 Device GO와 가른다.
+
+**Context:** D-72 S3–S6이 `fresh`/`delayed`/`disconnected`/`unavailable`과 stale
+teleop 차단을 HOST 시험으로 올렸다. G4 본문은 다섯 safety 상태, 나열된 Nav2
+이름, 보정 상태기계, Device viewport 터치/키보드, 권한 경로의 Device 증거도
+요구한다. HOST 조각만으로 G4를 닫으면 벤치 화면이 현장 화면이 된다.
+
+**Decision:** G4 GO는 **Device viewport에서** 다음이 증빙될 때만이다.
+
+- 다섯 상태 `NORMAL`/`LIMITED`/`HOLD`/`ESTOP_LATCHED`/`RECOVERY_PENDING` (G0/D-51)
+- G4가 나열한 navigation 이름 또는 그에 대한 사상표
+- 보정: check → prepare → confirm → progress → cancel/fail → save → apply
+- 권한 경로와 세션 철회
+- 지원 Device viewport의 터치·키보드
+
+HOST 증거 4상태와 `/dashboard` 단일 콘솔(D-77)은 G4를 **이행 중이게** 하지
+**닫지 않는다.** G4 행의 상태·증거는 device-validation 계획만 쓴다.
+
+**Alternatives:** HOST pytest로 G4를 GO하는 안은 계층을 속인다. G4를 대시보드
+색 계약으로 줄이는 안은 D-72가 이미 나눈 법을 다시 섞는다.
+
+**Consequences:** G4는 HOLD. 다섯 상태 매핑은 D-51이 연다. 이 ADR이 보정 UI를
+구현하지 않는다.
+
+**Validation / Transition:** device-validation G4 HOST 단락. `test_evidence.py`,
+`test_dashboard.py`는 HOST. Device viewport 시험은 아직 없다.
+
+**References:** D-51, D-72, D-77,
+[device-validation G4](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md).
+
+---
+
+## D-81 Fleet 콘솔 v1 gather는 CORE REST 폴링이다
+
+**Status:** Accepted (2026-09-17). D-5 outbound WS를 뒤집지 않는다. 콘솔 v1
+경로만 고정한다.
+
+**Context:** D-5는 로봇이 Fleet에 outbound WS로 붙는다고 했다. D-59는 관제 PC의
+한 Fleet 서버가 모은다고 했다. 지금 `rosy_fleet console`은 N대를 한 화면에 모으고
+목표·취소를 내리지만, `hub --listen`과 CORE `FleetAgent` outbound는 없다. gather는
+CORE REST 폴링이다. "Fleet 서버 미구현"과 "콘솔이 이미 있다"가 같이 적혀 혼선이
+난다.
+
+**Decision:** v1 콘솔의 gather는 **CORE REST 폴링**이다.
+
+- `rosy_fleet hub --listen`과 `FleetAgent` outbound는 다음 단계다. 없어도 콘솔
+  v1은 유효하다.
+- D-5 outbound WS는 목표 경로로 남는다. 에이전트가 붙으면
+  `FleetConsole.snapshot()` 출처만 바뀐다.
+- Fleet은 최종 `cmd_vel` 소스가 아니다(D-38, D-59).
+- 물리 대형 실측과 D-35 후보는 이 결정이 닫지 않는다.
+
+**Alternatives:** 콘솔을 outbound 전까지 금지하는 안은 이미 있는 운용 화면을
+지운다. REST 폴링을 D-5 대체로 승격하는 안은 로봇→Fleet 푸시를 포기한다.
+채택하지 않는다.
+
+**Consequences:** concept README의 "Fleet unimplemented"은 서버 소켓을 말하고
+콘솔 v1을 말하지 않는다. sim bench Task 14와 D-35는 별도다.
+
+**Validation / Transition:** `src/rosy_fleet/test` 콘솔 시험. 패키지 `rclpy`
+금지(`test_boundaries.py`). hub listen 시험은 이 ADR이 요구하지 않는다.
+
+**References:** D-5, D-12, D-20, D-38, D-59, D-70,
+[site fabric](../plans/2026-09-14-site-middleware-role-fabric-design.md).

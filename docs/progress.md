@@ -20,16 +20,18 @@ gates:
     state: N/A
   FIELD:
     state: N/A
-adrs: [D-17, D-18, D-45, D-61, D-72, D-75, D-77]
+adrs: [D-17, D-18, D-45, D-61, D-72, D-75, D-77, D-78, D-79, D-80, D-81]
 plans:
   - docs/plans/2026-09-15-module-harness-design.md
   - docs/plans/2026-09-17-interface-design-implementation-design.md
+  - docs/plans/2026-09-17-remaining-gates-adr-plan.md
 ---
 ## 지금 상태
 
 - ROS-SIM/ARTIFACT/DEVICE/FIELD는 docs가 문서 모듈이라 N/A다.
 - D-61 Accepted. 모듈 progress/logs와 생성 index/STATUS가 계약 시험으로 산다.
-- concept 16과 D-72 L1·증거·capability 계약이 live다. 운용자 콘솔은 CORE `/dashboard` 하나(D-77). G4 DEVICE는 HOLD.
+- concept 16과 D-72 L1·증거·capability 계약이 live다. 운용자 콘솔은 CORE `/dashboard` 하나(D-77). G4 DEVICE는 HOLD (D-80).
+- 남은 게이트는 D-78–D-81이 가른다. ARTIFACT는 네이티브 Pi(D-78). 옛 ROS-SIM GO는 무효(D-79). Fleet 콘솔 v1 gather는 REST(D-81).
 - ADR 로그 분리(개별 `docs/adr/D-NNN-*.md`)는 보류한다.
 
 ## 다음 gate

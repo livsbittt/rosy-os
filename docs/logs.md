@@ -45,3 +45,10 @@
 - 결정: D-61 Accepted, D-77 Accepted
 - 교훈: 없음
 
+## 2026-09-17 · uncommitted · docs(adr): lock leftover gates as D-78–D-81
+- 변경: 남은 HOLD를 새 ADR로 가름. D-78 네이티브 Pi ARTIFACT, D-79 현재 트리 GO, D-80 G4는 Device, D-81 Fleet REST gather. device-validation §1 ROS-SIM을 HOLD로 정정
+- 증거: `python -m pytest test/test_network_topology_contracts.py test/test_harness_contracts.py -q`
+- gate 변화: 없음. docs SOURCE/LOCAL GO. ARTIFACT/DEVICE는 소비 모듈 HOLD
+- 결정: D-78–D-81 Accepted (경로·증거 규칙). G0–G3는 D-41–D-56 Proposed 유지
+- 교훈: 없음
+

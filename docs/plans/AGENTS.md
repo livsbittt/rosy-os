@@ -40,6 +40,7 @@ Dated design and execute plans (2026-08-31 onward). These are the working trail 
 | `2026-09-16-concept-runtime-alignment.md` | Execution: identity one plane, inventory API, adapter manifests, TaskKind, Control launch guard |
 | `2026-09-17-arm64-artifact-native-pi-plan.md` | D-66 ARM64 after QEMU HOLD: native Pi (or pinned digest), not Hub hollow ros-base |
 | `2026-09-17-concept-folder-adr-plan.md` | concept 00–15 → D-67–D-71; 09–12 and apt/rosyctl are not v1 |
+| `2026-09-17-remaining-gates-adr-plan.md` | leftover gates → D-78–D-81; G0–G3 reuse Proposed D-41–D-56 |
 | D-73 | `tools/harness/harness.yaml` `functional` + `test/test_module_functional_surface.py` |
 
 ## Subdirectories
