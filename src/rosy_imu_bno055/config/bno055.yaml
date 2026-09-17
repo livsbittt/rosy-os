@@ -1,0 +1,8 @@
+# Optional BNO055 profile. This file is not loaded by the default Rosy OS
+# runtime; select the IMU launch explicitly after Device calibration.
+rosy_imu_bno055:
+  ros__parameters:
+    interface: /dev/i2c-0
+    frame_id: imu_link
+    rate: 100.0
+    reset_on_start: false

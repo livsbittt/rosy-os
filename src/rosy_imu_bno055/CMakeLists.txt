@@ -10,12 +10,11 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(angles REQUIRED)
 find_package(realtime_tools REQUIRED)
 
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-  add_executable(main_node src/main_node.cpp)
-  ament_target_dependencies(main_node sensor_msgs rclcpp angles realtime_tools)
+  add_executable(main_node src/main_node.cpp src/bno055_device.cpp)
+  ament_target_dependencies(main_node sensor_msgs std_msgs rclcpp realtime_tools)
   target_link_libraries(main_node
     wiringPi
   )
@@ -29,6 +28,10 @@ else()
 endif()
 
 if(BUILD_TESTING)
+  enable_testing()
+  add_executable(test_imu_sample test/test_sample.cpp)
+  target_compile_features(test_imu_sample PRIVATE cxx_std_17)
+  add_test(NAME imu_sample COMMAND test_imu_sample)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
   # comment the line when a copyright and license is added to all source files
@@ -39,5 +42,10 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
+
+install(
+  DIRECTORY config launch
+  DESTINATION share/${PROJECT_NAME}
+)
 
 ament_package()
