@@ -25,6 +25,10 @@ def _imports(path: Path) -> set[str]:
     return names
 
 
+def test_stage_one_has_no_isaac_tree():
+    assert not (ROOT / "rosy_games" / "isaac").exists()
+
+
 def test_pure_layers_do_not_import_runtime_or_vision():
     for folder in PURE:
         for path in folder.glob("*.py"):

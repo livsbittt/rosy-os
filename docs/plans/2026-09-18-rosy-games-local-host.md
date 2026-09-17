@@ -444,13 +444,13 @@ python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q
 
 카메라 없이 통과. `progress.md` LOCAL을 그 명령·증거로 GO. DEVICE/FIELD는 PARKED 유지.
 
-- [ ] **Step 1: 전체 시험**
+- [x] **Step 1: 전체 시험**
 
 Expected: PASS, `isaac` 경로 없음, Dockerfile에 `rosy_games` 없음
 
-- [ ] **Step 2: harness generate, `test/test_harness_contracts.py` PASS**
+- [x] **Step 2: harness generate, `test/test_harness_contracts.py` PASS**
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```
 git commit -m "docs(games): mark LOCAL host complete without overhead camera"

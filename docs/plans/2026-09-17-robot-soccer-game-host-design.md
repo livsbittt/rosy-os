@@ -366,13 +366,10 @@ Isaac은 심판 UI이자 학습장이다. 실기 Command Manager가 아니다.
 
 ## 9. 구현 게이트
 
-이 문서는 실행 계획이 아니다. 구현을 열려면 별도 execute plan이 필요하고, 최소한 다음이 빠져 있으면 안 된다.
+카메라 없는 LOCAL 호스트는 `docs/plans/2026-09-18-rosy-games-local-host.md`가 닫았다 (2026-09-18).
 
-- §3.1 트리가 그대로 있고, `isaac/`이 없음
-- `test_boundaries.py`가 §3.4를 통과
-- `test_soccer.py` / `test_gate.py` / `test_heuristic.py` / `test_loop.py`가 카메라 없이 득점·이격·쌍정지
-- `HttpPlayerClient`가 부르는 경로가 API Ref §5.5 / §6.1의 mode·teleop·stop 뿐인지
-- 한 대 명령 경로 증거가 Device 검증 계획의 안전 게이트와 모순되지 않는지
-- `rosy_games`가 기본 compose·board.yaml 슬라이스에 없는지
-
-준비되면 `superpowers:writing-plans`로 실행 계획을 쪼갠다.
+- §3.1 트리, `isaac/` 없음
+- 경계·득점·이격·쌍정지·mode/teleop/stop dry-run이 카메라 없이 통과
+- `rosy_games`는 compose·board 슬라이스·CORE 이미지에 없음
+- `host/overhead.py`와 `field/homography.py`는 **없음**. 천장 카메라 실측이 다음 계획이다
+- DEVICE/FIELD는 PARKED. 한 대 공 밀기는 Device 정지·워치독 증거 다음이다

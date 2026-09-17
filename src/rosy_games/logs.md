@@ -21,3 +21,10 @@
 - gate 변화: 없음. DEVICE/FIELD PARKED
 - 결정: D-90. overhead 카메라는 열지 않음
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · docs(games): mark LOCAL host complete without overhead camera
+- 변경: 설계 §9를 카메라 없는 LOCAL 완료로. isaac 경로 없음. DEVICE/FIELD PARKED
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q`
+- gate 변화: 없음
+- 결정: D-90 LOCAL 호스트. overhead는 다음 계획
+- 교훈: 없음
