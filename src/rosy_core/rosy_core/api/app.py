@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 
 from rosy_core.api.errors import register_exception_handlers
@@ -39,10 +40,18 @@ def create_app(config: dict[str, Any], services: CoreServices) -> FastAPI:
         description="로봇 미들웨어 API — 계약: ROSY-API-REF-001 (v1.2)",
     )
     app.state.core = services
+    # 현장 화면은 로봇 AP 위에서 뜬다. 대시보드 자산은 압축 없이 122 KB이고
+    # gzip 뒤에는 29 KB다 — 첫 로드에서 93 KB가 줄어든다. 별도 런타임도,
+    # 빌드 산출물도 늘리지 않으므로 D-23의 최소 표면 원칙을 지킨다.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
     register_exception_handlers(app)
 
     web_root = Path(__file__).resolve().parent.parent / "web"
     dashboard_assets = {
+        # tokens.css는 색의 단일 출처다(D-72 L1). styles.css보다 먼저 링크된다.
+        # 이 allowlist는 `{asset_name:path}`가 슬래시를 허용하므로 경로 순회를
+        # 막는 유일한 방어이기도 하다 — 디렉터리 스캔으로 바꾸지 않는다.
+        "tokens.css": "text/css",
         "styles.css": "text/css",
         "app.js": "application/javascript",
         "map.js": "application/javascript",

@@ -1,3 +1,47 @@
+// 색은 tokens.css가 소유한다(concept 16 §6, D-72 L1). 캔버스는 CSS 변수를
+// 직접 못 쓰므로 한 번만 읽어 캐시한다 — 픽셀마다 읽으면 안 된다.
+const PALETTE_TOKENS = {
+  rasterUnknown: "--raster-unknown",
+  rasterFree: "--raster-free",
+  rasterUncertain: "--raster-uncertain",
+  rasterOccupied: "--raster-occupied",
+  costLethal: "--status-warn",
+  route: "--series-primary",
+  // 로봇 자신은 계열 중 하나가 아니라 보는 사람의 현재 위치다. 계열 색
+  // 예산을 쓰지 않고 가장 밝은 중립으로 둔다.
+  pose: "--paper",
+  ground: "--ground-deep",
+};
+
+let paletteCache = null;
+
+function readToken(name) {
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
+  const hex = raw.replace("#", "");
+  if (hex.length !== 6) return [0, 0, 0];
+  return [
+    parseInt(hex.slice(0, 2), 16),
+    parseInt(hex.slice(2, 4), 16),
+    parseInt(hex.slice(4, 6), 16),
+  ];
+}
+
+function palette() {
+  if (paletteCache) return paletteCache;
+  paletteCache = {};
+  for (const [key, token] of Object.entries(PALETTE_TOKENS)) {
+    paletteCache[key] = readToken(token);
+  }
+  return paletteCache;
+}
+
+function cssColor(key) {
+  const [r, g, b] = palette()[key];
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 function GridFrame(grid) {
   this.width = Number(grid?.width) || 0;
   this.height = Number(grid?.height) || 0;
@@ -41,10 +85,11 @@ GridFrame.prototype.worldToCanvas = function worldToCanvas(x, y, canvasWidth, ca
 };
 
 function occupancyColor(cell) {
-  if (cell < 0) return [17, 22, 20, 255];
-  if (cell < 20) return [36, 46, 41, 255];
-  if (cell < 60) return [90, 78, 48, 255];
-  return [196, 219, 118, 255];
+  const tone = palette();
+  if (cell < 0) return tone.rasterUnknown;
+  if (cell < 20) return tone.rasterFree;
+  if (cell < 60) return tone.rasterUncertain;
+  return tone.rasterOccupied;
 }
 
 function paintLayers(occupancy, costmap, layers, width, height) {
@@ -59,14 +104,15 @@ function paintLayers(occupancy, costmap, layers, width, height) {
       image.data[index] = color[0];
       image.data[index + 1] = color[1];
       image.data[index + 2] = color[2];
-      image.data[index + 3] = color[3];
+      image.data[index + 3] = 255;
       if (!costFrame) continue;
       const lethal = costFrame.sampleWorld(world.x, world.y);
       if (lethal == null || lethal < 50) continue;
       const mix = Math.min(1, lethal / 254);
-      image.data[index] = Math.round(image.data[index] * (1 - mix) + 242 * mix);
-      image.data[index + 1] = Math.round(image.data[index + 1] * (1 - mix) + 196 * mix);
-      image.data[index + 2] = Math.round(image.data[index + 2] * (1 - mix) + 109 * mix);
+      const hazard = palette().costLethal;
+      image.data[index] = Math.round(image.data[index] * (1 - mix) + hazard[0] * mix);
+      image.data[index + 1] = Math.round(image.data[index + 1] * (1 - mix) + hazard[1] * mix);
+      image.data[index + 2] = Math.round(image.data[index + 2] * (1 - mix) + hazard[2] * mix);
     }
   }
   return image;
@@ -120,7 +166,7 @@ export function createFieldMap(options) {
     fitCanvas();
     if (!state.occupancy) {
       state.raster = null;
-      ctx.fillStyle = "#0d1210";
+      ctx.fillStyle = cssColor("ground");
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       return;
     }
@@ -131,7 +177,7 @@ export function createFieldMap(options) {
   function paint() {
     if (!ctx || !canvas) return;
     if (!state.occupancy || !state.raster) {
-      ctx.fillStyle = "#0d1210";
+      ctx.fillStyle = cssColor("ground");
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       return;
     }
@@ -144,7 +190,7 @@ export function createFieldMap(options) {
         if (index === 0) ctx.moveTo(point.x, point.y);
         else ctx.lineTo(point.x, point.y);
       });
-      ctx.strokeStyle = "#75b8c8";
+      ctx.strokeStyle = cssColor("route");
       ctx.lineWidth = 2;
       ctx.stroke();
     }
@@ -159,7 +205,7 @@ export function createFieldMap(options) {
     ctx.lineTo(-7, 7);
     ctx.lineTo(-7, -7);
     ctx.closePath();
-    ctx.fillStyle = "#c4db76";
+    ctx.fillStyle = cssColor("pose");
     ctx.fill();
     ctx.restore();
   }

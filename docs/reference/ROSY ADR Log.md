@@ -79,7 +79,7 @@
 | D-69 | 어댑터는 트리 안 YAML 매니페스트다 | Accepted |
 | D-70 | 워크플로 엔진은 로봇이 아니라 Fleet이다 | Accepted |
 | D-71 | concept 05·09–12·15 apt는 v1 미들웨어가 아니다 | Accepted |
-| D-72 | 표면은 법을 공유하고 문법은 나눈다 | Proposed |
+| D-72 | 표면은 법을 공유하고 문법은 나눈다 | Accepted |
 | D-73 | 모듈마다 자기 코드를 도는 기능 시험 표면이 있다 | Accepted |
 | D-74 | 작업 명령은 CORE를 거쳐 내부 ROS로 가고 조회는 CORE에 남는다 | Accepted |
 | D-75 | 로봇 로컬 화면은 손으로 쓴 정적 자산이다 — D-7 React 대체 | Accepted |
@@ -1980,7 +1980,7 @@ test/test_module_functional_surface.py -q` → 19 passed.
 
 ## D-72 표면은 법을 공유하고 문법은 나눈다
 
-**Status:** Proposed (2026-09-17). concept 16.
+**Status:** Accepted (2026-09-17). concept 16. L1 색 계약 시험이 올라왔다.
 
 **Context:** 사람이 보는 표면이 넷이다 — 운용자 콘솔, 장비 런타임, Fleet,
 그리고 로봇 얼굴(`rosy_emotion` LCD). 지금 살아 있는 둘이 서로 다른 디자인
@@ -2025,10 +2025,10 @@ LCD의 문법을 파괴한다. 콘솔을 먼저 합치고 토큰을 나중에 �
 app.js 손배선 대신 역할 슬롯 등록으로 붙는다. 콘솔 통합(두 서버·CSP·단일 파일
 자족성)은 이 ADR이 정하지 않으며 별도 결정이 필요하다.
 
-**Validation / Transition:** concept 16 §10의 계약 시험 — 토큰 파일 밖 원시
-색, categorical 자리의 status 색, `render_png`와 클라이언트 맵 래스터 값 불일치,
-이유 없는 `blocked`, 증거 상태 없는 값 바인딩. 시험이 생기기 전까지 Proposed로
-둔다.
+**Validation / Transition:** `src/rosy_core/test/test_ui_token_contracts.py`
+(토큰 파일 밖 원시 색, status 색이 계열 자리, 미선언 var()). HOST 2026-09-17:
+token + dashboard + no-bundler 30 passed. 맵 래스터 교차 모듈 시험과
+`blocked` 이유 단언은 후속이다. 콘솔 통합은 이 ADR이 정하지 않는다.
 
 **References:** [concept 16](../concept/16_ROSY_Interface_Design_Principles.md),
 D-7, D-11, D-23, D-32, D-55, D-61, D-68, D-71,

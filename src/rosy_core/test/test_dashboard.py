@@ -330,3 +330,33 @@ def test_dashboard_exposes_local_field_settings_not_fleet():
     assert ".field-settings-panel" in css
     assert ".waypoint-list" in css
     assert ".settings-card" in css
+
+
+def test_dashboard_assets_are_compressed_for_the_robot_access_point(dashboard_client):
+    """현장 화면은 로봇 AP 위에서 뜬다. 자산이 압축되지 않으면 첫 로드가
+    122 KB이고, 압축하면 29 KB다. 별도 런타임 없이 미들웨어로만 얻는다."""
+    for asset in ("styles.css", "app.js"):
+        response = dashboard_client.get(
+            f"/dashboard/assets/{asset}",
+            headers={"accept-encoding": "gzip"},
+        )
+
+        assert response.status_code == 200
+        assert response.headers.get("content-encoding") == "gzip", asset
+
+    page = dashboard_client.get("/dashboard", headers={"accept-encoding": "gzip"})
+
+    assert page.status_code == 200
+    assert page.headers.get("content-encoding") == "gzip"
+
+
+def test_uncompressed_clients_still_get_the_dashboard(dashboard_client):
+    """압축은 협상이다. Accept-Encoding이 없으면 원본을 그대로 준다."""
+    response = dashboard_client.get(
+        "/dashboard/assets/styles.css",
+        headers={"accept-encoding": "identity"},
+    )
+
+    assert response.status_code == 200
+    assert "content-encoding" not in response.headers
+    assert "--signal-danger" in response.text
