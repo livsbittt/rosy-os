@@ -35,3 +35,6 @@ reference/src/*.zip
 # OMC 운영 산출물 (.omc/skills 제외)
 .omc/
 !.omc/skills/
+
+# rosy_control 테스트 basetemp (Windows 호스트에서 --basetemp 로 지정)
+.pytest-tmp-control/
