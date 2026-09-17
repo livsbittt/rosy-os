@@ -21,7 +21,7 @@
 | SOURCE | 소스·ADR·경계·패키지 구조 | GO | 변경마다 diff와 ADR 연결 |
 | LOCAL | Windows의 순수 Python/문서/계약 테스트 | GO(환경 의존 일부 제외) | 반복 가능한 명령과 결과 저장 |
 | ROS-SIM | ROS 2 Jazzy graph, parameter, topic, safety 시나리오 | GO(기존 증거) | container에서 재실행 가능한 smoke |
-| ARTIFACT | linux/arm64 이미지·digest·서명·manifest | HOLD | 빌드와 서명 readback. D-66 이후 CORE는 `rosy_control`/OpenCV를 포함하지 않으므로 `ac81f2f` digest는 재사용하지 않는다. 2026-09-17 호스트 QEMU는 Hub `jazzy-ros-base` arm64 hollow 이미지에서 실패했다. 다음 실행: `docs/plans/2026-09-17-arm64-artifact-native-pi-plan.md`. |
+| ARTIFACT | linux/arm64 이미지·digest·서명·manifest | HOLD | 빌드와 서명 readback. D-66 이후 CORE 이미지는 `rosy_control`/OpenCV를 포함하지 않으므로 이전 digest는 재사용하지 않는다. 2026-09-17 호스트 QEMU는 Hub `jazzy-ros-base` arm64 hollow 이미지에서 실패했다. 다음 실행: `docs/plans/2026-09-17-arm64-artifact-native-pi-plan.md`. |
 | DEVICE | Pi OS 설치·identity·systemd·컨테이너·센서 readback | HOLD | 설치 전후 manifest와 health 증거 |
 | FIELD | Pinky Pro 구동·정지·카메라·적재·암 | PARKED | 안전 담당자와 실물 시험 승인 |
 
@@ -378,3 +378,237 @@ The executable promotion order is now explicit:
    artifact revision/digest, Device identity, operator, timestamp, and rollback
    result. Any failed gate restores the last known-good generation and leaves
    field capabilities disabled.
+
+## 2026-09-13 Nav2 and system improvement review
+
+The current Nav2 slice is a usable default backend, but several values and
+responsibilities are still split across files or depend on physical evidence.
+These are the next improvements, ordered by their effect on safety and field
+repeatability.
+
+### P0 — close before floor motion
+
+1. **Make the Pinky profile the single source for motion limits.** The CORE
+   profile currently limits angular velocity to 0.80 rad/s while the Nav2
+   launch defaults and velocity smoother permit higher values. Generate or
+   validate the Nav2 controller, smoother, goal checker, acceleration and
+   progress limits from the selected Device profile. A mismatch fails the
+   profile check before hardware mode starts.
+2. **Fail closed on a missing site map.** `hardware.launch.py` currently falls
+   back to a packaged demo map when `/var/lib/rosy/maps/site.yaml` is absent.
+   Keep that fallback for simulation and bench profiles only. A field profile
+   must enter `HOLD` and refuse navigation until the YAML and referenced image
+   exist, have a recorded map ID, and match the waypoint map ID.
+3. **Replace the placeholder footprint with measured profiles.** The current
+   0.12 m square describes neither the measured Pinky base nor a mounted arm or
+   payload. Record base, stowed-arm, carried-box and placement footprints with
+   clearance margins. Nav2's 2-D footprint and the arm's 3-D collision scene
+   must be derived from the same physical state; an arm extension changes the
+   allowed base motion.
+4. **Make lifecycle and safety gates authoritative.** If localization,
+   controller, costmap or the final motor adapter is not active, CORE must show
+   `HOLD` and publish zero. Recovery, cancel and e-stop must be recorded with
+   the same generation and stop-latency evidence; the software deadman remains
+   supplementary to a hardware E-stop.
+
+### P1 — improve navigation quality and diagnosis
+
+5. **Stabilize odometry and TF before tuning planners.** Measure encoder
+   scale, wheel separation, timestamp age, frame prefix and covariance. When
+   the BNO055 path is ready, evaluate a `robot_localization` EKF (wheel odom +
+   IMU) as a separate profile; do not add IMU data to Nav2 until covariance,
+   bias and restart behavior are accepted.
+6. **Expose real Nav2 feedback, not only a state enum.** Return an operation ID,
+   goal acceptance, current pose, distance remaining, recovery count, result
+   code and cancel completion. A REST `accepted` response must not imply that
+   the Nav2 action server accepted or completed the goal.
+7. **Define recovery policy and budgets explicitly.** Bind spin, backup and
+   wait behaviors to obstacle, localization and controller failure reasons.
+   Bound retries and time, then escalate to `BLOCKED`/`HOLD` with an evidence
+   record. The `docking/collision_exemption` topic remains intent only until a
+   real costmap integration is tested.
+8. **Add repeatable navigation metrics.** For every test run retain map ID,
+   profile revision, goal error, path length, time to goal, minimum clearance,
+   stop latency/distance, recovery count, localization covariance, CPU, memory,
+   temperature and frame/scan drops. Use rosbag2 or an equivalent bounded
+   recorder on the Pi, with automatic disk limits and run IDs.
+
+### P2 — connect perception and manipulation without creating a second driver
+
+9. **Keep camera/OpenCV local and observation-only first.** Compare host
+   Picamera2/libcamera capture with a least-privilege container on native ARM64;
+   measure p95 latency, drops, CPU, memory and restart isolation. Start with
+   AprilTag or known rectangular blocks for deterministic pose estimation.
+   Camera evidence may refine a goal or grasp pose but cannot replace LiDAR,
+   odometry or the safety authority.
+10. **Add a robot-local manipulation mission layer.** Nav2 should own base
+    navigation, while a future `rosy_manipulation` action/state machine owns
+    `approach → stop-confirm → detect → pre-grasp → grasp-verify → lift →
+    transport → place-verify → retreat`. OMX/MoveIt must never publish the
+    final base `cmd_vel`; CORE remains the single command arbiter.
+11. **Treat the carried object as a navigation state.** Arm pose, gripper
+    state, box dimensions, mass and centre of gravity select the footprint,
+    speed, acceleration and turning limits. Navigation is disabled when the
+    carried-object state is unknown after restart or communication loss.
+
+### Execution order
+
+Implement P0 items as source/profile and contract tests first. Validate P1
+items on a stationary Pi and lifted-wheel bench, then on a measured floor
+course. Run P2 only after the base navigation and safety gates are accepted.
+No recommendation in this review advances `ARTIFACT`, `DEVICE` or `FIELD` to
+`GO` without the corresponding signed release, Pi readback and physical
+evidence.
+
+## 2026-09-13 ROS-native adapter implementation checkpoint
+
+The implementation direction is now explicit: use standard ROS messages,
+launch parameters, lifecycle, Nav2, `ros2_control` and MoveIt 2 wherever their
+contracts fit. Board or vendor differences stay behind adapters; CORE remains
+the external API and the only final base `cmd_vel` publisher.
+
+### Implemented source boundary
+
+- `rosy_bringup.pinky_pro_adapter.PinkyProAdapter` validates the complete
+  Pinky Pro parameter set before the Dynamixel SDK is constructed. It emits a
+  ROS launch parameter mapping and performs no UART access itself.
+- `pinky_pro_adapter.yaml` is loaded by the Pinky bringup launch before
+  commissioning overrides. The existing driver-side validation and deadman
+  remain the second device-side guard.
+- `rosy_omx_adapter` validates an unselected or model-selected OMX profile and
+  emits standard `joint_state_broadcaster` and
+  `joint_trajectory_controller`/MoveIt names. Its disabled profile returns no
+  controller contract, creates no fake joint state, and opens no transport.
+- The Device `io` image builds and ships `rosy_omx_adapter`, so the same
+  profile validator is available on Raspberry Pi without enabling an arm or
+  adding a vendor plugin.
+
+### Remaining adapter work
+
+1. Replace the current custom base driver with a measured
+   `ros2_control` hardware plugin only after its DYNAMIXEL transport,
+   encoder sign, torque and deadman behavior are proven equivalent on Pi. The
+   current `rosy_bringup` path remains the accepted baseline until then.
+2. Select OMX-F, OMX-AI or legacy OpenMANIPULATOR-X. Add the selected vendor
+   transport behind `ros2_control`, expose `FollowJointTrajectory`, and build
+   MoveIt 2 planning scene, joint limits, gripper action and recovery from ROS
+   parameters. Model selection, power and payload measurements are still HOLD.
+3. Prefer `sensor_msgs`, `image_transport`, `camera_info_manager`,
+   `robot_localization` and Nav2 lifecycle/diagnostic topics over bespoke
+   transports. Any custom logic remains an observation or policy adapter and
+   cannot create a competing final command publisher.
+
+The new adapter tests are source-only evidence. They do not assert that a
+vendor plugin exists, that a motor can move, or that an OMX arm can carry a
+payload. Those claims require a signed ARM64 image, Pi readback and physical
+commissioning.
+
+## 2026-09-13 P0 motion-limit guard implementation
+
+The first P0 item is now wired into the hardware launch path. The selected
+Device profile is mounted into the motor and IO containers as
+`/etc/rosy/profile.yaml`. `rosy_navigation.profile_limits` reads the profile's
+`max_linear_velocity` and `max_angular_velocity`, rejects launch overrides
+above those ceilings, and checks the velocity-bearing Nav2 parameters before
+the Nav2 graph is included. The Pinky bringup and Compose defaults now match
+the current measured-profile envelope of `0.20 m/s` and `0.80 rad/s`.
+
+The same launch now exposes `allow_demo_map`, which defaults to `false` for
+hardware mode. A missing or unloadable site YAML/image therefore stops launch;
+simulation or an explicitly declared bench run can opt into the packaged demo
+map with `allow_demo_map:=true`.
+
+P0-3 now has a parameter boundary as well. `motion_profiles.yaml` defines the
+states `base`, `stowed_arm`, `carrying_box` and `placing`, but keeps each state
+`measured: false` until the Pinky/OMX geometry and payload are recorded. When a
+measured state is selected with `footprint_profile_file` and
+`footprint_state`, the launch rewrites both Nav2 costmap footprints and lowers
+the effective speed envelope to the state profile. Selecting an unmeasured
+state, or requiring a measured profile without one, fails before Nav2 starts.
+
+This is a startup/configuration guard, not a physical calibration result. The
+footprint, acceleration, wheel scale and stop distance still require Pi and
+floor-course evidence. A future carried-box profile must provide a new
+measured envelope rather than increasing these values by launch override.
+
+## 2026-09-13 Verification snapshot
+
+The source and contract checks for the current ROS/device slice pass:
+
+```text
+test/test_network_topology_contracts.py
+test/test_footprint_profiles.py
+test/test_nav2_hardware_slice.py
+test/test_nav2_profile_limits.py
+test/test_robot_runtime.py
+test/test_bringup_motor_contracts.py
+test/test_pi_wifi_deployment.py
+112 passed, 14 skipped
+
+src/rosy_bringup/test/test_pinky_pro_adapter.py
+src/rosy_bringup/test/test_command_deadman.py
+19 passed
+
+src/rosy_omx_adapter/test/test_omx_profile.py
+9 passed
+```
+
+`python -m py_compile` for the changed Python modules and `git diff --check`
+also pass. A complete `python -m pytest test/` run reached 743 passed and 50
+skipped; its 22 failures and 27 errors are confined to release/signature and
+device-readback fixtures that invoke `openssl`, which is not installed in the
+current Windows environment. That run does not promote ARTIFACT or DEVICE.
+
+The remaining promotion gates are unchanged: build and sign the ARM64 image,
+install it on a Raspberry Pi 5, capture readback, select a measured Pinky/OMX
+profile, and run lifted-wheel then floor-course payload and safety trials.
+
+## 2026-09-13 BNO055 optional-driver implementation checkpoint
+
+The BNO055 WIP is now a self-contained optional package. `main_node.cpp`
+delegates I2C ownership and bounded initialization to `bno055_device`, keeps
+the deployed acceleration and degrees-per-second unit contract in the
+ROS-free decoder, rejects invalid quaternion/short-read samples, and publishes
+freshness telemetry on `sensors/imu/status`. Startup failures exit nonzero so
+the supervisor can hold the runtime rather than publishing synthetic zeros.
+
+`reset_on_start` defaults to `false`; a reset is sent only when explicitly
+requested and is followed by the required quiet wait. The package now exposes
+`bno055.launch.py` and `config/bno055.yaml` for an explicit opt-in run, while
+the default Rosy OS compose image remains IMU-disabled until ARM64 and
+calibration evidence exists.
+
+The ROS-free decoder, package-contract tests, and injected-bus fault harness
+are part of the source evidence. `colcon`/ARM64 compilation, a real BNO055,
+stationary bias data, and `robot_localization` fusion remain DEVICE/FIELD
+gates and are still HOLD on this Windows workspace.
+
+The Windows run currently reports `3 passed, 10 skipped` for the BNO055 Python
+package/fault tests; the skips are the expected Linux ARM64 executable harness
+without `BNO055_TEST_EXECUTABLE`.
+
+## 2026-09-13 P0 lifecycle and motor readiness implementation checkpoint
+
+P0-4 now has a source-level safety boundary. `NavigationReadinessGate` is a
+ROS-free state machine shared by `NavigationManager` and `CommandManager`.
+Hardware mode requires active lifecycle transitions from AMCL, map server,
+controller server and both costmaps, plus the Pinky bringup adapter's
+transient-local `motor/ready` lease. The lease is refreshed by the motor node;
+an expired lease or any inactive/missing lifecycle observation keeps the gate
+in HOLD. CORE still publishes the single `cmd_vel` topic at 50 Hz, but forces
+the outgoing twist to zero while the gate is held. New navigation and teleop
+requests return `HARDWARE_NOT_READY` (HTTP 503) before changing mode.
+
+The default core/simulation configuration leaves the gate disabled for
+host-only and bench tests. The device example configuration enables it and
+lists the six required components explicitly. Lifecycle and adapter wiring is
+covered by bridge/bringup contract tests, while the gate and command behavior
+are covered by ROS-free tests.
+
+The current focused verification is `112 passed, 14 skipped` across the
+readiness, API/core, bridge registration, Nav2 hardware-slice and
+motor-contract tests. The complete `src/rosy_core/test` suite is `758 passed,
+10 skipped`; the smaller ROS-free core subset is `86 passed`. The full
+root suite remains subject to the existing Windows `openssl` fixture blocker;
+ARM64 lifecycle, UART-loss, restart and physical stop-latency evidence remain
+DEVICE/FIELD HOLD gates.

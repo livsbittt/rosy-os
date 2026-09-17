@@ -127,6 +127,7 @@ the code against its own allowlist and has no opinion about prose.
 
 The original nine reaches above remain the historical triage. The absorbed
 ControlSensorAdapter and ROS node compatibility layer add fourteen reaches;
+the readiness bridge adds four accepted public-state probes;
 they are also published here so the set-equality test and this document stay
 in lockstep:
 
@@ -153,6 +154,12 @@ implements it and fails with `CAPABILITY_NOT_SUPPORTED`, and the probe is gone. 
 that finds a live defect the first time it is run is not an abstraction.
 
 Line numbers above drift; the test keys on `(file, kind, receiver, attribute)` for exactly that reason.
+
+The readiness gate added four accepted bridge probes: the injected
+`services.readiness` object and the public `TransitionEvent.goal_state` with
+its `id`/`label` representations. They are listed in the test allowlist and
+are kept inside the ROS bridge; none reaches a private owner or adds a command
+path.
 
 ### C7 — a service field whose methods span two requirement families
 
@@ -296,6 +303,6 @@ C5 fired with `{nav, maps, waypoints}`. Resolved: `map_router` → `api/v1/map.p
 
   **X6 applies independently:** `ros_bridge.py` is under active contention across five worktrees and the DDS Phase 0 measurement work.
 
-  **What holds the line instead.** `test/test_bridge_timers.py` pins six timers with periods and order, eleven subscriptions with callback and QoS, five publishers with QoS, four service clients, the action client, the TF listener and both executor wirings. `test/test_executor_contracts.py` pins both Protocols' member sets and the five diagnostics providers. Together these make the accepted violation *stable* — it cannot silently grow — which is what an accepted violation has to be.
+  **What holds the line instead.** `test/test_bridge_timers.py` pins six timers with periods and order, seventeen subscriptions with callback and QoS, five publishers with QoS, four service clients, the action client, the TF listener and both executor wirings. `test/test_executor_contracts.py` pins both Protocols' member sets and the five diagnostics providers. Together these make the accepted violation *stable* — it cannot silently grow — which is what an accepted violation has to be.
 
   **Re-entry trigger.** Any one of: (a) a seventh timer, or a sixth independently-failing domain, is added to `RosBridge`; (b) a third Protocol is satisfied by it; (c) a Pi becomes routinely available **and** CI boot smoke runs on the branch. Until then this is a recorded accept, not a backlog item.

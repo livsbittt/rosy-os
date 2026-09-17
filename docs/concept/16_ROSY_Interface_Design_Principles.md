@@ -1,0 +1,211 @@
+# 16. ROSY Interface Design Principles
+
+## 1. Purpose
+
+ROSY exposes state and control through several human-facing surfaces. They serve
+different people, answer different questions, and must not look or behave alike.
+
+This document fixes what every surface shares and what each surface is free to
+invent. It binds regardless of framework: the rules below are about evidence,
+colour, hierarchy and vocabulary, not about a rendering stack.
+
+## 2. Surfaces
+
+| Surface | Audience | Question it answers | v1 status |
+|---|---|---|---|
+| Robot console | field operator | "Can I send this robot now?" | live (`rosy_core` `/dashboard`, `rosy_control` `web_node`) |
+| Device runtime | installer, maintainer | "Is this hardware standing up correctly?" | live (`/dashboard` host and ROS-graph panels) |
+| Fleet | dispatcher | "Which robot is the problem?" | target — Fleet server unimplemented |
+| Robot face | bystander | "What is it about to do?" | live (`rosy_emotion` LCD, `info_screen`) |
+
+The robot face is a user interface. It is the only surface for people who never
+open a browser, and the only one with no input.
+
+## 3. The Five Laws
+
+These hold on every surface. A surface that breaks one is wrong, not different.
+
+### Law 0 — A surface states only what the robot knows
+
+D-32 established that a hollow endpoint returns an honest 501 rather than a
+lying 200. Interfaces inherit that. A value with no source is not rendered as
+`0`. A control the robot cannot honour is not rendered as a button.
+
+### Law 1 — Colour carries meaning, never decoration
+
+Three closed sets, never mixed (§6). Decorative gradients, ambient textures and
+per-metric tinting spend the colour budget that a threshold alarm needs.
+
+### Law 2 — Surface is hierarchy
+
+Things that report sit flat. Things that change the world are raised. Grouping
+is done by ground and rule, not by giving every block the same outline. An
+operator learns "raised means it moves" once, and it holds everywhere.
+
+### Law 3 — Irreversible actions differ in kind, not degree
+
+An action that cannot be undone from the same screen — emergency stop, release
+rollback, map reset, undock — is a different visual category, not a red variant
+of an ordinary button.
+
+### Law 4 — Vocabulary belongs to the audience
+
+Labels are the plain language of whoever reads that surface. For an operator
+that means Korean plain words. For an installer reading the ROS graph,
+`DOMAIN ID` and `DDS ISOLATION` are plain words and stay. Consistency means each
+surface speaks its own audience's plain language, not that all surfaces share
+one wording.
+
+## 4. Three Layers
+
+What is shared is law and vocabulary. Components are not shared.
+
+| Layer | Content | Scope |
+|---|---|---|
+| L1 — Law | tokens, evidence states, colour sets, surface hierarchy | binding on every surface |
+| L2 — Grammar | layout, interaction model, components | per surface, independent, not shared |
+| L3 — Content | what a capability contributes | portable across surfaces |
+
+A single component library spanning all four surfaces is a defect, not a goal:
+it would make Fleet look like a console and make the LCD impossible.
+
+## 5. Evidence States
+
+Every displayed value carries one of four states. Collapsing them into a single
+placeholder destroys the distinction Law 0 exists to preserve.
+
+| State | Meaning | Rendering rule |
+|---|---|---|
+| `live` | current, sourced | full contrast |
+| `stale` | value exists, is old | de-emphasised, age shown |
+| `absent` | source exists, nothing arriving | marked missing, not zero |
+| `unavailable` | this device has no such source | omitted, or named as not present on this device |
+
+`stale` is not `absent`, and neither is `unavailable`. Fleet must never draw an
+unreachable robot as healthy: loss of contact is its own state.
+
+## 6. Colour Sets
+
+| Set | Use | Constraint |
+|---|---|---|
+| categorical | series identity (route, alternative, goal, marker) | never used for status |
+| status | threshold crossings only | never used for series, never decorative |
+| neutral | everything else | default for all gauges below threshold |
+
+Gauges read as margin: neutral until a threshold is crossed. A metric is not
+assigned a colour because it is a different metric.
+
+Map rasters are a shared contract: the free and occupied values a client draws
+must equal the values the server renderer writes. This is checked, not
+commented.
+
+## 7. Surface Grammars
+
+Layout follows from the viewer's time budget and input device. This is where
+surfaces are deliberately unlike each other.
+
+| Surface | Time budget | Input | Grammar |
+|---|---|---|---|
+| Robot console | ~2 s, standing beside the robot | pointer and keyboard, possibly gloved | spatial |
+| Device runtime | ~30 s, seated | pointer | procedural |
+| Fleet | ambient, while doing other work | keyboard-first | exception |
+| Robot face | ~0.5 s, walking past | none | intent |
+
+### 7.1 Console — spatial grammar
+
+Fixed three-region split: sense, observe, act. No page scroll; position is
+memory. Capability panels occupy role slots and never reorder when a device is
+added. When content exceeds the viewport, the sense region scrolls while observe
+and act stay fixed.
+
+### 7.2 Device runtime — procedural grammar
+
+The only surface where scrolling is allowed, because scrolling is the procedure.
+Order follows bring-up order: power, host OS, network, DDS domain, ROS graph,
+release, commissioning. A stage that depends on an earlier stage is placed below
+it, never beside it — a multi-column grid erases the causality. Step numbering
+is legitimate here and only here, because the steps are a sequence.
+
+### 7.3 Fleet — exception grammar
+
+The default view contains only robots needing attention; healthy robots are
+absent, not green. The full roster is an explicit action. Navigation is
+keyboard-first: traverse exceptions, then enter one robot's console. The colour
+budget is tightest here — one robot in twenty in trouble means one coloured row.
+
+Fleet failure must not present as robot failure (FLEET SRS §1.2). Unknown is
+rendered as unknown.
+
+### 7.4 Robot face — intent grammar
+
+Legible at about 1.5 m within about 0.5 s, without reading text. It shows
+intent, not state: the direction it is about to take, not a mode name. This is
+the one surface where a second typeface is justified, chosen for small-size
+low-resolution rendering.
+
+## 8. Capability Presentation
+
+A capability supplies *what*. The surface owns *how*.
+
+A capability contributes a data contract, a semantic role (sense, observe or
+act) and a priority. It does not ship a renderer. `mobility.navigate` is a
+half-screen map on the console, one row with an ETA on Fleet, an arrow on the
+LCD, and a node-liveness line on the device runtime.
+
+Presentation state has four values, and `blocked` must carry a reason:
+
+| State | Meaning |
+|---|---|
+| `available` | usable |
+| `constrained` | usable within stated limits |
+| `blocked` | not usable now, with the reason named (safety policy, node down, model missing) |
+| `absent` | not provided by this device — omitted, not greyed |
+
+A greyed button with no reason contradicts the 501 the server already returns.
+
+### 8.1 Two capability documents (D-68)
+
+CAP-001 (`GET /api/v1/system/capabilities`) stays the feature-gate document and
+its body does not change. Concept ids and dynamic `available` live on inventory
+`descriptors[]` and `capability_ids`. A concept-level view reads inventory; a
+feature gate reads CAP-001. These are not merged.
+
+## 9. Composite Assets — target, not v1
+
+Per D-71 and D-55, v1 is a single-device asset. The rules below apply when
+composition is enabled, and are recorded now so the console does not have to be
+rebuilt then.
+
+1. **Slot is decided by role, not by device.** A manipulator's grip control
+   lands in the act region beside the base's drive pad. Adding a device never
+   reshuffles the layout.
+2. **Safety does not compose.** Devices own their local safety (concept 09), but
+   the surface has exactly one emergency stop, at asset level, in a fixed
+   position. Per-device stop buttons are a hazard.
+3. **Each device brings its own evidence.** Staleness is owned by the panel. One
+   device going quiet dims only its own panels.
+4. **Refusals name their author.** In a composite asset "it stopped" has several
+   possible authors; the operator cannot choose a recovery without knowing which
+   one refused.
+
+## 10. Conformance
+
+These are contract tests, in the style the repository already uses, not review
+guidance:
+
+- surface stylesheets contain no raw colour outside the token file
+- a status colour never appears in a categorical position
+- client map raster values equal the server renderer's values
+- a `blocked` capability without a reason fails
+- evidence state is present on every rendered value binding
+
+## 11. v1 Mapping
+
+| Section | v1 meaning | ADR |
+|---|---|---|
+| §2 surfaces | console and device runtime are one FastAPI-served page; Fleet is not built | D-23, D-5 |
+| §3 laws | binding on shipped surfaces now | D-32 |
+| §5 evidence | host values already report unavailable; `stale` and `absent` are not yet distinguished in `rosy_core` | D-23 |
+| §8 capability | CAP-001 gate live; concept descriptors on inventory | D-11, D-68 |
+| §9 composite | not v1 | D-55, D-71 |
+| §10 conformance | to be added as contract tests | D-61 |
