@@ -3,7 +3,7 @@
 작성일: 2026-09-17
 상태: **pending approval** — 실행 승인 전. 이 문서는 아직 어느 모듈의 `progress.md`에도 등록하지 않았다.
 
-관련: [D-72](../reference/ROSY%20ADR%20Log.md) (Proposed) · [concept 16](../concept/16_ROSY_Interface_Design_Principles.md) ·
+관련: [D-72](../reference/ROSY%20ADR%20Log.md) (Accepted) · [D-77](../reference/ROSY%20ADR%20Log.md) · [concept 16](../concept/16_ROSY_Interface_Design_Principles.md) ·
 D-7, D-11, D-18, D-23, D-32, D-55, D-61, D-68, D-71, D-73 ·
 [device validation 계획](2026-09-13-rosy-os-device-validation-implementation-plan.md) G4
 
@@ -186,9 +186,14 @@ G4는 렌더링만이 아니라 **동작**도 요구한다 — "stale values dis
 - D-72 → Accepted 승격 제안(사람 승인)
 - 게이트: `docs` SOURCE/LOCAL — cmd: `python tools/harness/rosy_harness.py lint` · `python -m pytest test/test_network_topology_contracts.py test/test_harness_contracts.py -q`
 
-### S8 — 콘솔 통합 (이 계획은 실행하지 않는다)
+### S8 — 콘솔 통합
 
-미결: (a) CSP nonce로 단일 파일 자족성 유지 / (b) 분해해 core 자산 편입 / (c) 서버 2개 유지. ROS-SIM·DEVICE 게이트를 건드리므로 별도 ADR과 device-validation 조율이 선행한다.
+**2026-09-17 결정 (D-77):** (c) 역할 분리. 운용자 콘솔은 CORE `/dashboard`
+하나. `web_node`는 레거시 런치 진단 화면이며 compose에 없다. (a) 기각.
+(b) DEVICE 전까지 보류 — 두 맵 파이프라인과 `cmd_vel_raw`(D-38).
+
+미결이었던 것: (a) CSP nonce로 단일 파일 자족성 유지 / (b) 분해해 core 자산
+편입 / (c) 서버 2개 유지.
 
 ---
 
@@ -301,7 +306,14 @@ S1과 같이 압축 뒤 L1 여유가 있고 계약 시험이 우선이라 되돌
 
 서빙 자산 실측(이번 작업 세 파일): `index.html` −987 B, `styles.css` −414 B, `app.js` +899 B. 합 **−502 B**. S5 순감>0 만족. S6 `app.js` +899 ≤ +900.
 
-남은 단계: S7(거버넌스 정정). S8(콘솔 통합)은 이 계획 밖.
+**S7·S8 실행 (2026-09-17).**
+
+| 단계 | 결과 | 증거 |
+|---|---|---|
+| S7 거버넌스 | 완료 | concept 16 §5 G4 어휘, §8 `not_provided`, §6 래스터 파이프라인 경계, §10 D-73 한계, §11 G4. D-72 Validation 시험 경로. device-validation G4 HOST 단락(DEVICE HOLD) |
+| S8 콘솔 | 완료(역할 분리, 병합 아님) | **D-77** Accepted. compose에 `web_node` 없음. control 페이지 제목은 diagnostic. (b) 병합은 DEVICE 보류 |
+
+이 계획의 실행 범위 S0–S8은 여기까지다. DEVICE/ARTIFACT GO가 아니다.
 
 ## 12. RALPLAN 루프 상태
 

@@ -87,7 +87,7 @@ ROSY OS uses six primary domain objects:
 | 13 Current-to-target | Phase 0–3 live; 4–5 = D-71 | D-65, D-71 | Phase 0–3 live |
 | 14 Verification | Device validation ARTIFACT/DEVICE/FIELD | D-71 | Device GO not claimed |
 | 15 Ubuntu modular install | D-62 slices, not apt/`rosyctl` | D-62, D-69, D-71 | apt path **not v1** |
-| 16 Interface design principles | console + device runtime on `/dashboard`; Fleet surface and composite rules are target | D-23, D-68, D-71, **D-72**, D-75 | L1 colour contracts live |
+| 16 Interface design principles | operator console is CORE `/dashboard`; control `web_node` is not that console; Fleet and composite rules are target | D-23, D-68, D-71, **D-72**, D-75, **D-77** | L1 colour + evidence + capability states live; G4 DEVICE HOLD |
 
 ## First Refactoring Priority
 

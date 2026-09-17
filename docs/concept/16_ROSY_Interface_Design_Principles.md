@@ -13,10 +13,11 @@ colour, hierarchy and vocabulary, not about a rendering stack.
 
 | Surface | Audience | Question it answers | v1 status |
 |---|---|---|---|
-| Robot console | field operator | "Can I send this robot now?" | live (`rosy_core` `/dashboard`, `rosy_control` `web_node`) |
+| Robot console | field operator | "Can I send this robot now?" | live (`rosy_core` `/dashboard` only — D-77) |
 | Device runtime | installer, maintainer | "Is this hardware standing up correctly?" | live (`/dashboard` host and ROS-graph panels) |
 | Fleet | dispatcher | "Which robot is the problem?" | target — Fleet server unimplemented |
 | Robot face | bystander | "What is it about to do?" | live (`rosy_emotion` LCD, `info_screen`) |
+| Control diagnostic | control-stack maintainer | "What is the absorbed IO graph showing?" | live on legacy `rosy_control/launch/robot.launch.py` only; not composed with CORE |
 
 The robot face is a user interface. It is the only surface for people who never
 open a browser, and the only one with no input.
@@ -76,13 +77,23 @@ placeholder destroys the distinction Law 0 exists to preserve.
 
 | State | Meaning | Rendering rule |
 |---|---|---|
-| `live` | current, sourced | full contrast |
-| `stale` | value exists, is old | de-emphasised, age shown |
-| `absent` | source exists, nothing arriving | marked missing, not zero |
+| `fresh` | current, sourced | full contrast |
+| `delayed` | value exists, is old | de-emphasised, age shown |
+| `disconnected` | source exists, nothing arriving | marked missing, not zero |
 | `unavailable` | this device has no such source | omitted, or named as not present on this device |
 
-`stale` is not `absent`, and neither is `unavailable`. Fleet must never draw an
-unreachable robot as healthy: loss of contact is its own state.
+These four are **per value**, not per transport. A WebSocket drop is a page-level
+signal and must not reuse this vocabulary. The server judges the state and
+exposes the threshold that produced it; the client displays the string and does
+not recompute it (G4, D-72 S3/S4).
+
+`delayed` is not `disconnected`, and neither is `unavailable`. Fleet must never
+draw an unreachable robot as healthy: loss of contact is its own state.
+
+**Known overlap with §8:** `unavailable` here and capability `not_provided` can
+name the same fact ("this robot has no lidar"). They stay two tokens. A concept
+view reads inventory; a value binding reads `evidence`. Do not merge the
+renderers.
 
 ## 6. Colour Sets
 
@@ -95,9 +106,16 @@ unreachable robot as healthy: loss of contact is its own state.
 Gauges read as margin: neutral until a threshold is crossed. A metric is not
 assigned a colour because it is a different metric.
 
-Map rasters are a shared contract: the free and occupied values a client draws
-must equal the values the server renderer writes. This is checked, not
-commented.
+Map rasters are a shared contract **inside one pipeline**: the free and occupied
+values `rosy_control/web/dashboard.html` draws must equal
+`sensing/map_raster.py` (BGR in the PNG, RGB in the CSS tokens). This is
+checked in `rosy_control` (`test_map_raster_color_contract.py`), not commented.
+
+`rosy_core/web/map.js` is a different pipeline. It paints `/api/v1/map` in the
+browser (four occupancy buckets, different thresholds) and is bound by the
+colour-set law only. A `tokens.css` ↔ `dashboard.html` assertion has no legal
+home under D-73: no harness module owns both packages. That limit is recorded
+here, not treated as a pass.
 
 ## 7. Surface Grammars
 
@@ -159,16 +177,19 @@ Presentation state has four values, and `blocked` must carry a reason:
 | `available` | usable |
 | `constrained` | usable within stated limits |
 | `blocked` | not usable now, with the reason named (safety policy, node down, model missing) |
-| `absent` | not provided by this device — omitted, not greyed |
+| `not_provided` | not provided by this device — omitted, not greyed |
 
-A greyed button with no reason contradicts the 501 the server already returns.
+`not_provided` is the former `absent`. The rename avoids clashing with §5
+`disconnected` (once called `absent`). A greyed button with no reason
+contradicts the 501 the server already returns. Inventory omits
+`not_provided` ids; it does not list them as disabled.
 
 ### 8.1 Two capability documents (D-68)
 
 CAP-001 (`GET /api/v1/system/capabilities`) stays the feature-gate document and
-its body does not change. Concept ids and dynamic `available` live on inventory
-`descriptors[]` and `capability_ids`. A concept-level view reads inventory; a
-feature gate reads CAP-001. These are not merged.
+its body does not change. Concept ids, dynamic `available`, `state`, and
+`reason` live on inventory `descriptors[]` and `capability_ids`. A concept-level
+view reads inventory; a feature gate reads CAP-001. These are not merged.
 
 ## 9. Composite Assets — target, not v1
 
@@ -194,18 +215,26 @@ These are contract tests, in the style the repository already uses, not review
 guidance:
 
 - surface stylesheets contain no raw colour outside the token file
-- a status colour never appears in a categorical position
+  (`src/rosy_core/test/test_ui_token_contracts.py`)
+- a status colour never appears in a categorical position (same)
 - client map raster values equal the server renderer's values
+  (`src/rosy_control/test/test_map_raster_color_contract.py` — control
+  pipeline only; see §6)
 - a `blocked` capability without a reason fails
-- evidence state is present on every rendered value binding
+  (`src/rosy_core/test/test_capability_descriptors.py`)
+- evidence state is present on every rendered telemetry binding
+  (`src/rosy_core/test/test_dashboard.py`, `test_evidence.py`)
+
+D-73: a test that opened both `rosy_core/web/tokens.css` and
+`rosy_control/web/dashboard.html` would have no owning module. Do not add one.
 
 ## 11. v1 Mapping
 
 | Section | v1 meaning | ADR |
 |---|---|---|
-| §2 surfaces | console and device runtime are one FastAPI-served page; Fleet is not built | D-23, D-5 |
+| §2 surfaces | operator console is CORE `/dashboard`; device runtime is the same page; control `web_node` is not that console | D-23, D-75, **D-77** |
 | §3 laws | binding on shipped surfaces now | D-32 |
-| §5 evidence | host values already report unavailable; `stale` and `absent` are not yet distinguished in `rosy_core` | D-23 |
-| §8 capability | CAP-001 gate live; concept descriptors on inventory | D-11, D-68 |
+| §5 evidence | server-judged `fresh`/`delayed`/`disconnected`/`unavailable` on `StateSnapshot.evidence`; stale teleop blocked | D-23, **G4** (HOST slice; DEVICE HOLD) |
+| §8 capability | CAP-001 gate live; inventory descriptors carry `state`+`reason`; `blocked` requires a reason | D-11, D-68 |
 | §9 composite | not v1 | D-55, D-71 |
-| §10 conformance | to be added as contract tests | D-61 |
+| §10 conformance | contract tests listed above; cross-package token assertion has no D-73 home | D-61, D-73 |

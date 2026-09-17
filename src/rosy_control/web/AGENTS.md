@@ -3,15 +3,17 @@
 # web/ (web_node dashboard UI)
 
 ## Purpose
-Single-page browser UI served by `rosy_control/web_node.py` (installed to
-`share/rosy_control/web/`). Polls `/state.json` every 333 ms and `/map.png`
+Control-stack diagnostic page served by `rosy_control/web_node.py` (installed to
+`share/rosy_control/web/`). This is **not** the operator console (D-77: that is
+CORE `/dashboard`). It is launched only from legacy `robot.launch.py`, never
+from `deploy/robot/compose.yaml`. Polls `/state.json` every 333 ms and `/map.png`
 only when its gen counter changes; posts to `/cmd`, `/wander`, `/estop`,
 `/goal`, `/teleop`, `/map/reset`, `/map/resume`.
 
 ## Key Files
 | File | Description |
 |---|---|
-| `dashboard.html` | the whole console: three regions (감지 / 관측 / 조작), map canvas with overlays, lidar dial, clearance gauges, safety flags, camera, and every control |
+| `dashboard.html` | diagnostic surface: three regions (감지 / 관측 / 조작), map canvas with overlays, lidar dial, clearance gauges, safety flags, camera, and every control |
 
 ## Subdirectories
 

@@ -344,6 +344,21 @@ session revocation, direct-route access, audit events, and camera/map/diagnostic
 retention. Touch and keyboard behavior is verified on the supported Device
 viewport.
 
+HOST slice (2026-09-17, D-72 S3–S6). This paragraph is not DEVICE GO.
+`rosy_core` `StateSnapshot.evidence` is server-judged
+`fresh`/`delayed`/`disconnected`/`unavailable` with `received_at` and
+`stale_after_s`. The dashboard binds those strings as `data-evidence` and
+refuses teleop unless pose and velocity are `fresh` (click-to-goal needs
+pose). Tests: `src/rosy_core/test/test_evidence.py`,
+`src/rosy_core/test/test_dashboard.py`. Operator console is CORE
+`/dashboard` only (D-77); `rosy_control` `web_node` is not composed with
+CORE.
+
+Still HOLD for G4 GO: mapping of the five safety states and the listed
+Nav2 names (CORE navigation enum is not that list), the calibration
+state machine, Device viewport touch/keyboard, and Device evidence for
+authorization routes.
+
 ### G5 — objective package split trigger
 
 `rosy_control` stays one absorbed package while its pure logic, ROS adapter, and

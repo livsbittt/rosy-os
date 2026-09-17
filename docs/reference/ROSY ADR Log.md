@@ -84,6 +84,7 @@
 | D-74 | 작업 명령은 CORE를 거쳐 내부 ROS로 가고 조회는 CORE에 남는다 | Accepted |
 | D-75 | 로봇 로컬 화면은 손으로 쓴 정적 자산이다 — D-7 React 대체 | Accepted |
 | D-76 | 501 본문의 capability는 CAP-001이고 concept_id는 부가다 | Accepted |
+| D-77 | 운용자 콘솔은 CORE `/dashboard` 하나다 | Accepted |
 
 ---
 
@@ -1980,7 +1981,9 @@ test/test_module_functional_surface.py -q` → 19 passed.
 
 ## D-72 표면은 법을 공유하고 문법은 나눈다
 
-**Status:** Accepted (2026-09-17). concept 16. L1 색 계약 시험이 올라왔다.
+**Status:** Accepted (2026-09-17). concept 16. L1 색·증거·capability 계약 시험이
+올라왔다. 증거 어휘는 G4: `fresh`/`delayed`/`disconnected`/`unavailable`.
+capability 표현의 넷째 상태는 `not_provided`(옛 `absent`).
 
 **Context:** 사람이 보는 표면이 넷이다 — 운용자 콘솔, 장비 런타임, Fleet,
 그리고 로봇 얼굴(`rosy_emotion` LCD). 지금 살아 있는 둘이 서로 다른 디자인
@@ -1997,17 +2000,18 @@ test/test_module_functional_surface.py -q` → 19 passed.
 
 **Decision:** 공유 범위를 층으로 가른다.
 
-- L1(법)은 전 표면 구속이다: 증거 4상태(`live`/`stale`/`absent`/
-  `unavailable`), 닫힌 3색 집합(categorical/status/neutral), 바탕이 위계,
-  되돌릴 수 없는 명령은 종류가 다르다, 어휘는 그 표면 청중의 평문이다.
+- L1(법)은 전 표면 구속이다: 증거 4상태(`fresh`/`delayed`/`disconnected`/
+  `unavailable` — 값별이며 전송 계층이 아님), 닫힌 3색 집합(categorical/
+  status/neutral), 바탕이 위계, 되돌릴 수 없는 명령은 종류가 다르다, 어휘는
+  그 표면 청중의 평문이다.
 - L2(문법)은 표면마다 독립이며 공유하지 않는다. 레이아웃·상호작용·컴포넌트는
   시청자의 시간 예산과 입력 장치에서 연역한다: 콘솔=공간(스크롤 없음),
   장비 런타임=절차(스크롤이 절차), Fleet=예외(정상은 안 보임),
   얼굴=의도(입력 없음).
 - L3(내용)은 이식 가능하다. **capability는 렌더러를 제공하지 않는다.** 데이터
   계약·역할(감지/관측/조작)·우선순위만 제공하고 표현은 표면이 소유한다.
-  표현 상태는 `available`/`constrained`/`blocked`/`absent`이며 `blocked`는
-  이유를 반드시 말한다.
+  표현 상태는 `available`/`constrained`/`blocked`/`not_provided`이며
+  `blocked`는 이유를 반드시 말한다.
 
 D-68은 유지한다. CAP-001 본문은 게이트로 남고 개념 id·`available`은 inventory
 descriptors에만 둔다. 개념 뷰는 inventory를, 기능 게이트는 CAP-001을 읽는다.
@@ -2022,17 +2026,24 @@ LCD의 문법을 파괴한다. 콘솔을 먼저 합치고 토큰을 나중에 �
 **Consequences:** 프레임워크와 무관하게 구속한다 — D-7(React) 산출물이든 D-23
 로컬 자산이든 같은 법을 지킨다. `rosy_core/web`은 장식·지표별 색·eyebrow를
 잃고, `dom.js`는 placeholder 하나 대신 증거 상태를 실어야 한다. 새 capability는
-app.js 손배선 대신 역할 슬롯 등록으로 붙는다. 콘솔 통합(두 서버·CSP·단일 파일
-자족성)은 이 ADR이 정하지 않으며 별도 결정이 필요하다.
+app.js 손배선 대신 역할 슬롯 등록으로 붙는다. 콘솔이 둘인지 하나인지는 D-77.
 
-**Validation / Transition:** `src/rosy_core/test/test_ui_token_contracts.py`
-(토큰 파일 밖 원시 색, status 색이 계열 자리, 미선언 var()). HOST 2026-09-17:
-token + dashboard + no-bundler 30 passed. 맵 래스터 교차 모듈 시험과
-`blocked` 이유 단언은 후속이다. 콘솔 통합은 이 ADR이 정하지 않는다.
+**Validation / Transition:** HOST 2026-09-17.
+
+- L1 색: `src/rosy_core/test/test_ui_token_contracts.py`
+- 증거 판정·게이트: `src/rosy_core/test/test_evidence.py`,
+  `src/rosy_core/test/test_dashboard.py`
+- `blocked` 이유: `src/rosy_core/test/test_capability_descriptors.py`
+- 제어 파이프라인 래스터: `src/rosy_control/test/test_map_raster_color_contract.py`
+  (`tokens.css` ↔ `dashboard.html` 교차 단언은 D-73상 거처가 없어 두지 않는다)
+
+콘솔이 둘인지 하나인지는 D-77. G4의 Device viewport·보정 상태기계는
+device-validation 계획이 소유하며 이 ADR의 HOST 시험이 DEVICE GO가 아니다.
 
 **References:** [concept 16](../concept/16_ROSY_Interface_Design_Principles.md),
-D-7, D-11, D-23, D-32, D-55, D-61, D-68, D-71,
-[FLEET SRS](../spec/ROSY%20FLEET%20SRS.md) §1.2.
+D-7, D-11, D-23, D-32, D-55, D-61, D-68, D-71, D-73, D-75, D-77,
+[FLEET SRS](../spec/ROSY%20FLEET%20SRS.md) §1.2,
+[device-validation G4](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md).
 
 ---
 ---
@@ -2092,3 +2103,47 @@ digest 경로를 함께 설계한다.
 **Validation / Transition:** 	est_taskkind_require_keeps_cap001_flag_and_adds_concept_id, 	est_disabled_navigation_capabilities_return_501의 concept_id 단언.
 
 **References:** D-11, D-32, D-68, D-74.
+
+---
+
+## D-77 운용자 콘솔은 CORE `/dashboard` 하나다
+
+**Status:** Accepted (2026-09-17). D-72 S8. concept 16 §2.
+
+**Context:** D-72가 남긴 질문이다. 운용자가 "이 로봇 괜찮나"에 답이 둘이다 —
+`rosy_core` FastAPI `/dashboard`와 `rosy_control` `web_node`가 서빙하는
+`dashboard.html`. 선택지는 셋이었다. (a) CSP nonce로 control 단일 파일을
+자족 콘솔로 유지. (b) `dashboard.html`을 분해해 CORE 자산에 편입.
+(c) 서버 둘을 유지. (a)와 (b)는 ROS-SIM·DEVICE 게이트와 두 맵 파이프라인
+(S2), 그리고 `web_node`의 `/cmd_vel_raw` 발행(D-38)을 건드린다.
+
+운용 compose(`deploy/robot/compose.yaml`)는 이미 `rosy_control/launch`를
+띄우지 않는다. device-validation 계획 §1은 `robot.launch.py`를 CORE와 함께
+돌리지 말라고 적는다. 그런데 문서와 control 페이지 제목은 둘을 같은 콘솔로
+부르고 있었다.
+
+**Decision:** v1 운용자 콘솔은 **CORE `/dashboard` 하나**다 (D-23, D-75).
+
+- (c)를 고르되, 두 *운용자* 콘솔이 아니라 역할이 다른 두 HTTP 표면이다.
+- `rosy_control` `web_node`+`dashboard.html`은 흡수된 IO 스택의 진단 화면이다.
+  레거시 `robot.launch.py`에서만 뜬다. CORE와 같이 올리지 않는다.
+- (a)는 기각한다. 두 번째 운용자 콘솔을 자족적으로 만들면 같은 질문에 답이
+  둘로 남는다.
+- (b)는 DEVICE 전까지 미룬다. CORE `map.js`와 control `/map.png`는 별개
+  파이프라인이고, `web_node` teleop은 `cmd_vel_raw`를 낸다. 합치면 D-38과
+  S2 경계를 한 번에 연다.
+
+**Alternatives:** (a)는 답이 둘인 문제를 남긴다. (b)를 지금 하는 안은
+맵 파이프라인과 명령 경로를 DEVICE 증거 없이 합친다. 둘 다 채택하지 않는다.
+
+**Consequences:** "이 로봇 괜찮나"의 운용자 답은 `/dashboard`다. control
+진단 화면은 레거시 런치에 남고, 교차 패키지 토큰 시험은 여전히 D-73 거처가
+없다(concept 16 §6). 이 결정이 DEVICE/ARTIFACT GO가 아니다.
+
+**Validation / Transition:** `test/test_control_launch_boundary.py` —
+compose에 `web_node`/`dashboard.html`/`rosy_control/launch`가 없다.
+concept 16 §2 표면 표. HOST 시험이지 Device viewport가 아니다.
+
+**References:** D-23, D-38, D-72, D-73, D-75,
+[concept 16](../concept/16_ROSY_Interface_Design_Principles.md),
+[device-validation](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md).
