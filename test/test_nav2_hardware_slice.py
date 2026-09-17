@@ -192,6 +192,39 @@ def test_nav2_frame_prefix_module_prefixes_odom_not_map():
     ] == "odom"
 
 
+def test_costmap_observation_topic_is_absolute_so_the_obstacle_layer_hears_the_lidar():
+    """실측에서 온 시험 — 상대 토픽은 **코스트맵 노드** 네임스페이스에서 풀린다.
+
+    `topic: scan` 은 `/{ns}/global_costmap/scan` 이 되고, 라이다는 `/{ns}/scan` 에 낸다.
+    둘은 만나지 않는다. 장애물 레이어가 관측을 한 번도 못 받으니 nav2 는 정적 맵만 보고
+    달렸고, 로봇 두 대가 통로 폭 1.4 m 부터 0.7 m 까지 전부 정면으로 들이받았다(중심 간
+    0.01~0.08 m). 플래너는 한 번도 막혔다고 말하지 않았다 - 그쪽에서 통로는 비어 있었다.
+
+    이 결함은 조용하다. 로그도 경고도 남지 않으므로 시험이 아니면 다시 들어온다.
+    """
+    raw = yaml.safe_load(NAV_PARAMS.read_text(encoding="utf-8"))
+    for scope in ("local_costmap", "global_costmap"):
+        params = raw[scope][scope]["ros__parameters"]
+        layer = params.get("voxel_layer") or params.get("obstacle_layer")
+        assert layer["scan"]["topic"].startswith("/"), (
+            f"{scope} 의 관측 토픽이 상대 경로다 — 코스트맵 노드 밑으로 풀린다")
+
+
+def test_the_namespaced_sim_points_the_obstacle_layer_at_that_robots_lidar():
+    from rosy_navigation.frame_prefix import apply_nav2_frame_prefix
+
+    raw = yaml.safe_load(NAV_PARAMS.read_text(encoding="utf-8"))
+    prefixed = apply_nav2_frame_prefix(raw, "rosy_01")
+
+    for scope in ("local_costmap", "global_costmap"):
+        params = prefixed[scope][scope]["ros__parameters"]
+        layer = params.get("voxel_layer") or params.get("obstacle_layer")
+        assert layer["scan"]["topic"] == "/rosy_01/scan"
+    # 네임스페이스가 없는 실기는 그대로 /scan 이다.
+    plain = apply_nav2_frame_prefix(raw, "")["global_costmap"]["global_costmap"]
+    assert plain["ros__parameters"]["obstacle_layer"]["scan"]["topic"] == "/scan"
+
+
 def test_write_prefixed_nav2_params_writes_a_unique_file(tmp_path):
     from rosy_navigation.params_rewrite import write_prefixed_nav2_params
 

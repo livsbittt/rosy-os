@@ -221,7 +221,12 @@ local_costmap:
         mark_threshold: 0
         observation_sources: scan
         scan:
-          topic: scan
+          # 절대 경로여야 한다. 코스트맵 플러그인의 상대 토픽은 **코스트맵 노드**
+          # 네임스페이스(.../global_costmap)에서 풀려서 아무도 쓰지 않는
+          # /global_costmap/scan 이 된다 - 장애물 레이어가 관측을 한 번도 못 받고,
+          # nav2 는 정적 맵만 보고 달린다. 네임스페이스를 쓰는 시뮬은
+          # rosy_navigation.frame_prefix 가 /{ns}/scan 으로 바꿔 준다.
+          topic: /scan
           max_obstacle_height: 2.0
           clearing: True
           marking: True
@@ -262,7 +267,12 @@ global_costmap:
         enabled: True
         observation_sources: scan
         scan:
-          topic: scan
+          # 절대 경로여야 한다. 코스트맵 플러그인의 상대 토픽은 **코스트맵 노드**
+          # 네임스페이스(.../global_costmap)에서 풀려서 아무도 쓰지 않는
+          # /global_costmap/scan 이 된다 - 장애물 레이어가 관측을 한 번도 못 받고,
+          # nav2 는 정적 맵만 보고 달린다. 네임스페이스를 쓰는 시뮬은
+          # rosy_navigation.frame_prefix 가 /{ns}/scan 으로 바꿔 준다.
+          topic: /scan
           max_obstacle_height: 2.0
           clearing: True
           marking: True

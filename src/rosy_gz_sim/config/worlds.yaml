@@ -22,6 +22,17 @@ worlds:
     spawn_x: -2.4
     spawn_y: -2.4
     spawn_spacing: 0.55
+  rosy_gauntlet.world:
+    map: rosy_gauntlet.yaml
+    # 교행 한계를 재는 월드다. 여기서 팽창 반경은 "통로 폭에 맞춘 값"이 아니라 **재는
+    # 대상**이다 - 벽 가까이가 비싸면 두 대가 서로를 비켜 갈 자리가 있어도 플래너가
+    # 그리로 가지 않는다. 기본값은 저장소 기본과 같은 0.15 로 두고, 스윕이 런치 인자로
+    # 덮어쓰며 비교한다.
+    inflation_radius: 0.15
+    # 아래 접근 구역(y -2.7~-1.5)의 가운데. 1.38 간격이면 둘째가 통로 2 앞에 선다.
+    spawn_x: -2.50
+    spawn_y: -2.10
+    spawn_spacing: 1.38
   rosy_swarm_bench.world:
     map: rosy_swarm_bench.yaml
     inflation_radius: 0.15

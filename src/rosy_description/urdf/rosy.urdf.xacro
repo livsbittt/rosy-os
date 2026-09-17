@@ -195,6 +195,14 @@
         </joint>
 
         <link name="rplidar_link"/>
+        <!--
+            yaw pi 는 오타가 아니다. 라이다가 180 도 돌아 달려 있어서 스캔 각 0 이 로봇의
+            뒤쪽을 가리킨다. TF 를 거치는 소비자(nav2, 코스트맵)는 영향을 받지 않는다 -
+            프레임이 rplidar_link 이기 때문이다. 걸리는 쪽은 scan 토픽의 ranges 를 직접
+            읽으며 각 0 을 정면이라고 가정하는 분석 스크립트다. 실제로 그렇게 읽어서
+            뒷벽 0.64 m 를 앞에 있는 로봇으로 착각한 적이 있다. 정면은 각 0 이 아니라
+            각 pi 다.
+        -->
         <joint name="${namespace}rplidar_link_fixed_joint" type="fixed">
             <parent link="rplidar_mount"/>
             <child link="rplidar_link"/>

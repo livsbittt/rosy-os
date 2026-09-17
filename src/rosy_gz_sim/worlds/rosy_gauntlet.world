@@ -1,0 +1,121 @@
+<?xml version="1.0" ?>
+<!--
+  교행 한계를 재는 월드. 하나의 질문만 묻는다 — pinky 두 대가 서로를 지나갈 수 있는
+  가장 좁은 통로는 몇 m 인가.
+
+  6.4 x 5.4 m 방에 세로 통로 여섯을 나란히 둔다. 폭은 왼쪽부터
+  1.4 / 1.2 / 1.0 / 0.9 / 0.8 / 0.7 m 이고, 통로 길이는 3.0 m 다. 위아래에는 폭 1.2 m
+  접근 구역이 통로 전부를 잇는다 - 두 대를 한 통로의 양 끝에 세우고 서로의 자리로
+  보내면, 반드시 그 통로 **안에서** 마주친다.
+
+  왜 한 월드에 여섯을 넣는가: 폭만 다르고 나머지가 같아야 결과를 폭 탓으로 돌릴 수 있다.
+  월드를 여섯 개 만들면 벽 재질도 조명도 spawn 거리도 조금씩 달라지고, 그 차이가 어느
+  통로에서 실패했는지에 섞인다.
+
+  통로 중심 x: -2.50 / -1.12 / +0.06 / +1.09 / +2.02 / +2.85
+  접근 구역 y: 아래 -2.10, 위 +2.10
+
+  벽 두께 0.08 m: gpu_lidar 는 렌더링이라 1 cm 벽을 비스듬한 각도에서 놓친다.
+  벽 높이 0.44 m, 바닥부터: rplidar_link 가 0.125 m 라 스캔에 반드시 걸린다.
+-->
+<sdf version="1.8">
+  <world name="rosy_gauntlet">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"></plugin>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"></plugin>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"></plugin>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"></plugin>
+
+    <light type="directional" name="sun">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 3 0 0 0</pose>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>1 1 1 1</specular>
+      <attenuation>
+        <range>1000</range><constant>1</constant><linear>0</linear><quadratic>0</quadratic>
+      </attenuation>
+      <direction>0 0 -1</direction>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="ground_link">
+        <collision name="ground_collision">
+          <geometry><plane><normal>0 0 1</normal><size>14 14</size></plane></geometry>
+        </collision>
+        <visual name="ground_visual">
+          <geometry><plane><normal>0 0 1</normal><size>14 14</size></plane></geometry>
+          <material>
+            <diffuse>0.55 0.56 0.54 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 바깥 벽: 안쪽 6.40 x 5.40 -->
+    <model name="wall_south">
+      <static>true</static><pose>0 -2.74 0.22 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><box><size>6.56 0.08 0.44</size></box></geometry>
+        <material><diffuse>0.7 0.7 0.7 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>6.56 0.08 0.44</size></box></geometry></collision></link>
+    </model>
+    <model name="wall_north">
+      <static>true</static><pose>0 2.74 0.22 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><box><size>6.56 0.08 0.44</size></box></geometry>
+        <material><diffuse>0.7 0.7 0.7 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>6.56 0.08 0.44</size></box></geometry></collision></link>
+    </model>
+    <model name="wall_west">
+      <static>true</static><pose>-3.24 0 0.22 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><box><size>0.08 5.40 0.44</size></box></geometry>
+        <material><diffuse>0.7 0.7 0.7 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>0.08 5.40 0.44</size></box></geometry></collision></link>
+    </model>
+    <model name="wall_east">
+      <static>true</static><pose>3.24 0 0.22 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><box><size>0.08 5.40 0.44</size></box></geometry>
+        <material><diffuse>0.7 0.7 0.7 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>0.08 5.40 0.44</size></box></geometry></collision></link>
+    </model>
+
+    <!-- 칸막이 다섯. 길이 3.0 m, y 는 -1.5 에서 +1.5 까지 -->
+    <model name="lane_wall_1">
+      <static>true</static><pose>-1.76 0 0.22 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><box><size>0.08 3.00 0.44</size></box></geometry>
+        <material><diffuse>0.62 0.64 0.66 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>0.08 3.00 0.44</size></box></geometry></collision></link>
+    </model>
+    <model name="lane_wall_2">
+      <static>true</static><pose>-0.48 0 0.22 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><box><size>0.08 3.00 0.44</size></box></geometry>
+        <material><diffuse>0.62 0.64 0.66 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>0.08 3.00 0.44</size></box></geometry></collision></link>
+    </model>
+    <model name="lane_wall_3">
+      <static>true</static><pose>0.60 0 0.22 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><box><size>0.08 3.00 0.44</size></box></geometry>
+        <material><diffuse>0.62 0.64 0.66 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>0.08 3.00 0.44</size></box></geometry></collision></link>
+    </model>
+    <model name="lane_wall_4">
+      <static>true</static><pose>1.58 0 0.22 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><box><size>0.08 3.00 0.44</size></box></geometry>
+        <material><diffuse>0.62 0.64 0.66 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>0.08 3.00 0.44</size></box></geometry></collision></link>
+    </model>
+    <model name="lane_wall_5">
+      <static>true</static><pose>2.46 0 0.22 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><box><size>0.08 3.00 0.44</size></box></geometry>
+        <material><diffuse>0.62 0.64 0.66 1</diffuse></material></visual>
+        <collision name="c"><geometry><box><size>0.08 3.00 0.44</size></box></geometry></collision></link>
+    </model>
+  </world>
+</sdf>
