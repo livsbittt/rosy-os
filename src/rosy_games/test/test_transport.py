@@ -82,6 +82,19 @@ def test_estop_posts_safety_stop():
     assert seen["auth"] == "Bearer op-token"
 
 
+def test_empty_token_omits_authorization():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["auth"] = request.headers.get("authorization")
+        return httpx.Response(200, json={"accepted": True})
+
+    empty = RobotEndpoint(id="rosy_01", url="http://robot:8080", token="", aruco_id=1, attacks="positive_x")
+    http = httpx.Client(transport=httpx.MockTransport(handler), base_url=empty.url)
+    HttpPlayerClient(empty, http=http).teleop(0.0, 0.0)
+    assert seen["auth"] is None
+
+
 @pytest.mark.parametrize("status", [409, 500])
 def test_http_error_raises_so_the_loop_can_estop_both(status):
     def handler(_request: httpx.Request) -> httpx.Response:

@@ -19,26 +19,26 @@ def _imports(path: Path) -> set[str]:
     names: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            names.update(alias.name.split(".")[0] for alias in node.names)
+            names.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom) and node.module:
-            names.add(node.module.split(".")[0])
+            names.add(node.module)
     return names
 
 
 def test_pure_layers_do_not_import_runtime_or_vision():
-    banned = set(PURE_FORBIDDEN)
+    banned = set(PURE_FORBIDDEN) | {"rosy_games.host", "websockets"}
     for folder in PURE:
-        for path in folder.glob("*.py"):
-            hits = _imports(path) & banned
+        for path in folder.rglob("*.py"):
+            hits = {name for name in _imports(path) if name in banned or name.split(".")[0] in banned}
             assert not hits, f"{path.name} imports {hits}"
 
 
 def test_host_except_overhead_has_no_cv2():
     banned = set(HOST_FORBIDDEN)
-    for path in (PKG / "host").glob("*.py"):
+    for path in (PKG / "host").rglob("*.py"):
         if path.name == "overhead.py":
             continue
-        hits = _imports(path) & banned
+        hits = {name.split(".")[0] for name in _imports(path)} & banned
         assert not hits, f"{path.name} imports {hits}"
 
 

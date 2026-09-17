@@ -3,8 +3,7 @@ from rosy_games.host.hold import HoldObserver
 from rosy_games.host.loop import MatchHost
 from rosy_games.host.session import run_match
 
-from fakes import FakeObserver, FakePlayerClient
-from test_loop import _obs
+from fakes import FakePlayerClient
 
 
 def test_hold_observer_keeps_both_robots_at_zero():

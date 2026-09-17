@@ -35,3 +35,14 @@ def test_policy_idles_when_phase_is_not_play():
     state = MatchState(phase=Phase.HOLD, score={"rosy_01": 0, "rosy_02": 0}, reason="lost")
     out = policy.act(obs, state)
     assert out == {} or all(twist == ZERO for twist in out.values())
+
+
+def test_policy_does_not_hang_on_nonfinite_yaw():
+    policy = HeuristicPolicy()
+    play = _play()
+    obs = _obs(
+        (0.5, 0.0),
+        {"rosy_01": (0.0, 0.0, float("inf")), "rosy_02": (0.0, 1.0, 0.0)},
+    )
+    out = policy.act(obs, play)
+    assert out["rosy_01"].linear == 0.0 or abs(out["rosy_01"].angular) <= 1.0

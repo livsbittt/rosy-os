@@ -56,6 +56,7 @@ def test_kickoff_not_ready_teleops_zero_to_both_robots():
     observer = FakeObserver(_obs(ball=None, lost_ball=True))
     host = MatchHost(observer, (home, away))
     host.reset()
+    assert home.manual == 1 and away.manual == 1
     state = host.tick()
     assert state.phase is Phase.KICKOFF
     assert home.teleops == [(0.0, 0.0)]
