@@ -10,6 +10,8 @@ A 가 B 를 기다리고 B 가 A 를 기다리며 둘 다 영원히 선다.
 
 from __future__ import annotations
 
+import math
+
 from fakes import FakeRobot, run
 from test_server_bays import ALCOVE, CORRIDOR, HALL, payload
 from rosy_fleet.server.console import FleetConsole
@@ -35,6 +37,9 @@ class SimRobot(FakeRobot):
         self._target = None
         #: 거짓이면 목표를 받아도 경로를 내지 않는다 — 계획기가 아직 늦은 상태.
         self.plans = True
+        #: 계획 경로가 목표보다 이만큼 앞에서 끝난다. 상대가 선 자리는 치명 비용이라
+        #: 플래너가 거기까지 가지 못한다 — 실측으로 0.13 m 짧았다.
+        self.plan_short_by = 0.0
 
     @property
     def xy(self):
@@ -43,7 +48,11 @@ class SimRobot(FakeRobot):
 
     async def navigation_goal(self, x: float, y: float, yaw: float) -> dict:
         result = await super().navigation_goal(x, y, yaw)
-        self._path = _line(self.xy[0], self.xy[1], x, y) if self.plans else []
+        path = _line(self.xy[0], self.xy[1], x, y) if self.plans else []
+        if path and self.plan_short_by:
+            path = [p for p in path
+                    if math.dist(p, (x, y)) >= self.plan_short_by] or path[:1]
+        self._path = path
         self._state = {**self._state, "navigation": "NAVIGATING"}
         self._target = (x, y)
         return result
@@ -312,6 +321,25 @@ def test_without_a_map_nobody_is_moved_aside_merely_for_being_near_the_route():
 
     assert "queued" not in result
     assert _goals(beside) == []
+
+
+def test_a_truncated_plan_does_not_hide_the_robot_sitting_on_the_goal():
+    """실측 — 장애물 레이어가 살아난 뒤 계획 경로는 목표에 0.13 m 못 미쳐 끝난다.
+
+    상대가 선 자리가 치명 비용이라 플래너가 거기까지 가지 못한다. 잘린 끝을 목표로 알면
+    "목표를 깔고 앉았다"는 판정이 그만큼 물러난 자리에서 이뤄진다. 지시한 목표로 봐야 한다.
+    """
+    grid = payload(HALL)
+    left = SimRobot("rosy_01", (0.4, 1.05), grid)
+    on_goal = SimRobot("rosy_02", (2.2, 1.05), grid)
+    # 계획 경로가 목표 0.3 m 앞에서 끊긴 상태를 흉내낸다.
+    left.plan_short_by = 0.3
+    console = _console(left, on_goal)
+
+    result = run(console.goal("rosy_01", 2.2, 1.05))
+
+    assert result["reason"] == "YIELDING"
+    assert _goals(on_goal), "목표를 깔고 앉은 로봇은 비켜서야 한다"
 
 
 def test_a_robot_sitting_on_the_goal_blocks_it_even_with_no_map_at_all():

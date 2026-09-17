@@ -231,7 +231,7 @@ class FleetConsole:
         await self._observe()
         intended = self._intended_route(robot_id, route, x, y)
         grid = bays.Grid.from_payload(await self.map())
-        standing = self._standing_in_the_way(robot_id, intended, grid)
+        standing = self._standing_in_the_way(robot_id, intended, grid, (x, y))
         if standing:
             return await self._make_room(robot_id, x, y, yaw, intended, standing)
         self._claims[robot_id] = route
@@ -259,7 +259,8 @@ class FleetConsole:
         return [(here[0] + (x - here[0]) * i / steps,
                  here[1] + (y - here[1]) * i / steps) for i in range(steps + 1)]
 
-    def _standing_in_the_way(self, mover: str, route: Sequence, grid) -> list[str]:
+    def _standing_in_the_way(self, mover: str, route: Sequence, grid,
+                             goal: tuple) -> list[str]:
         """이 경로 위에 **서서** 길을 막은 로봇들. 순서로는 풀리지 않는 쪽이다.
 
         거르는 조건이 둘이다. 달리는 로봇은 뺀다 - 그쪽은 경로 대 경로 판정이 이미 봤고,
@@ -288,7 +289,12 @@ class FleetConsole:
             # 지나가려는 경우의 물음이고, 여기서는 **거기 서려고** 가는 것이다. 이 규칙은
             # 맵이 없어도 성립한다 - 실환경에서 갓 시작한 콘솔이 아직 맵을 못 받아
             # "지나갈 수 있다"로 떨어지자, 상대가 서 있는 좌표로 미션이 그냥 나갔다.
-            if math.dist(pose, route[-1]) >= self._goal_blocked_m:
+            #
+            # 경로의 끝이 아니라 **지시한 목표**와 견준다. 장애물 레이어가 살아난 뒤로는
+            # 상대가 선 자리가 치명 비용이라 계획 경로가 목표에 닿지 못하고 잘린다 -
+            # 실측으로 0.13 m 짧았다. 잘린 끝을 목표로 알면 "목표를 깔고 앉았다"가 그만큼
+            # 물러난 자리에서 판정된다.
+            if math.dist(pose, goal) >= self._goal_blocked_m:
                 if bays.passing_is_possible(grid, route, pose, self._passing_width_m):
                     continue
             out.append(robot_id)
