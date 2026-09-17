@@ -37,3 +37,9 @@
 - 변경: `test/conftest.py`로 루트 pytest 수집. 빈 `rosy_games/isaac/` 삭제. harness 기록 추가
 - 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q`
 - gate 변화: SOURCE/LOCAL HOLD로 기록 시작. ROS-SIM/ARTIFACT N/A, DEVICE/FIELD PARKED
+
+## 2026-09-18 · uncommitted · docs(games): mark LOCAL host complete without overhead camera
+
+- 변경: 경계 시험이 field/game/policy에서 cv2/httpx/rclpy/rosy_core/rosy_fleet을 금지하고, host는 overhead.py만 cv2를 허용한다. loop.py/transport.py는 cv2 없음. LOCAL 호스트를 overhead 없이 닫음.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 31 passed
+- gate 변화: LOCAL GO 유지. SOURCE는 트리에서 overhead/homography를 다음 계획으로 명시한 채 GO. DEVICE/FIELD PARKED.

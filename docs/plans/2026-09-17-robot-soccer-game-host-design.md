@@ -2,7 +2,7 @@
 
 작성일: 2026-09-17
 
-상태: 방향 합의. 구현·현장 1v1 GO가 아니다. DEVICE/FIELD 검증이 HOLD인 동안 서로 박는 속도의 경기를 성공으로 적지 않는다. 축구는 본선 슬라이스가 아니다(논외). 그래도 패키지 경계는 CORE/Fleet 계약을 지킨다.
+상태: LOCAL 호스트는 [2026-09-18-rosy-games-local-host.md](2026-09-18-rosy-games-local-host.md)로 닫힘 (`overhead.py`/`homography.py` 없음). 현장 1v1 GO가 아니다. DEVICE/FIELD가 PARKED인 동안 서로 박는 속도의 경기를 성공으로 적지 않는다. 축구는 본선 슬라이스가 아니다(논외). 그래도 패키지 경계는 CORE/Fleet 계약을 지킨다.
 
 관련: D-1, D-2, D-12, D-33, D-38, D-59, D-62, **D-90** · [선택 슬라이스](2026-09-16-optional-runtime-slices-design.md) · [모듈형 미들웨어](2026-09-16-modular-middleware-goal-design.md) · [AI](../concept/11_ROSY_AI_and_Physical_AI.md) · [학습 파이프라인](../concept/12_ROSY_Dataset_and_Learning_Pipeline.md) · [Device 검증](2026-09-13-rosy-os-device-validation-implementation-plan.md) · CORE SRS §8.1 CMD-001 / SAF-001 / SAF-002 / SAF-004 · API Ref §5.5, §6.1
 
@@ -366,13 +366,25 @@ Isaac은 심판 UI이자 학습장이다. 실기 Command Manager가 아니다.
 
 ## 9. 구현 게이트
 
-이 문서는 실행 계획이 아니다. 구현을 열려면 별도 execute plan이 필요하고, 최소한 다음이 빠져 있으면 안 된다.
+[2026-09-18-rosy-games-local-host.md](2026-09-18-rosy-games-local-host.md)가 LOCAL 호스트를 닫았다. `host/overhead.py`와 `field/homography.py`는 만들지 않았다. 천장 카메라 실측은 다음 계획이다.
 
-- §3.1 트리가 그대로 있고, `isaac/`이 없음
-- `test_boundaries.py`가 §3.4를 통과
-- `test_soccer.py` / `test_gate.py` / `test_heuristic.py` / `test_loop.py`가 카메라 없이 득점·이격·쌍정지
-- `HttpPlayerClient`가 부르는 경로가 API Ref §5.5 / §6.1의 mode·teleop·stop 뿐인지
-- 한 대 명령 경로 증거가 Device 검증 계획의 안전 게이트와 모순되지 않는지
-- `rosy_games`가 기본 compose·board.yaml 슬라이스에 없는지
+LOCAL GO:
 
-준비되면 `superpowers:writing-plans`로 실행 계획을 쪼갠다.
+```
+python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q
+```
+
+카메라 없이 통과. DEVICE/FIELD는 PARKED.
+
+닫힌 항목:
+
+- §3.1 트리에서 `overhead.py`·`homography.py`·`test_homography.py`만 다음 계획으로 미룸. `isaac/` 없음
+- `test_games_boundaries.py`가 §3.4를 통과 (host 중 `overhead.py`만 cv2 허용; 지금은 그 파일이 없음. `loop.py`/`transport.py`는 cv2 없음)
+- soccer / gate / heuristic / loop가 카메라 없이 득점·이격·쌍정지
+- `HttpPlayerClient`가 API Ref §5.5 / §6.1의 mode·teleop·stop만 부름
+- `rosy_games`가 기본 compose·board.yaml 슬라이스에 없음
+
+아직 열린 항목:
+
+- 한 대 명령 경로 증거가 Device 검증 계획의 안전 게이트와 모순되지 않는지 (DEVICE)
+- 현장 1v1 (FIELD)

@@ -1,16 +1,17 @@
-"""game/field/policy stay free of ROS, OpenCV, CORE, and Fleet."""
+"""field/game/policy stay free of vision and transport. host except overhead.py has no cv2."""
 
 import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+PKG = ROOT / "rosy_games"
 PURE = (
-    ROOT / "rosy_games" / "field",
-    ROOT / "rosy_games" / "game",
-    ROOT / "rosy_games" / "policy",
-    ROOT / "rosy_games" / "host",
+    PKG / "field",
+    PKG / "game",
+    PKG / "policy",
 )
-FORBIDDEN = ("rclpy", "cv2", "rosy_core", "rosy_fleet", "isaac", "torch")
+PURE_FORBIDDEN = ("cv2", "httpx", "rclpy", "rosy_core", "rosy_fleet")
+HOST_FORBIDDEN = ("cv2", "rclpy", "rosy_core", "rosy_fleet")
 
 
 def _imports(path: Path) -> set[str]:
@@ -25,15 +26,25 @@ def _imports(path: Path) -> set[str]:
 
 
 def test_pure_layers_do_not_import_runtime_or_vision():
+    banned = set(PURE_FORBIDDEN)
     for folder in PURE:
         for path in folder.glob("*.py"):
-            names = _imports(path)
-            hits = names & set(FORBIDDEN)
+            hits = _imports(path) & banned
             assert not hits, f"{path.name} imports {hits}"
 
 
-def test_host_loop_does_not_import_runtime_or_vision():
-    path = ROOT / "rosy_games" / "host" / "loop.py"
-    assert path.is_file()
-    hits = _imports(path) & set(FORBIDDEN)
-    assert not hits, f"loop.py imports {hits}"
+def test_host_except_overhead_has_no_cv2():
+    banned = set(HOST_FORBIDDEN)
+    for path in (PKG / "host").glob("*.py"):
+        if path.name == "overhead.py":
+            continue
+        hits = _imports(path) & banned
+        assert not hits, f"{path.name} imports {hits}"
+
+
+def test_host_loop_and_transport_do_not_import_cv2():
+    for name in ("loop.py", "transport.py"):
+        path = PKG / "host" / name
+        assert path.is_file()
+        hits = _imports(path) & {"cv2"}
+        assert not hits, f"{name} imports {hits}"

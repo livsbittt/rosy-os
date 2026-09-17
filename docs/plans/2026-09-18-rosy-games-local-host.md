@@ -131,7 +131,7 @@ git commit -m "chore(games): bootstrap pytest path and drop the empty isaac pack
 - Modify: `src/rosy_games/rosy_games/field/__init__.py` (재수출만)
 - Create: `src/rosy_games/test/test_field.py`
 
-- [ ] **Step 1: 실패하는 시험**
+- [x] **Step 1: 실패하는 시험**
 
 `test_field.py`:
 
@@ -153,7 +153,7 @@ def test_zero_twist_is_a_full_stop():
     assert (pose.x, pose.y, pose.yaw) == (0.1, -0.2, 1.5)
 ```
 
-- [ ] **Step 2: 실행해서 실패 확인**
+- [x] **Step 2: 실행해서 실패 확인**
 
 ```
 python -m pytest src/rosy_games/test/test_field.py -v
@@ -161,7 +161,7 @@ python -m pytest src/rosy_games/test/test_field.py -v
 
 Expected: FAIL — `Pose2D` / `Twist` / `ZERO` 없음
 
-- [ ] **Step 3: 최소 구현**
+- [x] **Step 3: 최소 구현**
 
 `types.py`: frozen `Pose2D(x, y, yaw)`, `Twist(linear, angular)`, `ZERO`.
 
@@ -169,7 +169,7 @@ Expected: FAIL — `Pose2D` / `Twist` / `ZERO` 없음
 
 `field/__init__.py`는 `Field`, `Pose2D`, `Twist`, `ZERO`만 재수출한다.
 
-- [ ] **Step 4: 기존 soccer/heuristic 시험도 통과**
+- [x] **Step 4: 기존 soccer/heuristic 시험도 통과**
 
 ```
 python -m pytest src/rosy_games/test -q
@@ -177,7 +177,7 @@ python -m pytest src/rosy_games/test -q
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```
 git commit -m "refactor(games): split field types from pitch geometry"
@@ -209,7 +209,7 @@ Game.step(obs: Observation) -> MatchState
 
 `Observation`은 `Pose2D`를 쓴다. 하위 호환 튜플 입력은 넣지 않는다. 기존 시험을 새 타입으로 고친다.
 
-- [ ] **Step 1: 실패하는 시험 — 유실이면 HOLD**
+- [x] **Step 1: 실패하는 시험 — 유실이면 HOLD**
 
 ```python
 from rosy_games.field import Pose2D
@@ -236,17 +236,17 @@ def test_missing_ball_in_play_holds():
 
 기존 `test_reset_is_kickoff...` / `test_a_ball_in_the_away_goal...`도 `Pose2D`와 `step(obs)` 한 인자로 고친다. 골 틱에서 `actions`를 보지 않는다 — 정지는 `gate` 몫 (Task 4).
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 Expected: FAIL — `step`이 아직 actions를 받고 `HOLD`가 없음
 
-- [ ] **Step 3: `state.py` + `SoccerGame.step(obs)`**
+- [x] **Step 3: `state.py` + `SoccerGame.step(obs)`**
 
 `MatchState(phase, score, reason, scorer=None)`.
 
-- [ ] **Step 4: soccer + heuristic 시험 PASS** (heuristic는 아직 옛 `Observation`을 쓰면 이 Task에서 같이 `Pose2D`로 맞춘다)
+- [x] **Step 4: soccer + heuristic 시험 PASS** (heuristic는 아직 옛 `Observation`을 쓰면 이 Task에서 같이 `Pose2D`로 맞춘다)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```
 git commit -m "feat(games): referee holds on lost ball and drops policy actions"
@@ -274,7 +274,7 @@ gate(twists, obs, state, field) -> CommandSet
 
 한쪽 클라이언트 실패로 양쪽 `estop=True`는 **루프**(Task 6) 몫이다. gate는 기하만 본다.
 
-- [ ] **Step 1: 실패하는 시험**
+- [x] **Step 1: 실패하는 시험**
 
 ```python
 from rosy_games.field import ZERO, Field, Pose2D, Twist
@@ -304,7 +304,7 @@ def test_gate_zeros_when_not_in_play_and_clips_ramming():
     assert ram.twists["rosy_02"].linear <= 0.0
 ```
 
-- [ ] **Step 2–4: 구현, PASS, commit**
+- [x] **Step 2–4: 구현, PASS, commit**
 
 ```
 git commit -m "feat(games): clamp non-play and ramming twists in the referee gate"
@@ -327,7 +327,7 @@ Policy.act(obs, state) -> dict[robot_id, Twist]
 
 기존 `act(robot_id, observation)` 시그니처는 삭제한다. 시험 한 곳에서만 호출한다.
 
-- [ ] **Step 1–5: 실패 시험 → 구현 → 기존 추적/이격 assert를 dict 결과에 맞게 → commit**
+- [x] **Step 1–5: 실패 시험 → 구현 → 기존 추적/이격 assert를 dict 결과에 맞게 → commit**
 
 ```
 git commit -m "feat(games): policy returns twists for both robots"
@@ -366,7 +366,7 @@ else:
 
 `PlayerClient` 프로토콜은 이 Task에서 `host/transport.py`에 시그니처만 두거나 `loop.py` 옆에 둔다. HTTP는 Task 7.
 
-- [ ] **Step 1–5: TDD, commit**
+- [x] **Step 1–5: TDD, commit**
 
 ```
 git commit -m "feat(games): run the match loop against fake robots"
@@ -394,7 +394,7 @@ follow / navigation / swarm 문자열은 이 파일에 없어야 한다. 시험�
 
 4xx면 예외를 올려 루프가 양쪽 estop 하게 한다.
 
-- [ ] **Step 1–5: TDD, commit**
+- [x] **Step 1–5: TDD, commit**
 
 ```
 git commit -m "feat(games): talk to CORE with mode, teleop, and stop only"
@@ -420,7 +420,7 @@ python -m rosy_games.cli match --config src/rosy_games/config/match.yaml --dry-r
 
 `.gitignore`에 `src/rosy_games/config/match.local.yaml`을 넣는다. 실기 URL은 로컬 오버라이드.
 
-- [ ] **Step 1–5: TDD, commit**
+- [x] **Step 1–5: TDD, commit**
 
 ```
 git commit -m "feat(games): load a match config without touching the robots"
@@ -444,13 +444,13 @@ python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q
 
 카메라 없이 통과. `progress.md` LOCAL을 그 명령·증거로 GO. DEVICE/FIELD는 PARKED 유지.
 
-- [ ] **Step 1: 전체 시험**
+- [x] **Step 1: 전체 시험**
 
 Expected: PASS, `isaac` 경로 없음, Dockerfile에 `rosy_games` 없음
 
-- [ ] **Step 2: harness generate, `test/test_harness_contracts.py` PASS**
+- [x] **Step 2: harness generate, `test/test_harness_contracts.py` PASS**
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```
 git commit -m "docs(games): mark LOCAL host complete without overhead camera"
