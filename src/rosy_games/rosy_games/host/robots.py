@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -19,8 +20,21 @@ class RobotEndpoint:
     attacks: str
 
 
-def load_match(path: Path) -> tuple[Field, list[RobotEndpoint]]:
-    data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+@dataclass(frozen=True)
+class MatchSetup:
+    field: Field
+    robots: tuple[RobotEndpoint, ...]
+    game: str = "soccer"
+    policy: str = "heuristic"
+    linear: float = 0.08
+
+
+def load_match(path: Path) -> MatchSetup:
+    path = Path(path)
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    overlay = path.with_name("match.local.yaml")
+    if overlay.is_file():
+        data = _merge(data, yaml.safe_load(overlay.read_text(encoding="utf-8")) or {})
     row = data.get("field") or {}
     robots = [
         RobotEndpoint(
@@ -34,12 +48,49 @@ def load_match(path: Path) -> tuple[Field, list[RobotEndpoint]]:
     ]
     if len(robots) != 2:
         raise ValueError(f"{path}: needs exactly two robots")
+    home, away = _sides(robots)
+    limits = data.get("limits") or {}
     field = Field(
         length_m=float(row["length_m"]),
         width_m=float(row["width_m"]),
         goal_width_m=float(row["goal_width_m"]),
         min_spacing_m=float(row["min_spacing_m"]),
-        home_id=robots[0].id,
-        away_id=robots[1].id,
+        home_id=home.id,
+        away_id=away.id,
     )
-    return field, robots
+    return MatchSetup(
+        field=field,
+        robots=(home, away),
+        game=str(data.get("game") or "soccer"),
+        policy=str(data.get("policy") or "heuristic"),
+        linear=float(limits.get("linear", 0.08)),
+    )
+
+
+def _sides(robots: list[RobotEndpoint]) -> tuple[RobotEndpoint, RobotEndpoint]:
+    by_attack = {robot.attacks: robot for robot in robots}
+    try:
+        return by_attack["positive_x"], by_attack["negative_x"]
+    except KeyError as exc:
+        raise ValueError("robots need attacks positive_x and negative_x") from exc
+
+
+def _merge(base: Any, over: Any) -> Any:
+    if not isinstance(base, dict) or not isinstance(over, dict):
+        return over
+    out = dict(base)
+    for key, value in over.items():
+        if key == "robots" and isinstance(value, list) and isinstance(out.get("robots"), list):
+            by_id = {row["id"]: dict(row) for row in out["robots"]}
+            order = [row["id"] for row in out["robots"]]
+            for row in value:
+                rid = row["id"]
+                by_id[rid] = {**by_id.get(rid, {}), **row}
+                if rid not in order:
+                    order.append(rid)
+            out["robots"] = [by_id[rid] for rid in order]
+        elif key in out and isinstance(out[key], dict) and isinstance(value, dict):
+            out[key] = _merge(out[key], value)
+        else:
+            out[key] = value
+    return out

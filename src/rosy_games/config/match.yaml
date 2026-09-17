@@ -1,3 +1,5 @@
+game: soccer
+policy: heuristic
 field:
   length_m: 2.0
   width_m: 1.4

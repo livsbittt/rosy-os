@@ -12,7 +12,7 @@ class HeuristicPolicy:
     def __init__(self, field: Field | None = None, *, speed: float = 0.08) -> None:
         self.field = field or Field()
         self.speed = speed
-        self.avoid_m = 0.35
+        self.avoid_m = self.field.min_spacing_m
 
     def act(self, obs: Observation, state: MatchState) -> dict[str, Twist]:
         if state.phase is not Phase.PLAY:
@@ -38,8 +38,6 @@ class HeuristicPolicy:
 
 
 def _wrap(angle: float) -> float:
-    while angle > math.pi:
-        angle -= 2 * math.pi
-    while angle < -math.pi:
-        angle += 2 * math.pi
-    return angle
+    if not math.isfinite(angle):
+        return 0.0
+    return math.remainder(angle, 2 * math.pi)

@@ -31,6 +31,8 @@ class HttpPlayerClient:
         )
 
     def _headers(self) -> dict[str, str]:
+        if not self._ep.token:
+            return {}
         return {"Authorization": f"Bearer {self._ep.token}"}
 
     def _post(self, path: str, body: dict | None = None) -> None:
