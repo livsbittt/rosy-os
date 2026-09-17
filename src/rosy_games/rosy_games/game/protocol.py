@@ -1,23 +1,13 @@
+"""Referee contract. Policy twists stay out of step()."""
+
 from __future__ import annotations
 
-import enum
-from dataclasses import dataclass, field
-from typing import Mapping, Optional
+from typing import Protocol
 
-from rosy_games.field import Pose2D
+from rosy_games.game.state import MatchState, Observation
 
 
-class Phase(str, enum.Enum):
-    KICKOFF = "kickoff"
-    PLAY = "play"
-    HOLD = "hold"
-    GOAL = "goal"
+class Game(Protocol):
+    def reset(self) -> MatchState: ...
 
-
-@dataclass(frozen=True)
-class Observation:
-    t: float
-    ball: Optional[Pose2D]
-    robots: Mapping[str, Pose2D]
-    lost_ball: bool = False
-    lost_robots: frozenset[str] = field(default_factory=frozenset)
+    def step(self, obs: Observation) -> MatchState: ...

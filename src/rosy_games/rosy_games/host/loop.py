@@ -1,27 +1,27 @@
-"""Match loop: observe → referee → policy → gate → clients.
+"""Match loop: observe → referee → policy → gate → PlayerClient.
 
-OpenCV belongs in an ObservationSource. This file does not import rosy_core.
+OpenCV belongs in an Observer implementation, not here. PlayerClient is
+whatever talks to CORE teleop; this module does not import rosy_core.
 """
 
 from __future__ import annotations
 
-from typing import Mapping, Protocol
+from typing import Iterable, Protocol
 
-from rosy_games.field import Twist
-from rosy_games.game import SoccerGame, gate
-from rosy_games.game.protocol import Observation
-from rosy_games.game.state import MatchState
+from rosy_games.field import ZERO
+from rosy_games.game import MatchState, SoccerGame
+from rosy_games.game.gate import CommandSet, gate
+from rosy_games.host.observer import Observer
 from rosy_games.policy.heuristic import HeuristicPolicy
-
-
-class ObservationSource(Protocol):
-    def capture(self) -> Observation: ...
+from rosy_games.policy.protocol import Policy
 
 
 class PlayerClient(Protocol):
     robot_id: str
 
-    def teleop(self, twist: Twist) -> None: ...
+    def set_manual(self) -> None: ...
+
+    def teleop(self, linear: float, angular: float) -> None: ...
 
     def estop(self) -> None: ...
 
@@ -29,14 +29,14 @@ class PlayerClient(Protocol):
 class MatchHost:
     def __init__(
         self,
-        source: ObservationSource,
-        clients: Mapping[str, PlayerClient],
+        observer: Observer,
+        clients: Iterable[PlayerClient],
         *,
         game: SoccerGame | None = None,
-        policy: HeuristicPolicy | None = None,
+        policy: Policy | None = None,
     ) -> None:
-        self.source = source
-        self.clients = dict(clients)
+        self.observer = observer
+        self.clients = tuple(clients)
         self.game = game or SoccerGame()
         self.policy = policy or HeuristicPolicy(self.game.field)
 
@@ -44,24 +44,30 @@ class MatchHost:
         return self.game.reset()
 
     def tick(self) -> MatchState:
-        observation = self.source.capture()
-        state = self.game.step(observation)
-        twists = self.policy.act(observation, state)
-        try:
-            commands = gate(twists, observation, state, self.game.field)
-            if commands.estop:
-                self._estop_all()
-                return state
-            for robot_id, twist in commands.twists.items():
-                client = self.clients.get(robot_id)
-                if client is None:
-                    continue
-                client.teleop(twist)
-        except Exception:
+        obs = self.observer.observe()
+        state = self.game.step(obs)
+        twists = self.policy.act(obs, state)
+        commands = gate(twists, obs, state, self.game.field)
+        if not commands.estop:
+            try:
+                self._teleop_all(commands)
+            except Exception:
+                commands = CommandSet(twists=dict(commands.twists), estop=True)
+        if commands.estop:
             self._estop_all()
-            raise
         return state
 
+    def _teleop_all(self, commands: CommandSet) -> None:
+        for client in self.clients:
+            twist = commands.twists.get(client.robot_id, ZERO)
+            client.teleop(twist.linear, twist.angular)
+
     def _estop_all(self) -> None:
-        for client in self.clients.values():
-            client.estop()
+        errors: list[BaseException] = []
+        for client in self.clients:
+            try:
+                client.estop()
+            except Exception as exc:
+                errors.append(exc)
+        if errors:
+            raise ExceptionGroup("estop failed", errors)

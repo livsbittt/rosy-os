@@ -11,9 +11,13 @@ setup(
         ("share/" + package_name, ["package.xml"]),
         ("share/" + package_name + "/config", ["config/match.yaml"]),
     ],
-    install_requires=["setuptools", "httpx", "PyYAML"],
+    install_requires=["setuptools"],
     zip_safe=True,
     description="Laptop game host. Not a CORE RobotMode.",
     license="Apache-2.0",
-    entry_points={"console_scripts": ["rosy_games=rosy_games.cli:main"]},
+    entry_points={
+        "console_scripts": [
+            "rosy_games=rosy_games.cli:main",
+        ],
+    },
 )

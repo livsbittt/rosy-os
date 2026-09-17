@@ -3,27 +3,23 @@
 from __future__ import annotations
 
 import math
-from typing import Mapping
 
 from rosy_games.field import ZERO, Field, Twist
-from rosy_games.game.protocol import Observation, Phase
-from rosy_games.game.state import MatchState
+from rosy_games.game import MatchState, Observation, Phase
 
 
 class HeuristicPolicy:
     def __init__(self, field: Field | None = None, *, speed: float = 0.08) -> None:
         self.field = field or Field()
         self.speed = speed
+        self.avoid_m = 0.35
 
-    def act(self, observation: Observation, state: MatchState) -> Mapping[str, Twist]:
-        if state.phase is not Phase.PLAY or observation.ball is None:
-            return {robot_id: ZERO for robot_id in observation.robots}
-        return {
-            robot_id: self._one(robot_id, observation)
-            for robot_id in observation.robots
-        }
+    def act(self, obs: Observation, state: MatchState) -> dict[str, Twist]:
+        if state.phase is not Phase.PLAY:
+            return {}
+        return {robot_id: self._twist(robot_id, obs) for robot_id in obs.robots}
 
-    def _one(self, robot_id: str, observation: Observation) -> Twist:
+    def _twist(self, robot_id: str, observation: Observation) -> Twist:
         pose = observation.robots.get(robot_id)
         if pose is None or observation.ball is None:
             return ZERO
@@ -36,7 +32,7 @@ class HeuristicPolicy:
         other = next((rid for rid in observation.robots if rid != robot_id), None)
         if other is not None:
             opp = observation.robots[other]
-            if math.hypot(opp.x - pose.x, opp.y - pose.y) < self.field.avoid_m:
+            if math.hypot(opp.x - pose.x, opp.y - pose.y) < self.avoid_m:
                 drive = min(drive, 0.0)
         return Twist(linear=max(-self.speed, min(self.speed, drive)), angular=turn)
 

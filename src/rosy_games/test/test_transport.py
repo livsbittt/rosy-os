@@ -1,51 +1,100 @@
+"""HttpPlayerClient talks to CORE with mode, teleop, and stop only."""
+
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import httpx
+import pytest
 
-from rosy_games.field import Twist
-from rosy_games.host.transport import HttpPlayerClient
+from rosy_games.host.robots import RobotEndpoint
+from rosy_games.host.transport import HttpPlayerClient, PlayerClient
 
-SOURCE = Path(__file__).resolve().parents[1] / "rosy_games" / "host" / "transport.py"
+EP = RobotEndpoint(
+    id="rosy_01",
+    url="http://robot:8080",
+    token="op-token",
+    aruco_id=1,
+    attacks="positive_x",
+)
+HOST = Path(__file__).resolve().parents[1] / "rosy_games" / "host"
+
+
+def _client(handler) -> HttpPlayerClient:
+    http = httpx.Client(transport=httpx.MockTransport(handler), base_url=EP.url)
+    return HttpPlayerClient(EP, http=http)
+
+
+def test_http_player_client_exposes_player_client_surface():
+    client = _client(lambda _request: httpx.Response(200, json={}))
+    assert client.robot_id == "rosy_01"
+    assert callable(client.set_manual)
+    assert callable(client.teleop)
+    assert callable(client.estop)
+    assert PlayerClient is not None
+
+
+def test_set_manual_posts_mode_manual_with_bearer():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["method"] = request.method
+        seen["path"] = request.url.path
+        seen["body"] = json.loads(request.content)
+        seen["auth"] = request.headers.get("authorization")
+        return httpx.Response(200, json={"mode": "MANUAL"})
+
+    _client(handler).set_manual()
+    assert seen["method"] == "POST"
+    assert seen["path"] == "/api/v1/mode"
+    assert seen["body"] == {"mode": "MANUAL"}
+    assert seen["auth"] == "Bearer op-token"
+
+
+def test_teleop_posts_linear_and_angular():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["method"] = request.method
+        seen["path"] = request.url.path
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"accepted": True})
+
+    _client(handler).teleop(0.08, -0.2)
+    assert seen["method"] == "POST"
+    assert seen["path"] == "/api/v1/teleop"
+    assert seen["body"] == {"linear": 0.08, "angular": -0.2}
+
+
+def test_estop_posts_safety_stop():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["method"] = request.method
+        seen["path"] = request.url.path
+        seen["auth"] = request.headers.get("authorization")
+        return httpx.Response(200, json={"estop": True})
+
+    _client(handler).estop()
+    assert seen["method"] == "POST"
+    assert seen["path"] == "/api/v1/safety/stop"
+    assert seen["auth"] == "Bearer op-token"
+
+
+@pytest.mark.parametrize("status", [409, 500])
+def test_http_error_raises_so_the_loop_can_estop_both(status):
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status, json={"error": {"code": "HTTP"}})
+
+    with pytest.raises(Exception):
+        _client(handler).teleop(0.1, 0.0)
 
 
 def test_transport_source_has_only_mode_teleop_and_stop():
-    text = SOURCE.read_text(encoding="utf-8")
-    for banned in ("/follow", "/goal", "NavigateToPose"):
-        assert banned not in text
-
-
-def test_http_player_posts_manual_teleop_and_stop(tmp_path):
-    calls: list[tuple[str, dict | None]] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        body = request.content.decode() if request.content else None
-        calls.append((str(request.url), body))
-        if request.url.path.endswith("/mode") or request.url.path.endswith("/teleop") or request.url.path.endswith("/stop"):
-            return httpx.Response(200, json={"ok": True})
-        return httpx.Response(404)
-
-    transport = httpx.MockTransport(handler)
-    http = httpx.Client(transport=transport, base_url="http://robot")
-    player = HttpPlayerClient("rosy_01", "http://robot", "secret", client=http)
-    player.set_manual()
-    player.teleop(Twist(0.08, 0.1))
-    player.estop()
-    paths = [httpx.URL(url).path for url, _ in calls]
-    assert paths == ["/api/v1/mode", "/api/v1/teleop", "/api/v1/safety/stop"]
-    assert "MANUAL" in (calls[0][1] or "")
-    assert "0.08" in (calls[1][1] or "")
-
-
-def test_http_4xx_raises_so_the_loop_can_estop_both():
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(403, json={"error": "no"})
-
-    http = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://robot")
-    player = HttpPlayerClient("rosy_01", "http://robot", client=http)
-    try:
-        player.set_manual()
-    except httpx.HTTPStatusError:
-        return
-    raise AssertionError("expected HTTPStatusError")
+    src = (HOST / "transport.py").read_text(encoding="utf-8").lower()
+    for banned in ("follow", "navigation", "swarm"):
+        assert banned not in src
+    assert "/api/v1/mode" in src
+    assert "/api/v1/teleop" in src
+    assert "/api/v1/safety/stop" in src

@@ -1,4 +1,4 @@
-"""Non-play and ramming twists become zero. Policy is not trusted here."""
+"""Last clamp on policy twists. Geometry only; no HTTP."""
 
 from __future__ import annotations
 
@@ -7,36 +7,44 @@ from dataclasses import dataclass
 from typing import Mapping
 
 from rosy_games.field import ZERO, Field, Twist
-from rosy_games.game.protocol import Observation, Phase
-from rosy_games.game.state import MatchState
+from rosy_games.game.state import MatchState, Observation, Phase
 
 
 @dataclass(frozen=True)
 class CommandSet:
-    twists: Mapping[str, Twist]
-    estop: bool = False
+    twists: dict[str, Twist]
+    estop: bool
 
 
 def gate(
     twists: Mapping[str, Twist],
-    observation: Observation,
+    obs: Observation,
     state: MatchState,
     field: Field,
 ) -> CommandSet:
-    ids = set(observation.robots) | set(twists)
-    cleaned = {robot_id: _finite(twists.get(robot_id, ZERO)) for robot_id in ids}
+    roster = (field.home_id, field.away_id)
+    ids = tuple(dict.fromkeys((*twists, *roster)))
     if state.phase is not Phase.PLAY:
-        return CommandSet(twists={robot_id: ZERO for robot_id in cleaned}, estop=False)
-    poses = observation.robots
-    if len(poses) >= 2:
-        (id_a, a), (id_b, b) = tuple(poses.items())[:2]
-        if math.hypot(a.x - b.x, a.y - b.y) < field.avoid_m:
-            cleaned[id_a] = Twist(min(cleaned.get(id_a, ZERO).linear, 0.0), cleaned.get(id_a, ZERO).angular)
-            cleaned[id_b] = Twist(min(cleaned.get(id_b, ZERO).linear, 0.0), cleaned.get(id_b, ZERO).angular)
-    return CommandSet(twists=cleaned, estop=False)
+        return CommandSet(twists={robot_id: ZERO for robot_id in ids}, estop=False)
+
+    close = _too_close(obs, field.min_spacing_m)
+    out: dict[str, Twist] = {}
+    for robot_id in ids:
+        twist = twists.get(robot_id, ZERO)
+        if not math.isfinite(twist.linear) or not math.isfinite(twist.angular):
+            out[robot_id] = ZERO
+            continue
+        linear = min(twist.linear, 0.0) if robot_id in close else twist.linear
+        out[robot_id] = Twist(linear, twist.angular)
+    return CommandSet(twists=out, estop=False)
 
 
-def _finite(twist: Twist) -> Twist:
-    if not math.isfinite(twist.linear) or not math.isfinite(twist.angular):
-        return ZERO
-    return twist
+def _too_close(obs: Observation, spacing_m: float) -> set[str]:
+    close: set[str] = set()
+    robots = list(obs.robots.items())
+    for i, (left_id, left) in enumerate(robots):
+        for right_id, right in robots[i + 1 :]:
+            if math.hypot(right.x - left.x, right.y - left.y) < spacing_m:
+                close.add(left_id)
+                close.add(right_id)
+    return close

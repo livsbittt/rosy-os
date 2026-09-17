@@ -28,6 +28,7 @@
 ## 최근 기록
 
 - 2026-09-18 · uncommitted · docs(games): mark LOCAL host complete without overhead camera
-- 2026-09-18 · uncommitted · feat(games): CORE mode/teleop/stop client and dry-run CLI
-- 2026-09-18 · uncommitted · feat(games): referee, gate, and match loop against fakes
 - 2026-09-18 · uncommitted · chore(games): bootstrap pytest path and drop empty isaac
+- 2026-09-18 · uncommitted · feat(games): clamp non-play and ramming twists in the referee gate
+- 2026-09-18 · uncommitted · feat(games): policy returns twists for both robots
+- 2026-09-18 · uncommitted · feat(games): run the match loop against fake robots

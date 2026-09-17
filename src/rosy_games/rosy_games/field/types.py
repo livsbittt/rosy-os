@@ -1,4 +1,4 @@
-"""Shared poses and twists. No pitch numbers here."""
+"""Pose and velocity on the pitch. No camera, no ROS."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from dataclasses import dataclass
 class Pose2D:
     x: float
     y: float
-    yaw: float = 0.0
+    yaw: float
 
 
 @dataclass(frozen=True)
