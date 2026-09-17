@@ -21,6 +21,16 @@ PROFILE = ROOT / "deploy" / "robot" / "config" / "profile.hardware.yaml"
 NAV2 = ROOT / "src" / "rosy_navigation" / "params" / "nav2_params.yaml"
 
 
+def test_default_inflation_fits_the_factory_and_launch_can_override():
+    """현장 기본은 0.15 m. 좁은 미로는 gz_multi inflation_radius 로 덮어쓴다."""
+    data = yaml.safe_load(NAV2.read_text(encoding="utf-8"))
+    for costmap in ("local_costmap", "global_costmap"):
+        radius = data[costmap][costmap]["ros__parameters"]["inflation_layer"][
+            "inflation_radius"
+        ]
+        assert radius == 0.15, f"{costmap} inflation_radius={radius}"
+
+
 def test_global_planner_is_smac_and_rejects_unknown():
     """긴 통로에서 NavFn 역추적이 실패한다. 미지 공간은 지름길이 아니다."""
     data = yaml.safe_load(NAV2.read_text(encoding="utf-8"))

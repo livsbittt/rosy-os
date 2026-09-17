@@ -95,7 +95,8 @@ def _slam_config(ns: str, rosy_nav_share: str) -> dict:
     return {"/**": {"ros__parameters": params}}
 
 
-def _nav_config(ns: str, rosy_nav_share: str) -> dict:
+def _nav_config(ns: str, rosy_nav_share: str,
+                inflation_radius: float = 0.0) -> dict:
     """로봇별 nav2 파라미터.
 
     프레임 접두는 rosy_navigation 의 `apply_nav2_frame_prefix` 를 그대로 쓴다 — `map` 은
@@ -122,7 +123,15 @@ def _nav_config(ns: str, rosy_nav_share: str) -> dict:
             return [force_sim_time(v) for v in value]
         return value
 
-    return {ns: force_sim_time(apply_nav2_frame_prefix(defaults, ns))}
+    params = force_sim_time(apply_nav2_frame_prefix(defaults, ns))
+    if inflation_radius:
+        # 통로 폭은 월드마다 다르고, 팽창 반경은 그 폭에 맞춰야 한다. 좁은 통로에서는
+        # 반폭보다 크게 잡아야 경로가 중앙을 따라가고, 잡동사니가 빽빽한 방에서는
+        # 작게 잡아야 출발조차 막히지 않는다. 한 값으로 둘 다 만족시킬 수 없다.
+        for costmap in ("local_costmap", "global_costmap"):
+            layer = params[costmap][costmap]["ros__parameters"]["inflation_layer"]
+            layer["inflation_radius"] = inflation_radius
+    return {ns: params}
 
 
 def _robots_manifest(namespaces: list, api_port_base: int) -> list:
@@ -194,6 +203,7 @@ def _launch_setup(context):
     map_yaml = LaunchConfiguration("map").perform(context)
     spawn_x = float(LaunchConfiguration("spawn_x").perform(context))
     spawn_y = float(LaunchConfiguration("spawn_y").perform(context))
+    inflation_radius = float(LaunchConfiguration("inflation_radius").perform(context))
 
     gz_sim_share = get_package_share_directory("ros_gz_sim")
     rosy_gz_share = get_package_share_directory("rosy_gz_sim")
@@ -286,7 +296,8 @@ def _launch_setup(context):
         if mode == "nav":
             nav_cfg = os.path.join(bridge_dir, f"nav2_{ns}.yaml")
             with open(nav_cfg, "w", encoding="utf-8") as f:
-                yaml.safe_dump(_nav_config(ns, rosy_nav_share), f, sort_keys=False)
+                yaml.safe_dump(_nav_config(ns, rosy_nav_share, inflation_radius),
+                               f, sort_keys=False)
             nav_args = {"namespace": ns, "params_file": nav_cfg}
             if map_yaml:
                 nav_args["map"] = map_yaml
@@ -380,6 +391,9 @@ def generate_launch_description():
                               choices=["none", "nav", "slam"],
                               description="로봇별 상위 스택 (none=spawn만)"),
         DeclareLaunchArgument("headless", default_value="false"),
+        DeclareLaunchArgument("inflation_radius", default_value="0.0",
+                              description="코스트맵 팽창 반경 덮어쓰기 (0 이면 nav2_params.yaml 값). "
+                                          "좁은 통로 월드는 통로 반폭보다 크게"),
         DeclareLaunchArgument("spawn_x", default_value="0.0",
                               description="첫 로봇의 spawn x. 원점에 구조물이 있는 월드(미로 등)에서 쓴다"),
         DeclareLaunchArgument("spawn_y", default_value="0.0",

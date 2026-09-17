@@ -13,6 +13,7 @@ def test_package_and_multi_robot_launch_exist():
     assert "gz_multi" in launch or "core" in launch
     assert "rosy_core" in launch
     assert "spawn_x" in launch
+    assert "inflation_radius" in launch
 
 
 def test_world_to_map_is_installed_and_bench_worlds_exist():

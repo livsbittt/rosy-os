@@ -195,13 +195,13 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        # 팽창 반경은 통로 반폭보다 커야 한다. 0.15 m 면 1.4 m 통로의 가운데 1.1 m 가
-        # 전부 cost 0 이라 플래너가 중앙으로 붙을 이유가 없고, 최단거리로 칸막이 끝을
-        # 스치는 경로를 낸다 - 미로에서 pinky 가 벽면 4.7 cm 까지 붙어 끼었다(풋프린트
-        # 반폭 6 cm). 0.55 m 면 양쪽 팽창이 통로 가운데서 겹쳐 비용 골짜기가 생기고,
-        # 경로가 중앙을 따라가며 모서리를 넓게 돈다. 치명값은 여전히 내접 반경(6 cm)
-        # 안쪽뿐이라 0.55 m 문은 계속 지나갈 수 있다.
-        inflation_radius: 0.55
+        # 현장 값이다. 통로 반폭보다 크게 잡으면 팽창이 통로 가운데서 겹쳐 비용
+        # 골짜기가 생기고, 경로가 중앙을 따라가며 모서리를 넓게 돈다 - 1.4 m 통로의
+        # 미로는 0.55 가 있어야 pinky 가 칸막이 끝에 코를 박지 않는다. 반대로 선반
+        # 사이가 0.4 m 인 rosy_factory 에서 0.55 를 쓰면 방 전체가 고비용이 되어 두
+        # 대 다 출발조차 못 한다. 시뮬에서는 gz_multi 의 inflation_radius 인자로
+        # 월드마다 덮어쓴다.
+        inflation_radius: 0.15
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: True
@@ -267,13 +267,13 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        # 팽창 반경은 통로 반폭보다 커야 한다. 0.15 m 면 1.4 m 통로의 가운데 1.1 m 가
-        # 전부 cost 0 이라 플래너가 중앙으로 붙을 이유가 없고, 최단거리로 칸막이 끝을
-        # 스치는 경로를 낸다 - 미로에서 pinky 가 벽면 4.7 cm 까지 붙어 끼었다(풋프린트
-        # 반폭 6 cm). 0.55 m 면 양쪽 팽창이 통로 가운데서 겹쳐 비용 골짜기가 생기고,
-        # 경로가 중앙을 따라가며 모서리를 넓게 돈다. 치명값은 여전히 내접 반경(6 cm)
-        # 안쪽뿐이라 0.55 m 문은 계속 지나갈 수 있다.
-        inflation_radius: 0.55
+        # 현장 값이다. 통로 반폭보다 크게 잡으면 팽창이 통로 가운데서 겹쳐 비용
+        # 골짜기가 생기고, 경로가 중앙을 따라가며 모서리를 넓게 돈다 - 1.4 m 통로의
+        # 미로는 0.55 가 있어야 pinky 가 칸막이 끝에 코를 박지 않는다. 반대로 선반
+        # 사이가 0.4 m 인 rosy_factory 에서 0.55 를 쓰면 방 전체가 고비용이 되어 두
+        # 대 다 출발조차 못 한다. 시뮬에서는 gz_multi 의 inflation_radius 인자로
+        # 월드마다 덮어쓴다.
+        inflation_radius: 0.15
       always_send_full_costmap: True
 
 # The yaml_filename does not need to be specified since it going to be set by defaults in launch.
