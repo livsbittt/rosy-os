@@ -309,7 +309,7 @@ def _launch_setup(context):
                     launch_arguments=nav_args.items(),
                 )
             )
-        elif mode == "slam":
+        elif mode in ("slam", "slam_nav"):
             slam_cfg = os.path.join(bridge_dir, f"mapper_{ns}.yaml")
             with open(slam_cfg, "w", encoding="utf-8") as f:
                 yaml.safe_dump(_slam_config(ns, rosy_nav_share), f, sort_keys=False)
@@ -332,6 +332,41 @@ def _launch_setup(context):
                     ),
                 ])
             )
+            if mode == "slam_nav":
+                # 맵을 만들면서 그 맵 위로 주행한다. map_server 와 amcl 은 띄우지 않는다
+                # — map→odom 은 slam_toolbox 가 낸다. 이 조합이 없으면 좁은 통로 월드는
+                # 순환에 걸린다: 맵이 없어 nav2 를 못 쓰고, nav2 없이 몰면 로봇이 벽에
+                # 끼고, 끼면 바퀴가 헛돌아 odom 이 폭주하고, 그 odom 으로 뜬 맵은 못 쓴다.
+                nav_cfg = os.path.join(bridge_dir, f"nav2_{ns}.yaml")
+                with open(nav_cfg, "w", encoding="utf-8") as f:
+                    yaml.safe_dump(_nav_config(ns, rosy_nav_share, inflation_radius),
+                                   f, sort_keys=False)
+                group_actions.append(
+                    GroupAction([
+                        PushRosNamespace(ns),
+                        Node(package="rclcpp_components",
+                             executable="component_container_isolated",
+                             name="nav2_container", output="screen",
+                             parameters=[nav_cfg, {"use_sim_time": True, "autostart": True}]),
+                    ])
+                )
+                group_actions.append(
+                    GroupAction([
+                        PushRosNamespace(ns),
+                        IncludeLaunchDescription(
+                            AnyLaunchDescriptionSource(
+                                os.path.join(rosy_nav_share, "launch", "navigation_launch.xml")
+                            ),
+                            launch_arguments={
+                                "params_file": nav_cfg,
+                                "use_sim_time": "True",
+                                "autostart": "True",
+                                "use_composition": "True",
+                                "container_name": f"{ns}/nav2_container",
+                            }.items(),
+                        ),
+                    ])
+                )
 
         # 5) rosy_core (core:=true) — 로봇마다 포트·HOME·설정을 가른다.
         #    HOME 을 가르는 이유: waypoints.json 과 audit.jsonl 이 Path.home()/.rosy 에
@@ -388,8 +423,9 @@ def generate_launch_description():
                               description="namespace 접두 (rosy → rosy_01, rosy_02, ...)"),
         DeclareLaunchArgument("world_name", default_value="rosy_factory.world"),
         DeclareLaunchArgument("mode", default_value="none",
-                              choices=["none", "nav", "slam"],
-                              description="로봇별 상위 스택 (none=spawn만)"),
+                              choices=["none", "nav", "slam", "slam_nav"],
+                              description="로봇별 상위 스택. none=spawn만, nav=기존 맵 주행, "
+                                          "slam=맵 작성만, slam_nav=맵을 만들면서 그 맵 위로 주행"),
         DeclareLaunchArgument("headless", default_value="false"),
         DeclareLaunchArgument("inflation_radius", default_value="0.0",
                               description="코스트맵 팽창 반경 덮어쓰기 (0 이면 nav2_params.yaml 값). "
