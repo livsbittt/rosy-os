@@ -41,6 +41,17 @@ from rosy_fleet.swarm.transport import RobotApiError, RobotClient
 MAP_TTL_S = 10.0
 
 
+#: 대기 미션에서 화면에 보내지 않는 것. `route` 는 폴리라인이라 매 폴링마다 실어 보내면
+#: 스냅샷이 통째로 불어나고, `settled_ticks` 는 양보가 멈췄는지 세는 내부 계수기다.
+_INTERNAL_MISSION_KEYS = ("route", "settled_ticks")
+
+
+def _shown(mission: Optional[dict]) -> Optional[dict]:
+    if mission is None:
+        return None
+    return {k: v for k, v in mission.items() if k not in _INTERNAL_MISSION_KEYS}
+
+
 def _error_of(exc: BaseException) -> dict:
     """예외를 UI 가 그대로 읽을 수 있는 모양으로. 로봇이 거절한 것과 닿지 못한 것을 가른다."""
     if isinstance(exc, RobotApiError):
@@ -85,6 +96,13 @@ class FleetConsole:
         self._clearance_m = clearance_m
         self._passing_width_m = passing_width_m
         self._yield_keep_out_m = yield_keep_out_m
+        #: 비켜서라고 한 뒤 "안 움직인다"고 판단하기까지 참아 주는 스냅샷 수. 목표를 막
+        #: 받은 로봇은 아직 NAVIGATING 을 보고하지 않는다 - 한 틱만 보면 시작도 하기 전에
+        #: 실패로 읽는다.
+        self._yield_grace_ticks = 3
+        #: 상대가 목표 자리를 깔고 앉았다고 보는 거리. 두 대의 풋프린트 반지름(0.12+0.12)에
+        #: 측위 몫을 조금 더한다 - 이보다 가까우면 그 자리에 설 수 없다.
+        self._goal_blocked_m = 0.35
         #: 비켜서 있는 로봇 → 어디로, 누구를 위해. 화면이 "왜 저리로 갔는지"를 말하려면
         #: 필요하고, 비켜서기가 끝났는지 판단하는 데도 쓴다.
         self._yielding: dict[str, dict] = {}
@@ -125,16 +143,17 @@ class FleetConsole:
             queued = self._queued.get(robot_id)
             if isinstance(result, BaseException):
                 robots.append({"robot_id": robot_id, "online": False, "goal": goal,
-                               "queued": queued, "error": _error_of(result), "state": None})
+                               "queued": _shown(queued), "error": _error_of(result),
+                               "state": None})
             else:
                 robots.append({"robot_id": robot_id, "online": True, "goal": goal,
-                               "queued": queued, "error": None, "state": result})
+                               "queued": _shown(queued), "error": None, "state": result})
         self._remember(robots)
         await self._run_traffic(robots)
         # 교통 정리가 대기 미션을 내려보냈으면 이 스냅샷이 이미 그 뒤다. 행을 다시 읽지
         # 않으면 화면은 방금 출발한 미션을 한 주기 동안 계속 "대기 중"으로 보여 준다.
         for row in robots:
-            row["queued"] = self._queued.get(row["robot_id"])
+            row["queued"] = _shown(self._queued.get(row["robot_id"]))
             row["goal"] = self._goals.get(row["robot_id"])
             row["yielding"] = self._yielding.get(row["robot_id"])
         online = sum(1 for r in robots if r["online"])
@@ -209,13 +228,38 @@ class FleetConsole:
                                       "waiting_on": [blocker], "reason": "ROUTE_CONFLICT"}
             return {"accepted": True, "queued": True, "blocked_by": blocker}
 
-        standing = await self._standing_in_the_way(robot_id, route)
+        await self._observe()
+        intended = self._intended_route(robot_id, route, x, y)
+        grid = bays.Grid.from_payload(await self.map())
+        standing = self._standing_in_the_way(robot_id, intended, grid)
         if standing:
-            return await self._make_room(robot_id, x, y, yaw, route, standing)
+            return await self._make_room(robot_id, x, y, yaw, intended, standing)
         self._claims[robot_id] = route
         return result
 
-    async def _standing_in_the_way(self, mover: str, route: Sequence) -> list[str]:
+    def _intended_route(self, mover: str, route: Sequence, x: float, y: float) -> list:
+        """계획 경로. 아직 없으면 지금 자리에서 목표까지 직선으로 대신한다.
+
+        경로는 목표를 받은 **뒤** 계획기가 내야 생긴다. 그 틈에 물으면 빈 목록이 오고,
+        빈 목록은 "아무도 안 막는다"로 읽힌다 - 실측에서 폭 1 m 방의 둘째 미션이 그
+        틈으로 나가 상대 0.19 m 앞까지 밀고 들어갔다. 관제가 막았다고 말한 통로였다.
+
+        어디로 갈지는 몰라도 **어디서 어디로** 가는지는 안다. 직선은 실제 경로보다
+        넓게 잡힐 수 있지만, 그래서 생기는 손해는 넓은 데서 한 대가 잠깐 비켜서는
+        것뿐이고 - 넓은 곳은 `passing_is_possible` 이 이미 걸러 낸다 - 좁은 통로에서는
+        직선이 곧 경로다.
+        """
+        if route:
+            return traffic.thin(list(route))
+        here = self._pose_of(mover)
+        if here is None:
+            return []
+        span = math.dist(here, (x, y))
+        steps = max(1, int(span / traffic.SAMPLE_STEP_M))
+        return [(here[0] + (x - here[0]) * i / steps,
+                 here[1] + (y - here[1]) * i / steps) for i in range(steps + 1)]
+
+    def _standing_in_the_way(self, mover: str, route: Sequence, grid) -> list[str]:
         """이 경로 위에 **서서** 길을 막은 로봇들. 순서로는 풀리지 않는 쪽이다.
 
         거르는 조건이 둘이다. 달리는 로봇은 뺀다 - 그쪽은 경로 대 경로 판정이 이미 봤고,
@@ -230,9 +274,6 @@ class FleetConsole:
         """
         if not route:
             return []
-        await self._observe()
-        grid = bays.Grid.from_payload(await self.map())
-        thinned = traffic.thin(list(route))
         out = []
         for robot_id in self._order:
             if robot_id == mover or robot_id in self._claims:
@@ -240,11 +281,16 @@ class FleetConsole:
             pose = self._pose_of(robot_id)
             if pose is None:
                 continue
-            nearest = bays.nearest_on_route(thinned, pose)
+            nearest = bays.nearest_on_route(route, pose)
             if nearest is None or math.dist(nearest, pose) >= self._yield_keep_out_m:
                 continue
-            if bays.passing_is_possible(grid, thinned, pose, self._passing_width_m):
-                continue
+            # 목표 자리를 깔고 앉았으면 폭도 맵도 볼 것 없다. 지나갈 수 있느냐는 물음은
+            # 지나가려는 경우의 물음이고, 여기서는 **거기 서려고** 가는 것이다. 이 규칙은
+            # 맵이 없어도 성립한다 - 실환경에서 갓 시작한 콘솔이 아직 맵을 못 받아
+            # "지나갈 수 있다"로 떨어지자, 상대가 서 있는 좌표로 미션이 그냥 나갔다.
+            if math.dist(pose, route[-1]) >= self._goal_blocked_m:
+                if bays.passing_is_possible(grid, route, pose, self._passing_width_m):
+                    continue
             out.append(robot_id)
         return out
 
@@ -258,12 +304,13 @@ class FleetConsole:
         적어, 사람이 손을 대야 풀린다는 것을 화면이 말하게 한다.
         """
         grid = bays.Grid.from_payload(await self.map())
-        thinned = traffic.thin(list(route))
         yielded, no_space = [], []
         for robot_id in standing:
             pose = self._pose_of(robot_id)
-            bay = None if pose is None else bays.best_bay(
-                grid, thinned, pose, keep_out_m=self._yield_keep_out_m)
+            # 거리장 계산은 순수 계산이고 맵이 커지면 몇백 ms 가 된다(40x40 m, 20 m 경로에서
+            # 0.38 s). 이벤트 루프에서 돌리면 그동안 다른 로봇의 폴링까지 같이 멈춘다.
+            bay = None if pose is None else await asyncio.to_thread(
+                bays.best_bay, grid, route, pose, keep_out_m=self._yield_keep_out_m)
             if bay is None:
                 no_space.append(robot_id)
                 continue
@@ -277,7 +324,7 @@ class FleetConsole:
         blocked_by = (no_space or yielded)[0]
         self._queued[mover] = {"x": x, "y": y, "yaw": yaw, "blocked_by": blocked_by,
                                "waiting_on": list(standing), "reason": reason,
-                               "route": thinned}
+                               "route": list(route)}
         return {"accepted": True, "queued": True, "blocked_by": blocked_by,
                 "reason": reason, "yielding": yielded, "no_space": no_space}
 
@@ -336,7 +383,9 @@ class FleetConsole:
                 self._yielding.pop(robot_id, None)
         for robot_id in sorted(self._queued):
             mission = self._queued[robot_id]
-            if self._still_blocked(robot_id, mission):
+            if self._still_blocked(mission):
+                if mission.get("reason") == "YIELDING":
+                    self._check_yield_worked(mission)
                 continue
             self._queued.pop(robot_id, None)
             try:
@@ -346,8 +395,8 @@ class FleetConsole:
                 # 내린 미션이 어디로 갔는지 알 수 없다.
                 self._queued[robot_id] = mission
 
-    def _still_blocked(self, robot_id: str, mission: dict) -> bool:
-        """이 대기 미션이 아직 나가면 안 되는가.
+    def _still_blocked(self, mission: dict) -> bool:
+        """이 대기 미션이 아직 나가면 안 되는가. 묻기만 하고 아무것도 바꾸지 않는다.
 
         **비켜서기를 기다리는 미션은 기하로만 판단한다.** 남이 비켜 주기를 기다리는 A 와
         A 가 지나가기를 기다리는 B 는 서로를 블로커로 가리킨다 - "앞이 대기열에 있으면
@@ -360,6 +409,25 @@ class FleetConsole:
         # 앞이 아직 못 나갔으면 그 뒤도 못 나간다. 점유만 보면, 대기열에 들어간 순간
         # 점유가 없는 블로커를 "끝났다"고 읽고 뒤가 먼저 튀어 나간다.
         return blocker in self._claims or blocker in self._queued
+
+    def _check_yield_worked(self, mission: dict) -> None:
+        """비켜섰는데도 길이 안 열렸으면, 화면이 그렇게 말하게 한다.
+
+        **이유를 바꾸는 것 말고는 아무것도 하지 않는다.** 로봇을 더 밀어내지 않는 이유는,
+        한 번 비켜서고도 부족했다는 것이 곧 이 맵에 자리가 없다는 뜻이기 때문이다. 더
+        멀리 보내면 벽에 붙을 때까지 같은 일이 반복된다.
+
+        이 검사가 없으면 화면은 "물러나면 자동 출발합니다"를 영원히 띄운다 - 실측에서
+        2x1 m 방의 두 대가 그 문장 아래서 한없이 서 있었다. 대기 자체는 맞다(물리가
+        그렇다). 거짓말은 곧 풀린다고 말한 쪽이다.
+        """
+        if any((self._seen.get(rid) or {}).get("navigation") == "NAVIGATING"
+               for rid in mission.get("waiting_on", [])):
+            return          # 아직 비켜서는 중이다
+        # 상태가 아직 안 올라온 첫 몇 틱을 "멈췄다"로 읽지 않는다.
+        mission["settled_ticks"] = mission.get("settled_ticks", 0) + 1
+        if mission["settled_ticks"] >= self._yield_grace_ticks:
+            mission["reason"] = "NO_YIELD_SPACE"
 
     def _route_still_occupied(self, mission: dict) -> bool:
         """비켜서라고 한 로봇들이 아직 내 경로 위에 있는가."""

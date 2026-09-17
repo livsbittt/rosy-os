@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from fakes import FakeRobot, run
 from test_server_bays import ALCOVE, CORRIDOR, HALL, payload
-from rosy_fleet.server import bays
 from rosy_fleet.server.console import FleetConsole
 from rosy_fleet.swarm.robots import RobotEndpoint
 
@@ -34,6 +33,8 @@ class SimRobot(FakeRobot):
                          state={"robot_id": robot_id, "navigation": "IDLE", "map_id": "m1",
                                 "pose": {"x": xy[0], "y": xy[1], "yaw": 0.0}})
         self._target = None
+        #: 거짓이면 목표를 받아도 경로를 내지 않는다 — 계획기가 아직 늦은 상태.
+        self.plans = True
 
     @property
     def xy(self):
@@ -42,7 +43,7 @@ class SimRobot(FakeRobot):
 
     async def navigation_goal(self, x: float, y: float, yaw: float) -> dict:
         result = await super().navigation_goal(x, y, yaw)
-        self._path = _line(self.xy[0], self.xy[1], x, y)
+        self._path = _line(self.xy[0], self.xy[1], x, y) if self.plans else []
         self._state = {**self._state, "navigation": "NAVIGATING"}
         self._target = (x, y)
         return result
@@ -180,6 +181,47 @@ def test_a_corridor_without_a_bay_says_so_instead_of_pretending():
     assert _goals(right) == []                        # 아무 데로도 보내지 않았다
 
 
+def test_neither_half_of_an_impossible_swap_drives_into_the_other_robot():
+    """실측 — 폭 1 m 방에서 둘째 미션이 나가 상대 0.19 m 앞까지 밀고 들어갔다.
+
+    자리가 없다고 첫 미션을 세워 놓고 둘째는 내보내면, 관제가 막았다고 말한 그 통로로
+    로봇이 들어간다. 사람이 보기에는 관제가 거짓말을 한 것이다.
+    """
+    left, right, console = _corridor(CORRIDOR)
+
+    run(console.goal("rosy_01", 2.2, 0.6))            # rosy_02 가 막았다 — 자리 없음
+    second = run(console.goal("rosy_02", 0.4, 0.6))   # 이제 rosy_01 이 막는다
+
+    assert second["queued"] is True
+    assert second["reason"] == "NO_YIELD_SPACE"
+    assert ("navigation_cancel",) in right.calls
+    assert all(r["queued"] is not None for r in run(console.snapshot())["robots"])
+
+
+def test_a_robot_with_no_plan_yet_is_still_checked_against_who_is_standing_there():
+    """실측에서 이 틈으로 로봇이 들어갔다 — 계획 경로는 목표를 받은 뒤에야 생긴다.
+
+    빈 경로를 "아무도 안 막는다"로 읽으면, 계획기가 몇백 ms 늦은 것만으로 관제의 판단이
+    통째로 건너뛰어진다. 어디로 갈지는 몰라도 어디서 어디로 가는지는 안다.
+    """
+    left, right, console = _corridor(CORRIDOR)
+    left.plans = False                                 # 계획기가 아직 경로를 못 냈다
+
+    result = run(console.goal("rosy_01", 2.2, 0.6))
+
+    assert result["queued"] is True and result["reason"] == "NO_YIELD_SPACE"
+    assert ("navigation_cancel",) in left.calls
+
+
+def test_a_robot_with_no_plan_yet_still_yields_when_there_is_a_bay():
+    left, right, console = _corridor()
+    left.plans = False
+
+    result = run(console.goal("rosy_01", 2.2, 0.6))
+
+    assert result["reason"] == "YIELDING" and result["yielding"] == ["rosy_02"]
+
+
 def test_a_mission_blocked_with_no_space_is_released_when_the_way_clears():
     """사람이 손을 대 로봇을 치우면 미션은 저절로 나가야 한다 — 다시 내리게 하면 안 된다."""
     left, right, console = _corridor(CORRIDOR)
@@ -192,6 +234,39 @@ def test_a_mission_blocked_with_no_space_is_released_when_the_way_clears():
 
     assert row["queued"] is None
     assert _goals(left) == [(2.2, 0.6), (2.2, 0.6)]
+
+
+def test_a_yield_that_did_not_open_the_way_stops_promising_it_will():
+    """실측에서 온 시험 — 2x1 m 방의 두 대가 "물러나면 자동 출발합니다" 아래서 한없이 섰다.
+
+    기다리는 것 자체는 맞다(물리가 그렇다). 거짓말은 곧 풀린다고 말한 쪽이다. 비켜선
+    로봇이 멈췄는데도 길이 안 열렸으면 화면은 사람을 불러야 한다.
+    """
+    left, right, console = _corridor()
+    run(console.goal("rosy_01", 2.2, 0.6))
+    assert _row(run(console.snapshot()), "rosy_01")["queued"]["reason"] == "YIELDING"
+
+    # 비켜서긴 했는데 충분히 못 갔다 — 목표에 못 미쳐 서는 실제 장면이다.
+    right._state = {"robot_id": "rosy_02", "navigation": "ARRIVED", "map_id": "m1",
+                    "pose": {"x": 1.25, "y": 0.9, "yaw": 0.0}}
+    right._target = None
+    for _ in range(4):
+        run(console.snapshot())
+
+    row = _row(run(console.snapshot()), "rosy_01")
+    assert row["queued"]["reason"] == "NO_YIELD_SPACE"
+    assert _goals(left) == [(2.2, 0.6)]        # 여전히 안 보낸다 — 길이 실제로 막혔다
+
+
+def test_a_yield_still_in_progress_is_not_called_a_failure():
+    """움직이는 중인 로봇을 실패로 읽으면, 잘 되던 양보가 매번 경고로 끝난다."""
+    left, right, console = _corridor()
+    run(console.goal("rosy_01", 2.2, 0.6))
+
+    for _ in range(6):
+        run(console.snapshot())               # rosy_02 는 계속 NAVIGATING
+
+    assert _row(run(console.snapshot()), "rosy_01")["queued"]["reason"] == "YIELDING"
 
 
 # --- 끼어들지 않아야 할 때 --------------------------------------------------------
@@ -227,16 +302,34 @@ def test_a_robot_parked_on_the_goal_is_moved_even_in_a_wide_hall():
     assert _goals(on_goal), "넓은 방에는 비켜설 자리가 얼마든지 있다"
 
 
-def test_without_a_map_the_console_does_not_move_anyone_aside():
+def test_without_a_map_nobody_is_moved_aside_merely_for_being_near_the_route():
     """맵을 못 읽었다는 이유로 로봇을 옮기면, 그 좌표에 무엇이 있는지 아무도 모른다."""
     left = SimRobot("rosy_01", (0.4, 0.6), None)
-    right = SimRobot("rosy_02", (2.2, 0.6), None)
-    console = _console(left, right)
+    beside = SimRobot("rosy_02", (1.3, 0.75), None)
+    console = _console(left, beside)
 
     result = run(console.goal("rosy_01", 2.2, 0.6))
 
     assert "queued" not in result
-    assert _goals(right) == []
+    assert _goals(beside) == []
+
+
+def test_a_robot_sitting_on_the_goal_blocks_it_even_with_no_map_at_all():
+    """실측에서 온 규칙 — 갓 시작한 콘솔이 맵을 못 받자 미션이 상대 좌표로 그냥 나갔다.
+
+    "지나갈 수 있는가"는 지나가려는 경우의 물음이다. 목표 자리를 깔고 앉은 로봇에게는
+    폭도 맵도 상관없다 - 거기에는 두 대가 설 수 없다.
+    """
+    left = SimRobot("rosy_01", (0.4, 0.6), None)
+    on_goal = SimRobot("rosy_02", (2.2, 0.6), None)
+    console = _console(left, on_goal)
+
+    result = run(console.goal("rosy_01", 2.2, 0.6))
+
+    assert result["queued"] is True
+    # 맵이 없으면 비켜설 자리도 고를 수 없다 — 그래서 사람을 부른다.
+    assert result["reason"] == "NO_YIELD_SPACE"
+    assert _goals(on_goal) == []
 
 
 def test_a_robot_without_a_pose_is_never_ordered_to_yield():
@@ -299,6 +392,17 @@ def test_the_snapshot_says_who_is_yielding_and_for_whom():
     assert row["yielding"]["bay"]["y"] > 1.0
     waiting = _row(run(console.snapshot()), "rosy_01")
     assert waiting["queued"]["reason"] == "YIELDING"
+
+
+def test_the_snapshot_does_not_carry_the_stored_route_to_the_browser():
+    """경로 폴리라인을 매 폴링마다 실어 보내면 스냅샷이 통째로 불어난다."""
+    left, right, console = _corridor()
+    run(console.goal("rosy_01", 2.2, 0.6))
+
+    queued = _row(run(console.snapshot()), "rosy_01")["queued"]
+
+    assert "route" not in queued and "settled_ticks" not in queued
+    assert queued["reason"] == "YIELDING"         # 운영자가 볼 것은 남아 있다
 
 
 def _row(snapshot, robot_id):

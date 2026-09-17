@@ -56,6 +56,19 @@ MAX_DETOUR_M = 3.0
 #: 통로를 아직 좁힌다 - 0.5 m 더 들어가는 값으로 지나가는 쪽이 훨씬 편해진다.
 BAY_SLACK_M = 0.5
 
+#: 대피 지점은 해제 기준(`keep_out_m`)보다 **이만큼 더** 멀어야 한다.
+#:
+#: 이것이 없으면 교착이 생긴다. 실측 - 2x1 m 방에서 경로로부터 0.48 m 떨어진 자리를
+#: 골랐는데(기준 0.45 통과), 로봇은 목표에 0.13 m 못 미쳐 섰고 AMCL 은 0.18 m 틀렸다.
+#: 보고 위치는 경로에서 0.18 m 였고, 기다리던 미션의 해제 조건은 "0.45 m 밖"이었다.
+#: 둘 다 영원히 서서 화면은 "물러나면 자동 출발합니다"라고 거짓말을 했다.
+#:
+#: 값은 그 실측과 반대쪽 실측 사이에서 고른다. 문제가 된 자리는 0.48 m 였고, 폭 1 m
+#: 통로 옆 0.3 m 벽감의 자리는 0.65 m 다 - 뒤쪽은 살려야 한다. 0.15 는 앞을 버리고 뒤를
+#: 남긴다. 이 값으로도 못 막는 경우는 콘솔의 `_check_yield_worked` 가 받는다 - 여백을
+#: 더 키우면 쓸 만한 벽감이 통째로 탈락하고, 자리가 있는 맵에서도 "자리 없음"이 된다.
+BAY_MARGIN_M = 0.15
+
 #: 자유 폭은 이 위로는 재지 않는다. 넓은 방 한가운데의 정확한 값은 쓸 데가 없고,
 #: 상한이 있어야 거리장을 계산할 창을 유한하게 잡을 수 있다.
 CAP_M = 1.5
@@ -162,8 +175,9 @@ def _window_for(grid: Grid, points: Iterable[Point], reach_m: float,
 def _clearance_field(grid: Grid, window: _Window) -> list[float]:
     """창 안 각 칸에서 가장 가까운 막힌 칸까지의 거리(m).
 
-    8SSED - 벡터를 두 번 훑으며 전파한다. 유클리드 거리 변환을 격자 크기에 비례하는
-    비용으로 얻는다. 여기 창은 통로 하나 크기라 수천 칸이면 충분하다.
+    8SSED - 벡터를 두 번 훑으며 전파한다. 유클리드 거리 변환을 창 크기에 비례하는 비용으로
+    얻는다. 창은 경로 길이가 정한다 - 실측으로 공장 맵(4x3 m) 전체가 47 ms, 40x40 m 맵의
+    20 m 경로가 0.38 s 다. 그래서 호출하는 쪽은 이것을 스레드로 넘긴다.
     """
     w, h = window.w, window.h
     far = 1 << 14
@@ -259,18 +273,27 @@ def passing_is_possible(grid: Optional[Grid], route: Sequence[Point], point: Poi
     meeting = nearest_on_route(route, point)
     if meeting is None:
         return True
-    return free_width_at(grid, meeting) >= passing_width_m
+    width = free_width_at(grid, meeting)
+    if width <= 0.0:
+        # 만나는 지점이 벽 속이면 경로에 대한 우리 짐작이 틀린 것이다 - 계획 경로가 아직
+        # 없어 직선으로 대신할 때 모서리를 가로지르면 이렇게 된다. 벽에 대한 짐작을
+        # 근거로 로봇을 옮기지는 않는다.
+        return True
+    return width >= passing_width_m
 
 
 def best_bay(grid: Optional[Grid], route: Sequence[Point], robot_xy: Point, *,
              keep_out_m: float, robot_radius_m: float = ROBOT_RADIUS_M,
              max_detour_m: float = MAX_DETOUR_M,
-             slack_m: float = BAY_SLACK_M) -> Optional[Point]:
+             slack_m: float = BAY_SLACK_M,
+             margin_m: float = BAY_MARGIN_M) -> Optional[Point]:
     """`robot_xy` 에 선 로봇이 `route` 를 비켜 줄 가장 가까운 자리. 없으면 `None`.
 
-    고르는 조건 셋. 로봇이 설 만큼 넓고(`robot_radius_m`), 경로에서 `keep_out_m` 이상
-    떨어져 있고, 지금 자리에서 좁은 목을 지나지 않고 갈 수 있어야 한다. 마지막 조건이
-    없으면 벽 건너편의 넓은 자리를 골라 놓고 로봇은 영영 도착하지 못한다.
+    고르는 조건 셋. 로봇이 설 만큼 넓고(`robot_radius_m`), 경로에서
+    `keep_out_m + margin_m` 이상 떨어져 있고, 지금 자리에서 좁은 목을 지나지 않고 갈 수
+    있어야 한다. 마지막 조건이 없으면 벽 건너편의 넓은 자리를 골라 놓고 로봇은 영영
+    도착하지 못한다. 가운데 조건에 `margin_m` 이 붙은 이유는 `BAY_MARGIN_M` 에 적었다 -
+    해제 기준과 같은 값으로 자리를 고르면 교착이 생긴다.
 
     다익스트라를 쓰는 이유는 하나다 - 비용이 낮은 칸부터 나오므로 창 전체를 훑지 않고도
     가까운 후보부터 손에 넣는다. 다만 **첫 후보를 그대로 쓰지는 않는다.** 가장 가까운
@@ -294,6 +317,7 @@ def best_bay(grid: Optional[Grid], route: Sequence[Point], robot_xy: Point, *,
         # 근거가 없다. 조용히 아무 데나 보내는 것보다 모른다고 하는 편이 낫다.
         return None
 
+    needed = keep_out_m + margin_m
     res = grid.resolution
     seen: set[Cell] = set()
     # 출발 칸은 여유 조건을 묻지 않고 넣는다 - 로봇은 이미 거기 서 있다. 맵 잡음 때문에
@@ -313,7 +337,7 @@ def best_bay(grid: Optional[Grid], route: Sequence[Point], robot_xy: Point, *,
         if cost > 0.0 and clearance(cx, cy) >= robot_radius_m:
             nearest = nearest_on_route(route, point)
             off_route = math.inf if nearest is None else math.dist(nearest, point)
-            if off_route >= keep_out_m:
+            if off_route >= needed:
                 if best is None:
                     # 첫 후보가 나왔다. 이제부터는 조금 더 들어간 자리를 찾을 여지만 본다.
                     budget = min(budget, cost + slack_m)

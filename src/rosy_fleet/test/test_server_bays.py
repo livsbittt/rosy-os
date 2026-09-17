@@ -163,6 +163,17 @@ def test_without_a_map_passing_is_assumed_possible():
     assert bays.passing_is_possible(None, _line(0, 0, 2, 0), (1.0, 0.0))
 
 
+def test_a_route_that_runs_through_a_wall_never_forces_a_yield():
+    """계획 경로가 아직 없어 직선으로 대신할 때, 그 직선은 모서리를 가로지를 수 있다.
+
+    그때 만나는 지점은 벽 속이고 자유 폭은 0 이다. 그것을 "못 지나간다"로 읽으면 벽에
+    대한 짐작을 근거로 멀쩡한 로봇을 구석으로 보낸다.
+    """
+    grid = _grid(ALCOVE)
+    through_wall = _line(1.25, 0.55, 1.25, 1.45)      # 벽감 위쪽 벽을 뚫고 나가는 직선
+    assert bays.passing_is_possible(grid, through_wall, (1.25, 1.45))
+
+
 def test_an_empty_route_never_forces_a_yield():
     grid = _grid(CORRIDOR)
     assert bays.passing_is_possible(grid, [], (1.3, 0.55))
@@ -215,6 +226,32 @@ def test_the_nearest_bay_wins():
     assert near is not None
     # 벽감 입구 쪽이지 깊숙한 안쪽이 아니다 — 들어간 만큼 되나와야 하기 때문이다.
     assert near[1] < 1.5
+
+
+def test_a_bay_must_be_further_than_the_release_radius():
+    """실측에서 온 조건이다 — 딱 기준선에 걸친 자리를 고르면 교착이 생긴다.
+
+    2x1 m 방에서 경로로부터 0.48 m 떨어진 자리를 골랐고(기준 0.45 통과), 로봇은 목표에
+    0.13 m 못 미쳐 섰고 AMCL 은 0.18 m 틀렸다. 보고 위치는 경로에서 0.18 m 였고 기다리던
+    미션의 해제 조건은 "0.45 m 밖"이라 문이 영영 열리지 않았다.
+    """
+    grid = _grid(ALCOVE)
+    route = _line(0.2, 0.55, 2.4, 0.55)
+
+    bay = bays.best_bay(grid, route, (1.25, 0.55), keep_out_m=bays.YIELD_KEEP_OUT_M)
+
+    assert bay is not None
+    off_route = math.dist(bays.nearest_on_route(route, bay), bay)
+    assert off_route >= bays.YIELD_KEEP_OUT_M + bays.BAY_MARGIN_M
+
+
+def test_the_margin_rejects_a_bay_that_only_just_clears_the_release_line():
+    """여백이 하는 일 자체. 0.70 m 자리는 기준 0.65 를 통과하지만 여유가 0.05 뿐이다."""
+    grid = _grid(ALCOVE)
+    route = _line(0.2, 0.55, 2.4, 0.55)
+
+    assert bays.best_bay(grid, route, (1.25, 0.55), keep_out_m=0.65, margin_m=0.0) is not None
+    assert bays.best_bay(grid, route, (1.25, 0.55), keep_out_m=0.65) is None
 
 
 def test_a_pose_inside_a_wall_yields_no_bay():

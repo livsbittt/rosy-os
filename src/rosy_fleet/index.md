@@ -39,8 +39,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · fix(server): 실환경이 비켜서기의 결함 넷을 드러냈다 (그리고 고친 뒤 맞바꾸기가 끝까지 돌았다)
 - 2026-09-17 · uncommitted · test(swarm): Task 14 sim bench 를 끝까지 돌려 HOLD 지연을 실측
 - 2026-09-17 · uncommitted · feat(server): 관제 화면에서 대형을 열고 닫는다
 - 2026-09-17 · uncommitted · feat(server): 좁은 통로 교행을 Fleet 이 정리한다
 - 2026-09-17 · uncommitted · feat(server): Fleet 서버 v1 — N대 관제 UI와 로봇별 미션 하달
-- 2026-09-16 · uncommitted · docs(harness): park the site-PC deployment gates
