@@ -63,6 +63,7 @@ ROSY OS uses six primary domain objects:
 | 13 | Current-to-Target Migration | Refactoring plan |
 | 14 | Verification & Acceptance | v1 validation criteria |
 | 15 | Ubuntu Modular Installation | Package/profile installation design |
+| 16 | Interface Design Principles | Human-facing surfaces: shared laws, per-surface grammar |
 
 ## Current mapping (2026-09-17)
 
@@ -86,6 +87,7 @@ ROSY OS uses six primary domain objects:
 | 13 Current-to-target | Phase 0–3 live; 4–5 = D-71 | D-65, D-71 | Phase 0–3 live |
 | 14 Verification | Device validation ARTIFACT/DEVICE/FIELD | D-71 | Device GO not claimed |
 | 15 Ubuntu modular install | D-62 slices, not apt/`rosyctl` | D-62, D-69, D-71 | apt path **not v1** |
+| 16 Interface design principles | console + device runtime on `/dashboard`; Fleet surface and composite rules are target | D-23, D-68, D-71, **D-72**, D-75 | L1 colour contracts live |
 
 ## First Refactoring Priority
 
