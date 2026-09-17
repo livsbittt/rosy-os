@@ -39,7 +39,8 @@
 
 ## 최근 기록
 
+- 2026-09-17 · uncommitted · test(swarm): Task 14 sim bench 를 끝까지 돌려 HOLD 지연을 실측
+- 2026-09-17 · uncommitted · feat(server): 관제 화면에서 대형을 열고 닫는다
+- 2026-09-17 · uncommitted · feat(server): 좁은 통로 교행을 Fleet 이 정리한다
 - 2026-09-17 · uncommitted · feat(server): Fleet 서버 v1 — N대 관제 UI와 로봇별 미션 하달
 - 2026-09-16 · uncommitted · docs(harness): park the site-PC deployment gates
-- 2026-09-16 · uncommitted · docs(harness): hold the unrun formation sim bench
-- 2026-09-15 · uncommitted · docs(harness): start the rosy_fleet harness record

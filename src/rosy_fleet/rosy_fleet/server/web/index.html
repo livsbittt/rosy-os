@@ -45,6 +45,37 @@
       <p class="eyebrow">ROBOTS</p>
       <h2 id="roster-heading">등록 로봇</h2>
       <div id="roster" class="roster"></div>
+
+      <div class="formation" aria-labelledby="formation-heading">
+        <div class="robot-head">
+          <b id="formation-heading">대형</b>
+          <span class="spacer"></span>
+          <span id="formation-state" class="tag">IDLE</span>
+        </div>
+        <div class="formation-form">
+          <label for="formation-leader">리더</label>
+          <select id="formation-leader"></select>
+          <label for="formation-shape">모양</label>
+          <select id="formation-shape">
+            <option value="COLUMN">COLUMN 종대</option>
+            <option value="LINE">LINE 횡대</option>
+            <option value="V">V</option>
+            <option value="GRID">GRID</option>
+            <option value="CIRCLE">CIRCLE</option>
+            <option value="FOLLOW">FOLLOW</option>
+          </select>
+          <label for="formation-spacing">간격 m</label>
+          <input id="formation-spacing" type="number" min="0.2" max="3" step="0.1" value="0.6">
+        </div>
+        <div class="robot-actions">
+          <button id="formation-start" type="button">무장</button>
+          <button id="formation-reform" type="button">대형 변경</button>
+          <button id="formation-resume" type="button">재개</button>
+          <button id="formation-stop" type="button">해제</button>
+        </div>
+        <p class="hint" id="formation-detail">리더를 고르고 무장하면 나머지가 슬롯으로 따라붙습니다.</p>
+      </div>
+
       <div id="log" class="log" role="status" aria-live="polite"></div>
     </section>
   </main>

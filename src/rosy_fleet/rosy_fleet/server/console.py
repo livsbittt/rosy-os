@@ -23,8 +23,15 @@ import asyncio
 import time
 from typing import Any, Callable, Optional, Sequence
 
+from rosy_fleet.formation.geometry import DEFAULT_SPACING, Formation
 from rosy_fleet.hub.hub import HubError, SiteHub
 from rosy_fleet.server import traffic
+from rosy_fleet.swarm.session import (
+    FormationSession,
+    FormationSpec,
+    SessionError,
+    SessionState,
+)
 from rosy_fleet.swarm.robots import RobotEndpoint
 from rosy_fleet.swarm.transport import RobotApiError, RobotClient
 
@@ -52,6 +59,7 @@ class FleetConsole:
         map_ttl_s: float = MAP_TTL_S,
         fleet_name: str = "rosy-site",
         clearance_m: float = traffic.DEFAULT_CLEARANCE_M,
+        relay_factory=None,
     ) -> None:
         if len(endpoints) != len(clients):
             raise ValueError("endpoints and clients must line up one for one")
@@ -72,6 +80,12 @@ class FleetConsole:
         #: 남의 경로와 부딪혀 아직 못 내려간 미션. 앞이 비면 그대로 다시 내려간다.
         self._queued: dict[str, dict] = {}
         self._clearance_m = clearance_m
+        #: 열려 있는 대형 세션. 한 사이트에 하나다 - 같은 로봇이 두 대형에 들어가면
+        #: 어느 리더를 따라야 하는지 로봇 쪽에서 정할 방법이 없다.
+        self._formation = None
+        self._formation_leader = None
+        #: 시험이 가짜 릴레이를 끼우는 자리. 운용에서는 None 이라 세션의 기본값을 쓴다.
+        self._relay_factory = relay_factory
         self.fleet_name = fleet_name
         # e-stop 은 hub 의 scatter 를 그대로 쓴다 — 흩뿌림의 규칙을 두 군데 두지 않는다.
         self._hub = SiteHub(list(endpoints), dict(self._clients), fleet_name=fleet_name)
@@ -149,6 +163,11 @@ class FleetConsole:
         양보는 늘 **나중에 내려온 미션** 쪽이다. 달리던 로봇을 세우면 좁은 통로 한가운데
         멈춘 장애물이 하나 생길 뿐이고, 그 로봇이 비켜설 자리는 애초에 없다.
         """
+        if robot_id in self._formation_members():
+            # 팔로워는 리더 pose 를 따라가는 중이다. 여기에 목표를 따로 내리면 로봇 안에서
+            # 두 임자가 같은 바퀴를 두고 다툰다 - 대형을 풀고 보내라고 돌려준다.
+            raise HubError("FORMATION_ACTIVE",
+                           f"{robot_id} is in the running formation; stop it first")
         result = await self._client(robot_id).navigation_goal(x, y, yaw)
         # 로봇이 받아들인 뒤에만 기억한다 — 거절된 목표가 화면에 남으면 운영자는 가지도
         # 않을 곳으로 로봇이 간다고 읽는다.
@@ -206,6 +225,14 @@ class FleetConsole:
         움직이는 것이 이 버튼에서 가장 나쁜 결과다. 로봇 쪽 e-stop 과 deadman 은 관제와
         무관하게 살아 있다(설계 §3).
         """
+        # 대형이 살아 있으면 먼저 푼다. 릴레이가 참조를 계속 밀어 넣는 채로 로봇만 세우면,
+        # e-stop 을 푸는 순간 팔로워가 밀린 참조를 향해 달려나간다.
+        if self._formation is not None and self._formation_members():
+            try:
+                await self._formation.stop()
+            except Exception:
+                pass
+            self._formation_leader = None
         results = await asyncio.gather(
             *(self._hub.scatter_estop(rid) for rid in self._order),
             return_exceptions=True,
@@ -222,6 +249,117 @@ class FleetConsole:
                 self._queued.pop(robot_id, None)
                 rows.append({"robot_id": robot_id, "stopped": True, "result": result})
         return {"stopped": sum(1 for r in rows if r["stopped"]), "total": len(rows), "robots": rows}
+
+    # --- 대형 (FOR-004) --------------------------------------------------------
+
+    def _formation_members(self) -> set:
+        """개별 미션을 받으면 안 되는 로봇 = 팔로워.
+
+        **리더는 넣지 않는다.** 대형은 리더를 몰아서 움직이는 것이고(D-20: 오케스트레이션은
+        Fleet, 폐루프 추종은 로봇), 리더가 목표를 못 받으면 대형은 무장만 된 채 아무 데도
+        가지 못한다. 팔로워는 반대다 - 리더 pose 를 따라가는 중이라 목표를 따로 받으면
+        로봇 안에서 두 임자가 같은 바퀴를 두고 다툰다.
+        """
+        session = self._formation
+        if session is None or session.state in (SessionState.STOPPED, SessionState.IDLE):
+            return set()
+        return set(session.assignment)
+
+    def formation_status(self) -> dict:
+        """화면이 읽는 대형 상태. 세션이 없으면 `active: False` 하나다."""
+        session = self._formation
+        if session is None:
+            return {"active": False, "state": "IDLE"}
+        stats = session.relay.stats() if session.relay is not None else None
+        return {
+            "active": session.state in (SessionState.ARMING, SessionState.RUNNING,
+                                        SessionState.HOLDING),
+            "state": session.state.value,
+            "leader": self._formation_leader,
+            "formation": session.spec.formation.value,
+            "spacing": session.spec.spacing,
+            "assignment": {rid: {"distance": slot.distance, "lateral": slot.lateral}
+                           for rid, slot in session.assignment.items()},
+            # HOLDING 인데 이유가 비어 있으면 운영자는 왜 멈췄는지 알 길이 없다.
+            "reason": list(session.reason) if session.reason else None,
+            "pending_triggers": [list(t) for t in session.pending_triggers],
+            "relay": None if stats is None else {
+                "paused": stats.paused,
+                "leader_rx_hz": round(stats.leader_rx_hz, 2),
+                "leader_age_s": stats.leader_age_s,
+                "leader_last_error": stats.leader_last_error,
+                "follower_tx_hz": {k: round(v, 2) for k, v in stats.follower_tx_hz.items()},
+                "follower_connected": dict(stats.follower_connected),
+            },
+        }
+
+    def _spec(self, formation: str, spacing, max_speed) -> FormationSpec:
+        try:
+            shape = Formation(formation)
+        except ValueError as exc:
+            raise HubError("UNKNOWN_FORMATION", f"{formation} is not a formation") from exc
+        current = self._formation.spec if self._formation is not None else None
+        if max_speed is None:
+            max_speed = current.max_speed if current is not None else 0.15
+        return FormationSpec(
+            formation=shape,
+            spacing=DEFAULT_SPACING if spacing is None else spacing,
+            max_speed=max_speed,
+        )
+
+    async def formation_start(self, leader_id: str, formation: str = "COLUMN",
+                              spacing=None, max_speed=None) -> dict:
+        """리더 하나와 나머지 전원으로 대형을 연다.
+
+        이미 열려 있으면 거절한다. 조용히 갈아치우면 앞 세션의 팔로워가 무장된 채로
+        남고, 그 로봇은 아무도 보내지 않는 참조를 기다리며 서 있게 된다.
+        """
+        if self._formation_members():
+            raise HubError("FORMATION_ACTIVE", "a formation is already running; stop it first")
+        leader = self._client(leader_id)
+        followers = [self._clients[rid] for rid in self._order if rid != leader_id]
+        if not followers:
+            raise HubError("NO_FOLLOWERS", "a formation needs at least one follower")
+        kwargs = {} if self._relay_factory is None else {"relay_factory": self._relay_factory}
+        session = FormationSession(leader, followers,
+                                   self._spec(formation, spacing, max_speed), **kwargs)
+        self._formation = session
+        self._formation_leader = leader_id
+        try:
+            await session.start()
+        except SessionError as exc:
+            # 세션이 자기 안에서 이미 무장을 되돌렸다. 상태는 남겨 화면이 이유를 읽게 한다.
+            raise HubError("ARMING_FAILED", str(exc)) from exc
+        return self.formation_status()
+
+    async def formation_reform(self, formation: str, spacing=None) -> dict:
+        session = self._formation
+        if session is None or session.state is SessionState.STOPPED:
+            raise HubError("NO_FORMATION", "no formation to reform")
+        try:
+            await session.reform(self._spec(formation, spacing, None))
+        except SessionError as exc:
+            raise HubError("REFORM_REFUSED", str(exc)) from exc
+        return self.formation_status()
+
+    async def formation_resume(self) -> dict:
+        session = self._formation
+        if session is None:
+            raise HubError("NO_FORMATION", "no formation to resume")
+        try:
+            await session.resume()
+        except SessionError as exc:
+            raise HubError("RESUME_REFUSED", str(exc)) from exc
+        return self.formation_status()
+
+    async def formation_stop(self) -> dict:
+        session = self._formation
+        if session is None:
+            return {"active": False, "state": "IDLE"}
+        await session.stop()
+        status = self.formation_status()
+        self._formation_leader = None
+        return status
 
     async def aclose(self) -> None:
         for client in self._clients.values():
