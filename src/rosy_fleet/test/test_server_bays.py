@@ -144,6 +144,17 @@ def test_a_point_inside_a_wall_has_no_free_width():
 # --- 그냥 지나갈 수 있는가 --------------------------------------------------------
 
 
+def test_the_passing_width_sits_between_the_measured_pass_and_fail():
+    """스윕 실측을 상수에 묶어 둔다 — 근거 없이 도로 낮아지면 좁은 통로에서 양보를 접는다.
+
+    `rosy_gauntlet.world` 에서 폭 1.4 m 는 통과했고 1.2 m 는 실패했다. 팽창을 0.15 에서
+    0.08 로 줄여도 같았다 — 한계는 공간이 아니라 협상이기 때문이다. 기준선은 실패한 폭
+    **위**, 통과한 폭 **이하**여야 한다.
+    """
+    measured_fail, measured_pass = 1.2, 1.4
+    assert measured_fail < bays.PASSING_WIDTH_M <= measured_pass
+
+
 def test_two_robots_cannot_pass_in_the_one_metre_corridor():
     """실측과 같아야 한다 — 폭 1 m 데모룸에서 두 대는 서로를 지나가지 못했다."""
     grid = _grid(CORRIDOR)
