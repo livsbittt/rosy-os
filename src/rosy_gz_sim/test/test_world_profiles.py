@@ -40,7 +40,7 @@ def test_catalog_names_every_shipped_world():
 def test_factory_and_maze_do_not_share_inflation():
     factory = profile_for("rosy_factory.world")
     maze = profile_for("rosy_maze")
-    assert factory.inflation_radius == 0.15
+    assert factory.inflation_radius == 0.25
     assert maze.inflation_radius == 0.55
     assert factory.map == "rosy_factory.yaml"
     assert maze.map == "rosy_maze.yaml"

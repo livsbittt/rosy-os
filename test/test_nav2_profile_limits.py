@@ -21,17 +21,21 @@ PROFILE = ROOT / "deploy" / "robot" / "config" / "profile.hardware.yaml"
 NAV2 = ROOT / "src" / "rosy_navigation" / "params" / "nav2_params.yaml"
 
 
-def test_default_inflation_matches_the_factory_world_catalog():
-    """nav2 기본 팽창은 factory 카탈로그와 같다. 미로는 gz_multi가 덮어쓴다."""
-    catalog = ROOT / "src" / "rosy_gz_sim" / "config" / "worlds.yaml"
-    worlds = yaml.safe_load(catalog.read_text(encoding="utf-8"))["worlds"]
-    factory = float(worlds["rosy_factory.world"]["inflation_radius"])
+def test_nav2_default_inflation_is_the_hardware_value():
+    """현장 기본은 0.15 m. 시뮬 월드는 worlds.yaml이 덮어쓴다."""
     data = yaml.safe_load(NAV2.read_text(encoding="utf-8"))
     for costmap in ("local_costmap", "global_costmap"):
         radius = data[costmap][costmap]["ros__parameters"]["inflation_layer"][
             "inflation_radius"
         ]
-        assert radius == factory, f"{costmap} inflation_radius={radius}"
+        assert radius == 0.15, f"{costmap} inflation_radius={radius}"
+
+
+def test_factory_sim_inflation_is_wider_than_hardware_default():
+    catalog = ROOT / "src" / "rosy_gz_sim" / "config" / "worlds.yaml"
+    worlds = yaml.safe_load(catalog.read_text(encoding="utf-8"))["worlds"]
+    factory = float(worlds["rosy_factory.world"]["inflation_radius"])
+    assert factory > 0.15
 
 
 def test_global_planner_is_smac_and_rejects_unknown():
