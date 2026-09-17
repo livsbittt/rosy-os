@@ -23,6 +23,8 @@ class HeuristicPolicy:
         pose = observation.robots.get(robot_id)
         if pose is None or observation.ball is None:
             return ZERO
+        if not all(math.isfinite(v) for v in (pose.x, pose.y, pose.yaw, observation.ball.x, observation.ball.y)):
+            return ZERO
         heading = math.atan2(observation.ball.y - pose.y, observation.ball.x - pose.x)
         err = _wrap(heading - pose.yaw)
         turn = max(-1.0, min(1.0, err * 2.0))
