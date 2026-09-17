@@ -35,5 +35,6 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · fix(nav): 기동 경쟁과 좁은 방 여유를 실측으로 잡는다
 - 2026-09-17 · uncommitted · fix(nav): 좁은 통로에서 실제로 완주하게 만든 네 가지
 - 2026-09-15 · uncommitted · docs(harness): start the rosy_navigation harness record

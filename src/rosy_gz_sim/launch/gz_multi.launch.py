@@ -459,8 +459,9 @@ def generate_launch_description():
                               description="비면 월드 카탈로그"),
         DeclareLaunchArgument("spawn_y", default_value="",
                               description="비면 월드 카탈로그"),
-        DeclareLaunchArgument("spawn_spacing", default_value="1.5",
-                              description="로봇 간 x축 배치 간격 (m)"),
+        DeclareLaunchArgument("spawn_spacing", default_value="",
+                              description="로봇 간 x축 배치 간격 (m). 비우면 월드 프로필 값 "
+                                          "(config/worlds.yaml), 그것도 없으면 1.5"),
         DeclareLaunchArgument("core", default_value="false",
                               description="로봇별 rosy_core 기동 (포트 api_port_base + i - 1)"),
         DeclareLaunchArgument("map", default_value="",
