@@ -1,4 +1,10 @@
-from rosy_core.domain.capabilities import descriptors_from_cap001
+import pytest
+
+from rosy_core.domain.capabilities import (
+    CapabilityDescriptor,
+    PresentationState,
+    descriptors_from_cap001,
+)
 from rosy_core.domain.model import DeviceState
 from rosy_core.domain.tasks import TaskKind
 
@@ -42,9 +48,11 @@ def test_safe_stop_keeps_ids_but_marks_them_unavailable():
     descriptors = descriptors_from_cap001(
         _PINKY_FLAGS, device_state=DeviceState.SAFE_STOP
     )
-    by_id = {d.id: d.available for d in descriptors}
-    assert by_id["mobility.move"] is False
-    assert by_id["mobility.navigate"] is False
+    by_id = {d.id: d for d in descriptors}
+    assert by_id["mobility.move"].available is False
+    assert by_id["mobility.navigate"].available is False
+    assert by_id["mobility.move"].state == PresentationState.BLOCKED.value
+    assert by_id["mobility.move"].reason == "device_state:SAFE_STOP"
     assert "manipulate.pick" not in by_id
 
 
@@ -52,9 +60,37 @@ def test_ready_marks_advertised_descriptors_available():
     descriptors = descriptors_from_cap001(
         _PINKY_FLAGS, device_state=DeviceState.READY
     )
-    by_id = {d.id: d.available for d in descriptors}
-    assert by_id["mobility.move"] is True
-    assert by_id["perception.localize"] is True
+    by_id = {d.id: d for d in descriptors}
+    assert by_id["mobility.move"].available is True
+    assert by_id["mobility.move"].state == PresentationState.AVAILABLE.value
+    assert by_id["mobility.move"].reason is None
+    assert by_id["perception.localize"].available is True
+
+
+def test_degraded_is_constrained_with_a_server_reason():
+    descriptors = descriptors_from_cap001(
+        _PINKY_FLAGS, device_state=DeviceState.DEGRADED
+    )
+    move = {d.id: d for d in descriptors}["mobility.move"]
+    assert move.available is True
+    assert move.state == PresentationState.CONSTRAINED.value
+    assert move.reason == "device_state:DEGRADED"
+
+
+def test_blocked_descriptor_without_reason_is_rejected():
+    with pytest.raises(ValueError, match="reason"):
+        CapabilityDescriptor(
+            id="mobility.move",
+            available=False,
+            state=PresentationState.BLOCKED.value,
+        )
+
+
+def test_unsupported_flags_are_omitted_not_greyed():
+    ids = {d.id for d in descriptors_from_cap001(_PINKY_FLAGS)}
+    assert "mobility.dock" not in ids
+    assert all(d.state != PresentationState.NOT_PROVIDED.value for d in
+               descriptors_from_cap001(_PINKY_FLAGS))
 
 
 def test_task_kinds_require_concept_ids_not_hardware_names():

@@ -350,6 +350,44 @@ def test_dashboard_assets_are_compressed_for_the_robot_access_point(dashboard_cl
     assert page.headers.get("content-encoding") == "gzip"
 
 
+def test_dashboard_drops_ornament_and_stacks_boot_stages():
+    html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+    css = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+    for token in ("eyebrow", "ambient-grid", "data-tone"):
+        assert token not in html
+        assert token not in css
+    assert "Georgia" not in css
+    assert "--display" not in css
+    assert "--shadow" not in css
+    assert "FIELD RUNTIME / 01" not in html
+    assert html.index('data-step="1"') < html.index('data-step="2"') < html.index('data-step="3"')
+    grid = css.split(".host-card-grid", 1)[1].split("}", 1)[0]
+    assert "grid-template-columns: 1fr" in grid
+    assert "font-variant-numeric: tabular-nums" in css
+    meter = css.split(".meter-rail i", 1)[1].split("}", 1)[0]
+    assert "var(--paper)" in meter
+    assert "var(--status-crit)" not in meter
+    assert "var(--signal-danger)" not in meter
+
+
+def test_dashboard_renders_inventory_states_from_the_server():
+    """S6: 목록은 inventory. CAP-001은 게이트만. 이유는 서버가 준다."""
+    app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+    css = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+    assert 'api("/api/v1/system/inventory")' in app
+    assert "renderInventory" in app
+    assert "flattenCapabilities" not in app
+    assert "node down" not in app
+    assert "row.reason" in app
+    assert 'row.state !== "not_provided"' in app
+    assert 'api("/api/v1/system/capabilities")' in app
+    assert "session.capabilities" in app
+    assert '[data-state="blocked"]' in css
+    assert '[data-state="constrained"]' in css
+
+
 def test_dashboard_binds_server_evidence_and_gates_stale_motion():
     """S4 / G4: 텔레메트리만 서버 evidence를 싣고, 낡은 pose·velocity는 teleop을 막는다.
 

@@ -180,8 +180,10 @@ def test_inventory_is_booting_before_diagnostics_arrive(client):
     assert inventory.status_code == 200
     body = inventory.json()
     assert body["device_state"] == "BOOTING"
-    by_id = {item["id"]: item["available"] for item in body["descriptors"]}
-    assert by_id["mobility.move"] is False
+    by_id = {item["id"]: item for item in body["descriptors"]}
+    assert by_id["mobility.move"]["available"] is False
+    assert by_id["mobility.move"]["state"] == "blocked"
+    assert by_id["mobility.move"]["reason"] == "device_state:BOOTING"
     robot = tc.get("/api/v1/robot/state", headers=VIEWER)
     assert robot.status_code == 200
     assert robot.json()["mode"] == "IDLE"
@@ -195,8 +197,10 @@ def test_inventory_leaves_booting_after_a_diagnostic(client):
     svc.state.set_diagnostic("drive", HealthState.OK)
     body = tc.get("/api/v1/system/inventory", headers=VIEWER).json()
     assert body["device_state"] == "READY"
-    by_id = {item["id"]: item["available"] for item in body["descriptors"]}
-    assert by_id["mobility.move"] is True
+    by_id = {item["id"]: item for item in body["descriptors"]}
+    assert by_id["mobility.move"]["available"] is True
+    assert by_id["mobility.move"]["state"] == "available"
+    assert by_id["mobility.move"]["reason"] is None
     robot = tc.get("/api/v1/robot/state", headers=VIEWER).json()
     assert robot["mode"] == "IDLE"
 

@@ -291,8 +291,17 @@ device-validation 계획이 소유하므로 이 단계에서는 쓰지 않는다
 S1과 같이 압축 뒤 L1 여유가 있고 계약 시험이 우선이라 되돌리지 않으며,
 상한을 빗나갔음을 기록한다.
 
-남은 단계: S5(장식 제거) · S6(capability 4상태) · S7(거버넌스 정정).
-S8(콘솔 통합)은 이 계획 밖.
+**S5·S6 실행 (2026-09-17).** 사용자 지시로 이어서 처리. concept 16 본문
+개명과 G4 행은 S7.
+
+| 단계 | 결과 | 증거 |
+|---|---|---|
+| S5 장식·절차 | 완료 | `eyebrow`/`ambient-grid`/`data-tone`/`Georgia` 웹 경로 0. host 카드 1열+data-step. 게이지 채움 `--paper`. `rosy_core` 814 passed, 12 skipped |
+| S6 capability 4상태 | 완료 | inventory descriptor에 `state`+`reason` additive. `blocked`는 이유 필수. 목록은 inventory, CAP-001은 게이트만. 클라이언트 이유 합성 없음 |
+
+서빙 자산 실측(이번 작업 세 파일): `index.html` −987 B, `styles.css` −414 B, `app.js` +899 B. 합 **−502 B**. S5 순감>0 만족. S6 `app.js` +899 ≤ +900.
+
+남은 단계: S7(거버넌스 정정). S8(콘솔 통합)은 이 계획 밖.
 
 ## 12. RALPLAN 루프 상태
 

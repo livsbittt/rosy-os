@@ -76,8 +76,9 @@ def test_inventory_exposes_descriptors_and_task_kinds():
             "slam": False,
         },
     )
-    ids = {d["id"]: d["available"] for d in data["descriptors"]}
-    assert ids["mobility.move"] is True
+    ids = {d["id"]: d for d in data["descriptors"]}
+    assert ids["mobility.move"]["available"] is True
+    assert ids["mobility.move"]["state"] == "available"
     assert "manipulate.pick" not in ids
     kinds = {item["kind"]: item["concept_id"] for item in data["task_kinds"]}
     assert kinds["MOVE"] == "mobility.move"

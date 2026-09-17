@@ -136,6 +136,13 @@ function renderRuntime(runtime) {
   const temperature = runtime.temperature_c;
   setText("temperature", Number.isFinite(Number(temperature)) ? `${number(temperature, 1)}°` : null);
   setText("temperature-state", temperature == null ? "센서 없음" : temperature >= 80 ? "고온 경고" : temperature >= 70 ? "주의" : "정상 범위");
+  const tempCard = elements.temperature?.closest(".temperature-card");
+  if (tempCard) {
+    if (!Number.isFinite(Number(temperature))) delete tempCard.dataset.level;
+    else if (temperature >= 80) tempCard.dataset.level = "crit";
+    else if (temperature >= 70) tempCard.dataset.level = "warn";
+    else delete tempCard.dataset.level;
+  }
   setText("runtime-warning", runtime.unavailable?.length ? `읽을 수 없는 항목: ${runtime.unavailable.join(", ")}` : "");
   renderRosNetwork(runtime);
 }
@@ -278,35 +285,8 @@ function renderRosNetwork(runtime) {
   });
 }
 
-function flattenCapabilities(value, prefix = "") {
-  const rows = [];
-  Object.entries(value || {}).forEach(([key, item]) => {
-    const path = prefix ? `${prefix}.${key}` : key;
-    if (item && typeof item === "object" && !Array.isArray(item)) {
-      rows.push(...flattenCapabilities(item, path));
-    } else {
-      rows.push([path, Boolean(item)]);
-    }
-  });
-  return rows;
-}
-
 function renderCapabilities(capabilities) {
   session.capabilities = capabilities;
-  const rows = flattenCapabilities(capabilities);
-  elements["capability-list"].replaceChildren();
-  rows.forEach(([name, enabled]) => {
-    const row = document.createElement("div");
-    row.className = "capability-item";
-    const label = document.createElement("span");
-    label.textContent = name;
-    const state = document.createElement("b");
-    state.className = enabled ? "enabled" : "disabled";
-    state.textContent = enabled ? "AVAILABLE" : "DISABLED";
-    row.append(label, state);
-    elements["capability-list"].append(row);
-  });
-  setText("capability-count", `${rows.filter((row) => row[1]).length} / ${rows.length} ON`);
   const slamOn = capabilities?.slam === true;
   const slamChip = elements["slam-capability"];
   if (slamChip) {
@@ -318,6 +298,31 @@ function renderCapabilities(capabilities) {
   setEnabled("slam-save", slamOn);
   updateModeButtons();
   updateTeleopControls();
+}
+
+function renderInventory(inventory) {
+  const rows = (inventory?.descriptors || []).filter(
+    (row) => row.state && row.state !== "not_provided",
+  );
+  elements["capability-list"].replaceChildren();
+  rows.forEach((row) => {
+    const item = document.createElement("div");
+    item.className = "capability-item";
+    item.dataset.state = row.state;
+    const label = document.createElement("span");
+    label.textContent = row.id;
+    const state = document.createElement("b");
+    state.textContent = row.state;
+    item.append(label, state);
+    if (row.reason) {
+      const reason = document.createElement("small");
+      reason.textContent = row.reason;
+      item.append(reason);
+    }
+    elements["capability-list"].append(item);
+  });
+  const usable = rows.filter((row) => row.state === "available" || row.state === "constrained");
+  setText("capability-count", `${usable.length} / ${rows.length}`);
 }
 
 function teleopEligible() {
@@ -607,6 +612,7 @@ async function refreshSlowData() {
     [api("/api/v1/system/runtime"), renderRuntime],
     [api("/api/v1/system/info"), renderRobotInfo],
     [api("/api/v1/system/capabilities"), renderCapabilities],
+    [api("/api/v1/system/inventory"), renderInventory],
     [api("/api/v1/safety/state"), renderSafety],
     [api("/api/v1/events?limit=10"), renderEvents],
     [api("/api/v1/host/network"), renderHostNetwork],

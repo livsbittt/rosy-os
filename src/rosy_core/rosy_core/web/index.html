@@ -11,12 +11,10 @@
 </head>
 <body>
   <a class="skip-link" href="#dashboard-main">상태 화면으로 건너뛰기</a>
-  <div class="ambient-grid" aria-hidden="true"></div>
-
   <header class="topbar">
     <a class="brand" href="/dashboard" aria-label="Rosy OS 대시보드 홈">
       <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-      <span><b>ROSY</b><small>FIELD RUNTIME / 01</small></span>
+      <span><b>ROSY</b><small>Field runtime</small></span>
     </a>
     <div class="topbar-status">
       <span id="clock" class="clock">--:--:--</span>
@@ -29,7 +27,6 @@
 
   <aside id="auth-drawer" class="auth-drawer" aria-labelledby="auth-title">
     <div>
-      <p class="eyebrow">SECURE SESSION</p>
       <h2 id="auth-title">Rosy에 연결</h2>
       <p>viewer, operator 또는 administrator 토큰을 입력하세요. 키는 이 탭이 열려 있는 동안에만 보관됩니다.</p>
     </div>
@@ -47,7 +44,6 @@
   <main id="dashboard-main" class="dashboard" aria-label="Rosy OS 상태">
     <section class="hero-strip" aria-labelledby="robot-heading">
       <div class="hero-copy">
-        <p class="eyebrow">ROBOT STATUS</p>
         <h1 id="robot-heading"><span id="robot-name">Rosy</span><em id="robot-id">연결 대기</em></h1>
         <p id="hero-message">접속 키를 입력하면 Raspberry Pi와 로봇 상태를 확인합니다.</p>
       </div>
@@ -66,7 +62,6 @@
     <section class="panel system-panel" aria-labelledby="system-heading">
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">RASPBERRY PI OS</p>
           <h2 id="system-heading">호스트 상태</h2>
         </div>
         <span id="host-name" class="machine-tag">—</span>
@@ -78,17 +73,17 @@
         <div><span>업타임</span><strong id="uptime">—</strong></div>
       </div>
       <div class="meter-stack">
-        <article class="meter" data-tone="rose">
+        <article class="meter">
           <header><span>CPU</span><b id="cpu-value">—</b></header>
           <div class="meter-rail"><i id="cpu-bar"></i></div>
           <footer id="cpu-detail">표본 수집 대기</footer>
         </article>
-        <article class="meter" data-tone="lime">
+        <article class="meter">
           <header><span>MEMORY</span><b id="memory-value">—</b></header>
           <div class="meter-rail"><i id="memory-bar"></i></div>
           <footer id="memory-detail">—</footer>
         </article>
-        <article class="meter" data-tone="amber">
+        <article class="meter">
           <header><span>STORAGE</span><b id="storage-value">—</b></header>
           <div class="meter-rail"><i id="storage-bar"></i></div>
           <footer id="storage-detail">Rosy 데이터 영역</footer>
@@ -105,14 +100,13 @@
     <section id="host-panel" class="panel host-panel" aria-labelledby="host-heading">
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">DEVICE RUNTIME</p>
           <h2 id="host-heading">네트워크와 릴리스</h2>
         </div>
         <span id="host-agent-status" class="machine-tag" data-status="UNKNOWN">확인 전</span>
       </div>
 
       <div class="host-card-grid">
-        <article class="host-card" id="network-card" data-available="unknown"
+        <article class="host-card" id="network-card" data-step="1" data-available="unknown"
                  aria-labelledby="network-card-heading">
           <header>
             <h3 id="network-card-heading">네트워크</h3>
@@ -136,7 +130,7 @@
           </form>
         </article>
 
-        <article class="host-card" id="release-card" data-available="unknown"
+        <article class="host-card" id="release-card" data-step="2" data-available="unknown"
                  aria-labelledby="release-card-heading">
           <header>
             <h3 id="release-card-heading">릴리스</h3>
@@ -161,7 +155,7 @@
           </div>
         </article>
 
-        <article class="host-card" id="commissioning-card" aria-labelledby="commissioning-heading">
+        <article class="host-card" id="commissioning-card" data-step="3" aria-labelledby="commissioning-heading">
           <header>
             <h3 id="commissioning-heading">커미셔닝</h3>
             <span id="commissioning-mode" class="mode-chip" data-mode="UNKNOWN">—</span>
@@ -174,7 +168,6 @@
     <section id="ros-network-panel" class="panel ros-network-panel" aria-labelledby="ros-network-heading">
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">DDS / ROS GRAPH</p>
           <h2 id="ros-network-heading">통신 격리와 연결 지도</h2>
         </div>
         <span id="ros-graph-status" class="machine-tag" data-status="UNAVAILABLE">확인 전</span>
@@ -212,7 +205,6 @@
     <section class="panel motion-panel" aria-labelledby="motion-heading">
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">MOTION VECTOR</p>
           <h2 id="motion-heading">로봇 텔레메트리</h2>
         </div>
         <span id="state-age" class="machine-tag">—</span>
@@ -233,7 +225,6 @@
     <section id="field-map-panel" class="panel field-map-panel" aria-labelledby="field-map-heading">
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">OCCUPANCY FIELD</p>
           <h2 id="field-map-heading">점유 지도</h2>
         </div>
         <span id="map-status" class="machine-tag">맵 수신 대기</span>
@@ -265,7 +256,6 @@
     <section class="panel control-panel" aria-labelledby="control-heading">
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">CONTROL AUTHORITY</p>
           <h2 id="control-heading">운영 제어</h2>
         </div>
         <a class="docs-link" href="/docs" target="_blank" rel="noreferrer">API 문서 ↗</a>
@@ -278,7 +268,6 @@
       <div class="teleop-commissioning" aria-labelledby="teleop-heading">
         <div class="teleop-copy">
           <div>
-            <p class="eyebrow">BENCH TELEOP</p>
             <h3 id="teleop-heading">저속 직접 제어</h3>
           </div>
           <span>직진 0.05 m/s · 회전 0.35 rad/s</span>
@@ -309,7 +298,6 @@
     <section id="field-settings-panel" class="panel field-settings-panel" aria-labelledby="field-settings-heading">
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">FIELD SETTINGS</p>
           <h2 id="field-settings-heading">현장 설정</h2>
         </div>
         <span class="machine-tag">이 로봇만 · 플릿 없음</span>
@@ -473,7 +461,6 @@
     <section class="panel capability-panel" aria-labelledby="capability-heading">
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">HARDWARE CONTRACT</p>
           <h2 id="capability-heading">기능 가용성</h2>
         </div>
         <span id="capability-count" class="machine-tag">—</span>
@@ -486,7 +473,6 @@
     <section class="panel event-panel" aria-labelledby="event-heading">
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">EVENT TAPE</p>
           <h2 id="event-heading">최근 이벤트</h2>
         </div>
         <button id="refresh-events" class="quiet-button" type="button">새로고침</button>

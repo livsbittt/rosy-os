@@ -150,7 +150,13 @@ def inventory_from_config(
 
         descriptors = descriptors_from_cap001(cap001, device_state=state)
         payload["descriptors"] = [
-            {"id": item.id, "available": item.available} for item in descriptors
+            {
+                "id": item.id,
+                "available": item.available,
+                "state": item.state,
+                "reason": item.reason,
+            }
+            for item in descriptors
         ]
         payload["capability_ids"] = [item.id for item in descriptors]
         payload["task_kinds"] = [

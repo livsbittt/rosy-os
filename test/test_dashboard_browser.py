@@ -55,6 +55,11 @@ window.fetch = async (input, options = {}) => {
       teleop: true, slam: true, docking: {supported: false},
       navigation: {goal_navigation: true},
     },
+    '/api/v1/system/inventory': {
+      descriptors: [
+        {id: 'mobility.move', available: true, state: 'available', reason: null},
+      ],
+    },
     '/api/v1/safety/state': {
       estop: false, source: null, fleet_loss_policy: 'STOP',
       limits: {max_linear: 0.2, max_angular: 0.8, manual_linear: 0.15, manual_angular: 0.6},

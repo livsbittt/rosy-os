@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import enum
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional
 
@@ -28,10 +29,25 @@ _UNAVAILABLE_STATES = {
 }
 
 
+class PresentationState(str, enum.Enum):
+    """concept 16 §8. `not_provided` is the S7 rename of `absent` (token clash)."""
+
+    AVAILABLE = "available"
+    CONSTRAINED = "constrained"
+    BLOCKED = "blocked"
+    NOT_PROVIDED = "not_provided"
+
+
 @dataclass(frozen=True)
 class CapabilityDescriptor:
     id: str
     available: bool = True
+    state: str = PresentationState.AVAILABLE.value
+    reason: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if self.state == PresentationState.BLOCKED.value and not self.reason:
+            raise ValueError("blocked capability requires a reason")
 
 
 def _flag_is_true(data: Any, dotted: str) -> bool:
@@ -43,18 +59,34 @@ def _flag_is_true(data: Any, dotted: str) -> bool:
     return node is True
 
 
+def _presentation(device_state: Optional[DeviceState]) -> tuple[bool, str, Optional[str]]:
+    if device_state is None:
+        return True, PresentationState.AVAILABLE.value, None
+    if device_state in _UNAVAILABLE_STATES:
+        return (
+            False,
+            PresentationState.BLOCKED.value,
+            f"device_state:{device_state.value}",
+        )
+    if device_state is DeviceState.DEGRADED:
+        return (
+            True,
+            PresentationState.CONSTRAINED.value,
+            f"device_state:{device_state.value}",
+        )
+    return True, PresentationState.AVAILABLE.value, None
+
+
 def descriptors_from_cap001(
     data: Mapping[str, Any],
     *,
     device_state: Optional[DeviceState] = None,
 ) -> tuple[CapabilityDescriptor, ...]:
-    available = (
-        True
-        if device_state is None
-        else device_state not in _UNAVAILABLE_STATES
-    )
+    available, state, reason = _presentation(device_state)
     return tuple(
-        CapabilityDescriptor(id=concept_id, available=available)
+        CapabilityDescriptor(
+            id=concept_id, available=available, state=state, reason=reason
+        )
         for flag, concept_id in _CAP001_TO_CONCEPT
         if _flag_is_true(data, flag)
     )
