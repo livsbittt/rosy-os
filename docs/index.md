@@ -21,12 +21,17 @@
 | D-80 | G4 GO는 Device 표면이다 |
 | D-81 | Fleet 콘솔 v1 gather는 CORE REST 폴링이다 |
 | D-82 | 팔레트는 OKLCH에서 생성하고 수치 게이트로 지킨다 |
+| D-83 | ROS-SIM 최소 재실행 묶음 |
+| D-84 | hardware 장치 패키지는 hardware 프로필 전까지 CORE/io에 없다 |
+| D-85 | 도크 펌웨어 ARTIFACT는 ESP32 툴체인 증거다 |
+| D-86 | POSIX identity 시험은 POSIX 호스트에서만 deploy를 찍는다 |
 
 ## 계획·결과 문서
 
 - [2026-09-15-module-harness-design.md](plans/2026-09-15-module-harness-design.md)
 - [2026-09-17-interface-design-implementation-design.md](plans/2026-09-17-interface-design-implementation-design.md)
 - [2026-09-17-remaining-gates-adr-plan.md](plans/2026-09-17-remaining-gates-adr-plan.md)
+- [2026-09-17-remaining-runtime-adr-plan.md](plans/2026-09-17-remaining-runtime-adr-plan.md)
 
 ## 교훈 (docs/solutions)
 
@@ -39,8 +44,8 @@
 
 ## 최근 기록
 
+- 2026-09-17 · uncommitted · docs(adr): lock remaining runtime as D-83–D-86
 - 2026-09-17 · dc89264 · docs(harness): stamp last_verified after SOURCE re-run
 - 2026-09-17 · uncommitted · docs(adr): accept D-82 after palette gate tests
 - 2026-09-17 · uncommitted · docs(adr): record the OKLCH palette decision as D-82
 - 2026-09-17 · uncommitted · docs(adr): lock leftover gates as D-78–D-81
-- 2026-09-17 · 8fdd8d2 · docs: lock G4 vocabulary, one operator console, and D-61 records

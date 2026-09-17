@@ -73,3 +73,10 @@
 - 결정: D-79
 - 교훈: 없음
 
+## 2026-09-17 · uncommitted · docs(adr): lock remaining runtime as D-83–D-86
+- 변경: ROS-SIM 최소 묶음, hardware 이미지 제외, 도크 ESP32 ARTIFACT, POSIX identity last_verified
+- 증거: `python -m pytest test/test_network_topology_contracts.py test/test_harness_contracts.py -q`
+- gate 변화: 없음
+- 결정: D-83–D-86 Accepted (실행 순서). G0–G3는 D-41–D-56 Proposed 유지
+- 교훈: 없음
+

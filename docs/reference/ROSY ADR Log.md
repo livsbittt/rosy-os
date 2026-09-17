@@ -90,6 +90,10 @@
 | D-80 | G4 GO는 Device 표면이다 | Accepted |
 | D-81 | Fleet 콘솔 v1 gather는 CORE REST 폴링이다 | Accepted |
 | D-82 | 팔레트는 OKLCH에서 생성하고 수치 게이트로 지킨다 | Accepted |
+| D-83 | ROS-SIM 최소 재실행 묶음 | Accepted |
+| D-84 | hardware 장치 패키지는 hardware 프로필 전까지 CORE/io에 없다 | Accepted |
+| D-85 | 도크 펌웨어 ARTIFACT는 ESP32 툴체인 증거다 | Accepted |
+| D-86 | POSIX identity 시험은 POSIX 호스트에서만 deploy를 찍는다 | Accepted |
 
 ---
 
@@ -2353,3 +2357,122 @@ map_raster.py`를 별개 파이프라인으로 두었고 D-77이 그 표면을 �
 **References:** [concept 16](../concept/16_ROSY_Interface_Design_Principles.md)
 §6, D-23, D-72, D-73, D-75, D-77,
 [이행 설계](../plans/2026-09-17-interface-design-implementation-design.md).
+
+---
+
+## D-83 ROS-SIM 최소 재실행 묶음
+
+**Status:** Accepted (2026-09-17). D-79의 실행 목록이다. 이 묶음을 돌리기 전까지
+ROS-SIM은 HOLD다.
+
+**Context:** 모듈 progress가 ROS-SIM을 HOLD로 두고 명령이 서로 다르다. 어떤
+세션은 `gz_multi`만, 어떤 세션은 Nav2 launch만 돌리고 GO를 주장한다. D-79는
+현재 트리 재실행을 요구하지만 **무엇을** 재실행하는지는 비어 있었다.
+
+**Decision:** ROS-SIM GO의 최소 묶음은 이것이다. 하나라도 빠지면 그 모듈은 HOLD.
+
+1. `rosy_core` — Jazzy 컨테이너에서 ROS 출력·`cmd_vel` 단일 publisher 스모크
+2. `rosy_control` — sensing/camera/planning 노드 그래프. `robot.launch.py`를
+   CORE와 같이 띄우지 않는다(D-38, D-77)
+3. `rosy_gz_sim` / `rosy_fleet` — `gz_multi robots:=2 mode:=nav core:=true`
+   (Task 14). `relay_tx_hz`·HOLD 지연이 나와야 D-35 후보를 논한다
+4. `rosy_navigation` / `rosy_bringup` — `hardware.launch.py` 또는 gz Nav2
+   include. 호스트 `test_nav2_profile_limits.py`는 ROS-SIM이 아니다
+
+이 Windows 호스트에서 이 묶음을 돌리지 않는다. 실행 장소는 ROS 2 Jazzy
+컨테이너 또는 네이티브 Linux.
+
+**Alternatives:** 모듈마다 제각각 스모크하는 안은 지금 혼선이다. 호스트 pytest로
+ROS-SIM을 대체하는 안은 D-79를 어긴다.
+
+**Consequences:** Fleet `hub --listen`과 Device G4는 이 묶음이 아니다.
+ARTIFACT는 D-78.
+
+**Validation / Transition:** 각 모듈 `progress.md` ROS-SIM blocker가 위 명령을
+가리키게 한다. 재실행 증거 전에는 GO로 쓰지 않는다.
+
+**References:** D-38, D-77, D-79,
+[device-validation](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md),
+[swarm bench](../plans/2026-09-08-swarm-formation-slice.md).
+
+---
+
+## D-84 hardware 장치 패키지는 hardware 프로필 전까지 CORE/io에 없다
+
+**Status:** Accepted (2026-09-17). D-62 슬라이스 규칙의 장치 쪽이다.
+
+**Context:** led / adc / lamp / emotion / `rosy_imu_bno055`는 패키지와 HOST
+계약 시험이 있다. `deploy/robot/Dockerfile` core/io는 이들을 복사하지 않는다.
+그런데도 이미지에 슬며시 넣으려는 수정이 반복된다. IMU 소스는 다른 커밋과
+섞지 않기로 한 WIP다.
+
+**Decision:** 이 다섯 패키지는 **hardware 프로필이 Device 증거로 열리기 전**에
+`rosy-core` / `rosy-io` 이미지에 넣지 않는다.
+
+- `test_io_image_packages_nav2_without_slam_or_aux_drivers`가 제외를 지킨다
+- IMU 융합은 D-56 Proposed. `src/rosy_imu_bno055/**` 구현 WIP는 다른 주제
+  커밋과 섞지 않는다
+- HOST 계약 시험 GO는 이미지 편입이 아니다
+
+**Alternatives:** 전부 io에 넣는 안은 Pi 이미지에 드라이버와 OpenCV를 다시
+싣는다(D-66과 충돌). 패키지를 지우는 안은 Device 프로필을 막는다.
+
+**Consequences:** ARTIFACT 기본 이미지는 CORE+io(+nav overlay)다. hardware
+슬라이스는 G1/G0 증거가 있을 때 연다.
+
+**Validation / Transition:** `test/test_nav2_hardware_slice.py` io 제외 단언.
+Dockerfile core/io에 다섯 패키지 COPY가 생기면 이 ADR 위반이다.
+
+**References:** D-56, D-57, D-62, D-66,
+[optional slices](../plans/2026-09-16-optional-runtime-slices-design.md).
+
+---
+
+## D-85 도크 펌웨어 ARTIFACT는 ESP32 툴체인 증거다
+
+**Status:** Accepted (2026-09-17).
+
+**Context:** `dock/firmware/rosy_dock/rosy_dock.ino`는 참조 구현이다. HOST
+pytest(`test_dock_contract.py`)는 README와 파서 계약만 본다. ESP32 툴체인이
+없는 Windows에서 펌웨어 빌드 없이 ARTIFACT GO를 쓰려는 시도가 있다.
+
+**Decision:** 도크 ARTIFACT GO는 **Arduino/ESP32 빌드·플래시 readback**이 있을
+때만이다. HOST 계약 시험은 SOURCE/LOCAL이다. 툴체인 없는 호스트는 HOLD다.
+물리 벤치 통전은 DEVICE다.
+
+**Alternatives:** `.ino` 존재만으로 ARTIFACT를 닫는 안은 계층을 속인다.
+
+**Consequences:** `dock` SOURCE/LOCAL GO는 펌웨어 발행이 아니다.
+
+**Validation / Transition:** `dock/progress.md` ARTIFACT blocker. HOST
+`test/test_dock_contract.py`.
+
+**References:** D-27, D-28, D-36, D-79.
+
+---
+
+## D-86 POSIX identity 시험은 POSIX 호스트에서만 deploy를 찍는다
+
+**Status:** Accepted (2026-09-17). D-79의 deploy 예외다.
+
+**Context:** `test_dds_identity_contracts.py`는 Git Bash로 `lib.sh`를 소스로
+한다. 이 Windows 세션은 임시 경로(`X:\DevTemp\...`)를 bash가 읽지 못해 13건이
+실패했다. 그 실패로 deploy SOURCE를 HOLD로 내리면 호스트 계약이 있는 다른
+시험까지 같이 무너진다. 반대로 실패한 채로 last_verified를 찍으면 D-79를
+어긴다.
+
+**Decision:** `require_robot_identity` bash 시험은 **POSIX(Git Bash가 `/` 임시
+경로를 쓰는 환경, 또는 Linux)** 에서만 deploy `last_verified`를 채운다.
+Windows에서 이 시험이 깨져도 deploy SOURCE GO(다른 계약)를 뒤집지 않는다.
+다만 **그 호스트에서는 last_verified를 비운다.**
+
+**Alternatives:** Windows 실패를 SOURCE HOLD로 쓰는 안은 계약 시험을 환경
+결함과 섞는다. 실패를 무시하고 SHA를 찍는 안은 D-79 위반이다.
+
+**Consequences:** STATUS.md deploy 행의 `uncommitted`는 이 결정이다. Linux CI
+또는 Git Bash가 통과하면 그때 SHA를 넣는다.
+
+**Validation / Transition:** `test/test_dds_identity_contracts.py`.
+`deploy/progress.md` last_verified.
+
+**References:** D-33, D-61, D-79.
