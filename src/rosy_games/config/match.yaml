@@ -1,0 +1,26 @@
+field:
+  length_m: 2.0
+  width_m: 1.4
+  goal_width_m: 0.35
+  min_spacing_m: 0.35
+robots:
+  - id: rosy_01
+    url: http://rosy-01.local:8080
+    token: ""
+    aruco_id: 1
+    attacks: positive_x
+  - id: rosy_02
+    url: http://rosy-02.local:8080
+    token: ""
+    aruco_id: 2
+    attacks: negative_x
+ball:
+  hsv_low: [5, 120, 80]
+  hsv_high: [25, 255, 255]
+limits:
+  linear: 0.08
+  angular: 0.40
+camera:
+  index: 0
+watchdog:
+  lost_hold_s: 0.5
