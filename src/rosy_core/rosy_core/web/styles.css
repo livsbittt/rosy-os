@@ -76,6 +76,7 @@ button { color: inherit; }
 .region-head h2,
 .panel-heading h2,
 .panel-heading h3,
+.teleop-copy h3,
 .telemetry-grid span,
 .navigation-line span,
 .system-identity span,
@@ -273,7 +274,7 @@ button { color: inherit; }
 .brand small { display: block; margin-top: var(--space-1); color: var(--muted); font: var(--text-micro)/1 var(--mono); letter-spacing: var(--track-label); }
 /* 마크는 로고이지 계기가 아니다 — 상태색을 쓰지 않는다. 화면에서 유일하게
    색이 있어야 할 것은 지금 잘못된 것 하나다. */
-.brand-mark { display: grid; grid-template-columns: repeat(3, 4px); align-items: end; gap: 3px; height: 22px; }
+.brand-mark { display: grid; grid-template-columns: repeat(3, 4px); align-items: end; gap: var(--space-1); height: 22px; }
 .brand-mark i { display: block; width: 4px; border-radius: var(--radius-flag); background: var(--muted); }
 .brand-mark i:nth-child(1) { height: 10px; }
 .brand-mark i:nth-child(2) { height: 22px; background: var(--paper); }
@@ -407,8 +408,11 @@ body[data-view="operate"] .page-footer { display: none; }
   padding: 0;
   list-style: none;
 }
-.triage-context li { display: flex; gap: var(--space-2); font-size: var(--text-micro); line-height: 1.3; opacity: 0.72; white-space: nowrap; }
+/* 맥락은 "또 무엇이 잘못됐나"를 말한다. 제목은 끝까지 보이고 설명은 자리가
+   남는 만큼만 보인다 — DOM에는 남으므로 화면 낭독기는 전문을 읽는다. */
+.triage-context li { display: flex; gap: var(--space-2); max-width: 30ch; font-size: var(--text-micro); line-height: 1.3; opacity: 0.72; white-space: nowrap; }
 .triage-context b { flex-shrink: 0; font-weight: 600; }
+.triage-context span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .triage-context:empty { display: none; }
 /* 맥락이 셋을 넘으면 읽지 않는다. 자리를 늘리는 대신 접는다. */
 .triage-context li:nth-child(n + 4) { display: none; }
@@ -521,16 +525,16 @@ body[data-view="operate"] .page-footer { display: none; }
 }
 .telemetry-grid article { min-width: 0; padding: var(--space-2); background: var(--ground); }
 .telemetry-grid span, .telemetry-grid strong, .telemetry-grid small { display: block; }
+/* 잘린 좌표는 좌표가 아니다. 낡은 값에는 나이가 따라붙어 칸보다 길어지므로
+   자르지 않고 접는다 — 감지 영역에는 남는 높이가 있고, 없는 것은 폭이다. */
 .telemetry-grid strong {
   margin: var(--space-1) 0 0;
   font-size: var(--text-value);
   font-weight: 600;
-  line-height: 1.2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
-.telemetry-grid small { margin-top: 2px; color: var(--nominal-quiet); font: var(--text-micro)/1 var(--mono); }
+.telemetry-grid small { margin-top: var(--space-1); color: var(--nominal-quiet); font: var(--text-micro)/1 var(--mono); }
 
 /* 한 줄짜리 값도 같은 격자다 — 라벨 왼쪽, 값 오른쪽, 위로 실선. */
 .navigation-line {
@@ -677,10 +681,13 @@ body[data-view="operate"] .page-footer { display: none; }
 
 /* 저속 직접 제어도 카드가 아니다 — 같은 면 위의 묶음이다. */
 .teleop-commissioning { display: flex; flex-direction: column; gap: var(--space-2); }
-.teleop-copy { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.teleop-copy > div { flex: none; }
-.teleop-copy h3 { margin: 0; }
-.teleop-copy > span { color: var(--nominal-quiet); font: var(--text-micro)/1.3 var(--mono); text-align: right; }
+/* 묶음 안의 묶음도 같은 줄이다 — 소제목만 다른 모양이면 위계가 아니라 예외가
+   하나 더 생긴 것이다. */
+.teleop-copy { display: flex; align-items: center; gap: var(--space-2); }
+.teleop-copy > div { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2); }
+.teleop-copy > div::after { content: ""; flex: 1; height: 1px; background: var(--surface-line); }
+.teleop-copy h3 { flex: none; margin: 0; }
+.teleop-copy > span { flex: none; color: var(--nominal-quiet); font: var(--text-micro)/1.3 var(--mono); text-align: right; }
 .bench-confirmation {
   display: flex;
   align-items: center;
@@ -705,7 +712,7 @@ body[data-view="operate"] .page-footer { display: none; }
   touch-action: none;
   user-select: none;
 }
-.teleop-pad button small { display: block; margin-top: 2px; color: var(--nominal-quiet); font: var(--text-micro)/1 var(--mono); }
+.teleop-pad button small { display: block; margin-top: var(--space-1); color: var(--nominal-quiet); font: var(--text-micro)/1 var(--mono); }
 /* 눌려 있는 동안만 움직인다 — 그 사실이 계열색 채움으로 보인다. */
 .teleop-pad button.active { color: var(--button-primary-ink); background: var(--series-primary); }
 .teleop-pad button.active small { color: var(--button-primary-ink); }
@@ -847,7 +854,7 @@ body[data-view="operate"] .page-footer { display: none; }
 .graph-node { fill: var(--ground-raise); stroke: var(--surface-line); stroke-width: 1; }
 .graph-node.foreign { fill: var(--status-crit-a10); stroke: var(--status-crit); }
 .graph-topic { fill: var(--status-warn); stroke: var(--ground); stroke-width: 3; }
-.graph-node-label, .graph-topic-label, .graph-empty { fill: var(--paper); font: 11px var(--mono); text-anchor: middle; }
+.graph-node-label, .graph-topic-label, .graph-empty { fill: var(--paper); font: var(--text-label) var(--mono); text-anchor: middle; }
 .graph-topic-label { fill: var(--muted); text-anchor: end; }
 .graph-empty { fill: var(--muted); }
 
@@ -914,10 +921,13 @@ body[data-view="operate"] .page-footer { display: none; }
    ======================================================================== */
 
 @media (max-width: 1080px) {
-  .regions { grid-template-columns: 240px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
-  .region-observe { grid-column: 2; grid-row: 1; }
-  .region-act { grid-column: 1 / -1; grid-row: 2; border-left: 0; border-top: 1px solid var(--surface-line); }
-  .safety-actions { grid-template-columns: 1fr 1fr; }
+  /* 폭이 줄어도 셋의 자리는 그대로다. 조작을 아래 줄로 돌려 봤더니 그 칸이
+     제 내용만큼(412px) 가져가고 지도가 37px로 눌렸다 — 자리를 옮기는 것은
+     공간 문법을 버리는 것이고, 얻는 것도 없었다. 레일만 좁힌다. */
+  .regions { grid-template-columns: 216px minmax(0, 1fr) 272px; }
+  .region { padding: var(--space-2) var(--space-3) var(--space-3); }
+  .telemetry-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .map-hint { max-width: 188px; }
   .ros-network-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .ros-graph-layout { grid-template-columns: 1fr; }
   .event-list { grid-template-columns: 1fr; }

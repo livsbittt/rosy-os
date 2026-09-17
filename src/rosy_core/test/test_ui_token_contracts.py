@@ -311,6 +311,73 @@ def test_touch_targets_clear_the_floor():
     assert not offenders, f"44px 미만 터치 타겟: {offenders}"
 
 
+def test_the_surface_sheet_declares_no_vocabulary_of_its_own():
+    """별칭 층은 같은 것을 부르는 이름을 둘로 만든다.
+
+    표면 규칙에는 `--ink: var(--ground)`, `--line: var(--line-14)`,
+    `--signal-danger: var(--status-crit)` 같은 선언이 있었다. 토큰 파일이
+    단일 출처라고 해 놓고 그 옆에 두 번째 어휘를 세운 셈이고, 값을 지키는
+    게이트들은 전부 토큰 이름을 보므로 별칭 쪽은 아무도 검사하지 않았다.
+    표면은 토큰을 **쓰기만** 한다.
+    """
+    offenders: dict[str, list[str]] = {}
+    for path in surface_stylesheets():
+        declared = DECLARATION.findall(path.read_text(encoding="utf-8"))
+        if declared:
+            offenders[path.name] = sorted(set(declared))
+    assert not offenders, f"표면 스타일시트가 토큰을 새로 선언한다: {offenders}"
+
+
+# 1px은 간격이 아니라 **실선**이다 — 격자를 선으로 짤 때 칸 사이에 바탕을
+# 비치게 하는 관용구(`gap: 1px`)이고, 치수 계단의 대상이 아니다.
+SPACING = re.compile(r"(?<![-a-z])(padding|margin|gap|row-gap|column-gap)[a-z-]*:\s*([^;}]+)")
+PX_VALUE = re.compile(r"(\d+(?:\.\d+)?)px")
+
+
+def test_spacing_comes_from_the_step_scale():
+    """치수는 여섯 단계다. 임의 값을 쓰면 다음 사람이 다른 값을 고른다.
+
+    예전 표면 규칙에는 간격으로 쓰인 px 값이 3px부터 50px까지 열아홉 가지
+    있었고 그중 열한 가지는 한 번씩만 쓰였다. 계단이 없으면 리듬도 없다.
+    """
+    offenders: dict[str, list[str]] = {}
+    for path in surface_stylesheets():
+        hits = [
+            f"{prop}: {value.strip()[:40]}"
+            for prop, value in SPACING.findall(path.read_text(encoding="utf-8"))
+            for px in PX_VALUE.findall(value)
+            if float(px) != 1.0
+        ]
+        if hits:
+            offenders[path.name] = hits
+    assert not offenders, f"--space-* 밖의 간격: {offenders}"
+
+
+FONT_SIZE = re.compile(r"(?<![-a-z])(font-size|font):\s*([^;}]+)")
+
+
+def test_type_sizes_come_from_the_scale():
+    """글자도 닫힌 계단이다(--text-micro ~ --text-title).
+
+    `clamp(3rem, 7vw, 6.7rem)`짜리 제목과 0.55rem짜리 라벨이 한 화면에 있으면
+    그건 위계가 아니라 소음이다. 상대 단위(`em`)는 부모 값에 매이므로 계단을
+    벗어나지 않는다 — 나이 접미사가 값 크기를 따라가는 자리에 쓴다.
+    """
+    offenders: dict[str, list[str]] = {}
+    for path in surface_stylesheets():
+        hits = []
+        for prop, value in FONT_SIZE.findall(path.read_text(encoding="utf-8")):
+            text = value.strip()
+            if "--text-" in text or text == "inherit":
+                continue
+            if prop == "font-size" and re.fullmatch(r"[\d.]+em", text):
+                continue
+            hits.append(f"{prop}: {text[:40]}")
+        if hits:
+            offenders[path.name] = hits
+    assert not offenders, f"--text-* 밖의 글자 크기: {offenders}"
+
+
 def test_a_danger_fill_carries_ink_not_dark_text():
     """D-82는 위험을 어두운 빨강으로 바꿨다. 옛 옅은 빨강에 맞춰진 어두운
     잉크를 그대로 두면 대비가 2.86:1로 떨어진다 — 실제로 그랬고, 값만 보는
