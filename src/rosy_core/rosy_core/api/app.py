@@ -55,6 +55,7 @@ def create_app(config: dict[str, Any], services: CoreServices) -> FastAPI:
         "styles.css": "text/css",
         "app.js": "application/javascript",
         "map.js": "application/javascript",
+        "triage.js": "application/javascript",
         "dom.js": "application/javascript",
         "client.js": "application/javascript",
         "settings.js": "application/javascript",

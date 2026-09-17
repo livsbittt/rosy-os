@@ -5,10 +5,31 @@ export const elements = Object.fromEntries(
   [...document.querySelectorAll("[id]")].map((element) => [element.id, element]),
 );
 
+// 낡은 값은 나이를 달고 다닌다. 판정 자체는 서버가 내린 `evidence` 문자열이
+// 이미 말하고 있으므로, 화면은 "얼마나 낡았나"만 더한다. 임계값은 읽지 않는다 —
+// 클라이언트가 임계를 만지면 판정자가 둘이 된다(D-72 S4, test_dashboard.py).
+function ageSeconds(receivedAt) {
+  if (!receivedAt) return null;
+  const stamp = Date.parse(receivedAt);
+  if (!Number.isFinite(stamp)) return null;
+  const age = (Date.now() - stamp) / 1000;
+  return age >= 0 ? age : null;
+}
+
+// 페이지 상태 — 값별 증거 어휘(fresh/delayed/disconnected/unavailable)를
+// 재사용하지 않는다(concept 16 §5). "아직 묻지 않았다"와 "물었는데 없다"는
+// 운용자에게 완전히 다른 사실이다: 전자는 빈칸, 후자가 em dash다.
+let requested = false;
+
+export function markRequested() {
+  requested = true;
+}
+
 export function setText(id, value, fallback = "—", evidence) {
   const node = elements[id];
   if (!node) return;
-  node.textContent = value ?? fallback;
+  node.textContent = value ?? (requested ? fallback : "");
+  delete node.dataset.age;
   if (evidence == null) {
     delete node.dataset.evidence;
     node.removeAttribute("title");
@@ -18,7 +39,23 @@ export function setText(id, value, fallback = "—", evidence) {
   const received = typeof evidence === "object" ? evidence.received_at : undefined;
   if (state) node.dataset.evidence = state;
   else delete node.dataset.evidence;
-  if (received) node.title = received;
+
+  // 신선한 값에는 나이도 임계도 붙이지 않는다 — 여유로울 때 시간을 적으면
+  // 화면 전체가 시끄러워진다.
+  if (state !== "delayed" && state !== "disconnected") {
+    if (received) node.title = received;
+    else node.removeAttribute("title");
+    return;
+  }
+
+  const age = ageSeconds(received);
+  const parts = [];
+  if (age != null) {
+    node.dataset.age = age.toFixed(1);
+    parts.push(`${age.toFixed(1)}초 낡음`);
+  }
+  if (received) parts.push(received);
+  if (parts.length) node.title = parts.join(" · ");
   else node.removeAttribute("title");
 }
 

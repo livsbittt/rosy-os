@@ -42,6 +42,16 @@
   </aside>
 
   <main id="dashboard-main" class="dashboard" aria-label="Rosy OS 상태">
+    <section id="triage" class="triage" hidden aria-live="polite">
+      <div class="triage-head">
+        <div class="triage-copy">
+          <h2 id="triage-title"></h2>
+          <p id="triage-detail"></p>
+        </div>
+      </div>
+      <ul id="triage-context" class="triage-context"></ul>
+    </section>
+
     <section class="hero-strip" aria-labelledby="robot-heading">
       <div class="hero-copy">
         <h1 id="robot-heading"><span id="robot-name">Rosy</span><em id="robot-id">연결 대기</em></h1>
@@ -49,13 +59,13 @@
       </div>
       <div class="hero-state">
         <span class="hero-label">CURRENT MODE</span>
-        <strong id="robot-mode">—</strong>
-        <span id="state-sequence" class="sequence">SEQ —</span>
+        <strong id="robot-mode"></strong>
+        <span id="state-sequence" class="sequence">SEQ</span>
       </div>
       <div class="hero-safety" id="safety-indicator">
         <span class="hero-label">SAFETY CIRCUIT</span>
         <strong id="safety-label">UNKNOWN</strong>
-        <span id="safety-source">상태 없음</span>
+        <span id="safety-source">확인 전</span>
       </div>
     </section>
 
@@ -64,33 +74,33 @@
         <div>
           <h2 id="system-heading">호스트 상태</h2>
         </div>
-        <span id="host-name" class="machine-tag">—</span>
+        <span id="host-name" class="machine-tag"></span>
       </div>
       <div class="system-identity">
-        <div><span>운영체제</span><strong id="os-name">—</strong></div>
-        <div><span>커널 / 아키텍처</span><strong id="kernel-name">—</strong></div>
-        <div><span>IP 주소</span><strong id="network-address">—</strong></div>
-        <div><span>업타임</span><strong id="uptime">—</strong></div>
+        <div><span>운영체제</span><strong id="os-name"></strong></div>
+        <div><span>커널 / 아키텍처</span><strong id="kernel-name"></strong></div>
+        <div><span>IP 주소</span><strong id="network-address"></strong></div>
+        <div><span>업타임</span><strong id="uptime"></strong></div>
       </div>
       <div class="meter-stack">
         <article class="meter">
-          <header><span>CPU</span><b id="cpu-value">—</b></header>
+          <header><span>CPU</span><b id="cpu-value"></b></header>
           <div class="meter-rail"><i id="cpu-bar"></i></div>
           <footer id="cpu-detail">표본 수집 대기</footer>
         </article>
         <article class="meter">
-          <header><span>MEMORY</span><b id="memory-value">—</b></header>
+          <header><span>MEMORY</span><b id="memory-value"></b></header>
           <div class="meter-rail"><i id="memory-bar"></i></div>
-          <footer id="memory-detail">—</footer>
+          <footer id="memory-detail"></footer>
         </article>
         <article class="meter">
-          <header><span>STORAGE</span><b id="storage-value">—</b></header>
+          <header><span>STORAGE</span><b id="storage-value"></b></header>
           <div class="meter-rail"><i id="storage-bar"></i></div>
           <footer id="storage-detail">Rosy 데이터 영역</footer>
         </article>
         <article class="temperature-card">
           <span>CORE TEMP</span>
-          <strong id="temperature">—</strong>
+          <strong id="temperature"></strong>
           <small id="temperature-state">센서 확인 중</small>
         </article>
       </div>
@@ -110,15 +120,15 @@
                  aria-labelledby="network-card-heading">
           <header>
             <h3 id="network-card-heading">네트워크</h3>
-            <span id="network-mode" class="mode-chip" data-mode="UNKNOWN">—</span>
+            <span id="network-mode" class="mode-chip" data-mode="UNKNOWN"></span>
           </header>
           <dl class="host-facts">
-            <div><dt>SSID</dt><dd id="network-ssid">—</dd></div>
-            <div><dt>WLAN IPv4</dt><dd id="network-ipv4">—</dd></div>
-            <div><dt>기본 경로</dt><dd id="network-route">—</dd></div>
-            <div><dt>DNS</dt><dd id="network-dns">—</dd></div>
-            <div><dt>인터넷</dt><dd id="network-internet">—</dd></div>
-            <div><dt>같은 WLAN 단말 접근</dt><dd id="network-peer">—</dd></div>
+            <div><dt>SSID</dt><dd id="network-ssid"></dd></div>
+            <div><dt>WLAN IPv4</dt><dd id="network-ipv4"></dd></div>
+            <div><dt>기본 경로</dt><dd id="network-route"></dd></div>
+            <div><dt>DNS</dt><dd id="network-dns"></dd></div>
+            <div><dt>인터넷</dt><dd id="network-internet"></dd></div>
+            <div><dt>같은 WLAN 단말 접근</dt><dd id="network-peer"></dd></div>
           </dl>
           <p class="host-note" id="network-note" role="status"></p>
           <form id="network-apply-form">
@@ -134,15 +144,15 @@
                  aria-labelledby="release-card-heading">
           <header>
             <h3 id="release-card-heading">릴리스</h3>
-            <span id="release-state" class="mode-chip" data-mode="UNKNOWN">—</span>
+            <span id="release-state" class="mode-chip" data-mode="UNKNOWN"></span>
           </header>
           <dl class="host-facts">
-            <div><dt>current</dt><dd id="release-current">—</dd></div>
-            <div><dt>previous</dt><dd id="release-previous">—</dd></div>
-            <div><dt>staged</dt><dd id="release-staged">—</dd></div>
-            <div><dt>Git revision</dt><dd id="release-revision">—</dd></div>
-            <div><dt>config / data schema</dt><dd id="release-schema">—</dd></div>
-            <div><dt>마지막 실패</dt><dd id="release-failure">—</dd></div>
+            <div><dt>current</dt><dd id="release-current"></dd></div>
+            <div><dt>previous</dt><dd id="release-previous"></dd></div>
+            <div><dt>staged</dt><dd id="release-staged"></dd></div>
+            <div><dt>Git revision</dt><dd id="release-revision"></dd></div>
+            <div><dt>config / data schema</dt><dd id="release-schema"></dd></div>
+            <div><dt>마지막 실패</dt><dd id="release-failure"></dd></div>
           </dl>
           <p class="host-note" id="release-note" role="status"></p>
           <div class="host-actions">
@@ -158,7 +168,7 @@
         <article class="host-card" id="commissioning-card" data-step="3" aria-labelledby="commissioning-heading">
           <header>
             <h3 id="commissioning-heading">커미셔닝</h3>
-            <span id="commissioning-mode" class="mode-chip" data-mode="UNKNOWN">—</span>
+            <span id="commissioning-mode" class="mode-chip" data-mode="UNKNOWN"></span>
           </header>
           <p class="host-note" id="commissioning-note" role="status">확인 전</p>
         </article>
@@ -173,19 +183,19 @@
         <span id="ros-graph-status" class="machine-tag" data-status="UNAVAILABLE">확인 전</span>
       </div>
       <div class="ros-network-facts">
-        <article><span>DOMAIN ID</span><strong id="ros-domain-id">—</strong><small>장비별 고유 값</small></article>
-        <article><span>NAMESPACE</span><strong id="ros-namespace">—</strong><small>로봇 식별 경계</small></article>
-        <article><span>DDS ISOLATION</span><strong id="dds-isolation">—</strong><small id="dds-interface">인터페이스 확인 전</small></article>
-        <article><span>NODES</span><strong id="ros-node-count">—</strong><small>발견된 프로세스</small></article>
-        <article><span>TOPICS</span><strong id="ros-topic-count">—</strong><small>메시지 경로</small></article>
+        <article><span>DOMAIN ID</span><strong id="ros-domain-id"></strong><small>장비별 고유 값</small></article>
+        <article><span>NAMESPACE</span><strong id="ros-namespace"></strong><small>로봇 식별 경계</small></article>
+        <article><span>DDS ISOLATION</span><strong id="dds-isolation"></strong><small id="dds-interface">인터페이스 확인 전</small></article>
+        <article><span>NODES</span><strong id="ros-node-count"></strong><small>발견된 프로세스</small></article>
+        <article><span>TOPICS</span><strong id="ros-topic-count"></strong><small>메시지 경로</small></article>
       </div>
       <div class="network-traffic-grid">
         <article class="traffic-card traffic-rx">
-          <header><span>WLAN / HOST RX</span><strong id="network-rx-rate">—</strong></header>
+          <header><span>WLAN / HOST RX</span><strong id="network-rx-rate"></strong></header>
           <svg id="network-sparkline-rx" class="network-sparkline" viewBox="0 0 120 36" role="img" aria-label="수신 대역폭 최근 변화"></svg>
         </article>
         <article class="traffic-card traffic-tx">
-          <header><span>WLAN / HOST TX</span><strong id="network-tx-rate">—</strong></header>
+          <header><span>WLAN / HOST TX</span><strong id="network-tx-rate"></strong></header>
           <svg id="network-sparkline-tx" class="network-sparkline" viewBox="0 0 120 36" role="img" aria-label="송신 대역폭 최근 변화"></svg>
         </article>
       </div>
@@ -207,7 +217,7 @@
         <div>
           <h2 id="motion-heading">로봇 텔레메트리</h2>
         </div>
-        <span id="state-age" class="machine-tag">—</span>
+        <span id="state-age" class="machine-tag"></span>
       </div>
       <div class="telemetry-grid">
         <article><span>X</span><strong id="pose-x">0.000</strong><small>metres</small></article>
@@ -215,10 +225,10 @@
         <article><span>YAW</span><strong id="pose-yaw">0.000</strong><small>radians</small></article>
         <article><span>LINEAR</span><strong id="velocity-linear">0.000</strong><small>m/s</small></article>
         <article><span>ANGULAR</span><strong id="velocity-angular">0.000</strong><small>rad/s</small></article>
-        <article><span>BATTERY</span><strong id="battery-value">—</strong><small id="battery-voltage">voltage —</small></article>
+        <article><span>BATTERY</span><strong id="battery-value"></strong><small id="battery-voltage">voltage</small></article>
       </div>
       <div class="navigation-line">
-        <span>NAVIGATION</span><b id="navigation-state">—</b><small id="map-id">map —</small>
+        <span>NAVIGATION</span><b id="navigation-state"></b><small id="map-id">map</small>
       </div>
     </section>
 
@@ -370,8 +380,8 @@
           </header>
           <p class="host-note">관리자만 바꿀 수 있습니다. ~/.rosy/rosy.yaml 에 남습니다. 속도는 프로필 상한을 넘기지 않으며, 배터리 임계는 deep &lt; critical &lt; warning 이어야 합니다.</p>
           <dl class="host-facts">
-            <div><dt>프로필 최대 직선</dt><dd id="limit-max-linear">—</dd></div>
-            <div><dt>프로필 최대 회전</dt><dd id="limit-max-angular">—</dd></div>
+            <div><dt>프로필 최대 직선</dt><dd id="limit-max-linear"></dd></div>
+            <div><dt>프로필 최대 회전</dt><dd id="limit-max-angular"></dd></div>
           </dl>
           <form id="limits-form">
             <label for="limit-manual-linear">수동 직선 m/s</label>
@@ -404,7 +414,7 @@
         <article class="settings-card" aria-labelledby="slam-heading">
           <header>
             <h3 id="slam-heading">맵핑 세션</h3>
-            <span id="slam-capability" class="mode-chip" data-mode="UNKNOWN">—</span>
+            <span id="slam-capability" class="mode-chip" data-mode="UNKNOWN"></span>
           </header>
           <p class="host-note">SLAM 세션은 이 로봇에서만 동작합니다. 저장하면 현재 map_id가 바뀝니다.</p>
           <div class="host-actions">
@@ -424,7 +434,7 @@
         <article class="settings-card" aria-labelledby="dock-heading">
           <header>
             <h3 id="dock-heading">도크</h3>
-            <span id="dock-capability" class="mode-chip" data-mode="UNKNOWN">—</span>
+            <span id="dock-capability" class="mode-chip" data-mode="UNKNOWN"></span>
           </header>
           <p class="host-note" id="dock-status-note">등록과 teach는 저장소에 남습니다. 실제 도킹 명령은 capability가 켜진 로봇에서만 나갑니다.</p>
           <form id="dock-form">
@@ -463,7 +473,7 @@
         <div>
           <h2 id="capability-heading">기능 가용성</h2>
         </div>
-        <span id="capability-count" class="machine-tag">—</span>
+        <span id="capability-count" class="machine-tag"></span>
       </div>
       <div id="capability-list" class="capability-list" aria-live="polite">
         <p class="empty-state">연결 후 기능 계약을 표시합니다.</p>
@@ -485,7 +495,7 @@
 
   <footer class="page-footer">
     <span>ROSY OS / FASTAPI EDGE CONSOLE</span>
-    <span id="last-sync">마지막 동기화 —</span>
+    <span id="last-sync">마지막 동기화</span>
   </footer>
 </body>
 </html>

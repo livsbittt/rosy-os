@@ -1,4 +1,5 @@
 import { createFieldMap } from "./map.js";
+import { triage } from "./triage.js";
 import {
   bindFormSave,
   bytes,
@@ -11,6 +12,7 @@ import {
   setEnabled,
   setFieldMessage,
   setMeter,
+  markRequested,
   setText,
   svgText,
 } from "./dom.js";
@@ -68,6 +70,42 @@ function renderRobotInfo(info) {
   fillIdentityForm(info.robot_id, name);
 }
 
+let triageSeen = {};
+
+function renderTriage() {
+  const node = elements["triage"];
+  if (!node) return;
+  const { headline, context, seenAt } = triage({
+    state: session.robotState,
+    inventory: session.inventory,
+    seenAt: triageSeen,
+  });
+  triageSeen = seenAt;
+
+  // 고장이 없으면 자리를 비운다 — "이상 없음"을 초록으로 칠하지 않는다.
+  node.hidden = !headline;
+  if (!headline) {
+    elements["triage-context"].replaceChildren();
+    return;
+  }
+  node.dataset.category = headline.category;
+  setText("triage-title", headline.title);
+  setText("triage-detail", headline.detail);
+
+  const list = elements["triage-context"];
+  list.replaceChildren();
+  context.forEach((fault) => {
+    const item = document.createElement("li");
+    item.dataset.category = fault.category;
+    const title = document.createElement("b");
+    title.textContent = fault.title;
+    const detail = document.createElement("span");
+    detail.textContent = fault.detail;
+    item.append(title, detail);
+    list.append(item);
+  });
+}
+
 function renderRobotState(state) {
   session.robotState = state;
   setText("robot-id", state.robot_id || "—");
@@ -95,6 +133,7 @@ function renderRobotState(state) {
   setText("safety-source", stopped ? "비상정지 활성" : "주행 회로 정상");
   setConnection("online", "상태 스트림 연결");
   setText("last-sync", `마지막 동기화 ${new Date().toLocaleTimeString("ko-KR")}`);
+  renderTriage();
   if (session.teleopActive && !teleopEligible()) stopTeleop("운전 조건이 변경되어 정지했습니다.");
   updateTeleopControls();
   fieldMap.setPose();
@@ -301,6 +340,7 @@ function renderCapabilities(capabilities) {
 }
 
 function renderInventory(inventory) {
+  session.inventory = inventory;
   const rows = (inventory?.descriptors || []).filter(
     (row) => row.state && row.state !== "not_provided",
   );
@@ -323,6 +363,7 @@ function renderInventory(inventory) {
   });
   const usable = rows.filter((row) => row.state === "available" || row.state === "constrained");
   setText("capability-count", `${usable.length} / ${rows.length}`);
+  renderTriage();
 }
 
 function teleopEligible() {
@@ -641,7 +682,10 @@ async function refreshSlowData() {
 }
 
 async function refreshRobotState() {
-  renderRobotState(await api("/api/v1/robot/state"));
+  const state = await api("/api/v1/robot/state");
+  // 이제부터는 빈 값이 "물었는데 없다"를 뜻한다 — em dash를 쓸 수 있다.
+  markRequested();
+  renderRobotState(state);
 }
 
 function connectStateSocket() {
