@@ -13,6 +13,12 @@ from pathlib import Path
 import pytest
 
 launch = pytest.importorskip("launch")
+if not hasattr(launch, "LaunchContext"):
+    # 여러 시험 디렉터리를 한 번에 돌리면 `src/rosy_gz_sim` 가 sys.path 에 얹히고,
+    # 그때 `import launch` 는 이 패키지의 `launch/` 디렉터리를 namespace 패키지로
+    # 집어온다. importorskip 은 통과하지만 ROS 2 의 launch 가 아니라서 수집이 깨진다.
+    pytest.skip("`launch` resolved to this package's launch/ directory, not ROS 2 launch",
+                allow_module_level=True)
 from launch import LaunchContext  # noqa: E402
 from launch_ros.actions import Node  # noqa: E402
 
