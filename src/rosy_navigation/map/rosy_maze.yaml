@@ -4,4 +4,8 @@ resolution: 0.05
 origin: [-3.34001101961504, -3.34, 0]
 negate: 0
 occupied_thresh: 0.65
-free_thresh: 0.25
+# free_thresh 는 0.196 이다. map_server 는 픽셀을 shade=(255-p)/255 로 읽고
+# shade < free_thresh 면 자유로 친다. 미지 픽셀 205 의 shade 가 정확히 0.196 이라,
+# 0.25 같은 값을 쓰면 맵 바깥의 미지 영역이 통째로 자유 공간이 된다 - 플래너는
+# 벽을 지나 방 밖으로 나가는 지름길을 찾다가 경로를 만들지 못한다.
+free_thresh: 0.196

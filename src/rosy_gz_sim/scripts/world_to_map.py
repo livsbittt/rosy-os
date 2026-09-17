@@ -139,7 +139,10 @@ def write_map(grid: list[list[int]], x0: float, y0: float, resolution: float,
         f"origin: [{x0}, {y0}, 0]\n"
         f"negate: 0\n"
         f"occupied_thresh: 0.65\n"
-        f"free_thresh: 0.25\n",
+        # 미지 픽셀 205 의 shade 는 (255-205)/255 = 0.196 이다. free_thresh 가 이보다
+        # 크면 map_server 가 미지를 자유로 읽어 맵 바깥이 통째로 뚫린 공간이 되고,
+        # 플래너는 벽을 지나 밖으로 나가는 지름길을 찾다가 경로를 못 만든다.
+        f"free_thresh: 0.196\n",
         encoding="utf-8")
 
 

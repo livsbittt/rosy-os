@@ -113,9 +113,17 @@
                         <far>100</far>
                     </clip>
                 </camera>
-                <always_on>1</always_on>
-                <update_rate>30</update_rate>
-                <visualize>true</visualize>
+                <!-- 구독자가 있을 때만 그린다 (D-34). always_on 1 은 아무도 보지 않는
+                     1280x720 프레임을 초당 30 장 렌더한다. GPU 없는 WSL 의
+                     소프트웨어 렌더러에서 그 하나가 RTF 를 0.07 로 끌어내렸고,
+                     0 으로 바꾼 뒤 같은 기계에서 0.98 이 나왔다. 라이다와 항법이
+                     함께 굶던 원인이다.
+                     이 파일의 주석에는 콜론과 따옴표를 쓰지 않는다. launch 가
+                     robot_description 을 YAML 로 한 번 훑기 때문에 그 둘이 있으면
+                     문자열이 매핑으로 읽혀 런치가 통째로 깨진다. -->
+                <always_on>0</always_on>
+                <update_rate>10</update_rate>
+                <visualize>false</visualize>
                 <topic>${namespace}camera/image_raw</topic>
                 <gz_frame_id>${namespace}front_camera_link</gz_frame_id>
             </sensor>

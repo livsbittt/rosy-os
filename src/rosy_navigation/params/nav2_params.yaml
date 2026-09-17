@@ -287,7 +287,12 @@ planner_server:
       plugin: "nav2_navfn_planner::NavfnPlanner"
       tolerance: 0.5
       use_astar: false
-      allow_unknown: true
+      # global_costmap 이 `track_unknown_space: true` 인데 플래너까지 미지 영역을 허용하면,
+      # 맵 바깥(로봇이 본 적 없는 곳)이 플래너에게는 뻥 뚫린 지름길이 된다. 방을 빙 돌아
+      # 나가는 경로가 벽을 따라가는 경로보다 싸지고, NavFn 은 그 전위장에서 경로를 되짚지
+      # 못해 "Failed to create a plan from potential" 로 끝난다 — 6x6 미로에서 실제로
+      # 모든 장거리 목표가 이렇게 실패했고, false 로 바꾸자 그대로 주파했다.
+      allow_unknown: false
 
 smoother_server:
   ros__parameters:
