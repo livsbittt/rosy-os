@@ -9,12 +9,25 @@ from rosy_core.protocol.schemas import (
     EnvelopeType,
     EventMessage,
     PoseSample,
+    RobotMode,
     Severity,
     StateSnapshot,
     SwarmFollowParams,
     SwarmRole,
     SwarmStatus,
 )
+
+
+def test_robot_mode_has_no_soccer():
+    """D-90: 축구는 게임 호스트다. CORE 모드가 아니다."""
+    assert "SOCCER" not in RobotMode.__members__
+    assert set(RobotMode) == {
+        RobotMode.IDLE,
+        RobotMode.MANUAL,
+        RobotMode.NAVIGATION,
+        RobotMode.DOCKING,
+        RobotMode.EMERGENCY,
+    }
 
 
 def test_envelope_defaults():

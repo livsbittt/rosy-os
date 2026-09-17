@@ -87,3 +87,10 @@
 - 결정: D-87–D-89 Accepted
 - 교훈: 없음
 
+## 2026-09-17 · uncommitted · docs(adr): lock soccer as a game host (D-90)
+- 변경: RobotMode에 SOCCER 없음. 1단계는 노트북 천장 카메라 + MANUAL teleop
+- 증거: `python -m pytest src/rosy_core/test/test_protocol_schemas.py test/test_network_topology_contracts.py -q`
+- gate 변화: 없음. DEVICE/FIELD HOLD
+- 결정: D-90 Accepted
+- 교훈: 없음
+

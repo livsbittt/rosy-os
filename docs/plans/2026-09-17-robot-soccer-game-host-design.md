@@ -4,7 +4,7 @@
 
 상태: 방향 합의. 구현·현장 1v1 GO가 아니다. DEVICE/FIELD 검증이 HOLD인 동안 서로 박는 속도의 경기를 성공으로 적지 않는다.
 
-관련: D-1, D-2, D-12, D-33, D-38, D-59, D-62 · [선택 슬라이스](2026-09-16-optional-runtime-slices-design.md) · [모듈형 미들웨어](2026-09-16-modular-middleware-goal-design.md) · [Device 검증](2026-09-13-rosy-os-device-validation-implementation-plan.md) · CORE SRS §8.1 CMD-001 / SAF-001 / SAF-002 / SAF-004 · API Ref §5.5, §6.1
+관련: D-1, D-2, D-12, D-33, D-38, D-59, D-62, **D-90** · [선택 슬라이스](2026-09-16-optional-runtime-slices-design.md) · [모듈형 미들웨어](2026-09-16-modular-middleware-goal-design.md) · [Device 검증](2026-09-13-rosy-os-device-validation-implementation-plan.md) · CORE SRS §8.1 CMD-001 / SAF-001 / SAF-002 / SAF-004 · API Ref §5.5, §6.1
 
 ## 1. 방향
 

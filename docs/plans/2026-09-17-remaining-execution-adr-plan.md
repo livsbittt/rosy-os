@@ -26,6 +26,7 @@ origin을 푸시하지 않는다.
 | G4 Device | D-80, D-51 | viewport |
 | IMU / 도크 ESP32 / hardware COPY | D-56, D-84, D-85 | 기존 유지 |
 | deploy identity SHA | D-86 | POSIX에서만 |
+| Pinky 1v1 축구를 CORE 모드로? | **D-90** | 아니요. 노트북 게임 호스트 |
 
 ## 3. 새 ADR 요약
 
@@ -34,6 +35,7 @@ origin을 푸시하지 않는다.
 | D-87 | D-83은 `install/setup.bash`가 있는 Linux에서만. x86 빌드 ≠ ARTIFACT |
 | D-88 | Fleet 소켓은 관제 PC. 로봇 이미지 금지. D-83 전 소켓 금지 |
 | D-89 | D-35는 D-83 Task 14 재실행 전까지 닫지 않음 |
+| D-90 | 축구는 게임 호스트. `RobotMode.SOCCER` 없음 |
 
 ## 4. 실행 순서 (다음 세션)
 
