@@ -36,6 +36,10 @@ button, input { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { color: inherit; }
 
+[data-evidence="delayed"] { color: var(--status-warn); }
+[data-evidence="disconnected"],
+[data-evidence="unavailable"] { color: var(--muted); }
+
 .ambient-grid {
   position: fixed;
   inset: 0;

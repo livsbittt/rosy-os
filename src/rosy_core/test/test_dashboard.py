@@ -350,6 +350,47 @@ def test_dashboard_assets_are_compressed_for_the_robot_access_point(dashboard_cl
     assert page.headers.get("content-encoding") == "gzip"
 
 
+def test_dashboard_binds_server_evidence_and_gates_stale_motion():
+    """S4 / G4: 텔레메트리만 서버 evidence를 싣고, 낡은 pose·velocity는 teleop을 막는다.
+
+    호스트명·시계 같은 정적 텍스트는 대상이 아니다. 클라이언트는 임계값을
+    다시 계산하지 않는다.
+    """
+    app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+    dom = (WEB_ROOT / "dom.js").read_text(encoding="utf-8")
+    css = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+    channels = {
+        "pose-x": "pose",
+        "pose-y": "pose",
+        "pose-yaw": "pose",
+        "velocity-linear": "velocity",
+        "velocity-angular": "velocity",
+        "battery-value": "battery",
+        "battery-voltage": "battery",
+        "navigation-state": "navigation",
+    }
+    assert "export const TELEMETRY_CHANNELS" in app
+    for element_id, channel in channels.items():
+        assert f'"{element_id}": "{channel}"' in app
+        assert f'setText("{element_id}"' in app
+        assert f"state.evidence?.{channel}" in app
+
+    assert 'setText("host-name", runtime.hostname);' in app
+    assert 'setText("clock"' in app
+    assert "motionEvidenceBlocks" in app
+    assert "!motionEvidenceBlocks(session.robotState)" in app
+    assert "pose ${pose} · velocity ${velocity}" in app
+    assert 'evidenceOf(session.robotState, "pose") === "fresh"' in app
+    assert "dataset.evidence" in dom
+    assert '[data-evidence="delayed"]' in css
+    assert '[data-evidence="disconnected"]' in css
+    assert '[data-evidence="unavailable"]' in css
+    assert "stale_after_s" not in app
+    assert "stale_after_s" not in dom
+    assert "stale_after_s" not in css
+
+
 def test_uncompressed_clients_still_get_the_dashboard(dashboard_client):
     """압축은 협상이다. Accept-Encoding이 없으면 원본을 그대로 준다."""
     response = dashboard_client.get(

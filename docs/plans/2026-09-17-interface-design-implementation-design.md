@@ -278,8 +278,21 @@ S1에서 잡은 기존 결함 둘(§11-2, §11-3)은 해소했다. `styles.css`�
 (`rgba(244,186,84,·)`)는 토큰으로 옮겼을 뿐 **의미 재배치는 하지 않았다** —
 어느 색이 어느 집합인지 정리하는 것은 S5다.
 
-남은 단계: S3(서버 신선도 판정) · S4(클라이언트 증거 상태 = G4) ·
-S5(장식 제거) · S6(capability 4상태) · S7(거버넌스 정정). 모두 미승인.
+**S3·S4 실행 (2026-09-17).** 사용자 지시로 이어서 처리. G4 게이트 행은
+device-validation 계획이 소유하므로 이 단계에서는 쓰지 않는다(S7).
+
+| 단계 | 결과 | 증거 |
+|---|---|---|
+| S3 서버 판정 | 완료 | `StateSnapshot.evidence` additive. `rosy_core` 809 passed, 10 skipped. API Ref v1.8. envelope `protocol_version` 1.0 유지 |
+| S4 클라이언트 게이트 | 완료 | 텔레메트리 8칸만 `data-evidence`. teleop은 pose+velocity `fresh`일 때만. click-to-goal은 pose `fresh`. 클라이언트에 `stale_after_s` 산술 없음 |
+
+**L3 미달 2건 — S4 소스 상한 초과.** 예산 ≤ +1,500 B, 실제 서빙 자산
+**+2,425 B** (`app.js` +1,711, `dom.js` +568, `styles.css` +146).
+S1과 같이 압축 뒤 L1 여유가 있고 계약 시험이 우선이라 되돌리지 않으며,
+상한을 빗나갔음을 기록한다.
+
+남은 단계: S5(장식 제거) · S6(capability 4상태) · S7(거버넌스 정정).
+S8(콘솔 통합)은 이 계획 밖.
 
 ## 12. RALPLAN 루프 상태
 

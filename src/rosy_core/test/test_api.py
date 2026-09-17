@@ -201,6 +201,29 @@ def test_inventory_leaves_booting_after_a_diagnostic(client):
     assert robot["mode"] == "IDLE"
 
 
+def test_robot_state_carries_server_judged_evidence(client):
+    tc, svc = client
+    body = tc.get("/api/v1/robot/state", headers=VIEWER).json()
+    evidence = body["evidence"]
+    for channel in ("pose", "velocity", "battery", "navigation", "safety", "docking"):
+        record = evidence[channel]
+        assert record["evidence"] in ("fresh", "delayed", "disconnected", "unavailable")
+        assert isinstance(record["stale_after_s"], (int, float))
+        assert record["evidence"] == "disconnected"
+        assert record["received_at"] is None
+    assert evidence["pose"]["stale_after_s"] == 2.0
+    assert evidence["velocity"]["stale_after_s"] == 0.5
+    assert evidence["safety"]["stale_after_s"] == 0.2
+
+    svc.state.set_pose(1.0, 2.0, 0.0)
+    svc.state.set_velocity(0.1, 0.0)
+    fresh = tc.get("/api/v1/robot/state", headers=VIEWER).json()["evidence"]
+    assert fresh["pose"]["evidence"] == "fresh"
+    assert fresh["velocity"]["evidence"] == "fresh"
+    assert fresh["pose"]["received_at"]
+    assert fresh["battery"]["evidence"] == "disconnected"
+
+
 def test_inventory_is_a_mobile_base_without_pick_or_rfid(client):
     tc, _svc = client
     response = tc.get("/api/v1/system/inventory", headers=VIEWER)

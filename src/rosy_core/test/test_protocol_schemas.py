@@ -40,6 +40,28 @@ def test_state_snapshot_defaults():
     snap = StateSnapshot(robot_id="rosy_01")
     assert snap.mode.value == "IDLE"
     assert snap.navigation.value == "IDLE"
+    assert snap.evidence == {}
+
+
+def test_state_snapshot_evidence_is_additive():
+    """v1.8: evidence 없는 구 페이로드도 읽고, 모르는 채널 키는 유지한다(API-002)."""
+    dumped = StateSnapshot(robot_id="rosy_01").model_dump()
+    dumped.pop("evidence", None)
+    restored = StateSnapshot.model_validate(dumped)
+    assert restored.evidence == {}
+
+    from rosy_core.protocol.evidence import EvidenceState, ValueEvidence
+
+    snap = StateSnapshot(
+        robot_id="rosy_01",
+        evidence={
+            "pose": ValueEvidence(evidence=EvidenceState.FRESH, stale_after_s=2.0),
+            "custom_channel": ValueEvidence(evidence=EvidenceState.UNAVAILABLE),
+        },
+    )
+    roundtrip = StateSnapshot.model_validate(snap.model_dump())
+    assert roundtrip.evidence["pose"].evidence is EvidenceState.FRESH
+    assert "custom_channel" in roundtrip.evidence
 
 
 def test_swarm_status_additive_default():

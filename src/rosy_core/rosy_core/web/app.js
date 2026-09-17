@@ -37,9 +37,29 @@ const fieldMap = createFieldMap({
   apiMaybe,
   getPose: () => session.robotState?.pose,
   getNavigation: () => session.robotState?.navigation,
-  canGoal: () => session.capabilities?.navigation?.goal_navigation === true,
+  canGoal: () => session.capabilities?.navigation?.goal_navigation === true
+    && evidenceOf(session.robotState, "pose") === "fresh",
   setAction: (text) => setText("action-message", text),
 });
+
+export const TELEMETRY_CHANNELS = Object.freeze({
+  "pose-x": "pose",
+  "pose-y": "pose",
+  "pose-yaw": "pose",
+  "velocity-linear": "velocity",
+  "velocity-angular": "velocity",
+  "battery-value": "battery",
+  "battery-voltage": "battery",
+  "navigation-state": "navigation",
+});
+
+function evidenceOf(state, channel) {
+  return state?.evidence?.[channel]?.evidence;
+}
+
+function motionEvidenceBlocks(state) {
+  return evidenceOf(state, "pose") !== "fresh" || evidenceOf(state, "velocity") !== "fresh";
+}
 
 function renderRobotInfo(info) {
   const name = info.robot_name || info.name || "Rosy";
@@ -53,14 +73,14 @@ function renderRobotState(state) {
   setText("robot-id", state.robot_id || "—");
   setText("robot-mode", state.mode);
   setText("state-sequence", `SEQ ${state.seq ?? "—"}`);
-  setText("pose-x", number(state.pose?.x, 3));
-  setText("pose-y", number(state.pose?.y, 3));
-  setText("pose-yaw", number(state.pose?.yaw, 3));
-  setText("velocity-linear", number(state.velocity?.linear, 3));
-  setText("velocity-angular", number(state.velocity?.angular, 3));
-  setText("battery-value", percent(state.battery?.percent));
-  setText("battery-voltage", Number.isFinite(Number(state.battery?.voltage)) ? `${number(state.battery.voltage, 2)} V` : "voltage —");
-  setText("navigation-state", state.navigation);
+  setText("pose-x", number(state.pose?.x, 3), "—", state.evidence?.pose);
+  setText("pose-y", number(state.pose?.y, 3), "—", state.evidence?.pose);
+  setText("pose-yaw", number(state.pose?.yaw, 3), "—", state.evidence?.pose);
+  setText("velocity-linear", number(state.velocity?.linear, 3), "—", state.evidence?.velocity);
+  setText("velocity-angular", number(state.velocity?.angular, 3), "—", state.evidence?.velocity);
+  setText("battery-value", percent(state.battery?.percent), "—", state.evidence?.battery);
+  setText("battery-voltage", Number.isFinite(Number(state.battery?.voltage)) ? `${number(state.battery.voltage, 2)} V` : "voltage —", "—", state.evidence?.battery);
+  setText("navigation-state", state.navigation, "—", state.evidence?.navigation);
   setText("map-id", `map ${state.map_id || "—"}`);
   setText("state-age", state.timestamp ? new Date(state.timestamp).toLocaleTimeString("ko-KR") : "—");
   setText("hero-message", state.online === false ? "로봇이 오프라인 상태를 보고했습니다." : "로봇 런타임과 상태 스트림이 연결되었습니다.");
@@ -90,7 +110,6 @@ function renderSafety(safety) {
   setText("safety-label", stopped ? "STOPPED" : "READY");
   setText("safety-source", safety.source || (stopped ? "source unknown" : "주행 회로 정상"));
   fillSafetyForm(safety);
-  updateTeleopControls();
   updateTeleopControls();
 }
 
@@ -307,7 +326,8 @@ function teleopEligible() {
     && session.capabilities?.teleop === true
     && session.robotState?.mode === "MANUAL"
     && session.robotState?.safety?.estop !== true
-    && elements["bench-safety-confirmed"]?.checked,
+    && elements["bench-safety-confirmed"]?.checked
+    && !motionEvidenceBlocks(session.robotState),
   );
 }
 
@@ -322,6 +342,10 @@ function updateTeleopControls() {
     setText("teleop-message", "현재 하드웨어 프로필에서 teleop을 사용할 수 없습니다.");
   } else if (session.robotState?.safety?.estop) {
     setText("teleop-message", "비상정지가 활성화되어 있습니다.");
+  } else if (motionEvidenceBlocks(session.robotState)) {
+    const pose = evidenceOf(session.robotState, "pose") || "unavailable";
+    const velocity = evidenceOf(session.robotState, "velocity") || "unavailable";
+    setText("teleop-message", `pose ${pose} · velocity ${velocity}`);
   } else if (session.robotState?.mode !== "MANUAL") {
     setText("teleop-message", "MANUAL 모드로 전환해야 합니다.");
   } else if (!elements["bench-safety-confirmed"]?.checked) {

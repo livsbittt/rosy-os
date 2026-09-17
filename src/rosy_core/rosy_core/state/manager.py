@@ -5,6 +5,9 @@ from __future__ import annotations
 import threading
 from typing import Optional
 
+import time
+
+from rosy_core.protocol.evidence import CHANNEL_STALE_AFTER_S, judge
 from rosy_core.protocol.schemas import (
     Battery,
     BatteryStatus,
@@ -41,10 +44,12 @@ def _as_map_id(value) -> Optional[str]:
 
 
 class StateManager:
-    def __init__(self, robot_id: str) -> None:
+    def __init__(self, robot_id: str, clock=time.time) -> None:
         self._robot_id = robot_id
+        self._clock = clock
         self._lock = threading.Lock()
         self._seq = 0
+        self._received: dict[str, float] = {}
         self._mode: RobotMode = RobotMode.IDLE
         self._navigation: NavigationState = NavigationState.IDLE
         self._pose = Pose()
@@ -71,23 +76,28 @@ class StateManager:
     def set_navigation(self, state: NavigationState) -> None:
         with self._lock:
             self._navigation = state
+            self._received["navigation"] = self._clock()
 
     def set_pose(self, x: float, y: float, yaw: float) -> None:
         with self._lock:
             self._pose = Pose(x=x, y=y, yaw=yaw)
+            self._received["pose"] = self._clock()
 
     def set_velocity(self, linear: float, angular: float) -> None:
         with self._lock:
             self._velocity = Velocity(linear=linear, angular=angular)
+            self._received["velocity"] = self._clock()
 
     def set_battery(self, percent: Optional[float], voltage: Optional[float] = None) -> None:
         with self._lock:
             self._battery = Battery(percent=percent if percent is not None else self._battery.percent,
                                     voltage=voltage if voltage is not None else self._battery.voltage)
+            self._received["battery"] = self._clock()
 
     def set_estop(self, active: bool) -> None:
         with self._lock:
             self._safety = SafetySummary(estop=active)
+            self._received["safety"] = self._clock()
 
     def set_swarm(self, status: SwarmStatus) -> None:
         with self._lock:
@@ -117,6 +127,7 @@ class StateManager:
     def set_docking(self, status: DockingStatus) -> None:
         with self._lock:
             self._docking = status
+            self._received["docking"] = self._clock()
 
     def set_sensor(self, key: str, data: dict) -> None:
         with self._lock:
@@ -139,6 +150,16 @@ class StateManager:
     def snapshot(self) -> StateSnapshot:
         with self._lock:
             self._seq += 1
+            now = self._clock()
+            evidence = {
+                channel: judge(
+                    has_source=True,
+                    received_at=self._received.get(channel),
+                    now=now,
+                    stale_after_s=stale,
+                )
+                for channel, stale in CHANNEL_STALE_AFTER_S.items()
+            }
             return StateSnapshot(
                 robot_id=self._robot_id,
                 online=True,
@@ -156,4 +177,5 @@ class StateManager:
                 diagnostics_summary=dict(self._diagnostics),
                 errors=list(self._errors),
                 seq=self._seq,
+                evidence=evidence,
             )

@@ -5,8 +5,21 @@ export const elements = Object.fromEntries(
   [...document.querySelectorAll("[id]")].map((element) => [element.id, element]),
 );
 
-export function setText(id, value, fallback = "—") {
-  if (elements[id]) elements[id].textContent = value ?? fallback;
+export function setText(id, value, fallback = "—", evidence) {
+  const node = elements[id];
+  if (!node) return;
+  node.textContent = value ?? fallback;
+  if (evidence == null) {
+    delete node.dataset.evidence;
+    node.removeAttribute("title");
+    return;
+  }
+  const state = typeof evidence === "string" ? evidence : evidence.evidence;
+  const received = typeof evidence === "object" ? evidence.received_at : undefined;
+  if (state) node.dataset.evidence = state;
+  else delete node.dataset.evidence;
+  if (received) node.title = received;
+  else node.removeAttribute("title");
 }
 
 export function number(value, digits = 1) {

@@ -19,6 +19,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
+from rosy_core.protocol.evidence import ValueEvidence
+
 PROTOCOL_VERSION = "1.0"
 
 
@@ -272,6 +274,9 @@ class StateSnapshot(BaseModel):
     diagnostics_summary: dict[str, HealthState] = Field(default_factory=dict)
     seq: int = 0
     timestamp: str = Field(default_factory=utc_now_iso)
+    #: v1.8 additive. Server-judged freshness per channel. Consumers must ignore
+    #: unknown keys (API-002). Client must not recompute thresholds.
+    evidence: dict[str, ValueEvidence] = Field(default_factory=dict)
 
 
 class HeartbeatPayload(BaseModel):
