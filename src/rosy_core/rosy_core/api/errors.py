@@ -66,9 +66,13 @@ def register_exception_handlers(app) -> None:
 
     @app.exception_handler(CapabilityError)
     async def _cap_error(_: Request, exc: CapabilityError):
-        return JSONResponse(status_code=501,
-                            content=error_body("CAPABILITY_NOT_SUPPORTED", str(exc),
-                                               {"capability": exc.feature}))
+        detail = {"capability": exc.feature}
+        if exc.concept_id:
+            detail["concept_id"] = exc.concept_id
+        return JSONResponse(
+            status_code=501,
+            content=error_body("CAPABILITY_NOT_SUPPORTED", str(exc), detail),
+        )
 
     @app.exception_handler(RequestValidationError)
     async def _validation(_: Request, exc: RequestValidationError):

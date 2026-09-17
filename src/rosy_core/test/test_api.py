@@ -554,8 +554,12 @@ def test_disabled_navigation_capabilities_return_501(client):
 
     assert goal.status_code == 501
     assert goal.json()["error"]["code"] == "CAPABILITY_NOT_SUPPORTED"
+    assert goal.json()["error"]["detail"]["capability"] == "navigation.goal_navigation"
+    assert goal.json()["error"]["detail"]["concept_id"] == "mobility.navigate"
     assert home.status_code == 501
     assert home.json()["error"]["code"] == "CAPABILITY_NOT_SUPPORTED"
+    assert home.json()["error"]["detail"]["capability"] == "navigation.return_home"
+    assert home.json()["error"]["detail"]["concept_id"] == "mobility.navigate"
 
 
 def test_audit_log_is_admin_only_and_survives_the_ring_buffer(client):

@@ -6,9 +6,10 @@ from typing import Any
 
 
 class CapabilityError(Exception):
-    def __init__(self, feature: str) -> None:
+    def __init__(self, feature: str, concept_id: str | None = None) -> None:
         super().__init__(f"capability not supported: {feature}")
         self.feature = feature
+        self.concept_id = concept_id
 
 
 def _walk(data: Any, dotted: str) -> Any:

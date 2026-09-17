@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import enum
 
-from rosy_core.capability import Capability
+from rosy_core.capability import Capability, CapabilityError
 
 
 class TaskKind(str, enum.Enum):
@@ -35,4 +35,7 @@ class TaskKind(str, enum.Enum):
         }[self]
 
     def require(self, capability: Capability) -> None:
-        capability.require(self.capability)
+        try:
+            capability.require(self.capability)
+        except CapabilityError as exc:
+            raise CapabilityError(self.capability, concept_id=self.concept_id) from exc

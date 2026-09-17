@@ -1,5 +1,8 @@
 """D-74: TaskKind work commands sink to ROS; system/host queries stay in CORE."""
 
+import pytest
+
+from rosy_core.capability import Capability, CapabilityError
 from rosy_core.domain.command_mapping import (
     CORE_LOCAL_PREFIXES,
     TASK_ROS_INTERFACE,
@@ -27,6 +30,14 @@ def test_queries_and_host_agent_are_not_ros_commands():
         assert "navigation" not in prefix
         assert "docking" not in prefix
         assert "swarm" not in prefix
+
+
+def test_taskkind_require_keeps_cap001_flag_and_adds_concept_id():
+    cap = Capability({"teleop": False})
+    with pytest.raises(CapabilityError) as caught:
+        TaskKind.MOVE.require(cap)
+    assert caught.value.feature == "teleop"
+    assert caught.value.concept_id == "mobility.move"
 
 
 def test_work_prefixes_are_the_ros_bound_rest_surface():

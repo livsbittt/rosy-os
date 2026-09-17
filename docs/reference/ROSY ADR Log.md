@@ -82,7 +82,8 @@
 | D-72 | 표면은 법을 공유하고 문법은 나눈다 | Proposed |
 | D-73 | 모듈마다 자기 코드를 도는 기능 시험 표면이 있다 | Accepted |
 | D-74 | 작업 명령은 CORE를 거쳐 내부 ROS로 가고 조회는 CORE에 남는다 | Accepted |
-| D-75 | 로봇 로컬 화면은 손으로 쓴 정적 자산이다 — D-7 React 대체 | Proposed |
+| D-75 | 로봇 로컬 화면은 손으로 쓴 정적 자산이다 — D-7 React 대체 | Accepted |
+| D-76 | 501 본문의 capability는 CAP-001이고 concept_id는 부가다 | Accepted |
 
 ---
 
@@ -1974,3 +1975,120 @@ src/rosy_core/test/test_api.py::test_inventory_is_a_mobile_base_without_pick_or_
 test/test_module_functional_surface.py -q` → 19 passed.
 
 **References:** CORE SRS §1.3, D-1, D-2, D-12, D-38, D-70, D-71.
+
+---
+
+## D-72 표면은 법을 공유하고 문법은 나눈다
+
+**Status:** Proposed (2026-09-17). concept 16.
+
+**Context:** 사람이 보는 표면이 넷이다 — 운용자 콘솔, 장비 런타임, Fleet,
+그리고 로봇 얼굴(`rosy_emotion` LCD). 지금 살아 있는 둘이 서로 다른 디자인
+언어를 쓴다. `rosy_control/web/dashboard.html`은 카드 테두리 대신 바탕으로
+위계를 만들고 색을 categorical·status로 닫아 두며 모름·낡음을 구분한다.
+`rosy_core/web`은 장식 격자와 gradient를 깔고 CPU·메모리·저장소에 지표별
+색(`data-tone`)을 주며, `dom.js`가 모름·낡음·없음을 한 placeholder로 뭉갠다.
+둘이 모드·비상정지·배터리를 모두 보여줘서 "이 로봇 괜찮나"에 답이 둘이다.
+
+분할선이 사용자가 아니라 패키지 소유권으로 그어져 있다. 반대로 네 표면을 한
+컴포넌트 라이브러리로 묶으면 Fleet이 콘솔처럼 되고 입력이 없는 LCD는
+불가능해진다. D-32가 서버에 세운 정직함(속 빈 경로는 501)을 화면이 회색
+버튼으로 되돌리고 있다.
+
+**Decision:** 공유 범위를 층으로 가른다.
+
+- L1(법)은 전 표면 구속이다: 증거 4상태(`live`/`stale`/`absent`/
+  `unavailable`), 닫힌 3색 집합(categorical/status/neutral), 바탕이 위계,
+  되돌릴 수 없는 명령은 종류가 다르다, 어휘는 그 표면 청중의 평문이다.
+- L2(문법)은 표면마다 독립이며 공유하지 않는다. 레이아웃·상호작용·컴포넌트는
+  시청자의 시간 예산과 입력 장치에서 연역한다: 콘솔=공간(스크롤 없음),
+  장비 런타임=절차(스크롤이 절차), Fleet=예외(정상은 안 보임),
+  얼굴=의도(입력 없음).
+- L3(내용)은 이식 가능하다. **capability는 렌더러를 제공하지 않는다.** 데이터
+  계약·역할(감지/관측/조작)·우선순위만 제공하고 표현은 표면이 소유한다.
+  표현 상태는 `available`/`constrained`/`blocked`/`absent`이며 `blocked`는
+  이유를 반드시 말한다.
+
+D-68은 유지한다. CAP-001 본문은 게이트로 남고 개념 id·`available`은 inventory
+descriptors에만 둔다. 개념 뷰는 inventory를, 기능 게이트는 CAP-001을 읽는다.
+
+합성 자산 규칙(concept 16 §9)은 기록만 하고 구현하지 않는다(D-71, D-55).
+
+**Alternatives:** 표면마다 자유롭게 두는 안은 지금 상태이며 같은 질문에 답이
+둘인 문제를 남긴다. 네 표면에 공통 컴포넌트 라이브러리를 두는 안은 Fleet과
+LCD의 문법을 파괴한다. 콘솔을 먼저 합치고 토큰을 나중에 뽑는 안은 통합 중에
+세 번째 디자인 언어를 만든다.
+
+**Consequences:** 프레임워크와 무관하게 구속한다 — D-7(React) 산출물이든 D-23
+로컬 자산이든 같은 법을 지킨다. `rosy_core/web`은 장식·지표별 색·eyebrow를
+잃고, `dom.js`는 placeholder 하나 대신 증거 상태를 실어야 한다. 새 capability는
+app.js 손배선 대신 역할 슬롯 등록으로 붙는다. 콘솔 통합(두 서버·CSP·단일 파일
+자족성)은 이 ADR이 정하지 않으며 별도 결정이 필요하다.
+
+**Validation / Transition:** concept 16 §10의 계약 시험 — 토큰 파일 밖 원시
+색, categorical 자리의 status 색, `render_png`와 클라이언트 맵 래스터 값 불일치,
+이유 없는 `blocked`, 증거 상태 없는 값 바인딩. 시험이 생기기 전까지 Proposed로
+둔다.
+
+**References:** [concept 16](../concept/16_ROSY_Interface_Design_Principles.md),
+D-7, D-11, D-23, D-32, D-55, D-61, D-68, D-71,
+[FLEET SRS](../spec/ROSY%20FLEET%20SRS.md) §1.2.
+
+---
+---
+
+## D-75 로봇 로컬 화면은 손으로 쓴 정적 자산이다 — D-7 React 대체
+
+**Status:** Accepted (2026-09-17). D-7을 대체한다. concept 16, D-72.
+
+**Context:** D-7(2026-08)은 로봇 로컬 Web UI를 React 18 + TypeScript + Vite로
+개발하고 `dist`를 정적 서빙하기로 했다. D-23(2026-09-01)은 그 뒤에 "별도
+React/Node 서비스는 첫 Pi 5 런타임의 프로세스·배포·장애 표면을 늘린다"며
+FastAPI가 로컬 HTML/CSS/JavaScript 자산을 직접 제공하도록 결정했고, 실제
+구현이 그 길로 갔다. 저장소에 `package.json`도 번들러도 없고 `/dashboard`는
+손으로 쓴 ES 모듈을 서빙한다. 그런데 **D-7의 Status가 Accepted로 남아 있어
+두 Accepted ADR이 서로 모순**이고, 어느 쪽이 유효한지 문서만 보고는 알 수
+없다. D-72 이행 계획이 이 모순 위에서 레이아웃과 렌더러를 손보게 되는데,
+D-7을 나중에 이행하면 그 산출물이 폐기된다.
+
+**Decision:** D-7을 Superseded로 표시하고, 로봇 로컬 화면은 **빌드 단계 없는
+손으로 쓴 정적 자산**임을 확정한다.
+
+- `rosy_core`가 `web/`의 HTML·CSS·ES 모듈을 직접 서빙한다(D-23).
+- 번들러·npm·Node 런타임·외부 CDN·웹폰트를 도입하지 않는다.
+- 전송 경량화는 빌드가 아니라 응답 압축으로 한다.
+- 색의 단일 출처는 `web/tokens.css`이며 계약 시험이 지킨다(D-72).
+
+**Alternatives:** D-7을 이행해 Vite로 전환하는 안은 Pi 5 로봇 보드에 빌드
+파이프라인과 배포 산출물 검증을 새로 얹고 D-23이 줄인 장애 표면을 되돌린다.
+두 ADR을 그대로 두는 안은 모순을 남겨 다음 사람이 같은 질문을 다시 한다.
+
+**Consequences:** 프론트엔드 작업은 빌드 산출물이 아니라 소스가 곧 배포물이라는
+전제로 한다. 손으로 쓴 자산이므로 규율은 도구가 아니라 계약 시험이 만든다.
+React 도입이 필요해지면 이 ADR을 먼저 뒤집어야 하며, 그때 Pi 이미지·서명·
+digest 경로를 함께 설계한다.
+
+**Validation / Transition:** `src/rosy_core/test/test_dashboard_no_bundler.py`.
+`package.json`/`vite.config.*` 없음. `/dashboard` allowlist는 `api/app.py`.
+색 단일 출처는 D-72 시험이 맡는다.
+
+**References:** D-7, D-22, D-23, D-72,
+[concept 16](../concept/16_ROSY_Interface_Design_Principles.md),
+[이행 설계](../plans/2026-09-17-interface-design-implementation-design.md).
+---
+
+## D-76 501 본문의 capability는 CAP-001이고 concept_id는 부가다
+
+**Status:** Accepted (2026-09-17). D-68 잔여. 에러 코드와 CAP-001 feature 필드는 유지한다.
+
+**Context:** TaskKind는 개념 id(mobility.move)를 알고, 501은 CAP-001 플래그(	eleop)만 말한다. 클라이언트가 inventory descriptors와 에러 본문을 맞추려면 concept_id가 필요하지만, feature를 바꾸면 CAP-003 계약이 깨진다.
+
+**Decision:** CapabilityError.feature는 CAP-001 dotted flag로 남고 501 detail.capability도 그대로다. TaskKind.require()가 실패하면 detail.concept_id를 부가한다. slam 등 TaskKind가 아닌 require()는 concept_id를 넣지 않는다. SAFE_STOP에서 거절은 계속 safety/e-stop이지 501이 아니다.
+
+**Alternatives:** feature를 개념 id로 교체하는 안은 기존 501 소비자를 깨뜨린다. 채택하지 않는다.
+
+**Consequences:** 조회는 inventory descriptors, 게이트는 CAP-001, 에러는 둘 다 담는다.
+
+**Validation / Transition:** 	est_taskkind_require_keeps_cap001_flag_and_adds_concept_id, 	est_disabled_navigation_capabilities_return_501의 concept_id 단언.
+
+**References:** D-11, D-32, D-68, D-74.
