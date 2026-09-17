@@ -147,6 +147,12 @@ class NavigationManager:
                                       "a mapping session owns navigation")
             self._session_counter += 1
             self._moving_session = self._session_counter
+            # 새 세션의 무진척 시계는 여기서 시작한다. `on_goal_accepted` 는 SWM-002 때문에
+            # 추종 중에는 기준점을 지우지 않는데, 그 규칙이 세션이 열리는 순간까지 걸리면
+            # 직전 주행에서 남은 낡은 기준시각을 그대로 물려받는다. 한참 서 있던 로봇은
+            # 첫 참조 pose 하나에 30 초 조건이 이미 성립해 무장 직후 stuck 으로 끊긴다.
+            self._last_progress_pos = None
+            self._last_progress_ts = time.monotonic()
             return self._moving_session
 
     def moving_goal(self, spec: NavGoalSpec, source: str = "moving",

@@ -224,6 +224,31 @@ def test_goal_replacement_does_not_reset_the_stuck_baseline():
     assert nav._last_progress_pos == (0.0, 0.0)
 
 
+def test_opening_a_follow_session_starts_the_no_progress_clock_fresh():
+    """서 있던 로봇이 추종을 시작하면 무진척 시계도 그때 시작한다.
+
+    SWM-002 를 지키느라 `on_goal_accepted` 가 추종 중 기준점을 지우지 않는데, 그 규칙이
+    세션이 **열리는 순간**까지 걸리면 직전 주행에서 남은 낡은 기준시각이 살아남는다.
+    그러면 한참 주차돼 있던 팔로워는 첫 참조 pose 하나에 `nav.stuck` 을 맞고, 대형은
+    무장하자마자 HOLDING 으로 떨어진다 — sim bench 에서 무장 63 ms 뒤에 실제로 그랬다.
+    """
+    swarm, nav, executor, clock, events, _safety, _docking = build()
+    nav.goal(NavGoalSpec(1.0, 0.0, 0.0))
+    executor.settle()
+    nav.on_pose_progress(0.0, 0.0)
+    nav.on_result(True)
+    import time as _time
+    nav._last_progress_ts = _time.monotonic() - 3600.0   # 한 시간 서 있었다
+
+    swarm.follow(params())
+    stream(swarm, executor, clock, 1.0)
+    nav.on_pose_progress(0.0, 0.0)   # 아직 못 움직였다 — 그래도 갓 시작한 세션이다
+    nav.on_pose_progress(0.0, 0.0)
+
+    assert "nav.stuck" not in events.types()
+    assert nav.nav_state is NavigationState.NAVIGATING
+
+
 def test_a_single_goal_still_resets_the_stuck_baseline():
     """추종 세션 밖에서는 기존 동작 그대로여야 한다."""
     swarm, nav, executor, clock, _events, _safety, _docking = build()
