@@ -44,6 +44,8 @@ def test_factory_and_maze_do_not_share_inflation():
     assert maze.inflation_radius == 0.55
     assert factory.map == "rosy_factory.yaml"
     assert maze.map == "rosy_maze.yaml"
+    assert (factory.spawn_x, factory.spawn_y) != (0.0, 0.0)
+    assert (maze.spawn_x, maze.spawn_y) != (factory.spawn_x, factory.spawn_y)
 
 
 def test_launch_args_override_the_catalog_not_the_other_way_around():
