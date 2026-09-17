@@ -61,9 +61,9 @@
 | D-51 | Independent safety and measured Device acceptance contract | Proposed |
 | D-52 | ARM64 camera placement and shadow handoff gates | Proposed |
 | D-53 | Device signature/readback trust evidence | Accepted; Pi acceptance pending |
-| D-54 | Nav2 profile limits and field maps fail closed | Proposed |
-| D-55 | Mobile manipulation is a robot-local mission capability | Proposed |
-| D-56 | Odometry and IMU fusion is a measured optional profile | Proposed |
+| D-54 | Nav2 profile limits and field maps fail closed | Accepted |
+| D-55 | Mobile manipulation is a robot-local mission capability | Accepted |
+| D-56 | Odometry and IMU fusion is a measured optional profile | Accepted |
 | D-57 | ROS-native first; board and vendor differences stay in adapters | Accepted |
 | D-58 | Hardware motion requires an authoritative readiness gate | Accepted |
 | D-59 | 사이트 패브릭은 역할별 계약 버스다 | Accepted |
@@ -98,6 +98,7 @@
 | D-88 | Fleet 소켓은 사이트 PC 산출물이며 D-83 뒤에 연다 | Accepted |
 | D-89 | D-35 대형 후보는 D-83 Task 14 재실행 전에는 열지 않는다 | Accepted |
 | D-90 | 축구는 게임 호스트이지 CORE 모드가 아니다 | Accepted |
+| D-91 | Device 비교 ADR은 호스트 pytest로 Accepted 하지 않는다 | Accepted |
 
 ---
 
@@ -1339,8 +1340,8 @@ and preserve the JSON alongside the release manifest.
 
 ## D-54 Nav2 profile limits and field maps fail closed
 
-**Status:** Proposed (2026-09-13). This decision does not promote the current
-hardware slice to field operation.
+**Status:** Accepted (2026-09-17). Source/configuration gate. Field-map identity
+and physical acceptance remain HOLD.
 
 **Context:** CORE and Nav2 currently receive related limits from different
 files. The CORE Pinky profile caps angular velocity at 0.80 rad/s, while Nav2
@@ -1377,8 +1378,8 @@ identity and physical acceptance gates remain open.
 
 ## D-55 Mobile manipulation is a robot-local mission capability
 
-**Status:** Proposed (2026-09-13). OMX model, mount and payload remain
-unselected and the capability stays disabled.
+**Status:** Accepted (2026-09-17). Architecture. OMX capability stays disabled
+until Device payload tests. Pinky+OMX composite Asset is still not v1 (D-71).
 
 **Context:** Nav2 can move the base but does not establish grasp success,
 object possession, arm collision safety or pallet stability. The current OS has
@@ -1414,8 +1415,9 @@ limits. No estimated box or arm dimensions are shipped.
 
 ## D-56 Odometry and IMU fusion is a measured optional profile
 
-**Status:** Proposed (2026-09-13). The optional BNO055 driver boundary is
-implemented; physical calibration and fusion promotion remain pending.
+**Status:** Accepted (2026-09-17). Encoder baseline. Fusion profile unselected;
+`rosy_imu_bno055` is not in the default image (D-84). Physical calibration
+remains pending.
 
 **Context:** Nav2 depends on a stable `map → odom → base` transform and fresh
 odometry. The current bridge observes IMU data, but observation alone does not
@@ -2583,19 +2585,63 @@ OpenCV가 다시 CORE 이미지로 돌아온다 (D-38, D-66). 앞 카메라는 3
 - `RobotMode.SOCCER` 없음. CORE는 게임을 import하지 않는다
 - 1단계는 천장 카메라 + 호스트가 양쪽 CORE teleop (`MANUAL`, SAF-002 워치독)
 - 호스트는 최종 `cmd_vel`을 발행하지 않는다
-- 코드는 `tools/soccer/`에서 시작한다. `rosy-core`/`rosy-io`에 OpenCV를 넣지 않는다
+- 코드는 `src/rosy_games`에 산다. `rosy-core`/`rosy-io`에 OpenCV를 넣지 않는다
 - DEVICE/FIELD HOLD인 동안 서로 박는 속도의 경기를 GO로 적지 않는다
 - 온보드 시야(2단계)는 1단계가 여러 번 반복되기 전에 열지 않는다
 
 설계 본문: [robot soccer game host](../plans/2026-09-17-robot-soccer-game-host-design.md).
 
+**Amendment (2026-09-17):** 경기의 집은 `rosy_games`다. Fleet은 로봇 통로(명단·토큰·일괄
+stop)이고 Isaac은 나중에 붙는 시뮬/학습 어댑터다. 축구를 `rosy_fleet` 안에 넣지 않고,
+D-62 카탈로그에도 올리지 않는다. `game` 모듈은 `cv2`/Isaac을 모른다. 시작 경로
+`tools/soccer/`는 이 패키지 트리로 대체한다. 심판을 Fleet 서버로 “옮긴다”는 문장은
+매치 시작 버튼의 자리이지, 규칙 엔진의 이사가 아니다.
+
 **Alternatives:** CORE 모드로 넣는 안은 미들웨어를 게임으로 만든다. Nav2로 공을
-쫓는 안은 공을 장애물로 만들고 너무 느리다.
+쫓는 안은 공을 장애물로 만들고 너무 느리다. Fleet 안에 넣는 안은 관제 패키지가
+규칙·RL·Isaac 의존을 떠안는다. Isaac이 경기를 소유하는 안은 학습에는 유리하고
+Isaac 없는 실기 1v1을 늦춘다.
 
 **Consequences:** 1단계 실패는 호스트 정책 문제이지 CORE 계약 위반이 아니다.
-Fleet 서버가 생기면 심판은 그쪽으로 옮길 수 있다 (D-12, D-88).
+Fleet 콘솔은 매치를 켤 수 있다. `reset()`은 `rosy_games`가 한다 (D-12, D-88).
 
 **Validation / Transition:** `RobotMode`에 `SOCCER`가 없다.
 `src/rosy_core/test/test_protocol_schemas.py`. 구현은 별도.
 
 **References:** D-1, D-2, D-12, D-33, D-38, D-59, D-62, D-66, D-88.
+
+---
+
+## D-91 Device 비교 ADR은 호스트 pytest로 Accepted 하지 않는다
+
+**Status:** Accepted (2026-09-17). D-79의 Device 쪽 적용이다.
+
+**Context:** D-41·D-42·D-43·D-44·D-51·D-52는 본문이 ARM64 캡처, shadow 핸드오프,
+보정 generation, OMX 실물, 다섯 safety 상태 실측을 요구한다. 호스트 pytest가
+초록이면 이 여섯을 Accepted로 올리려는 시도가 반복된다.
+
+**Decision:** 아래 ADR은 **각 본문의 Validation 측정이 Device/ARM64에 있을 때까지
+Proposed**로 남는다.
+
+| ADR | 열기 전에 필요한 증거 |
+|---|---|
+| D-41 | ARM64 캡처 위치 비교 (호스트 vs 최소권한 컨테이너) |
+| D-42 | 50 Hz 예산에서 후보·안전 상관 실측 |
+| D-43 | generation 격리 보정 쓰기·rollback |
+| D-44 | Nav2 vs ControlBackend 실 시나리오, OMX 실물 interlock |
+| D-51 | Pinky 프로필의 다섯 상태 행렬 + 바퀴 든 시험 |
+| D-52 | ARM64 카메라 spike + shadow, 두 번째 실 publisher 없음 |
+
+D-54·D-55·D-56은 소스/아키텍처 게이트만 Accepted이며 필드·payload·융합 승격은
+HOLD다.
+
+**Alternatives:** 여섯을 지금 Accepted 하는 안은 Validation을 지운다. 전부
+Proposed로 남겨 D-54까지 묶는 안은 이미 닫힌 설정 게이트를 다시 연다.
+
+**Consequences:** 다음 세션이 "나머지 ADR 처리"여도 D-41을 호스트에서 닫지 않는다.
+
+**Validation / Transition:** 색인 Status가 Proposed인 여섯 ID. 호스트
+`test_nav2_profile_limits.py` 통과는 D-54이지 D-51이 아니다.
+
+**References:** D-79, D-80, D-87,
+[device-validation](../plans/2026-09-13-rosy-os-device-validation-implementation-plan.md).

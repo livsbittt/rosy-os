@@ -1,7 +1,7 @@
 # 남은 실행 게이트 → ADR 계획
 
 작성일: 2026-09-17
-상태: D-87–D-89를 기록한다. G0–G3·카메라·OMX·IMU 융합은 기존 Proposed를 재사용한다.
+상태: D-87–D-91. D-54–D-56 소스 게이트 Accepted. D-41–D-44·D-51·D-52는 Device까지 Proposed (D-91).
 
 관련: D-35, D-59, D-78–D-81, D-83–D-86 ·
 [남은 런타임](2026-09-17-remaining-runtime-adr-plan.md) ·

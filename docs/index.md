@@ -29,6 +29,7 @@
 | D-88 | Fleet 소켓은 사이트 PC 산출물이며 D-83 뒤에 연다 |
 | D-89 | D-35 대형 후보는 D-83 Task 14 재실행 전에는 열지 않는다 |
 | D-90 | 축구는 게임 호스트이지 CORE 모드가 아니다 |
+| D-91 | Device 비교 ADR은 호스트 pytest로 Accepted 하지 않는다 |
 
 ## 계획·결과 문서
 
@@ -49,8 +50,8 @@
 
 ## 최근 기록
 
+- 2026-09-17 · uncommitted · docs(adr): accept D-54–D-56 source gates, park Device ADRs (D-91)
 - 2026-09-17 · uncommitted · docs(adr): lock soccer as a game host (D-90)
 - 2026-09-17 · uncommitted · docs(adr): lock remaining execution as D-87–D-89
 - 2026-09-17 · uncommitted · docs(adr): lock remaining runtime as D-83–D-86
 - 2026-09-17 · dc89264 · docs(harness): stamp last_verified after SOURCE re-run
-- 2026-09-17 · uncommitted · docs(adr): accept D-82 after palette gate tests

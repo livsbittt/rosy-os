@@ -94,3 +94,10 @@
 - 결정: D-90 Accepted
 - 교훈: 없음
 
+## 2026-09-17 · uncommitted · docs(adr): accept D-54–D-56 source gates, park Device ADRs (D-91)
+- 변경: D-54 Nav2 fail-closed, D-55 조작은 로봇 로컬, D-56 엔코더 기본. D-41–D-44·D-51·D-52는 Device 측정 전 Proposed
+- 증거: 색인 Status + `test_nav2_profile_limits.py` / `test_footprint_profiles.py` (소스 게이트). Device GO 아님
+- gate 변화: 없음
+- 결정: D-54–D-56 Accepted (소스/아키텍처). D-91
+- 교훈: 없음
+
