@@ -44,9 +44,13 @@ def _as_map_id(value) -> Optional[str]:
 
 
 class StateManager:
-    def __init__(self, robot_id: str, clock=time.time) -> None:
+    def __init__(self, robot_id: str, clock=time.time, stale_after_s=None) -> None:
         self._robot_id = robot_id
         self._clock = clock
+        self._stale_after_s = dict(CHANNEL_STALE_AFTER_S)
+        if stale_after_s:
+            for channel, value in stale_after_s.items():
+                self._stale_after_s[str(channel)] = float(value)
         self._lock = threading.Lock()
         self._seq = 0
         self._received: dict[str, float] = {}
@@ -158,7 +162,7 @@ class StateManager:
                     now=now,
                     stale_after_s=stale,
                 )
-                for channel, stale in CHANNEL_STALE_AFTER_S.items()
+                for channel, stale in self._stale_after_s.items()
             }
             return StateSnapshot(
                 robot_id=self._robot_id,

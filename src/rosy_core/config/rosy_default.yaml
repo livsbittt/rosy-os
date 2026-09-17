@@ -10,6 +10,13 @@ network:
 
 state:
   rate_hz: 10                 # CORE-001 스냅샷/푸시 주기
+  evidence:                   # 채널별 stale 초. 코드 기본은 protocol.evidence
+    pose: 2.0
+    velocity: 0.5
+    battery: 5.0
+    navigation: 2.0
+    safety: 0.2
+    docking: 2.0
 
 profile: profile.pinky_pro.yaml   # HWA-001 Robot Profile
 capabilities: capabilities.yaml

@@ -17,6 +17,16 @@ class Clock:
         return self.t
 
 
+def test_state_manager_reads_overlay_thresholds():
+    clock = Clock(1_000.0)
+    state = StateManager("rosy_01", clock=clock, stale_after_s={"pose": 0.1})
+    state.set_pose(0.0, 0.0, 0.0)
+    clock.t += 0.2
+    snap = state.snapshot()
+    assert snap.evidence["pose"].evidence is EvidenceState.DELAYED
+    assert snap.evidence["pose"].stale_after_s == 0.1
+
+
 def test_no_source_is_unavailable():
     record = judge(has_source=False, received_at=None, now=10.0, stale_after_s=0.5)
     assert record.evidence is EvidenceState.UNAVAILABLE

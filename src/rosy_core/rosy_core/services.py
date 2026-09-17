@@ -39,6 +39,7 @@ from rosy_core.power.manager import (
 )
 from rosy_core.profile import RobotProfile
 from rosy_core.safety.manager import BatteryPolicy, SafetyManager, SpeedLimits
+from rosy_core.protocol.evidence import CHANNEL_STALE_AFTER_S
 from rosy_core.state.manager import StateManager
 from rosy_core.system.runtime import HostRuntimeProbe
 from rosy_core.waypoints.manager import WaypointManager
@@ -200,7 +201,11 @@ class CoreServices:
 
         identity = RobotIdentity.from_config(config, profile_model=profile.model)
         capability = Capability(capability_data)
-        state = StateManager(robot_id)
+        evidence_cfg = (config.get("state") or {}).get("evidence") or {}
+        stale_after = dict(CHANNEL_STALE_AFTER_S)
+        if isinstance(evidence_cfg, dict):
+            stale_after.update({str(k): float(v) for k, v in evidence_cfg.items()})
+        state = StateManager(robot_id, stale_after_s=stale_after)
         registry = SourceRegistry(config.get("command_sources"))
         modes = ModeMachine()
         command = CommandManager(registry, modes, safety, events=events, readiness=readiness)
