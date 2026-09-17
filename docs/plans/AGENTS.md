@@ -44,6 +44,7 @@ Dated design and execute plans (2026-08-31 onward). These are the working trail 
 | `2026-09-17-remaining-runtime-adr-plan.md` | leftover runtime → D-83–D-86; ROS-SIM 묶음, hardware 이미지, dock ESP32, POSIX identity |
 | `2026-09-17-remaining-execution-adr-plan.md` | leftover execution → D-87–D-91; Device ADR park, D-54–D-56 source Accepted |
 | `2026-09-17-robot-soccer-game-host-design.md` | 실기 Pinky 1v1 푸시볼. 경기는 `rosy_games` 소유, Fleet은 통로, Isaac은 학습 어댑터 (D-90). CORE 모드 없음 |
+| `2026-09-18-rosy-games-local-host.md` | rosy_games LOCAL 실행 계획: 스켈레톤 → gate·MatchHost·teleop 클라이언트. Isaac/overhead 제외 |
 | D-73 | `tools/harness/harness.yaml` `functional` + `test/test_module_functional_surface.py` |
 
 ## Subdirectories

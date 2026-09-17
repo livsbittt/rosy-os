@@ -9,6 +9,7 @@
 | [deploy](deploy/progress.md) | 릴리스·플랫폼 | uncommitted (2026-09-15) | GO | GO | N/A | HOLD | HOLD | N/A |
 | [rosy_control](src/rosy_control/progress.md) | CONTROL | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [rosy_fleet](src/rosy_fleet/progress.md) | FLEET | dc89264 (2026-09-17) | GO | GO | GO | PARKED | PARKED | PARKED |
+| [rosy_games](src/rosy_games/progress.md) | GAMES | uncommitted (2026-09-18) | GO | GO | N/A | N/A | PARKED | PARKED |
 | [rosy_gz_sim](src/rosy_gz_sim/progress.md) | SIM | dc89264 (2026-09-17) | GO | GO | HOLD | N/A | N/A | N/A |
 | [rosy_navigation](src/rosy_navigation/progress.md) | NAV | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [rosy_bringup](src/rosy_bringup/progress.md) | BRINGUP | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |

@@ -29,7 +29,7 @@ No files at this level. Each child is a ROS 2 package with its own `package.xml`
 | `rosy_control/` | Absorbed Pinky sensing, camera/OpenCV, calibration, planning, safety-policy, and navigation-session code; final external API and motor command ownership remain in `rosy_core` (see `rosy_control/AGENTS.md`) |
 | `rosy_omx_adapter/` | Disabled-by-default OMX model profile and ROS-native ros2_control/MoveIt contract boundary (see `rosy_omx_adapter/AGENTS.md`) |
 | `rosy_fleet/` | Fleet seed: formation geometry, slot assignment, reference-stream relay, FOR-004 session, CLI (see `rosy_fleet/AGENTS.md`) |
-| `rosy_games/` | Laptop game host (D-90). Soccer referee/policy. Not a CORE slice. No ROS, no cmd_vel |
+| `rosy_games/` | Laptop game host (D-90). Soccer referee/policy. Not a CORE slice. No ROS, no cmd_vel (see `rosy_games/AGENTS.md`) |
 
 ## For AI Agents
 
@@ -44,7 +44,7 @@ No files at this level. Each child is a ROS 2 package with its own `package.xml`
 
 ```bash
 cd src && colcon build --symlink-install --event-handlers console_direct+
-python3 -m pytest rosy_core/test/ rosy_control/test/ rosy_fleet/test rosy_omx_adapter/test -q
+python3 -m pytest rosy_core/test/ rosy_control/test/ rosy_fleet/test rosy_omx_adapter/test rosy_games/test -q
 # ament linters live in each Python package's test/ (copyright, flake8, pep257)
 ```
 

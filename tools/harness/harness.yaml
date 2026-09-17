@@ -36,6 +36,11 @@ modules:
     tests: [src/rosy_fleet/test]
     functional_kind: pytest
     functional: [src/rosy_fleet/test]
+  - name: rosy_games
+    path: src/rosy_games
+    tests: [src/rosy_games/test, test/test_rosy_games_surface.py]
+    functional_kind: pytest
+    functional: [src/rosy_games/test]
   - name: rosy_gz_sim
     path: src/rosy_gz_sim
     tests: [src/rosy_gz_sim/test]
