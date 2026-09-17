@@ -8,8 +8,6 @@
   --signal-danger: var(--status-crit);
   --signal-amber: var(--status-warn);
   --signal-blue: var(--series-primary);
-  --body: Aptos, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
-  --mono: "Cascadia Mono", Consolas, "Noto Sans Mono", monospace;
 }
 
 * { box-sizing: border-box; }
@@ -265,7 +263,7 @@ button { color: inherit; }
 .field-map-panel::before { background: var(--signal-blue); }
 .map-toolbar { display: flex; gap: 8px; margin: 4px 0 12px; }
 .map-toolbar button {
-  min-height: 34px;
+  min-height: var(--target-secondary);
   padding: 0 12px;
   border: 1px solid var(--line);
   background: transparent;
@@ -356,7 +354,7 @@ button { color: inherit; }
 .action-message { margin: 16px 0 0; color: var(--muted); font: 0.65rem/1.4 var(--mono); }
 
 .capability-list { display: grid; gap: 8px; }
-.capability-item { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; min-height: 42px; border-bottom: 1px solid var(--line); }
+.capability-item { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; min-height: var(--target-secondary); border-bottom: 1px solid var(--line); }
 .capability-item span { font: 0.7rem var(--mono); }
 .capability-item b { font: 0.62rem var(--mono); color: var(--paper); }
 .capability-item small { grid-column: 1 / -1; color: var(--muted); font: 0.6rem/1.3 var(--mono); }
@@ -388,7 +386,7 @@ button { color: inherit; }
 .settings-card form { display: grid; gap: 0.45rem; }
 .settings-card label { color: var(--muted); font: 0.62rem var(--mono); letter-spacing: 0.08em; }
 .settings-card input {
-  min-height: 42px;
+  min-height: var(--target-secondary);
   padding: 0 12px;
   color: var(--paper);
   background: var(--scrim-raise);
@@ -396,7 +394,7 @@ button { color: inherit; }
 }
 .settings-card input:focus, .settings-card select:focus { outline: 0; border-color: var(--focus-ring); }
 .settings-card select {
-  min-height: 42px;
+  min-height: var(--target-secondary);
   padding: 0 12px;
   color: var(--paper);
   background: var(--scrim-raise);
@@ -416,7 +414,7 @@ button { color: inherit; }
 .waypoint-list span { grid-column: 1; color: var(--muted); font: 0.62rem var(--mono); }
 .waypoint-actions { display: flex; gap: 6px; align-items: start; }
 .waypoint-actions button {
-  min-height: 32px;
+  min-height: var(--target-secondary);
   padding: 0 10px;
   border: 1px solid var(--line);
   background: transparent;
@@ -605,7 +603,7 @@ button { color: inherit; }
 .host-card form { display: grid; gap: 0.45rem; margin-top: 0.4rem; }
 .host-card label { color: var(--muted); font: 0.62rem var(--mono); letter-spacing: 0.08em; }
 .host-card input {
-  min-height: 42px;
+  min-height: var(--target-secondary);
   padding: 0 12px;
   color: var(--paper);
   background: var(--scrim-raise);

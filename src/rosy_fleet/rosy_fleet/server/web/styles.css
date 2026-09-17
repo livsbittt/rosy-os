@@ -7,9 +7,7 @@ body {
   min-height: 100vh;
   color: var(--paper);
   font-family: var(--body);
-  background:
-    radial-gradient(circle at 12% 6%, var(--status-good-a09), transparent 28rem),
-    linear-gradient(145deg, var(--ground-grad-1) 0%, var(--ground-grad-2) 48%, var(--ground-deep) 100%);
+  background: var(--ground);
   text-rendering: optimizeLegibility;
 }
 
@@ -28,7 +26,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 
 .brand { display: flex; flex-direction: column; line-height: 1.15; }
-.brand b { font-family: var(--display); font-size: 1.25rem; letter-spacing: 0.04em; }
+.brand b { font-weight: 700; font-size: 1.25rem; letter-spacing: 0.04em; }
 .brand small { font-family: var(--mono); font-size: 0.66rem; color: var(--muted); letter-spacing: 0.16em; }
 
 .topbar .spacer { flex: 1; }
@@ -42,20 +40,20 @@ button, input, select { font: inherit; color: inherit; }
   color: var(--muted);
   white-space: nowrap;
 }
-.pill.good { color: var(--status-good); border-color: var(--status-good-a45); }
+.pill.good { color: var(--nominal); border-color: var(--surface-line); }
 .pill.bad { color: var(--status-crit); border-color: var(--status-crit-a45); }
 
 .estop {
   padding: 0.55rem 1.3rem;
   border-radius: 0.5rem;
-  border: 1px solid var(--status-crit-a45);
-  background: var(--status-crit-a10);
-  color: var(--status-crit);
+  border: 0;
+  background: var(--status-crit);
+  color: var(--paper);
   font-weight: 700;
   letter-spacing: 0.06em;
   cursor: pointer;
 }
-.estop:hover { background: var(--status-crit); color: var(--ground-deep); }
+.estop:hover { filter: brightness(1.12); }
 
 main {
   display: grid;
@@ -77,10 +75,10 @@ main {
   font-family: var(--mono);
   font-size: 0.64rem;
   letter-spacing: 0.2em;
-  color: var(--status-good);
+  color: var(--nominal-quiet);
   margin: 0 0 0.15rem;
 }
-.panel h2 { font-family: var(--display); font-weight: 400; font-size: 1.35rem; margin: 0 0 0.8rem; }
+.panel h2 { font-weight: 600; font-size: 1.15rem; margin: 0 0 0.8rem; }
 
 .map-head { display: flex; align-items: baseline; gap: 0.8rem; }
 .map-head .spacer { flex: 1; }
@@ -111,24 +109,23 @@ main {
 .sw.free { background: var(--paper); }
 .sw.occupied { background: var(--ground-deep); }
 .sw.unknown { background: var(--ground-soft); }
-.sw.robot { background: var(--series-primary); }
-.sw.goal { background: var(--status-warn); }
+.sw.robot { background: var(--robot-2); }
+.sw.goal { background: var(--series-goal); }
 
 .roster { display: flex; flex-direction: column; gap: 0.8rem; }
 
 .robot {
   border: 1px solid var(--line-10);
-  border-left: 3px solid var(--series-primary);
+  border-left: 3px solid var(--robot-2);
   border-radius: 0.7rem;
   background: var(--ground-card);
   padding: 0.85rem 0.9rem;
 }
 /* 로봇 정체색은 클래스로 돈다 — CSP 아래에서 style 속성은 적용되지 않는다. 지도의
    삼각형도 같은 순서로 색을 고르므로 카드의 띠와 지도의 로봇이 맞물린다. */
-.robot.s0 { border-left-color: var(--series-primary); }
-.robot.s1 { border-left-color: var(--series-2); }
-.robot.s2 { border-left-color: var(--series-3); }
-.robot.s3 { border-left-color: var(--series-4); }
+.robot.s0 { border-left-color: var(--robot-1); }
+.robot.s1 { border-left-color: var(--robot-2); }
+.robot.s2 { border-left-color: var(--robot-3); }
 .robot.selected { background: var(--ground-card-2); border-color: var(--line-30); }
 .robot.offline { opacity: 0.55; }
 
@@ -146,7 +143,7 @@ main {
   color: var(--muted);
 }
 .tag.nav { color: var(--series-primary); border-color: var(--series-primary); }
-.tag.ok { color: var(--status-good); border-color: var(--status-good-a45); }
+.tag.ok { color: var(--nominal); border-color: var(--surface-line); }
 .tag.warn { color: var(--status-warn); border-color: var(--status-warn); }
 .tag.crit { color: var(--status-crit); border-color: var(--status-crit-a45); }
 
@@ -170,9 +167,9 @@ main {
   cursor: pointer;
   font-size: 0.82rem;
 }
-.robot-actions button:hover:not(:disabled) { border-color: var(--status-good-a45); color: var(--status-good); }
+.robot-actions button:hover:not(:disabled) { border-color: var(--focus-ring); color: var(--paper); }
 .robot-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
-.robot-actions button.arming { background: var(--status-good); color: var(--ground-deep); border-color: var(--status-good); }
+.robot-actions button.arming { background: var(--paper); color: var(--ground); border-color: var(--paper); }
 
 .log {
   margin-top: 1rem;
@@ -185,7 +182,7 @@ main {
 }
 .log div { border-bottom: 1px solid var(--line-06); padding: 0.2rem 0; }
 .log .bad { color: var(--status-crit); }
-.log .good { color: var(--status-good); }
+.log .good { color: var(--nominal-quiet); }
 
 .note {
   margin: 1rem 1.4rem 2rem;
@@ -199,3 +196,34 @@ main {
 @media (max-width: 62rem) {
   main { grid-template-columns: minmax(0, 1fr); }
 }
+
+.formation {
+  margin-top: 1rem;
+  border: 1px solid var(--line-10);
+  border-radius: 0.7rem;
+  background: var(--ground-card);
+  padding: 0.85rem 0.9rem;
+}
+.formation-form {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: 0.35rem 0.6rem;
+  align-items: center;
+  margin: 0.6rem 0 0.7rem;
+}
+.formation-form label {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.formation-form select,
+.formation-form input {
+  width: 100%;
+  padding: 0.35rem 0.4rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--line-14);
+  background: var(--ground-soft);
+  font-size: 0.82rem;
+}
+.formation .robot-actions button { font-size: 0.78rem; }

@@ -159,4 +159,16 @@
   /* 게이지는 여유로 읽힌다 — 임계를 넘기 전까지 중립이다. */
   --gauge-track: var(--line-08);
   --gauge-fill: var(--muted-line);
+
+  /* ---- 글자 — 한 가족, 숫자만 따로 ---------------------------------- */
+  /* 플랫폼 UI 서체가 먼저다 — 작은 크기 UI용으로 설계된 얼굴이다.
+   * 그 다음이 플랫폼별 한글 서체이며, Windows는 Malgun Gothic이 항상
+   * 있고 Noto Sans KR은 보통 없다. 웹폰트는 쓰지 않는다(D-75). */
+  --body: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
+          "Segoe UI", Roboto, "Malgun Gothic", "Apple SD Gothic Neo",
+          "Noto Sans KR", sans-serif;
+  /* 변하는 숫자는 전부 등폭이다 — 갱신될 때 자릿수가 흔들리면 못 읽는다.
+   * 플랫폼마다 하나씩 두어 어디서도 Courier로 떨어지지 않게 한다. */
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Roboto Mono",
+          "DejaVu Sans Mono", "Noto Sans Mono", monospace;
 }

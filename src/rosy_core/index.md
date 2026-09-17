@@ -44,8 +44,8 @@
 
 ## 최근 기록
 
+- 2026-09-17 · uncommitted · feat(web): finish the D-82 pass — component tokens, typography, touch targets
 - 2026-09-17 · uncommitted · feat(web): regenerate the palette from OKLCH and gate its values
 - 2026-09-17 · 8fdd8d2 · feat(core): D-72 S3–S6 evidence, gauges, inventory states
 - 2026-09-17 · uncommitted · feat(web): compress dashboard assets and make tokens.css the single source of colour
 - 2026-09-15 · uncommitted · docs(harness): stop carrying over unrerun ROS-SIM evidence
-- 2026-09-15 · uncommitted · docs(harness): start the rosy_core harness pilot

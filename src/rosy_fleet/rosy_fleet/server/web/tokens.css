@@ -1,54 +1,75 @@
-/* rosy_fleet 관제 표면 토큰.
+/* rosy_fleet 관제 표면 토큰 — concept 16 §6, D-72 L1, D-82.
  *
- * 값은 rosy_core 의 `web/tokens.css` 와 같다 — 운영자는 로봇 대시보드와 이 화면을
- * 번갈아 본다. 두 화면의 색이 다르면 같은 제품으로 읽히지 않는다.
+ * L1(토큰)은 네 표면이 공유한다. 값은 rosy_core `web/tokens.css`와 같은 OKLCH
+ * 생성본이며, D-73에 따라 이 모듈이 자기 사본과 자기 시험을 갖는다.
  *
- * 복사인 이유: rosy_fleet 은 rosy_core 자산을 import 하지 않는다. 관제 PC 는 로봇
- * 패키지 없이도 뜬다(설계 §2, 두 역할은 다른 기계에 산다). 색이 갈라지면 그때
- * 공용 토큰 패키지를 만드는 것이 맞지, 여기서 로봇 패키지를 끌어오는 것이 아니다.
+ * 이전 사본은 D-82 이전 팔레트였다 — 적록 색약 시야에서 주의 대 위험 대비가
+ * 1.07:1로 무너져 있었고, 계열 색 하나가 따뜻한 띠에 있었으며 계열 6쌍 중
+ * 4쌍이 색약에서 갈리지 않았다. 관제는 색 예산이 가장 빡빡한 표면이다.
  *
- *   ground  바탕·글자·선          status  임계를 넘었을 때만
- *   series  계열 정체성 (로봇 구분에 쓴다 — 상태색과 섞지 않는다)
+ * Fleet 고유 규칙(concept 16 §7.3): 정상은 화면에 없다. 스무 대 중 한 대가
+ * 문제면 색이 있는 줄도 하나여야 한다.
  */
 :root {
   /* ---- ground ---------------------------------------------------------- */
-  --ground: #111614;
-  --ground-deep: #0d1210;
-  --ground-grad-1: #101512;
-  --ground-grad-2: #141b18;
-  --ground-soft: #18201d;
-  --ground-card: #202924;
-  --ground-card-2: #242e29;
-  --paper: #eee9dc;
-  --muted: #9fa99f;
+  --ground: #101214;
+  --ground-deep: #08090b;
+  --ground-grad-1: #0e0f11;
+  --ground-grad-2: #151618;
+  --ground-soft: #1d1f21;
+  --ground-card: #2b2d30;
+  --ground-card-2: #35383c;
+  --paper: #eeeeef;
+  --muted: #9499a0;
 
-  --panel-fill: rgba(29, 38, 34, 0.88);
-  --scrim: rgba(9, 14, 12, 0.84);
+  --panel-fill: rgba(29, 31, 33, 0.88);
+  --scrim: rgba(8, 9, 11, 0.84);
   --shade-28: rgba(0, 0, 0, 0.28);
-
-  --line-06: rgba(238, 233, 220, 0.06);
-  --line-10: rgba(238, 233, 220, 0.1);
-  --line-14: rgba(238, 233, 220, 0.14);
-  --line-30: rgba(238, 233, 220, 0.3);
   --sheen-04: rgba(255, 255, 255, 0.04);
+  --line-06: rgba(238, 238, 239, 0.06);
+  --line-10: rgba(238, 238, 239, 0.1);
+  --line-14: rgba(238, 238, 239, 0.14);
+  --line-30: rgba(238, 238, 239, 0.3);
 
-  /* ---- status: 임계에만 ------------------------------------------------- */
-  --status-good: #c4db76;
-  --status-good-a09: rgba(196, 219, 118, 0.09);
-  --status-good-a45: rgba(196, 219, 118, 0.45);
-  --status-warn: #f2c46d;
-  --status-crit: #ff6b6f;
-  --status-crit-a10: rgba(255, 107, 111, 0.1);
-  --status-crit-a45: rgba(255, 107, 111, 0.45);
+  --surface-flat: var(--ground-soft);
+  --surface-raised: var(--ground-card);
+  --surface-line: var(--line-14);
 
-  /* ---- series: 로봇 정체성 ---------------------------------------------- */
-  --series-primary: #75b8c8;
-  --series-2: #d8a0d0;
-  --series-3: #e0b184;
-  --series-4: #9ec6a0;
+  /* ---- 정상은 색이 아니다(D-82) ---------------------------------------- */
+  --nominal: var(--paper);
+  --nominal-quiet: var(--muted);
 
-  /* ---- 글꼴 ------------------------------------------------------------- */
-  --display: Georgia, "Times New Roman", serif;
-  --body: Aptos, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
-  --mono: "Cascadia Mono", Consolas, "Noto Sans Mono", monospace;
+  /* ---- status: 임계에만. 따뜻한 띠에만 --------------------------------- */
+  --status-warn: #feb432;
+  --status-crit: #c40921;
+  --status-crit-a10: rgba(196, 9, 33, 0.1);
+  --status-crit-a45: rgba(196, 9, 33, 0.45);
+
+  /* ---- series: 계열. 차가운 띠에만 ------------------------------------- */
+  --series-primary: #49affd;
+  --series-goal: #12bb81;
+
+  /* ---- 로봇 식별 --------------------------------------------------------
+   * 네 대를 네 색상으로 가르는 것은 sRGB에서 불가능하다 — 차가운 띠 안에서
+   * 어두운 바탕 위 가독과 색약 분리를 동시에 만족하는 4단계가 없다.
+   * 그래서 식별은 **라벨(PINKY-01)이 나르고**, 색은 두 번째 단서로 같은
+   * 색상의 밝기 사다리 세 단이며 N>3이면 순환한다. 밝기는 색약에서도 남는다.
+   */
+  --robot-1: #b6ddfe;
+  --robot-2: #24a6fd;
+  --robot-3: #0774b6;
+
+  --focus-ring: var(--series-primary);
+
+  /* ---- 글자 — 한 가족, 숫자만 따로 ------------------------------------- */
+  /* 플랫폼 UI 서체가 먼저다 — 작은 크기 UI용으로 설계된 얼굴이다.
+   * 그 다음이 플랫폼별 한글 서체이며, Windows는 Malgun Gothic이 항상
+   * 있고 Noto Sans KR은 보통 없다. 웹폰트는 쓰지 않는다(D-75). */
+  --body: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
+          "Segoe UI", Roboto, "Malgun Gothic", "Apple SD Gothic Neo",
+          "Noto Sans KR", sans-serif;
+  /* 변하는 숫자는 전부 등폭이다 — 갱신될 때 자릿수가 흔들리면 못 읽는다.
+   * 플랫폼마다 하나씩 두어 어디서도 Courier로 떨어지지 않게 한다. */
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Roboto Mono",
+          "DejaVu Sans Mono", "Noto Sans Mono", monospace;
 }

@@ -125,12 +125,13 @@ function drawOverlay() {
     ctx.restore();
 
     // 목표는 Fleet 이 기억하는 값이다(로봇 상태에는 없다) — "내가 무엇을 시켰는가".
-    const goal = robot.goal;
+    // 대기 중인 미션도 그린다 — 어디로 갈 예정인지가 보여야 순서를 판단한다.
+    const goal = robot.goal || robot.queued;
     if (goal && typeof goal.x === "number") {
       const gcell = worldToCell(grid, goal.x, goal.y);
       ctx.beginPath();
       ctx.arc(gcell.col, grid.height - gcell.row, size * 0.5, 0, Math.PI * 2);
-      ctx.strokeStyle = css("--status-warn");
+      ctx.strokeStyle = css("--series-goal");
       ctx.globalAlpha = 1;
       ctx.stroke();
     }
@@ -179,8 +180,8 @@ function card(robot, index) {
   if (!robot.online) mode.classList.add("crit");
   head.appendChild(mode);
   const navEl = document.createElement("span");
-  navEl.className = `tag ${nav.cls}`;
-  navEl.textContent = nav.text;
+  navEl.className = `tag ${robot.queued ? "warn" : nav.cls}`;
+  navEl.textContent = robot.queued ? "대기" : nav.text;
   head.appendChild(navEl);
   node.appendChild(head);
 
@@ -200,6 +201,14 @@ function card(robot, index) {
     facts.appendChild(cellEl);
   });
   node.appendChild(facts);
+
+  if (robot.queued) {
+    // 왜 안 가는지 화면이 말하지 않으면 운영자는 미션이 사라졌다고 읽는다.
+    const why = document.createElement("p");
+    why.className = "hint";
+    why.textContent = `${robot.queued.blocked_by} 경로와 겹쳐 대기 중 — 앞이 비면 자동 출발합니다`;
+    node.appendChild(why);
+  }
 
   if (!robot.online && robot.error) {
     const why = document.createElement("p");
@@ -241,6 +250,7 @@ function card(robot, index) {
 function render() {
   const roster = el("roster");
   roster.replaceChildren(...view.robots.map(card));
+  fillLeaders();
   drawOverlay();
   const hint = el("hint");
   hint.textContent = view.selected
@@ -278,12 +288,17 @@ el("map-canvas").addEventListener("click", async (event) => {
   canvas.classList.add("idle");
   render();
   try {
-    await call(`/api/fleet/robots/${encodeURIComponent(robotId)}/goal`, {
+    const result = await call(`/api/fleet/robots/${encodeURIComponent(robotId)}/goal`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ x: point.x, y: point.y, yaw: 0 }),
     });
-    log(`${robotId} → (${point.x.toFixed(2)}, ${point.y.toFixed(2)}) 미션 하달`, "good");
+    const where = `(${point.x.toFixed(2)}, ${point.y.toFixed(2)})`;
+    if (result && result.queued) {
+      log(`${robotId} → ${where} 대기 — ${result.blocked_by} 경로와 겹침`, "");
+    } else {
+      log(`${robotId} → ${where} 미션 하달`, "good");
+    }
   } catch (err) {
     log(`${robotId} 미션 거절 — ${err.message}`, "bad");
   }
@@ -301,14 +316,109 @@ el("estop").addEventListener("click", async () => {
   }
 });
 
+// --- 대형 ------------------------------------------------------------------
+
+function fillLeaders() {
+  const select = el("formation-leader");
+  const ids = view.robots.map((r) => r.robot_id);
+  const current = select.value;
+  if (select.dataset.ids === ids.join(",")) return;
+  select.dataset.ids = ids.join(",");
+  select.replaceChildren(...ids.map((id) => {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = id;
+    return option;
+  }));
+  if (ids.includes(current)) select.value = current;
+}
+
+function renderFormation(status) {
+  const stateEl = el("formation-state");
+  stateEl.textContent = status.state;
+  stateEl.className = `tag ${status.state === "RUNNING" ? "nav"
+    : status.state === "HOLDING" ? "warn" : ""}`;
+  el("formation-start").disabled = status.active;
+  el("formation-reform").disabled = !status.active;
+  // 재개는 HOLDING 에서만 뜻이 있다. RUNNING 에서 눌러 봐야 세션이 조용히 무시한다.
+  el("formation-resume").disabled = status.state !== "HOLDING";
+  el("formation-stop").disabled = !status.active;
+
+  const detail = el("formation-detail");
+  if (!status.active) {
+    detail.textContent = "리더를 고르고 무장하면 나머지가 슬롯으로 따라붙습니다.";
+    return;
+  }
+  const slots = Object.entries(status.assignment || {})
+    .map(([id, slot]) => `${id} ${slot.distance.toFixed(2)}m/${slot.lateral.toFixed(2)}m`);
+  const relay = status.relay;
+  const lines = [`리더 ${status.leader} · ${status.formation} ${status.spacing}m`];
+  if (slots.length) lines.push(slots.join(", "));
+  if (relay) {
+    // 릴레이가 0 Hz 인데 이유가 없으면 화면은 "그냥 멈춰 있다"로만 보인다.
+    lines.push(`릴레이 ${relay.paused ? "일시정지" : `${relay.leader_rx_hz} Hz`}` +
+      (relay.leader_last_error ? ` (${relay.leader_last_error})` : ""));
+  }
+  if (status.reason) lines.push(`이유: ${status.reason.join(" / ")}`);
+  if (status.pending_triggers && status.pending_triggers.length) {
+    lines.push(`재개 차단: ${status.pending_triggers.map((t) => t.join(":")).join(", ")}`);
+  }
+  detail.textContent = lines.join(" — ");
+}
+
+async function refreshFormation() {
+  try {
+    renderFormation(await call("/api/fleet/formation"));
+  } catch (err) {
+    el("formation-detail").textContent = `대형 상태를 읽지 못했습니다 — ${err.message}`;
+  }
+}
+
+async function formationCall(path, body, label) {
+  try {
+    const status = await call(path, body ? {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    } : { method: "POST" });
+    renderFormation(status);
+    log(`대형 ${label} — ${status.state}`, "good");
+  } catch (err) {
+    log(`대형 ${label} 거절 — ${err.message}`, "bad");
+    refreshFormation();
+  }
+}
+
+el("formation-start").addEventListener("click", () => formationCall(
+  "/api/fleet/formation/start",
+  {
+    leader: el("formation-leader").value,
+    formation: el("formation-shape").value,
+    spacing: Number(el("formation-spacing").value),
+  },
+  "무장"));
+
+el("formation-reform").addEventListener("click", () => formationCall(
+  "/api/fleet/formation/reform",
+  { formation: el("formation-shape").value, spacing: Number(el("formation-spacing").value) },
+  "변경"));
+
+el("formation-resume").addEventListener("click", () =>
+  formationCall("/api/fleet/formation/resume", null, "재개"));
+
+el("formation-stop").addEventListener("click", () =>
+  formationCall("/api/fleet/formation/stop", null, "해제"));
+
 function tickClock() {
   el("clock").textContent = new Date().toTimeString().slice(0, 8);
 }
 
-view.colors = [css("--series-primary"), css("--series-2"), css("--series-3"), css("--series-4")];
+view.colors = [css("--robot-1"), css("--robot-2"), css("--robot-3")];
 tickClock();
 setInterval(tickClock, 1000);
 refreshState();
 refreshMap();
+refreshFormation();
+setInterval(refreshFormation, MAP_MS);
 setInterval(refreshState, STATE_MS);
 setInterval(refreshMap, MAP_MS);

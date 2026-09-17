@@ -235,3 +235,74 @@ def test_irreversible_actions_are_a_fill_not_text():
     assert declared.get("--button-irreversible-bg", "").startswith("--status-crit")
     assert declared.get("--button-irreversible-ink") in ("--paper", "--ink")
 
+
+def test_typography_is_declared_in_the_token_file():
+    """타이포그래피도 L1이다 — 토큰 파일 밖에 있으면 게이트가 못 본다."""
+    tokens = tokens_text()
+    assert "--body:" in tokens and "--mono:" in tokens, "폰트 토큰이 tokens.css에 없다"
+    for path in surface_stylesheets():
+        body = path.read_text(encoding="utf-8")
+        assert "--body:" not in body and "--mono:" not in body, (
+            f"{path.name}이 폰트 토큰을 따로 선언한다"
+        )
+
+
+def test_font_stacks_do_not_fall_through_on_any_platform():
+    """웹폰트를 쓰지 않으므로(D-75) 스택이 곧 설계다.
+
+    예전 스택은 `Aptos`(MS Office 전용)로 시작해 Linux와 macOS에서 라틴
+    문자가 한글 서체로 떨어졌고, `Malgun Gothic`이 없어 Windows에서는 한글이
+    스택 전체를 빠져나갔다. 등폭은 macOS 항목이 없어 Courier로 떨어졌다 —
+    계기의 숫자에 가장 나쁜 결과다.
+    """
+    tokens = tokens_text()
+    body = re.search(r"--body:\s*([^;]+);", tokens, re.DOTALL)
+    mono = re.search(r"--mono:\s*([^;]+);", tokens, re.DOTALL)
+    assert body and mono
+
+    body_stack = " ".join(body.group(1).split())
+    mono_stack = " ".join(mono.group(1).split())
+
+    assert "Aptos" not in body_stack, "Aptos는 MS Office 전용이라 세 플랫폼에서 빠진다"
+    for face, why in (
+        ("-apple-system", "macOS UI 서체"),
+        ("Segoe UI", "Windows UI 서체"),
+        ("Roboto", "Linux/Android UI 서체"),
+        ("Malgun Gothic", "Windows 한글"),
+        ("Apple SD Gothic Neo", "macOS 한글"),
+        ("Noto Sans KR", "Linux 한글"),
+    ):
+        assert face in body_stack, f"본문 스택에 {face}({why})가 없다"
+    assert body_stack.rstrip().endswith("sans-serif")
+
+    for face, why in (
+        ("ui-monospace", "현대 제네릭"),
+        ("Cascadia Mono", "Windows"),
+        ("Noto Sans Mono", "Linux"),
+    ):
+        assert face in mono_stack, f"등폭 스택에 {face}({why})가 없다"
+    assert "SF Mono" in mono_stack, "등폭 스택에 macOS 항목이 없다 — Courier로 떨어진다"
+    assert mono_stack.rstrip().endswith("monospace")
+
+
+def test_touch_targets_clear_the_floor():
+    """장갑 낀 손이 누른다. 최소 타겟은 --target-secondary(44px)다.
+
+    예전에는 설정·호스트 카드의 입력과 선택이 42px였다 — 내가 정한 바닥보다
+    낮았고, 토큰을 선언만 하고 쓰지 않아 아무도 몰랐다.
+    """
+    interactive = re.compile(r"(input|select|button|\[type=)")
+    offenders: dict[str, list[str]] = {}
+    for path in surface_stylesheets():
+        hits = []
+        for rule in re.findall(r"([^{}]+)\{([^}]*)\}", path.read_text(encoding="utf-8")):
+            selector, body = rule
+            if not interactive.search(selector):
+                continue
+            for value in re.findall(r"min-height:\s*(\d+)px", body):
+                if int(value) < 44:
+                    hits.append(f"{selector.strip()[:50]} -> {value}px")
+        if hits:
+            offenders[path.name] = hits
+    assert not offenders, f"44px 미만 터치 타겟: {offenders}"
+
