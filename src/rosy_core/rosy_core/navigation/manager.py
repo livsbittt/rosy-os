@@ -43,7 +43,8 @@ _IDLE_STATES = {NavigationState.IDLE, NavigationState.ARRIVED,
 class NavigationManager:
     def __init__(self, events, state_manager, waypoints, safety,
                  map_id_provider=None, stuck_timeout_s: float = 30.0,
-                 stuck_min_progress: float = 0.05, readiness=None) -> None:
+                 stuck_min_progress: float = 0.05, readiness=None,
+                 clock=time.monotonic) -> None:
         self._events = events
         self._state = state_manager
         self._waypoints = waypoints
@@ -58,6 +59,11 @@ class NavigationManager:
         self.mapping_active = False
         self._stuck_timeout = stuck_timeout_s
         self._stuck_min_progress = stuck_min_progress
+        #: NAV-006 의 시계. 기본은 벽시계지만 브리지가 ROS 시계로 갈아끼운다 — `use_sim_time`
+        #: 이 켜진 시뮬에서 벽시계로 재면, RTF 0.1 인 기계에서 "30 초 무진척"이 실제로는
+        #: 시뮬 3 초가 되어 제자리 회전만 하던 로봇이 곧바로 stuck 으로 잘린다.
+        #: 실기에서는 ROS 시계가 곧 시스템 시계라 동작이 같다.
+        self.clock = clock
         self._last_progress_pos: Optional[tuple[float, float]] = None
         self._last_progress_ts: float = 0.0
         # 목표는 uvicorn 워커(REST·WS)와 rclpy executor(브리지 타이머) 양쪽에서
@@ -152,7 +158,7 @@ class NavigationManager:
             # 직전 주행에서 남은 낡은 기준시각을 그대로 물려받는다. 한참 서 있던 로봇은
             # 첫 참조 pose 하나에 30 초 조건이 이미 성립해 무장 직후 stuck 으로 끊긴다.
             self._last_progress_pos = None
-            self._last_progress_ts = time.monotonic()
+            self._last_progress_ts = self.clock()
             return self._moving_session
 
     def moving_goal(self, spec: NavGoalSpec, source: str = "moving",
@@ -273,7 +279,7 @@ class NavigationManager:
             # 다음 목표는 새 기준점에서 시작한다. 남겨 두면 이미 만료된
             # 기준으로 곧장 다시 stuck 판정이 나 취소-재목표를 반복한다.
             self._last_progress_pos = None
-            self._last_progress_ts = time.monotonic()
+            self._last_progress_ts = self.clock()
         self._events.publish("nav.canceled", source="navigation_manager", data={"source": source})
         if closed:
             self._notify_session_closed(source)
@@ -297,7 +303,7 @@ class NavigationManager:
                 # 문틀에 낀 팔로워가 아무 신호 없이 계속 밀어붙인다.
                 return
             self._last_progress_pos = None
-            self._last_progress_ts = time.monotonic()
+            self._last_progress_ts = self.clock()
 
     def on_result(self, succeeded: bool, error: Optional[str] = None) -> None:
         with self._lock:
@@ -313,7 +319,7 @@ class NavigationManager:
         """NAV-006 stuck: NAVIGATING 중 진척 없으면 자동 취소."""
         if self._nav_state is not NavigationState.NAVIGATING:
             return
-        now = time.monotonic()
+        now = self.clock()
         if self._last_progress_pos is not None:
             dist = math.hypot(x - self._last_progress_pos[0], y - self._last_progress_pos[1])
             if dist >= self._stuck_min_progress:

@@ -193,15 +193,17 @@ class TestNavigation:
         types = [ev.type for ev in bus.history()]
         assert "nav.started" in types and "nav.completed" in types
 
-    def test_stuck_detection(self, bus, safety, tmp_path, monkeypatch):
+    def test_stuck_detection(self, bus, safety, tmp_path):
         nav, _, _ = self._make(bus, safety, tmp_path)
         nav._stuck_timeout = 0.05
+        # NAV-006 의 시계는 주입된다(브리지가 ROS 시계를 끼운다). 모듈의 `time.monotonic`
+        # 을 몽키패치해도 이제 매니저는 그것을 보지 않는다.
+        now = [0.0]
+        nav.clock = lambda: now[0]
         nav.goal(nav.resolve_goal(x=1.0, y=1.0))
         nav.on_goal_accepted()
-        import rosy_core.navigation.manager as nm
-        monkeypatch.setattr(nm.time, "monotonic", lambda: 0.0)        # 동일 시각 고정
         nav.on_pose_progress(0.0, 0.0)
-        monkeypatch.setattr(nm.time, "monotonic", lambda: 1.0)        # 진척 없이 시간 경과
+        now[0] = 1.0                                                   # 진척 없이 시간 경과
         nav.on_pose_progress(0.0, 0.0)
         assert nav.nav_state.value == "CANCELED"                       # NAV-006
         assert "nav.stuck" in [ev.type for ev in bus.history()]

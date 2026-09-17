@@ -224,6 +224,28 @@ def test_goal_replacement_does_not_reset_the_stuck_baseline():
     assert nav._last_progress_pos == (0.0, 0.0)
 
 
+def test_the_stuck_timeout_is_measured_on_the_injected_clock():
+    """브리지가 ROS 시계를 끼우면 `use_sim_time` 시뮬에서도 30 초가 시뮬 30 초다.
+
+    벽시계로 재면 RTF 0.1 인 기계에서 30 초 무진척 조건이 시뮬 3 초 만에 성립해, 제자리
+    회전 중인 로봇이 움직여 보기도 전에 잘린다 — 미로 시험에서 실제로 그렇게 끊겼다.
+    """
+    swarm, nav, executor, clock, events, _safety, _docking = build()
+    fake = FakeClock()
+    nav.clock = fake
+    nav.goal(NavGoalSpec(1.0, 0.0, 0.0))
+    executor.settle()
+    nav.on_pose_progress(0.0, 0.0)
+
+    fake.advance(29.0)
+    nav.on_pose_progress(0.0, 0.0)
+    assert "nav.stuck" not in events.types()
+
+    fake.advance(2.0)
+    nav.on_pose_progress(0.0, 0.0)
+    assert "nav.stuck" in events.types()
+
+
 def test_opening_a_follow_session_starts_the_no_progress_clock_fresh():
     """서 있던 로봇이 추종을 시작하면 무진척 시계도 그때 시작한다.
 

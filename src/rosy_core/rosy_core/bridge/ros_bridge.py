@@ -164,6 +164,10 @@ class RosBridge:
 
         self._setup_diagnostics()
         self._svc.nav.executor = self
+        # NAV-006 무진척 시계를 ROS 시계로 바꾼다. `use_sim_time` 이 켜진 시뮬에서는 이것이
+        # sim clock 이라, 느리게 도는 기계에서도 "30 초"가 시뮬 30 초를 뜻한다. 실기에서는
+        # 시스템 시계와 같아 동작이 달라지지 않는다.
+        self._svc.nav.clock = lambda: self._node.get_clock().now().nanoseconds / 1e9
         self._svc.docking.executor = self
         self._node.get_logger().info("ros_bridge ready (cmd_vel sole publisher @50Hz)")
 
