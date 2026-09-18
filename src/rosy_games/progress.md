@@ -10,7 +10,7 @@ gates:
     cmd: "python -m pytest src/rosy_games/test/test_games_boundaries.py test/test_rosy_games_surface.py -q"
   LOCAL:
     state: GO
-    evidence: "85 passed including observe-only default (D-107, 2026-09-18 Windows)"
+    evidence: "88 passed including D-109 catalog lock (2026-09-18 Windows)"
     cmd: "python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q"
   ROS-SIM:
     state: N/A
@@ -20,7 +20,7 @@ gates:
     state: PARKED
   FIELD:
     state: PARKED
-adrs: [D-90, D-94, D-95, D-96, D-97, D-98, D-99, D-100, D-101, D-102, D-103, D-104, D-105, D-106, D-107, D-108]
+adrs: [D-90, D-94, D-95, D-96, D-97, D-98, D-99, D-100, D-101, D-102, D-103, D-104, D-105, D-106, D-107, D-108, D-109]
 plans:
   - docs/plans/2026-09-17-robot-soccer-game-host-design.md
   - docs/plans/2026-09-18-rosy-games-local-host.md
@@ -30,7 +30,7 @@ plans:
 ## 지금 상태
 
 - 노트북 게임 호스트 (D-90). CORE 모드 아님. 최종 `cmd_vel` 없음.
-- LOCAL 호스트: 기본 관측만 (D-107). `--drive`는 계단 2+ (D-108). Fleet 매치 버튼 없음 (D-106).
+- LOCAL 호스트: 기본 관측만 (D-107). 카탈로그 soccer/heuristic/hold/overhead (D-109). onboard/isaac/neural 없음.
 - DEVICE/FIELD는 실제 천장 웹캠·마커 실측. 합성 프레임 pytest로 승격하지 않는다.
 
 ## 다음 gate

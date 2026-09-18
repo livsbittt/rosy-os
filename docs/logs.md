@@ -219,3 +219,11 @@
 - gate 변화: rosy_games LOCAL GO 유지. DEVICE/FIELD PARKED
 - 결정: D-96 계단 1 호스트가 공을 보면 달리지 않는다
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · docs(adr): lock deferred catalog (D-109)
+
+- 변경: ADR D-109. 계단 4 전 카탈로그는 soccer/heuristic/hold/overhead. onboard/isaac/neural 거절.
+- 증거: ADR 색인, catalog 시험
+- gate 변화: 없음
+- 결정: D-97·D-98·D-99 호스트 잠금. 구현 아님
+- 교훈: 없음

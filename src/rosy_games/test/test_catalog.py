@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from rosy_games.catalog import GAMES, POLICIES, make_game, make_policy
+from rosy_games.catalog import GAMES, OBSERVERS, POLICIES, make_game, make_observer, make_policy
 from rosy_games.field import Field
 from rosy_games.game import SoccerGame
 from rosy_games.policy import HeuristicPolicy
@@ -38,3 +38,17 @@ def test_catalog_has_only_soccer_and_heuristic_until_field_repeats():
     assert set(POLICIES) == {"heuristic"}
     assert not (PKG / "rosy_games" / "isaac").exists()
     assert not (PKG / "rosy_games" / "policy" / "neural.py").exists()
+
+
+def test_catalog_observers_are_hold_and_overhead_until_field_repeats():
+    """D-97/D-109: onboard는 계단 4 전에 없다."""
+    assert OBSERVERS == frozenset({"hold", "overhead"})
+    assert not (PKG / "rosy_games" / "host" / "onboard.py").exists()
+    try:
+        make_observer("onboard", None)
+        raise AssertionError("onboard observer must fail")
+    except ValueError as exc:
+        assert "onboard" in str(exc)
+    catalog = (PKG / "rosy_games" / "catalog.py").read_text(encoding="utf-8")
+    assert "import cv2" not in catalog
+    assert "from cv2" not in catalog

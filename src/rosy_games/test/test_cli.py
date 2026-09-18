@@ -85,6 +85,14 @@ def test_cli_default_observer_is_hold_not_the_camera():
     assert args.observer == "hold"
 
 
+def test_cli_rejects_onboard_observer():
+    try:
+        parse_args(["match", "--config", str(MATCH), "--observer", "onboard"])
+        raise AssertionError("onboard must not be a CLI observer")
+    except SystemExit:
+        pass
+
+
 def test_cli_default_is_observe_only_not_drive():
     args = parse_args(["match", "--config", str(MATCH), "--dry-run"])
     assert args.drive is None

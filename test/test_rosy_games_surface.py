@@ -60,6 +60,19 @@ def test_fleet_does_not_own_the_match_and_games_has_no_fleet_start():
     assert "def reset(" in loop
 
 
+def test_deferred_soccer_track_is_not_in_the_tree():
+    """D-97/D-98/D-99/D-109: onboard·isaac·neural 없음. D-41은 Proposed."""
+    games = ROOT / "src" / "rosy_games" / "rosy_games"
+    assert not (games / "host" / "onboard.py").is_file()
+    assert not (games / "isaac").exists()
+    assert not (games / "policy" / "neural.py").is_file()
+    cli = (games / "cli.py").read_text(encoding="utf-8")
+    assert "onboard" not in cli
+    adr = (ROOT / "docs" / "reference" / "ROSY ADR Log.md").read_text(encoding="utf-8")
+    row = next(line for line in adr.splitlines() if line.startswith("| D-41 |"))
+    assert "Proposed" in row
+
+
 def test_games_board_is_not_the_core_dashboard():
     """D-101: 축구 보드는 노트북 게임 표면. CORE /dashboard 자산이 아니다."""
     core_web = ROOT / "src" / "rosy_core" / "rosy_core" / "web"

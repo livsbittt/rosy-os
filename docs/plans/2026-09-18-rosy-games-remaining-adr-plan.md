@@ -1,7 +1,7 @@
 # 남은 rosy_games 트랙 → ADR 계획
 
 작성일: 2026-09-18
-상태: D-95–D-108. 계단 1 호스트는 관측만. `--drive`는 계단 2+. 현장 GO가 아니다.
+상태: D-95–D-109. 계단 4 전 카탈로그는 soccer/heuristic/hold/overhead. 현장 GO가 아니다.
 
 관련: D-90, D-91, D-94 ·
 [game host 설계](2026-09-17-robot-soccer-game-host-design.md) ·
@@ -23,9 +23,9 @@
 | 실기 천장 1v1 순서 | **D-96** | 카메라만 → 한 대 0.08 → 두 대 이격 → 저속 1v1 → 킥오프 반복 |
 | 계단 1이 달리면? | **D-107** | 기본 관측만. `--observe-only` |
 | 계단 2+ 드라이브? | **D-108** | `--drive` / `--drive rosy_01`. FIELD GO 아님 |
-| 온보드 앞 카메라 지금? | **D-97** | 아니요. 계단 4 반복 뒤 CMD-001 |
-| Isaac / `isaac/` 폴더 | **D-98** | 계단 4 반복 전 금지. env는 `game`만 |
-| 신경망을 cmd_vel에? | **D-99** | 아니요. `Policy` 플러그인 |
+| 온보드 앞 카메라 지금? | **D-97**, **D-109** | 아니요. observer 카탈로그에 없음 |
+| Isaac / `isaac/` 폴더 | **D-98**, **D-109** | 아니요. 폴더 없음 |
+| 신경망을 cmd_vel에? | **D-99**, **D-109** | 아니요. `neural` 거절 |
 | Fleet 매치 버튼 | **D-106** | 지금은 안 만듦. 생기면 Fleet→`reset()` 한 방향 |
 | games를 D-62 슬라이스로? | D-90, **D-106** | 아니요 |
 | D-41을 overhead로 닫기 | D-94 | 아니요 |
@@ -54,6 +54,7 @@
 | D-106 | Fleet 매치 시작은 나중. 지금 버튼 없음. fleet↛games import |
 | D-107 | 계단 1 기본은 관측만. arm/teleop 없음 |
 | D-108 | `--drive`는 계단 2+. 한 id면 그 대만. FIELD GO 아님 |
+| D-109 | 카탈로그는 soccer/heuristic/hold/overhead만. onboard/isaac/neural 거절 |
 
 ## 4. 실행 순서 (다음 세션)
 
@@ -67,5 +68,5 @@
 
 ## 5. 수락
 
-- ADR 로그에 D-95–D-108 색인·본문이 있다
+- ADR 로그에 D-95–D-109 색인·본문이 있다
 - `python -m pytest test/test_harness_contracts.py src/rosy_games/test test/test_rosy_games_surface.py -q`

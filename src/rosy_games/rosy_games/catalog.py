@@ -10,6 +10,7 @@ from rosy_games.policy.protocol import Policy
 
 GAMES = {"soccer": SoccerGame}
 POLICIES = {"heuristic": HeuristicPolicy}
+OBSERVERS = frozenset({"hold", "overhead"})
 
 
 def make_game(kind: str, field: Field) -> Game:
@@ -32,3 +33,15 @@ def make_policy(
     except KeyError as exc:
         raise ValueError(f"unknown policy {kind!r}") from exc
     return cls(field, speed=speed, angular=angular)
+
+
+def make_observer(kind: str, setup):
+    if kind not in OBSERVERS:
+        raise ValueError(f"unknown observer {kind!r}")
+    if kind == "hold":
+        from rosy_games.host.hold import HoldObserver
+
+        return HoldObserver(setup.field.home_id, setup.field.away_id)
+    from rosy_games.host.overhead import OverheadCamera
+
+    return OverheadCamera(setup)

@@ -25,6 +25,7 @@
 | D-106 | Fleet 매치 시작은 나중에 Fleet→games 한 방향이며 지금은 버튼을 만들지 않는다 |
 | D-107 | D-96 계단 1 호스트는 관측만이며 기본은 모터를 무장하지 않는다 |
 | D-108 | `--drive`는 계단 2+ 스위치이며 FIELD GO가 아니다 |
+| D-109 | 계단 4 전 카탈로그는 soccer/heuristic/hold/overhead만이다 |
 
 ## 계획·결과 문서
 
@@ -44,8 +45,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · test(games): reject onboard, isaac, neural until stair 4 (D-109)
+- 2026-09-18 · uncommitted · docs(adr): D-109 catalog lock for deferred track
 - 2026-09-18 · uncommitted · feat(games): default to observe-only, opt in with --drive (D-107, D-108)
 - 2026-09-18 · uncommitted · docs(adr): D-107 observe-only, D-108 --drive
 - 2026-09-18 · uncommitted · test(games): lock the Fleet/games one-way cut (D-106)
-- 2026-09-18 · uncommitted · docs(adr): D-106 Fleet does not start matches yet
-- 2026-09-18 · uncommitted · feat(games): arm PUT limits and halt on space or board stop (D-104, D-105)

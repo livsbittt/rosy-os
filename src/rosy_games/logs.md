@@ -139,3 +139,15 @@
 - 변경: 기본은 arm/teleop 없음. `--drive` 또는 `--drive rosy_01`. `--observe-only`와 배타.
 - 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 85 passed
 - gate 변화: LOCAL GO 유지. DEVICE/FIELD PARKED
+
+## 2026-09-18 · uncommitted · docs(adr): D-109 catalog lock for deferred track
+
+- 변경: progress `adrs`에 D-109. observer는 hold/overhead만
+- 증거: ADR 로그
+- gate 변화: 없음
+
+## 2026-09-18 · uncommitted · test(games): reject onboard, isaac, neural until stair 4 (D-109)
+
+- 변경: `OBSERVERS` 카탈로그. `make_observer("onboard")` 거절. isaac/neural/onboard 파일 없음. catalog는 cv2를 상단 import하지 않음.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q`
+- gate 변화: 없음. DEVICE/FIELD PARKED
