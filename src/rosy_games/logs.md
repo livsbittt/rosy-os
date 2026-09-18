@@ -115,3 +115,15 @@
 - 변경: arm이 MANUAL 다음 PUT `/safety/limits`. 스페이스와 보드 POST `/stop`이 양쪽 halt. 보드는 CORE URL을 열지 않음.
 - 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 79 passed
 - gate 변화: LOCAL GO 유지. DEVICE/FIELD PARKED
+
+## 2026-09-18 · uncommitted · docs(adr): D-106 Fleet does not start matches yet
+
+- 변경: progress `adrs`에 D-106. Fleet 매치 버튼 없음, reset은 games
+- 증거: ADR 로그
+- gate 변화: 없음
+
+## 2026-09-18 · uncommitted · test(games): lock the Fleet/games one-way cut (D-106)
+
+- 변경: Fleet 소스는 rosy_games를 모르고, 게임 보드/CLI에 fleet 시작이 없다. RobotMode.SOCCER 없음.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py src/rosy_fleet/test/test_boundaries.py -q`
+- gate 변화: 없음. DEVICE/FIELD PARKED

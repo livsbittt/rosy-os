@@ -22,7 +22,7 @@ gates:
     state: PARKED
   FIELD:
     state: PARKED
-adrs: [D-5, D-10, D-12, D-18, D-20, D-21, D-30, D-31, D-59, D-60]
+adrs: [D-5, D-10, D-12, D-18, D-20, D-21, D-30, D-31, D-59, D-60, D-90, D-106]
 plans:
   - docs/plans/2026-09-14-site-middleware-role-fabric-design.md
   - docs/plans/2026-09-14-site-middleware-role-fabric.md
@@ -37,6 +37,7 @@ plans:
 - `test_boundaries.py`가 패키지 전체 `rclpy` 금지와 `hub/`의 `rosy_core.protocol.schemas` 외 CORE import 금지를 강제한다(D-18).
 - **Fleet 서버 v1 있음**: `rosy_fleet console --robots robots.yaml` 이 N대를 한 화면에 모으고 로봇별 목표·취소와 전체 정지를 내린다(site-fabric 설계 §2, 전환 순서 3단계). WSL ROS 2 Jazzy + Gazebo 2대 위에서 지도 클릭 미션 하달 → 양쪽 `ARRIVED` 확인(2026-09-17).
 - 아직 없는 것: `rosy_fleet hub --listen` 소켓과 CORE `FleetAgent` outbound. 그래서 v1 의 gather 는 REST 폴링이다 — 에이전트가 붙으면 `FleetConsole.snapshot()` 의 출처만 바뀐다.
+- 축구 매치 시작 버튼은 없다 (D-106). `rosy_games`를 import하지 않는다. `reset()`은 games.
 - 물리 대형(FAT-06 등) 실측은 아직 없다. D-35(전체 HOLD는 릴레이를 끊는 것)는 sim bench 실측 대기 중인 후보이며 ADR log에는 의도적으로 미등재다(`adr_gaps`).
 - 작업 트리에 미커밋 변경 있음(`AGENTS.md` 갱신 3건 + `formation/`·`swarm/` `AGENTS.md` 신규). LOCAL 증거는 이 작업 트리 기준이다.
 

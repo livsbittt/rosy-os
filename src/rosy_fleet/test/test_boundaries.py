@@ -62,6 +62,13 @@ def test_fleet_package_never_imports_rclpy():
             assert name != "rclpy" and not name.startswith("rclpy."), f"{path.name} imports {name}"
 
 
+def test_fleet_package_never_imports_rosy_games():
+    """D-106: 매치 시작이 생겨도 지금은 games를 모른다."""
+    for path in _py_files(FLEET_PKG):
+        for name in _imports(path):
+            assert name != "rosy_games" and not name.startswith("rosy_games."), path.name
+
+
 def test_hub_may_import_only_protocol_schemas_from_rosy_core():
     if not HUB_DIR.exists():
         pytest.fail("hub package missing — Task 4 creates it; this test should fail until then")

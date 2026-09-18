@@ -195,3 +195,11 @@
 - gate 변화: rosy_games LOCAL GO 유지. DEVICE/FIELD PARKED
 - 결정: 설계 §4.2·§5를 호스트 계약으로 옮김
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · docs(adr): Fleet match-start is later one-way (D-106)
+
+- 변경: ADR D-106. Fleet 매치 버튼은 지금 없음. reset()은 games. fleet↛games.
+- 증거: ADR 색인, `test/test_rosy_games_surface.py`
+- gate 변화: 없음
+- 결정: D-106 Accepted. 콘솔 버튼 미구현
+- 교훈: 없음

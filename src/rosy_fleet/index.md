@@ -19,6 +19,8 @@
 | D-31 | 군집 참조 스트림은 로봇의 소켓이다 — Fleet 은 선택적 중계자 |
 | D-59 | 사이트 패브릭은 역할별 계약 버스다 |
 | D-60 | 추종은 navigation이 아니라 swarm 패키지다 |
+| D-90 | 축구는 게임 호스트이지 CORE 모드가 아니다 |
+| D-106 | Fleet 매치 시작은 나중에 Fleet→games 한 방향이며 지금은 버튼을 만들지 않는다 |
 
 ## 계획·결과 문서
 
@@ -39,8 +41,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · test(fleet): never import rosy_games (D-106)
 - 2026-09-18 · uncommitted · feat(server): 폭 면제를 걷어낸다 (D-93)
 - 2026-09-18 · uncommitted · fix(server): 잘린 계획 경로가 목표 점유를 가렸다
 - 2026-09-18 · uncommitted · fix(server): 실환경이 비켜서기의 결함 넷을 드러냈다 (그리고 고친 뒤 맞바꾸기가 끝까지 돌았다)
 - 2026-09-17 · uncommitted · test(swarm): Task 14 sim bench 를 끝까지 돌려 HOLD 지연을 실측
-- 2026-09-17 · uncommitted · feat(server): 관제 화면에서 대형을 열고 닫는다

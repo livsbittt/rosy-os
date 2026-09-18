@@ -1,7 +1,7 @@
 # 남은 rosy_games 트랙 → ADR 계획
 
 작성일: 2026-09-18
-상태: D-95–D-105. LOCAL 호스트 루프·limits PUT·정지 입력까지 있다. 현장 1v1 GO가 아니다.
+상태: D-95–D-106. LOCAL 호스트와 Fleet/games 절단까지 있다. 현장 1v1 GO가 아니다.
 
 관련: D-90, D-91, D-94 ·
 [game host 설계](2026-09-17-robot-soccer-game-host-design.md) ·
@@ -24,8 +24,8 @@
 | 온보드 앞 카메라 지금? | **D-97** | 아니요. 계단 4 반복 뒤 CMD-001 |
 | Isaac / `isaac/` 폴더 | **D-98** | 계단 4 반복 전 금지. env는 `game`만 |
 | 신경망을 cmd_vel에? | **D-99** | 아니요. `Policy` 플러그인 |
-| Fleet 매치 버튼 | D-90 | 버튼은 Fleet, `reset()`은 games. 지금 구현하지 않음 |
-| games를 D-62 슬라이스로? | D-90 | 아니요 |
+| Fleet 매치 버튼 | **D-106** | 지금은 안 만듦. 생기면 Fleet→`reset()` 한 방향 |
+| games를 D-62 슬라이스로? | D-90, **D-106** | 아니요 |
 | D-41을 overhead로 닫기 | D-94 | 아니요 |
 | 골대를 QR/영역으로 보이게 | **D-100** | ArUco 20/21 + 선택 HSV 입구. 득점은 m 폴리곤 |
 | 경기 화면을 CORE 콘솔에? | **D-101** | 아니요. 노트북 `rosy_games --preview` |
@@ -49,6 +49,7 @@
 | D-103 | limits는 gate. 유실 HOLD 즉시. period ≤ lost_hold_s |
 | D-104 | arm은 MANUAL 다음 PUT safety/limits |
 | D-105 | 스페이스·보드 /stop은 양쪽 safety/stop. 보드는 CORE를 직접 안 침 |
+| D-106 | Fleet 매치 시작은 나중. 지금 버튼 없음. fleet↛games import |
 
 ## 4. 실행 순서 (다음 세션)
 
@@ -62,5 +63,5 @@
 
 ## 5. 수락
 
-- ADR 로그에 D-95–D-105 색인·본문이 있다
+- ADR 로그에 D-95–D-106 색인·본문이 있다
 - `python -m pytest test/test_harness_contracts.py src/rosy_games/test test/test_rosy_games_surface.py -q`

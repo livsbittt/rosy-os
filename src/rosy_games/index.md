@@ -22,6 +22,7 @@
 | D-103 | match.yaml 한계는 게이트 계약이고 유실 HOLD는 즉시다 |
 | D-104 | 호스트 arm은 MANUAL 다음에 PUT safety/limits를 건다 |
 | D-105 | 호스트 정지는 스페이스와 보드 /stop이며 양쪽 safety/stop이다 |
+| D-106 | Fleet 매치 시작은 나중에 Fleet→games 한 방향이며 지금은 버튼을 만들지 않는다 |
 
 ## 계획·결과 문서
 
@@ -41,8 +42,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · test(games): lock the Fleet/games one-way cut (D-106)
+- 2026-09-18 · uncommitted · docs(adr): D-106 Fleet does not start matches yet
 - 2026-09-18 · uncommitted · feat(games): arm PUT limits and halt on space or board stop (D-104, D-105)
 - 2026-09-18 · uncommitted · docs(adr): D-104 limits PUT, D-105 halt input
 - 2026-09-18 · uncommitted · feat(games): run live matches at 20 Hz and clamp yaml limits (D-102, D-103)
-- 2026-09-18 · uncommitted · docs(adr): D-102 20 Hz loop, D-103 yaml limits
-- 2026-09-18 · uncommitted · fix(games): keep --preview open until interrupt

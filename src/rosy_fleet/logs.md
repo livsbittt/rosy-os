@@ -79,3 +79,9 @@
 - 결정: **D-93** 등재. 통로 폭은 Fleet 중재의 면제 사유가 아니다
 - 교훈: 앞서 적은 "1.4 m 면 스스로 지나간다"는 틀렸다. 두 가지가 겹쳤다 — (1) 그 시험은 교행이 아니라 **자리 맞바꾸기**였다(각 목표가 상대가 선 좌표라 상대가 비켜야만 도착이 성립한다), (2) 단일 시행이었고 같은 폭의 순수 교행은 실패한다. 실패하는 실험과 성공하는 실험이 **다른 질문**을 묻고 있지 않은지 먼저 봐야 한다
 - 남은 것: 측면 회피가 있는 컨트롤러(DWB)로 바꾸면 이 결론이 바뀔 수 있다. D-93 은 그때 Superseded 한다
+
+## 2026-09-18 · uncommitted · test(fleet): never import rosy_games (D-106)
+
+- 변경: `test_boundaries.py`가 패키지 전체 `rosy_games` import를 금지. 매치 시작 버튼은 만들지 않음.
+- 증거: `python -m pytest src/rosy_fleet/test/test_boundaries.py test/test_rosy_games_surface.py -q`
+- gate 변화: 없음. D-90/D-106 경계만.
