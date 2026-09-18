@@ -103,6 +103,12 @@ h1 {
   color: #122018;
 }
 
+#stair1 {
+  margin: 0 22px 8px;
+  color: var(--mute);
+  font-size: 13px;
+}
+
 .lost {
   margin: 0 22px 24px;
   color: var(--lost);

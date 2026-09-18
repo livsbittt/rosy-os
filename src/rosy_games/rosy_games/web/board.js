@@ -112,6 +112,13 @@ async function tick() {
   document.getElementById("lost").textContent = payload.reason || (payload.lost_ball ? "공을 잃음" : "로봇을 잃음");
   draw(payload);
   chips(payload);
+  const vis = payload.visibility || {};
+  const stair1 = document.getElementById("stair1");
+  if (stair1) {
+    stair1.textContent = vis.ready
+      ? "계단 1 마커 보임 (FIELD GO 아님)"
+      : "계단 1 아직 (FIELD GO 아님)";
+  }
   const frame = document.getElementById("frame");
   if (!payload.has_frame) {
     frame.hidden = true;

@@ -119,6 +119,8 @@
 | D-109 | 계단 4 전 카탈로그는 soccer/heuristic/hold/overhead만이다 | Accepted |
 | D-110 | 첫 접촉 limits.linear는 0.10을 넘지 않는다 | Accepted |
 | D-111 | `--stair 1–5`는 호스트 프리셋이며 FIELD GO가 아니다 | Accepted |
+| D-112 | 계단 1 가시성은 호스트 보고이며 FIELD GO가 아니다 | Accepted |
+| D-113 | D-96 남은 실행은 현장 실측이며 LOCAL 호스트 트랙은 닫힌다 | Accepted |
 
 ---
 
@@ -2929,6 +2931,9 @@ HOLD teleop 0으로 무장한다.
 **Amendment (2026-09-18):** 첫 접촉 속도 상한은 D-110. 계단 프리셋은 D-111.
 `--stair`와 pytest가 현장 GO가 아니다.
 
+**Amendment (2026-09-18):** 계단 1 가시성 보고는 D-112. LOCAL 호스트 트랙 마감은
+D-113. 웹캠·Pinky 실측이 남는다.
+
 ---
 
 ## D-97 온보드 축구 시야는 FIELD 반복 뒤 CMD-001 후보다
@@ -3415,4 +3420,59 @@ D-41 행은 Proposed. DEVICE/FIELD PARKED.
 **Validation / Transition:** `test_cli.py`. FIELD PARKED.
 
 **References:** D-91, D-95, D-96, D-107, D-108.
+
+---
+
+## D-112 계단 1 가시성은 호스트 보고이며 FIELD GO가 아니다
+
+**Status:** Accepted (2026-09-18). 천장 마커 체크리스트다. 현장 GO가 아니다.
+
+**Context:** D-96 계단 1은 코너 10–13, 로봇 1/2, 공, 골 20/21이 보여야 한다.
+보드에 칩은 있으나 호스트가 “계단 1 보임”을 이름 붙여 말하지 않으면 합성
+프레임과 실측을 같은 성공으로 적기 쉽다.
+
+**Decision:**
+
+- `stair1_visibility`는 코너·로봇 ArUco·골 id·공 유실을 보고한다
+- `ready`는 네 코너와 두 로봇과 공, 그리고 골 20/21(또는 HSV 입구 설정)이
+  보일 때다
+- `ready`와 pytest는 FIELD GO가 아니다 (D-91, D-95, D-96)
+- `--stair 1 --dry-run`은 기대 id를 찍는다. 라이브는 마지막 보고를 찍는다
+- 보드 overlay에 `visibility`를 실어 “FIELD GO 아님”을 같이 쓴다
+- OpenCV는 계속 `overhead.py`만. `visibility.py`는 cv2를 import하지 않는다
+
+**Alternatives:** 보드 칩만 두는 안은 계단 1 합격 기준이 운영자 기억이다.
+`ready`를 FIELD GO로 승격하는 안은 D-95다.
+
+**Consequences:** 현장 계단 1은 보고를 보고 사람이 `logs.md`에 실측을 적는다.
+
+**Validation / Transition:** `test_cli.py`, `test_preview.py`. FIELD PARKED.
+
+**References:** D-91, D-95, D-96, D-100, D-101, D-111.
+
+---
+
+## D-113 D-96 남은 실행은 현장 실측이며 LOCAL 호스트 트랙은 닫힌다
+
+**Status:** Accepted (2026-09-18). 호스트 스위치는 D-107–D-112로 끝이다.
+
+**Context:** 남은 ADR을 호스트에 계속 붙이면 웹캠 없이 계단을 닫는 것처럼
+보인다. D-97–D-99·linear 0.20은 계단 4 기록이 전제다.
+
+**Decision:**
+
+- D-96 계단 1–5의 **다음 실행**은 실제 천장 웹캠과 Pinky다
+- LOCAL 호스트 계약은 D-107–D-112로 닫는다. 새 호스트 스위치 ADR은 현장
+  `logs.md` 실측 항목이 생긴 뒤에만 연다
+- DEVICE/FIELD는 PARKED. `--stair`·`ready`·pytest가 GO가 아니다
+- 온보드 / `isaac/` / `neural` / 0.20은 여전히 거절 (D-109, D-110)
+
+**Alternatives:** 합성 overhead `ready`로 계단 1을 GO로 적는 안은 D-95다.
+호스트 ADR을 더 만들어 현장을 미루는 안은 이 결정이 거절한다.
+
+**Consequences:** 다음 세션 명령은 `--stair 1 --observer overhead --preview`.
+
+**Validation / Transition:** `progress.md` FIELD PARKED. `test_rosy_games_surface.py`.
+
+**References:** D-91, D-95, D-96, D-107, D-108, D-109, D-110, D-111, D-112.
 

@@ -11,6 +11,7 @@ from rosy_games.host.loop import MatchHost
 from rosy_games.host.robots import load_match
 from rosy_games.host.session import HOST_PERIOD_S, run_match, space_pressed
 from rosy_games.host.transport import HttpPlayerClient
+from rosy_games.host.visibility import format_visibility, stair1_expect
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -23,7 +24,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     match.add_argument("--observer", choices=tuple(sorted(OBSERVERS)), default="hold")
     match.add_argument("--preview", action="store_true")
     match.add_argument("--preview-port", type=int, default=8765)
-    match.add_argument("--stair", type=int, choices=(1, 2, 3, 4, 5), default=None)
+    match.add_argument(
+        "--stair",
+        type=int,
+        choices=(1, 2, 3, 4, 5),
+        default=None,
+        help="D-96 host preset; not FIELD GO",
+    )
     drive = match.add_mutually_exclusive_group()
     drive.add_argument("--observe-only", action="store_true")
     drive.add_argument("--drive", nargs="*", metavar="ROBOT_ID")
@@ -40,6 +47,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"{robot.id} {robot.url} aruco={robot.aruco_id} attacks={robot.attacks}")
         print(f"goals {setup.goals.home_id}/{setup.goals.away_id}")
         print(_drive_line(_motion(args, setup), setup))
+        if args.stair == 1:
+            print(format_visibility(stair1_expect(setup), expect=True))
         if args.preview:
             print("preview 127.0.0.1 (not started in dry-run)")
         return 0
@@ -81,6 +90,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             period_s=period_s,
             halt_check=lambda: (board.stop if board is not None else False) or space_pressed(),
         )
+        if args.stair == 1:
+            vis = host.last_visibility
+            if vis is None:
+                print("stair 1 visibility unknown (hold; not FIELD GO)")
+            else:
+                print(format_visibility(vis))
     finally:
         if server is not None:
             server.close()

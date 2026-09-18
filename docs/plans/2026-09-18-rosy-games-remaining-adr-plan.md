@@ -1,7 +1,7 @@
 # 남은 rosy_games 트랙 → ADR 계획
 
 작성일: 2026-09-18
-상태: D-95–D-111. 계단 프리셋과 첫 접촉 0.10 상한까지. 현장 GO가 아니다.
+상태: D-95–D-113. LOCAL 호스트 트랙 닫힘. 다음은 웹캠·Pinky 실측. 현장 GO가 아니다.
 
 관련: D-90, D-91, D-94 ·
 [game host 설계](2026-09-17-robot-soccer-game-host-design.md) ·
@@ -25,6 +25,8 @@
 | 계단 2+ 드라이브? | **D-108** | `--drive` / `--drive rosy_01`. FIELD GO 아님 |
 | YAML을 0.20으로? | **D-110** | 아니요. linear ≤ 0.10 |
 | 계단을 CLI로? | **D-111** | `--stair 1–5` 프리셋. FIELD GO 아님 |
+| 계단 1이 보였는지? | **D-112** | 가시성 보고. `ready` ≠ FIELD GO |
+| 호스트 ADR을 더? | **D-113** | 아니요. LOCAL 호스트 트랙 닫힘. 현장 실측 |
 | 온보드 앞 카메라 지금? | **D-97**, **D-109** | 아니요. observer 카탈로그에 없음 |
 | Isaac / `isaac/` 폴더 | **D-98**, **D-109** | 아니요. 폴더 없음 |
 | 신경망을 cmd_vel에? | **D-99**, **D-109** | 아니요. `neural` 거절 |
@@ -59,10 +61,14 @@
 | D-109 | 카탈로그는 soccer/heuristic/hold/overhead만. onboard/isaac/neural 거절 |
 | D-110 | 첫 접촉 linear ≤ 0.10. 0.20은 계단 4 기록 다음 |
 | D-111 | `--stair 1–5` 호스트 프리셋. pytest ≠ FIELD GO |
+| D-112 | 계단 1 가시성 보고. `ready` ≠ FIELD GO |
+| D-113 | LOCAL 호스트 트랙 닫힘. 남은 D-96은 웹캠·Pinky |
 
 ## 4. 실행 순서 (다음 세션)
 
-1. `--stair 1 --observer overhead --preview` (D-111, D-107). 실제 웹캠
+호스트 트랙은 닫혔다 (D-113). 다음은 실측만.
+
+1. `--stair 1 --observer overhead --preview` (D-111, D-112). 실제 웹캠
 2. 기기 안전 증거 뒤 `--stair 2 --drive rosy_01 --observer overhead --preview`
 3. `--stair 3` 이격 → `--stair 4` 1v1 → `--stair 5` 킥오프 반복
 4. 계단 4가 여러 번 나온 뒤에만 D-97 온보드, D-98 Isaac, D-99 신경망. 0.20은 그 다음 ADR
@@ -71,5 +77,5 @@
 
 ## 5. 수락
 
-- ADR 로그에 D-95–D-111 색인·본문이 있다
+- ADR 로그에 D-95–D-113 색인·본문이 있다
 - `python -m pytest test/test_harness_contracts.py src/rosy_games/test test/test_rosy_games_surface.py -q`

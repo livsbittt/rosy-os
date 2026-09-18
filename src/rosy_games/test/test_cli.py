@@ -337,7 +337,33 @@ def test_stair_does_not_force_overhead():
 
 def test_stair_1_dry_run_is_observe_only(capsys):
     assert main(["match", "--config", str(MATCH), "--dry-run", "--stair", "1"]) == 0
-    assert "drive off (observe-only)" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "drive off (observe-only)" in out
+    assert "stair 1 expect corners=10,11,12,13 robots=1,2 goals=20,21" in out
+    assert "not FIELD GO" in out
+
+
+def test_stair_1_ticks_prints_visibility_not_field_go(monkeypatch, capsys):
+    class FakeHttp:
+        def __init__(self, endpoint, **_kwargs):
+            self.robot_id = endpoint.id
+
+        def set_manual(self) -> None:
+            pass
+
+        def teleop(self, linear: float, angular: float) -> None:
+            pass
+
+        def estop(self) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr("rosy_games.cli.HttpPlayerClient", FakeHttp)
+    assert main(["match", "--config", str(MATCH), "--ticks", "1", "--stair", "1"]) == 0
+    out = capsys.readouterr().out
+    assert "not FIELD GO" in out
 
 
 def test_stair_1_rejects_drive():

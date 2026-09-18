@@ -235,3 +235,11 @@
 - gate 변화: rosy_games LOCAL GO 유지. DEVICE/FIELD PARKED
 - 결정: D-96 계단 2–5 호스트 스위치. 현장 GO 아님
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · feat(games): stair 1 visibility report; close host track (D-112, D-113)
+
+- 변경: ADR D-112·D-113. 계단 1 가시성 보고. LOCAL 호스트 트랙 닫힘. 웹캠·Pinky 실측이 남음.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py test/test_harness_contracts.py -q`
+- gate 변화: rosy_games LOCAL GO 유지. DEVICE/FIELD PARKED
+- 결정: `ready`와 pytest는 FIELD GO가 아니다
+- 교훈: 없음

@@ -157,3 +157,9 @@
 - 변경: `load_match`는 `limits.linear` > 0.10을 거절. `--stair 1` 관측만, `--stair 2`는 `--drive <한 id>`, `--stair 3|4|5`는 두 대. pytest ≠ FIELD GO.
 - 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 103 passed
 - gate 변화: 없음. DEVICE/FIELD PARKED
+
+## 2026-09-18 · uncommitted · feat(games): stair 1 visibility report; close host track (D-112, D-113)
+
+- 변경: `stair1_visibility` 코너·로봇·골·공 보고. `ready` ≠ FIELD GO. LOCAL 호스트 트랙 닫힘. 다음은 웹캠·Pinky.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q`
+- gate 변화: 없음. DEVICE/FIELD PARKED

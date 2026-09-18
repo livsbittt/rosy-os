@@ -42,6 +42,8 @@ def test_overlay_payload_is_field_metres_not_pixels():
     assert payload["field"]["length_m"] == 2.0
     assert payload["has_frame"] is False
     assert payload["reason"] == ""
+    assert payload["visibility"]["ready"] is False
+    assert "not FIELD GO" in payload["visibility"]["note"]
 
 
 def test_preview_server_serves_the_board():
@@ -56,6 +58,7 @@ def test_preview_server_serves_the_board():
     try:
         html = urlopen(url, timeout=2).read().decode("utf-8")
         assert "1v1 피치" in html
+        assert "stair1" in html or "계단 1" in html
         overlay = urlopen(url + "overlay.json", timeout=2).read().decode("utf-8")
         assert "play" in overlay
         css = urlopen(url + "styles.css", timeout=2).read().decode("utf-8")

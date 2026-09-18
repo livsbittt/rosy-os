@@ -68,6 +68,21 @@ def test_stair_presets_are_host_not_field_go():
     assert "FIELD:\n    state: PARKED" in progress
 
 
+def test_host_track_is_closed_until_field_evidence():
+    """D-113: LOCAL 호스트 스위치는 끝. FIELD는 PARKED. onboard/isaac/neural 없음."""
+    progress = (ROOT / "src" / "rosy_games" / "progress.md").read_text(encoding="utf-8")
+    assert "FIELD:\n    state: PARKED" in progress
+    assert "DEVICE:\n    state: PARKED" in progress
+    games = ROOT / "src" / "rosy_games" / "rosy_games"
+    assert not (games / "host" / "onboard.py").is_file()
+    assert not (games / "isaac").exists()
+    assert not (games / "policy" / "neural.py").is_file()
+    html = (games / "web" / "index.html").read_text(encoding="utf-8")
+    js = (games / "web" / "board.js").read_text(encoding="utf-8")
+    assert "FIELD GO 아님" in html
+    assert "FIELD GO 아님" in js
+
+
 def test_deferred_soccer_track_is_not_in_the_tree():
     """D-97/D-98/D-99/D-109: onboard·isaac·neural 없음. D-41은 Proposed."""
     games = ROOT / "src" / "rosy_games" / "rosy_games"

@@ -28,6 +28,8 @@
 | D-109 | 계단 4 전 카탈로그는 soccer/heuristic/hold/overhead만이다 |
 | D-110 | 첫 접촉 limits.linear는 0.10을 넘지 않는다 |
 | D-111 | `--stair 1–5`는 호스트 프리셋이며 FIELD GO가 아니다 |
+| D-112 | 계단 1 가시성은 호스트 보고이며 FIELD GO가 아니다 |
+| D-113 | D-96 남은 실행은 현장 실측이며 LOCAL 호스트 트랙은 닫힌다 |
 
 ## 계획·결과 문서
 
@@ -47,8 +49,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · feat(games): stair 1 visibility report; close host track (D-112, D-113)
 - 2026-09-18 · uncommitted · feat(games): first-contact 0.10 cap and --stair 1-5 (D-110, D-111)
 - 2026-09-18 · uncommitted · test(games): reject onboard, isaac, neural until stair 4 (D-109)
 - 2026-09-18 · uncommitted · docs(adr): D-109 catalog lock for deferred track
 - 2026-09-18 · uncommitted · feat(games): default to observe-only, opt in with --drive (D-107, D-108)
-- 2026-09-18 · uncommitted · docs(adr): D-107 observe-only, D-108 --drive

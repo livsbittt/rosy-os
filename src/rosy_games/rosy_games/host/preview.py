@@ -29,6 +29,7 @@ def overlay_payload(
     markers: tuple[int, ...] | list[int] = (),
     *,
     has_frame: bool = False,
+    visibility: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     ball = None if obs.ball is None else {"x": obs.ball.x, "y": obs.ball.y}
     robots = {
@@ -47,6 +48,16 @@ def overlay_payload(
         "away_goal": None if obs.away_goal is None else [list(p) for p in obs.away_goal],
         "markers": [int(v) for v in markers],
         "has_frame": has_frame,
+        "visibility": visibility
+        if visibility is not None
+        else {
+            "corners": [],
+            "robots": [],
+            "goals": [],
+            "ball": False,
+            "ready": False,
+            "note": "not FIELD GO",
+        },
         "field": {
             "length_m": field.length_m,
             "width_m": field.width_m,

@@ -14,6 +14,7 @@ from rosy_games.game.protocol import Game
 from rosy_games.game.gate import CommandSet, gate
 from rosy_games.host.observer import Observer
 from rosy_games.host.preview import overlay_payload
+from rosy_games.host.visibility import stair1_visibility
 from rosy_games.policy.heuristic import HeuristicPolicy
 from rosy_games.policy.protocol import Policy
 
@@ -57,6 +58,7 @@ class MatchHost:
             self.drive_ids = frozenset(client.robot_id for client in self.clients)
         else:
             self.drive_ids = drive_ids
+        self.last_visibility: dict | None = None
 
     def _driven(self) -> tuple[PlayerClient, ...]:
         return tuple(client for client in self.clients if client.robot_id in self.drive_ids)
@@ -87,8 +89,12 @@ class MatchHost:
         try:
             obs = self.observer.observe()
             state = self.game.step(obs)
+            markers = getattr(self.observer, "last_markers", ())
+            setup = getattr(self.observer, "setup", None)
+            self.last_visibility = (
+                stair1_visibility(setup, markers, obs) if setup is not None else None
+            )
             if self.preview is not None:
-                markers = getattr(self.observer, "last_markers", ())
                 jpeg = getattr(self.observer, "last_jpeg", None)
                 self.preview.publish(
                     overlay_payload(
@@ -97,6 +103,7 @@ class MatchHost:
                         state,
                         markers=markers,
                         has_frame=jpeg is not None,
+                        visibility=self.last_visibility,
                     ),
                     jpeg=jpeg,
                 )
