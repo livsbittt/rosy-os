@@ -366,7 +366,7 @@ Isaac은 심판 UI이자 학습장이다. 실기 Command Manager가 아니다.
 
 ## 9. 구현 게이트
 
-[2026-09-18-rosy-games-local-host.md](2026-09-18-rosy-games-local-host.md)가 LOCAL 호스트를 닫았다. `host/overhead.py`와 `field/homography.py`는 만들지 않았다. 천장 카메라 실측은 다음 계획이다.
+[2026-09-18-rosy-games-local-host.md](2026-09-18-rosy-games-local-host.md)가 LOCAL 호스트를 닫았다. 합성 천장 어댑터는 있다 (D-94, D-95). 실제 웹캠 실측은 D-96.
 
 LOCAL GO:
 
@@ -378,13 +378,13 @@ python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q
 
 닫힌 항목:
 
-- §3.1 트리에서 `overhead.py`·`homography.py`·`test_homography.py`만 다음 계획으로 미룸. `isaac/` 없음
-- `test_games_boundaries.py`가 §3.4를 통과 (host 중 `overhead.py`만 cv2 허용; 지금은 그 파일이 없음. `loop.py`/`transport.py`는 cv2 없음)
+- §3.1 트리. `isaac/` 없음
+- `test_games_boundaries.py`가 §3.4를 통과 (`overhead.py`만 cv2)
 - soccer / gate / heuristic / loop가 카메라 없이 득점·이격·쌍정지
 - `HttpPlayerClient`가 API Ref §5.5 / §6.1의 mode·teleop·stop만 부름
 - `rosy_games`가 기본 compose·board.yaml 슬라이스에 없음
 
-아직 열린 항목:
+아직 열린 항목 (D-95–D-99):
 
-- 한 대 명령 경로 증거가 Device 검증 계획의 안전 게이트와 모순되지 않는지 (DEVICE)
-- 현장 1v1 (FIELD)
+- 실제 웹캠 계단 1–5 (D-96). 합성 overhead ≠ DEVICE (D-95)
+- 온보드 시야 (D-97), Isaac (D-98), NeuralPolicy (D-99) — 계단 4 반복 뒤

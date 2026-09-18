@@ -1,7 +1,7 @@
 # rosy_games 천장 카메라 실측 계획
 
 작성일: 2026-09-18
-상태: LOCAL 호스트는 닫힘. 이 계획은 OpenCV 관측 어댑터만. Device GO가 아니다.
+상태: 합성 어댑터는 트리에 있다 (D-94, D-95). 실제 웹캠 실측은 D-96 계단 1. Device GO가 아니다.
 
 관련: D-90, D-91 · [game host 설계](2026-09-17-robot-soccer-game-host-design.md) · [LOCAL 호스트](2026-09-18-rosy-games-local-host.md)
 

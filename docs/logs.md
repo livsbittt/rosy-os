@@ -115,3 +115,11 @@
 - gate 변화: 없음
 - 결정: 공용 컴포넌트 라이브러리를 만들지 않는다. concept 16 §4가 네 표면을 아우르는 컴포넌트 라이브러리를 "목표가 아니라 결함"으로 규정하고 있고(Fleet이 콘솔처럼 보이게 되며 LCD는 불가능해진다), D-75 아래서는 Fleet 서버가 `rosy_core` 자산을 서빙해야 해 모듈 경계도 넘는다(D-73). 대신 이름과 규칙을 표로 공유한다
 - 교훈: "나머지 컴포넌트를 미리 만들자"는 요구의 기본 형태가 하필 설계 법이 금지한 것이었다. 쓰이지 않는 컴포넌트는 결함을 숨기기도 한다 — 이번에 치수 토큰 13개가 사용처 0이었고 채택하자마자 44px 미만 터치 타겟 다섯이 드러났다. 그래서 만들지 않고 적었다
+
+## 2026-09-18 · uncommitted · docs(adr): lock remaining rosy_games track as D-95–D-99
+
+- 변경: ADR D-95–D-99 색인·본문. 합성 overhead ≠ DEVICE, 현장 다섯 계단, 온보드/Isaac/신경망은 FIELD 반복 뒤. D-94 수정(합성 시험은 overhead import 허용).
+- 증거: `python -m pytest test/test_harness_contracts.py src/rosy_games/test test/test_rosy_games_surface.py -q`
+- gate 변화: 없음. rosy_games DEVICE/FIELD PARKED 유지
+- 결정: D-95–D-99 Accepted (방향). 현장 GO 아님
+- 교훈: 없음

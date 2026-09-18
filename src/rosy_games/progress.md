@@ -20,10 +20,12 @@ gates:
     state: PARKED
   FIELD:
     state: PARKED
-adrs: [D-90]
+adrs: [D-90, D-94, D-95, D-96, D-97, D-98, D-99]
 plans:
   - docs/plans/2026-09-17-robot-soccer-game-host-design.md
   - docs/plans/2026-09-18-rosy-games-local-host.md
+  - docs/plans/2026-09-18-rosy-games-overhead-plan.md
+  - docs/plans/2026-09-18-rosy-games-remaining-adr-plan.md
 ---
 ## 지금 상태
 
@@ -33,4 +35,6 @@ plans:
 
 ## 다음 gate
 
-1. DEVICE/FIELD: 실제 천장 카메라, 네 모서리 ArUco 10–13, 로봇 1/2, 주황 공.
+1. D-96 계단 1: `--observer overhead`, 모터 없음, 실제 웹캠
+2. 그 기기 정지·워치독·단일 publisher 뒤 계단 2–5
+3. 계단 4 반복 뒤에만 D-97 온보드, D-98 Isaac, D-99 신경망

@@ -55,3 +55,9 @@
 - 변경: `field/homography.py` 순수 호모그래피. `host/project.py` 픽셀→Observation. `host/overhead.py`만 cv2 (ArUco 코너 10–13, 로봇 마커, 주황 blob). CLI `--observer overhead|hold`.
 - 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 53 passed
 - gate 변화: LOCAL GO 유지 (합성 프레임). DEVICE/FIELD PARKED.
+
+## 2026-09-18 · uncommitted · docs(adr): remaining games track is D-95–D-99
+
+- 변경: progress `adrs`에 D-94–D-99. 다음 게이트는 D-96 계단 1
+- 증거: ADR 로그 색인
+- gate 변화: 없음. DEVICE/FIELD PARKED

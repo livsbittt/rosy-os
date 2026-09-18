@@ -33,6 +33,11 @@
 | D-92 | L2 컴포넌트는 파일이 아니라 어휘 표로 공유한다 |
 | D-93 | 마주 오는 두 대는 폭으로 풀리지 않는다 — 교행은 Fleet이 중재한다 |
 | D-94 | rosy_games 천장 OpenCV는 노트북 호스트이며 D-41을 닫지 않는다 |
+| D-95 | 합성 천장 프레임은 DEVICE가 아니다 — 기본 observer는 hold |
+| D-96 | 현장 축구 1v1은 다섯 계단이고 충돌 속도는 기기 안전 다음 |
+| D-97 | 온보드 축구 시야는 FIELD 반복 뒤 CMD-001 후보다 |
+| D-98 | Isaac 축구 env는 FIELD 반복 전 폴더를 만들지 않는다 |
+| D-99 | 학습된 축구 정책은 Policy 플러그인이며 cmd_vel을 내지 않는다 |
 
 ## 계획·결과 문서
 
@@ -41,6 +46,7 @@
 - [2026-09-17-remaining-execution-adr-plan.md](plans/2026-09-17-remaining-execution-adr-plan.md)
 - [2026-09-17-remaining-gates-adr-plan.md](plans/2026-09-17-remaining-gates-adr-plan.md)
 - [2026-09-17-remaining-runtime-adr-plan.md](plans/2026-09-17-remaining-runtime-adr-plan.md)
+- [2026-09-18-rosy-games-remaining-adr-plan.md](plans/2026-09-18-rosy-games-remaining-adr-plan.md)
 
 ## 교훈 (docs/solutions)
 
@@ -53,8 +59,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · docs(adr): lock remaining rosy_games track as D-95–D-99
 - 2026-09-18 · uncommitted · docs(adr): record that L2 components are shared as a vocabulary table, not a file
 - 2026-09-18 · uncommitted · docs(c6): rule the profile velocity reaches a seam lie, not an accepted duck-type
 - 2026-09-17 · uncommitted · docs(adr): accept D-54–D-56 source gates, park Device ADRs (D-91)
 - 2026-09-17 · uncommitted · docs(adr): lock soccer as a game host (D-90)
-- 2026-09-17 · uncommitted · docs(adr): lock remaining execution as D-87–D-89

@@ -10,11 +10,19 @@
 | ID | 제목 |
 |---|---|
 | D-90 | 축구는 게임 호스트이지 CORE 모드가 아니다 |
+| D-94 | rosy_games 천장 OpenCV는 노트북 호스트이며 D-41을 닫지 않는다 |
+| D-95 | 합성 천장 프레임은 DEVICE가 아니다 — 기본 observer는 hold |
+| D-96 | 현장 축구 1v1은 다섯 계단이고 충돌 속도는 기기 안전 다음 |
+| D-97 | 온보드 축구 시야는 FIELD 반복 뒤 CMD-001 후보다 |
+| D-98 | Isaac 축구 env는 FIELD 반복 전 폴더를 만들지 않는다 |
+| D-99 | 학습된 축구 정책은 Policy 플러그인이며 cmd_vel을 내지 않는다 |
 
 ## 계획·결과 문서
 
 - [2026-09-17-robot-soccer-game-host-design.md](../../docs/plans/2026-09-17-robot-soccer-game-host-design.md)
 - [2026-09-18-rosy-games-local-host.md](../../docs/plans/2026-09-18-rosy-games-local-host.md)
+- [2026-09-18-rosy-games-overhead-plan.md](../../docs/plans/2026-09-18-rosy-games-overhead-plan.md)
+- [2026-09-18-rosy-games-remaining-adr-plan.md](../../docs/plans/2026-09-18-rosy-games-remaining-adr-plan.md)
 
 ## 교훈 (docs/solutions)
 
@@ -27,8 +35,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · docs(adr): remaining games track is D-95–D-99
 - 2026-09-18 · uncommitted · feat(games): project the ceiling camera onto the pitch
 - 2026-09-18 · uncommitted · feat(games): plug soccer in and arm CORE without a camera
 - 2026-09-18 · uncommitted · docs(games): mark LOCAL host complete without overhead camera
 - 2026-09-18 · uncommitted · chore(games): bootstrap pytest path and drop empty isaac
-- 2026-09-18 · uncommitted · feat(games): clamp non-play and ramming twists in the referee gate

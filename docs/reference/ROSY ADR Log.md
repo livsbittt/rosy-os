@@ -102,6 +102,11 @@
 | D-92 | L2 컴포넌트는 파일이 아니라 어휘 표로 공유한다 | Accepted |
 | D-93 | 마주 오는 두 대는 폭으로 풀리지 않는다 — 교행은 Fleet이 중재한다 | Accepted |
 | D-94 | rosy_games 천장 OpenCV는 노트북 호스트이며 D-41을 닫지 않는다 | Accepted |
+| D-95 | 합성 천장 프레임은 DEVICE가 아니다 — 기본 observer는 hold | Accepted |
+| D-96 | 현장 축구 1v1은 다섯 계단이고 충돌 속도는 기기 안전 다음 | Accepted |
+| D-97 | 온보드 축구 시야는 FIELD 반복 뒤 CMD-001 후보다 | Accepted |
+| D-98 | Isaac 축구 env는 FIELD 반복 전 폴더를 만들지 않는다 | Accepted |
+| D-99 | 학습된 축구 정책은 Policy 플러그인이며 cmd_vel을 내지 않는다 | Accepted |
 
 ---
 
@@ -2839,3 +2844,147 @@ OpenCV가 없다고 했고, D-41·D-52는 **로봇** ARM64에서 카메라 worke
 
 **References:** D-41, D-52, D-66, D-90, D-91,
 [overhead plan](../plans/2026-09-18-rosy-games-overhead-plan.md).
+
+**Amendment (2026-09-18):** `test/test_overhead.py`는 cv2가 있을 때 `overhead.py`를
+import해도 된다. 그건 합성 프레임 LOCAL이다. `test_rosy_games_surface.py`와
+`test_games_boundaries.py`는 overhead를 로드하지 않는다. DEVICE는 여전히 실제 웹캠이다
+(D-95).
+
+---
+
+## D-95 합성 천장 프레임은 DEVICE가 아니다 — 기본 observer는 hold
+
+**Status:** Accepted (2026-09-18). D-91의 games 적용이다.
+
+**Context:** `host/overhead.py`와 합성 ArUco 시험이 LOCAL에 있다. 그 통과를 현장
+웹캠 GO로 읽으면 D-91을 우회한다. CLI가 기본으로 `/dev/video0`을 열면 pytest와
+실기 실수가 같은 경로가 된다.
+
+**Decision:**
+
+- 합성 프레임·`test_overhead.py`는 LOCAL이다. DEVICE/FIELD로 승격하지 않는다
+- 실기 CLI 기본 `--observer`는 `hold`다. 천장 카메라는 `--observer overhead`
+- 실제 웹캠으로 구장·공·로봇이 보이는 기록만 D-96 계단 1이다
+
+**Alternatives:** 기본을 overhead로 두는 안은 카메라 없는 호스트가 기동에 실패한다.
+합성 통과를 DEVICE로 적는 안은 D-91 위반이다.
+
+**Consequences:** `rosy_games match --config ...`는 카메라를 열지 않고 두 대를
+HOLD teleop 0으로 무장한다.
+
+**Validation / Transition:** `src/rosy_games/rosy_games/cli.py` 기본값 `hold`.
+`progress.md` DEVICE/FIELD PARKED.
+
+**References:** D-90, D-91, D-94.
+
+---
+
+## D-96 현장 축구 1v1은 다섯 계단이고 충돌 속도는 기기 안전 다음
+
+**Status:** Accepted (2026-09-18). 방향이다. 현장 GO가 아니다.
+
+**Context:** Pinky 프로필 최대 0.20 m/s다. Device 정지·워치독·단일 publisher가
+그 기기에서 HOLD인 채 두 대가 공을 두고 달리면 설계 §5를 건너뛴다.
+
+**Decision:** 현장 순서는 고정이다.
+
+1. 모터 없음. `--observer overhead`로 구장·공·두 마커가 안정적으로 보이는지
+2. 한 대, `PUT /safety/limits` 0.08–0.10 m/s, 공 밀기 → 골 → HOLD
+3. 두 대, 공 없이, 0.35 m 이내면 감속
+4. 두 대 + 공, 같은 저속 1v1
+5. 득점 후 사람 손 킥오프가 반복 가능한지
+
+충돌 속도(프로필 0.20)는 그 기기의 정지·워치독 500 ms·`cmd_vel` publisher 1이
+확인된 다음이다. 호스트 pytest로 이 계단을 건너뛰지 않는다.
+
+**Alternatives:** 시뮬 좌표로 계단 4를 FIELD GO로 적는 안은 D-91이다. Nav2로 공을
+쫓는 안은 D-90이 이미 거절했다.
+
+**Consequences:** 사람이 호스트에서 스페이스(`safety/stop`)를 쥔다. 한 대만 뛰는
+경기는 없다.
+
+**Validation / Transition:** 설계 §8 현장 순서. `progress.md` FIELD PARKED until
+계단 4 기록이 있다.
+
+**References:** D-2, D-90, D-91, D-95, SAF-002, SAF-004.
+
+---
+
+## D-97 온보드 축구 시야는 FIELD 반복 뒤 CMD-001 후보다
+
+**Status:** Accepted (2026-09-18). 아직 구현하지 않는다.
+
+**Context:** Pinky 앞 카메라는 320×240, 8 fps, 바닥 전방용이다. 지금 온보드 blob을
+넣으면 시야 밖 공을 잃고, D-41 로봇 카메라 위치를 게임으로 닫게 된다.
+
+**Decision:**
+
+- D-96 계단 4가 여러 번 반복되기 전에 온보드 공 추적을 열지 않는다
+- 열릴 때도 최종 `cmd_vel`은 CORE다. 온보드는 CMD-001 속도 후보이거나 호스트가
+  쓰는 로컬 관측이다
+- 심판(득점, 킥오프, 양쪽 stop)은 노트북 `rosy_games`에 남는다
+- 이 코드는 D-41·D-52를 Accepted로 올리지 않는다
+
+**Alternatives:** 앞 카메라만으로 1v1을 시작하는 안은 천장 호스트를 버린다.
+온보드가 `cmd_vel`을 내는 안은 D-2·D-38 위반이다.
+
+**Consequences:** 1단계 실기는 천장 카메라다. 온보드 패키지/슬라이스는 별도 계획.
+
+**Validation / Transition:** `isaac/`과 온보드 플레이어 패키지가 트리에 없다.
+구현은 D-96 계단 4 기록 다음 문서.
+
+**References:** D-2, D-38, D-41, D-90, D-94, D-96.
+
+---
+
+## D-98 Isaac 축구 env는 FIELD 반복 전 폴더를 만들지 않는다
+
+**Status:** Accepted (2026-09-18). 아직 구현하지 않는다.
+
+**Context:** Isaac은 학습장으로 예약됐다. 빈 `isaac/` 패키지는 학습이 있는 것처럼
+보인다. Gazebo(`rosy_gz_sim`)는 CORE ROS-SIM용이다.
+
+**Decision:**
+
+- `src/rosy_games/rosy_games/isaac/`은 D-96 계단 4가 반복되기 전에 만들지 않는다
+- 열릴 때 Lab env는 `game.reset` / `game.step`만 호출한다. 규칙을 Isaac 스크립트에
+  복제하지 않는다
+- `rosy_gz_sim`을 축구 체육관으로 승격하지 않는다
+- Isaac이 실기 Command Manager를 대체하지 않는다
+
+**Alternatives:** 지금 빈 폴더를 두는 안은 이미 지웠다. Isaac이 경기를 소유하는 안은
+D-90이 거절했다.
+
+**Consequences:** Isaac 없는 실기 1v1이 `game`만으로 성립해야 한다.
+
+**Validation / Transition:** 트리에 `rosy_games/isaac/`이 없다.
+
+**References:** D-83, D-90, D-96, D-99.
+
+---
+
+## D-99 학습된 축구 정책은 Policy 플러그인이며 cmd_vel을 내지 않는다
+
+**Status:** Accepted (2026-09-18). 아직 구현하지 않는다.
+
+**Context:** 개념 11은 AI가 액추에이터 루프를 직접 돌리지 않는다고 했다. 축구 RL이
+`/cmd_vel`을 내면 D-2를 게임으로 우회한다.
+
+**Decision:**
+
+- `NeuralPolicy`는 `Policy.act(obs, state) -> dict[str, Twist]`만 구현한다
+- 호스트 `gate`와 CORE teleop/CMD-001이 그대로 자른다
+- 1단계 `MatchState`에 `reward`를 넣지 않는다. 보상은 학습 env가 `step` 결과에서
+  계산한다
+- `catalog`에 이름을 등록하기 전에는 파일을 만들지 않는다
+
+**Alternatives:** 학습 루프가 모터를 직접 쓰는 안은 개념 11·D-38 위반이다.
+
+**Consequences:** 휴리스틱과 신경망이 같은 구멍이다. D-98 Isaac env가 이 플러그인을
+끼운다.
+
+**Validation / Transition:** `POLICIES`에 `heuristic`만 있다.
+`src/rosy_games/rosy_games/catalog.py`.
+
+**References:** D-2, D-38, D-90, D-98, [concept 11](../concept/11_ROSY_AI_and_Physical_AI.md).
+
