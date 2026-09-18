@@ -18,6 +18,24 @@ def test_hold_observer_keeps_both_robots_at_zero():
     assert home.estops >= 1 and away.estops >= 1
 
 
+def test_run_match_without_a_tick_limit_stops_on_interrupt_and_still_halts():
+    home, away = FakePlayerClient("rosy_01"), FakePlayerClient("rosy_02")
+    host = MatchHost(HoldObserver(home_id="rosy_01", away_id="rosy_02"), (home, away))
+    n = {"i": 0}
+    real = host.tick
+
+    def tick():
+        n["i"] += 1
+        if n["i"] > 3:
+            raise KeyboardInterrupt
+        return real()
+
+    host.tick = tick  # type: ignore[method-assign]
+    states = run_match(host, ticks=None, period_s=0.0)
+    assert len(states) == 3
+    assert home.estops >= 1 and away.estops >= 1
+
+
 def test_run_match_halts_when_observe_raises():
     home, away = FakePlayerClient("rosy_01"), FakePlayerClient("rosy_02")
 

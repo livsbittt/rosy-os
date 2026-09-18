@@ -1,6 +1,16 @@
 const canvas = document.getElementById("pitch");
 const ctx = canvas.getContext("2d");
 const MARKER_IDS = [10, 11, 12, 13, 1, 2, 20, 21];
+const MARKER_LABEL = {
+  10: "코너",
+  11: "코너",
+  12: "코너",
+  13: "코너",
+  1: "로봇",
+  2: "로봇",
+  20: "골",
+  21: "골",
+};
 
 function draw(payload) {
   const field = payload.field || { length_m: 2, width_m: 1.4, goal_width_m: 0.35 };
@@ -40,8 +50,9 @@ function draw(payload) {
     strokePoly(payload.away_goal, X, Y, "#ffb3c7");
   }
   const robots = payload.robots || {};
-  Object.entries(robots).forEach(([id, pose], i) => {
-    ctx.fillStyle = i === 0 ? "#7ec8ff" : "#ffb3c7";
+  const homeId = field.home_id;
+  Object.entries(robots).forEach(([id, pose]) => {
+    ctx.fillStyle = id === homeId ? "#7ec8ff" : "#ffb3c7";
     wedge(X(pose.x), Y(pose.y), pose.yaw, 11);
     ctx.fillStyle = "#f4f1ea";
     ctx.font = "11px sans-serif";
@@ -80,7 +91,7 @@ function chips(payload) {
   root.replaceChildren();
   MARKER_IDS.forEach((id) => {
     const li = document.createElement("li");
-    li.textContent = String(id);
+    li.textContent = `${id} ${MARKER_LABEL[id] || ""}`.trim();
     if (seen.has(id)) li.className = "on";
     root.append(li);
   });
@@ -98,10 +109,14 @@ async function tick() {
   document.getElementById("away-score").textContent = payload.score?.[payload.field.away_id] ?? 0;
   const lost = payload.lost_ball || (payload.lost_robots || []).length;
   document.getElementById("lost").hidden = !lost;
-  document.getElementById("lost").textContent = payload.lost_ball ? "공을 잃음" : "로봇을 잃음";
+  document.getElementById("lost").textContent = payload.reason || (payload.lost_ball ? "공을 잃음" : "로봇을 잃음");
   draw(payload);
   chips(payload);
   const frame = document.getElementById("frame");
+  if (!payload.has_frame) {
+    frame.hidden = true;
+    return;
+  }
   frame.onerror = () => {
     frame.hidden = true;
   };

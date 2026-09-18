@@ -1,4 +1,4 @@
-"""rosy_games match --config ... [--dry-run] [--ticks N]"""
+"""rosy_games match --config ... [--dry-run] [--ticks N] [--preview]"""
 
 from __future__ import annotations
 
@@ -35,6 +35,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"game {setup.game} policy {setup.policy}")
         for robot in setup.robots:
             print(f"{robot.id} {robot.url} aruco={robot.aruco_id} attacks={robot.attacks}")
+        print(f"goals {setup.goals.home_id}/{setup.goals.away_id}")
         if args.preview:
             print("preview 127.0.0.1 (not started in dry-run)")
         return 0
@@ -54,7 +55,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if server is not None:
             print(server.start())
-        run_match(host, ticks=args.ticks or 1)
+        live = args.preview and args.ticks is None
+        run_match(
+            host,
+            ticks=None if live else (args.ticks or 1),
+            period_s=0.05 if live else 0.0,
+        )
     finally:
         if server is not None:
             server.close()

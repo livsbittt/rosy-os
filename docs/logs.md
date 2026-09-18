@@ -155,3 +155,11 @@
 - gate 변화: rosy_games LOCAL GO 유지. DEVICE/FIELD PARKED
 - 결정: 프론트엔드를 표면별로 나눔. 게임 보드는 콘솔이 아니다
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · fix(games): keep --preview open until interrupt
+
+- 변경: 미리보기가 1틱 만에 닫히지 않게. 유실 프레임 JPEG 잔상 제거. dry-run에 골 20/21.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py test/test_harness_contracts.py -q` 117 passed
+- gate 변화: 없음. DEVICE/FIELD PARKED
+- 결정: D-96 계단 1 노트북 도구가 실제로 떠 있어야 한다
+- 교훈: 없음

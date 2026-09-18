@@ -48,6 +48,7 @@ def test_dry_run_prints_both_robots_without_opening_a_socket(monkeypatch, capsys
 
     assert main(["match", "--config", str(MATCH), "--dry-run"]) == 0
     out = capsys.readouterr().out
+    assert "goals 20/21" in out
     assert "rosy_01" in out
     assert "rosy_02" in out
 
@@ -138,4 +139,47 @@ def test_live_match_arms_manual_and_holds_without_a_camera(monkeypatch):
     assert all(c.manual == 1 for c in created)
     assert all(c.teleops == [(0.0, 0.0), (0.0, 0.0)] for c in created)
     assert all(c.estops >= 1 for c in created)
+
+
+def test_preview_without_ticks_runs_until_interrupt(monkeypatch):
+    seen: dict[str, object] = {}
+
+    class FakeHttp:
+        def __init__(self, endpoint, **_kwargs):
+            self.robot_id = endpoint.id
+
+        def set_manual(self) -> None:
+            pass
+
+        def teleop(self, linear: float, angular: float) -> None:
+            pass
+
+        def estop(self) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+    class FakeServer:
+        def __init__(self, board, **_kwargs):
+            seen["board"] = board
+
+        def start(self) -> str:
+            return "http://127.0.0.1:9/"
+
+        def close(self) -> None:
+            seen["closed"] = True
+
+    def fake_run(host, ticks=1, period_s=0.0):
+        seen["ticks"] = ticks
+        seen["period_s"] = period_s
+        return []
+
+    monkeypatch.setattr("rosy_games.cli.HttpPlayerClient", FakeHttp)
+    monkeypatch.setattr("rosy_games.host.preview.PreviewServer", FakeServer)
+    monkeypatch.setattr("rosy_games.cli.run_match", fake_run)
+    assert main(["match", "--config", str(MATCH), "--preview"]) == 0
+    assert seen["ticks"] is None
+    assert seen["period_s"] == 0.05
+    assert seen["closed"] is True
 

@@ -27,6 +27,8 @@ def overlay_payload(
     obs: Observation,
     state: MatchState,
     markers: tuple[int, ...] | list[int] = (),
+    *,
+    has_frame: bool = False,
 ) -> dict[str, Any]:
     ball = None if obs.ball is None else {"x": obs.ball.x, "y": obs.ball.y}
     robots = {
@@ -44,6 +46,7 @@ def overlay_payload(
         "home_goal": None if obs.home_goal is None else [list(p) for p in obs.home_goal],
         "away_goal": None if obs.away_goal is None else [list(p) for p in obs.away_goal],
         "markers": [int(v) for v in markers],
+        "has_frame": has_frame,
         "field": {
             "length_m": field.length_m,
             "width_m": field.width_m,
@@ -63,8 +66,7 @@ class PreviewBoard:
     def publish(self, payload: dict[str, Any], jpeg: bytes | None = None) -> None:
         with self._lock:
             self.overlay = payload
-            if jpeg is not None:
-                self.jpeg = jpeg
+            self.jpeg = jpeg
 
     def snapshot(self) -> tuple[dict[str, Any], bytes | None]:
         with self._lock:

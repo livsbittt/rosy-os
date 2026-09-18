@@ -10,7 +10,7 @@ gates:
     cmd: "python -m pytest src/rosy_games/test/test_games_boundaries.py test/test_rosy_games_surface.py -q"
   LOCAL:
     state: GO
-    evidence: "69 passed including laptop match board (D-101, 2026-09-18 Windows)"
+    evidence: "72 passed including preview-until-interrupt (2026-09-18 Windows)"
     cmd: "python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q"
   ROS-SIM:
     state: N/A

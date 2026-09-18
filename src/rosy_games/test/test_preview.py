@@ -6,6 +6,18 @@ from rosy_games.game.state import MatchState
 from rosy_games.host.preview import overlay_payload
 
 
+def test_preview_board_clears_jpeg_when_the_frame_is_lost():
+    from rosy_games.host.preview import PreviewBoard
+
+    board = PreviewBoard()
+    board.publish({"phase": "play"}, jpeg=b"jpeg-bytes")
+    _, jpeg = board.snapshot()
+    assert jpeg == b"jpeg-bytes"
+    board.publish({"phase": "hold"}, jpeg=None)
+    _, jpeg = board.snapshot()
+    assert jpeg is None
+
+
 def test_overlay_payload_is_field_metres_not_pixels():
     field = Field(length_m=2.0, width_m=1.4)
     obs = Observation(
@@ -28,6 +40,8 @@ def test_overlay_payload_is_field_metres_not_pixels():
     assert payload["home_goal"] is not None
     assert payload["away_goal"] is None
     assert payload["field"]["length_m"] == 2.0
+    assert payload["has_frame"] is False
+    assert payload["reason"] == ""
 
 
 def test_preview_server_serves_the_board():

@@ -61,8 +61,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · fix(games): keep --preview open until interrupt
 - 2026-09-18 · uncommitted · feat(games): serve a laptop match board off CORE (D-101)
 - 2026-09-18 · uncommitted · docs(adr): D-101 games board is not CORE dashboard
 - 2026-09-18 · uncommitted · feat(games): see goals as ArUco 20/21 (D-100)
 - 2026-09-18 · uncommitted · docs(adr): goals are ArUco 20/21 plus a mouth region (D-100)
-- 2026-09-18 · uncommitted · docs(adr): lock remaining rosy_games track as D-95–D-99

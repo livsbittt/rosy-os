@@ -85,3 +85,9 @@
 - 변경: `rosy_games/web/` 정적 보드. `--preview`가 127.0.0.1에서 overlay JSON·선택 JPEG. CORE `/dashboard`·tokens.css 없음. cv2는 overhead만.
 - 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 69 passed
 - gate 변화: LOCAL GO 유지. DEVICE/FIELD PARKED
+
+## 2026-09-18 · uncommitted · fix(games): keep --preview open until interrupt
+
+- 변경: `--preview`이고 `--ticks`가 없으면 20 Hz로 Ctrl+C까지. 프레임 유실 시 JPEG를 비움. dry-run에 `goals 20/21`. 보드는 home_id로 색을 가름.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 72 passed
+- gate 변화: 없음. LOCAL GO 유지. DEVICE/FIELD PARKED

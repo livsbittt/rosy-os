@@ -71,7 +71,13 @@ class MatchHost:
                 markers = getattr(self.observer, "last_markers", ())
                 jpeg = getattr(self.observer, "last_jpeg", None)
                 self.preview.publish(
-                    overlay_payload(self.game.field, obs, state, markers=markers),
+                    overlay_payload(
+                        self.game.field,
+                        obs,
+                        state,
+                        markers=markers,
+                        has_frame=jpeg is not None,
+                    ),
                     jpeg=jpeg,
                 )
             twists = self.policy.act(obs, state)

@@ -54,5 +54,5 @@
 
 ## 5. 수락
 
-- ADR 로그에 D-95–D-100 색인·본문이 있다
+- ADR 로그에 D-95–D-101 색인·본문이 있다
 - `python -m pytest test/test_harness_contracts.py src/rosy_games/test test/test_rosy_games_surface.py -q`
