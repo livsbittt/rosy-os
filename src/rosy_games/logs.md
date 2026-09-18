@@ -103,3 +103,15 @@
 - 변경: `--ticks` 없으면 20 Hz Ctrl+C. `--preview`는 보드만. `limits.angular`는 gate·휴리스틱 클램프. 유실 HOLD는 즉시. period > lost_hold_s면 기동 거부.
 - 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 76 passed
 - gate 변화: LOCAL GO 유지. DEVICE/FIELD PARKED
+
+## 2026-09-18 · uncommitted · docs(adr): D-104 limits PUT, D-105 halt input
+
+- 변경: progress `adrs`에 D-104·D-105
+- 증거: ADR 로그
+- gate 변화: 없음
+
+## 2026-09-18 · uncommitted · feat(games): arm PUT limits and halt on space or board stop (D-104, D-105)
+
+- 변경: arm이 MANUAL 다음 PUT `/safety/limits`. 스페이스와 보드 POST `/stop`이 양쪽 halt. 보드는 CORE URL을 열지 않음.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 79 passed
+- gate 변화: LOCAL GO 유지. DEVICE/FIELD PARKED

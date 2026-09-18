@@ -10,7 +10,7 @@ from rosy_games.catalog import make_game, make_policy
 from rosy_games.host.hold import HoldObserver
 from rosy_games.host.loop import MatchHost
 from rosy_games.host.robots import load_match
-from rosy_games.host.session import HOST_PERIOD_S, run_match
+from rosy_games.host.session import HOST_PERIOD_S, run_match, space_pressed
 from rosy_games.host.transport import HttpPlayerClient
 
 
@@ -72,6 +72,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             host,
             ticks=None if live else args.ticks,
             period_s=period_s,
+            halt_check=lambda: (board.stop if board is not None else False) or space_pressed(),
         )
     finally:
         if server is not None:

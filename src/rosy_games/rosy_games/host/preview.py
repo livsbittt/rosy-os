@@ -62,6 +62,11 @@ class PreviewBoard:
         self._lock = threading.Lock()
         self.overlay: dict[str, Any] = {}
         self.jpeg: bytes | None = None
+        self.stop = False
+
+    def request_stop(self) -> None:
+        with self._lock:
+            self.stop = True
 
     def publish(self, payload: dict[str, Any], jpeg: bytes | None = None) -> None:
         with self._lock:
@@ -125,6 +130,14 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(404, "text/plain; charset=utf-8", b"not found")
             return
         self._send(200, MIME[file.suffix], file.read_bytes())
+
+    def do_POST(self) -> None:  # noqa: N802
+        path = self.path.split("?", 1)[0]
+        if path != "/stop":
+            self._send(404, "text/plain; charset=utf-8", b"not found")
+            return
+        self.board.request_stop()
+        self._send(200, MIME[".json"], b'{"ok":true}')
 
     def _send(self, code: int, media: str, body: bytes) -> None:
         self.send_response(code)

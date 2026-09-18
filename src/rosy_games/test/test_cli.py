@@ -122,10 +122,14 @@ def test_live_match_arms_manual_and_holds_without_a_camera(monkeypatch):
             self.manual = 0
             self.teleops: list[tuple[float, float]] = []
             self.estops = 0
+            self.limits: list[tuple[float, float]] = []
             created.append(self)
 
         def set_manual(self) -> None:
             self.manual += 1
+
+        def set_limits(self, linear: float, angular: float) -> None:
+            self.limits.append((linear, angular))
 
         def teleop(self, linear: float, angular: float) -> None:
             self.teleops.append((linear, angular))
@@ -140,6 +144,7 @@ def test_live_match_arms_manual_and_holds_without_a_camera(monkeypatch):
     assert main(["match", "--config", str(MATCH), "--ticks", "2"]) == 0
     assert [c.robot_id for c in created] == ["rosy_01", "rosy_02"]
     assert all(c.manual == 1 for c in created)
+    assert all(c.limits == [(0.08, 0.40)] for c in created)
     assert all(c.teleops == [(0.0, 0.0), (0.0, 0.0)] for c in created)
     assert all(c.estops >= 1 for c in created)
 
@@ -173,7 +178,7 @@ def test_preview_without_ticks_runs_until_interrupt(monkeypatch):
         def close(self) -> None:
             seen["closed"] = True
 
-    def fake_run(host, ticks=1, period_s=0.0):
+    def fake_run(host, ticks=1, period_s=0.0, **_kwargs):
         seen["ticks"] = ticks
         seen["period_s"] = period_s
         return []
@@ -207,7 +212,7 @@ def test_match_without_ticks_is_live_even_without_preview(monkeypatch):
         def close(self) -> None:
             pass
 
-    def fake_run(host, ticks=1, period_s=0.0):
+    def fake_run(host, ticks=1, period_s=0.0, **_kwargs):
         seen["ticks"] = ticks
         seen["period_s"] = period_s
         return []

@@ -39,8 +39,15 @@ class HttpPlayerClient:
         response = self._http.post(path, json=body, headers=self._headers())
         response.raise_for_status()
 
+    def _put(self, path: str, body: dict | None = None) -> None:
+        response = self._http.put(path, json=body, headers=self._headers())
+        response.raise_for_status()
+
     def set_manual(self) -> None:
         self._post("/api/v1/mode", {"mode": "MANUAL"})
+
+    def set_limits(self, linear: float, angular: float) -> None:
+        self._put("/api/v1/safety/limits", {"manual_linear": linear, "manual_angular": angular})
 
     def teleop(self, linear: float, angular: float) -> None:
         self._post("/api/v1/teleop", {"linear": linear, "angular": angular})

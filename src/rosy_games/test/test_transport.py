@@ -32,6 +32,7 @@ def test_http_player_client_exposes_player_client_surface():
     assert callable(client.set_manual)
     assert callable(client.teleop)
     assert callable(client.estop)
+    assert callable(client.set_limits)
     assert PlayerClient is not None
 
 
@@ -65,6 +66,21 @@ def test_teleop_posts_linear_and_angular():
     assert seen["method"] == "POST"
     assert seen["path"] == "/api/v1/teleop"
     assert seen["body"] == {"linear": 0.08, "angular": -0.2}
+
+
+def test_set_limits_puts_manual_linear_and_angular():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["method"] = request.method
+        seen["path"] = request.url.path
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"ok": True})
+
+    _client(handler).set_limits(0.08, 0.40)
+    assert seen["method"] == "PUT"
+    assert seen["path"] == "/api/v1/safety/limits"
+    assert seen["body"] == {"manual_linear": 0.08, "manual_angular": 0.40}
 
 
 def test_estop_posts_safety_stop():
@@ -104,10 +120,11 @@ def test_http_error_raises_so_the_loop_can_estop_both(status):
         _client(handler).teleop(0.1, 0.0)
 
 
-def test_transport_source_has_only_mode_teleop_and_stop():
+def test_transport_source_has_only_mode_teleop_stop_and_limits():
     src = (HOST / "transport.py").read_text(encoding="utf-8").lower()
     for banned in ("follow", "navigation", "swarm"):
         assert banned not in src
     assert "/api/v1/mode" in src
     assert "/api/v1/teleop" in src
     assert "/api/v1/safety/stop" in src
+    assert "/api/v1/safety/limits" in src

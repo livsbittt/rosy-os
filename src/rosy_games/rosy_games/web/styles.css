@@ -107,3 +107,23 @@ h1 {
   margin: 0 22px 24px;
   color: var(--lost);
 }
+
+.halt-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 22px 28px;
+  color: var(--mute);
+  font-size: 13px;
+}
+
+#halt {
+  min-width: 96px;
+  min-height: 48px;
+  border: 0;
+  background: var(--lost);
+  color: #f4f1ea;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}

@@ -126,5 +126,9 @@ async function tick() {
   frame.src = `/frame.jpg?t=${Date.now()}`;
 }
 
+document.getElementById("halt").addEventListener("click", async () => {
+  await fetch("/stop", { method: "POST" });
+});
+
 setInterval(tick, 250);
 tick();

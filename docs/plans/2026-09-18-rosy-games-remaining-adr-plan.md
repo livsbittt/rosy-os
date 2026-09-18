@@ -1,7 +1,7 @@
 # 남은 rosy_games 트랙 → ADR 계획
 
 작성일: 2026-09-18
-상태: D-95–D-103. LOCAL 호스트·합성 천장·골 20/21·노트북 보드·20 Hz 루프 계약은 있다. 현장 1v1 GO가 아니다.
+상태: D-95–D-105. LOCAL 호스트 루프·limits PUT·정지 입력까지 있다. 현장 1v1 GO가 아니다.
 
 관련: D-90, D-91, D-94 ·
 [game host 설계](2026-09-17-robot-soccer-game-host-design.md) ·
@@ -31,6 +31,8 @@
 | 경기 화면을 CORE 콘솔에? | **D-101** | 아니요. 노트북 `rosy_games --preview` |
 | 매치가 1틱 뒤 죽나? | **D-102** | `--ticks` 없으면 20 Hz, Ctrl+C까지 |
 | YAML angular·lost_hold 미사용? | **D-103** | angular는 gate 클램프. HOLD는 즉시. period ≤ lost_hold_s |
+| 첫 접촉을 CORE limits에? | **D-104** | arm 때 PUT `/safety/limits` |
+| 스페이스 정지? | **D-105** | CLI 스페이스 + 보드 `POST /stop` → 양쪽 halt |
 
 ## 3. 새 ADR 요약
 
@@ -45,6 +47,8 @@
 | D-101 | 축구 보드는 노트북 게임 표면. CORE `/dashboard` 금지 |
 | D-102 | `--ticks` 없으면 20 Hz 루프. preview는 보드만 |
 | D-103 | limits는 gate. 유실 HOLD 즉시. period ≤ lost_hold_s |
+| D-104 | arm은 MANUAL 다음 PUT safety/limits |
+| D-105 | 스페이스·보드 /stop은 양쪽 safety/stop. 보드는 CORE를 직접 안 침 |
 
 ## 4. 실행 순서 (다음 세션)
 
@@ -58,5 +62,5 @@
 
 ## 5. 수락
 
-- ADR 로그에 D-95–D-103 색인·본문이 있다
+- ADR 로그에 D-95–D-105 색인·본문이 있다
 - `python -m pytest test/test_harness_contracts.py src/rosy_games/test test/test_rosy_games_surface.py -q`

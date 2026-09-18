@@ -32,11 +32,15 @@ class FakePlayerClient:
         self.teleops: list[tuple[float, float]] = []
         self.estops = 0
         self.manual = 0
+        self.limits: list[tuple[float, float]] = []
 
     def set_manual(self) -> None:
         if self.fail_manual:
             raise RuntimeError("set_manual failed")
         self.manual += 1
+
+    def set_limits(self, linear: float, angular: float) -> None:
+        self.limits.append((linear, angular))
 
     def teleop(self, linear: float, angular: float) -> None:
         if self.fail_teleop:

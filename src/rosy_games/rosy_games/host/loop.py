@@ -23,6 +23,8 @@ class PlayerClient(Protocol):
 
     def set_manual(self) -> None: ...
 
+    def set_limits(self, linear: float, angular: float) -> None: ...
+
     def teleop(self, linear: float, angular: float) -> None: ...
 
     def estop(self) -> None: ...
@@ -57,6 +59,9 @@ class MatchHost:
         try:
             for client in self.clients:
                 client.set_manual()
+                if self.max_linear is not None:
+                    angular = 0.40 if self.max_angular is None else self.max_angular
+                    client.set_limits(self.max_linear, angular)
         except Exception:
             self.halt()
             raise

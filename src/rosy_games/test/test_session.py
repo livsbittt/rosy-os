@@ -36,6 +36,20 @@ def test_run_match_without_a_tick_limit_stops_on_interrupt_and_still_halts():
     assert home.estops >= 1 and away.estops >= 1
 
 
+def test_run_match_stops_when_halt_check_fires():
+    home, away = FakePlayerClient("rosy_01"), FakePlayerClient("rosy_02")
+    host = MatchHost(HoldObserver(home_id="rosy_01", away_id="rosy_02"), (home, away))
+    n = {"i": 0}
+
+    def halt_check() -> bool:
+        n["i"] += 1
+        return n["i"] >= 2
+
+    states = run_match(host, ticks=10, period_s=0.0, halt_check=halt_check)
+    assert len(states) == 2
+    assert home.estops >= 1 and away.estops >= 1
+
+
 def test_run_match_halts_when_observe_raises():
     home, away = FakePlayerClient("rosy_01"), FakePlayerClient("rosy_02")
 

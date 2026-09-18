@@ -179,3 +179,19 @@
 - gate 변화: rosy_games LOCAL GO 유지. DEVICE/FIELD PARKED
 - 결정: YAML에만 있던 한계를 호스트 계약으로 옮김
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · docs(adr): lock PUT limits and host halt input (D-104, D-105)
+
+- 변경: ADR D-104·D-105. arm은 PUT safety/limits. 정지는 스페이스와 보드 /stop.
+- 증거: ADR 색인
+- gate 변화: 없음
+- 결정: D-104·D-105 Accepted. DEVICE GO 아님
+- 교훈: 없음
+
+## 2026-09-18 · uncommitted · feat(games): arm PUT limits and halt on space or board stop (D-104, D-105)
+
+- 변경: HttpPlayerClient.set_limits. 보드 정지 버튼은 같은 노트북 서버만 친다.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py test/test_harness_contracts.py -q` 124 passed
+- gate 변화: rosy_games LOCAL GO 유지. DEVICE/FIELD PARKED
+- 결정: 설계 §4.2·§5를 호스트 계약으로 옮김
+- 교훈: 없음

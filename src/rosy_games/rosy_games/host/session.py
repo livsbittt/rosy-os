@@ -15,6 +15,7 @@ def run_match(
     ticks: int | None = 1,
     *,
     period_s: float = 0.0,
+    halt_check=None,
 ) -> list[MatchState]:
     states: list[MatchState] = []
     try:
@@ -23,6 +24,8 @@ def run_match(
         while ticks is None or count < ticks:
             states.append(host.tick())
             count += 1
+            if halt_check is not None and halt_check():
+                break
             if period_s > 0:
                 time.sleep(period_s)
         return states
@@ -30,3 +33,20 @@ def run_match(
         return states
     finally:
         host._estop_all()
+
+
+def space_pressed() -> bool:
+    try:
+        import msvcrt
+
+        if not msvcrt.kbhit():
+            return False
+        key = msvcrt.getch()
+        return key in (b" ", b"\x03")
+    except ImportError:
+        import select
+        import sys
+
+        if not select.select([sys.stdin], [], [], 0)[0]:
+            return False
+        return sys.stdin.read(1) == " "

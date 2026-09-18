@@ -36,6 +36,21 @@ def test_arm_puts_both_robots_in_manual_before_ticks():
     host.arm()
     assert home.manual == 1 and away.manual == 1
     assert home.estops == 0 and away.estops == 0
+    assert home.limits == [] and away.limits == []
+
+
+def test_arm_puts_safety_limits_after_manual():
+    home, away = _clients()
+    host = MatchHost(
+        FakeObserver(_obs()),
+        (home, away),
+        max_linear=0.08,
+        max_angular=0.40,
+    )
+    host.arm()
+    assert home.manual == 1 and away.manual == 1
+    assert home.limits == [(0.08, 0.40)]
+    assert away.limits == [(0.08, 0.40)]
 
 
 def test_arm_failure_estops_both_robots():

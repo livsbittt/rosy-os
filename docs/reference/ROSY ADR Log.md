@@ -111,6 +111,8 @@
 | D-101 | 축구 호스트 화면은 노트북 게임 표면이며 CORE `/dashboard`가 아니다 | Accepted |
 | D-102 | 노트북 매치 루프는 `--ticks`가 없으면 20 Hz로 Ctrl+C까지다 | Accepted |
 | D-103 | match.yaml 한계는 게이트 계약이고 유실 HOLD는 즉시다 | Accepted |
+| D-104 | 호스트 arm은 MANUAL 다음에 PUT safety/limits를 건다 | Accepted |
+| D-105 | 호스트 정지는 스페이스와 보드 /stop이며 양쪽 safety/stop이다 | Accepted |
 
 ---
 
@@ -3144,4 +3146,65 @@ period > `lost_hold_s`이면 기동하지 않는다.
 DEVICE/FIELD PARKED.
 
 **References:** D-90, D-96, D-99, D-102, SAF-002.
+
+---
+
+## D-104 호스트 arm은 MANUAL 다음에 PUT safety/limits를 건다
+
+**Status:** Accepted (2026-09-18). 호스트 계약이다. DEVICE GO가 아니다.
+
+**Context:** 설계 §4.2와 D-96 계단 2는 첫 접촉을 `PUT /api/v1/safety/limits`로
+0.08–0.10 m/s에 묶는다. 호스트 gate(D-103)만 있으면 CORE 프로필 최대 0.20이
+그대로다. `HttpPlayerClient`는 mode/teleop/stop만 알았다. PUT limits는 Admin
+토큰이다. 같은 토큰으로 403이 나면 `match.local.yaml` 문제이지 PUT을 생략할
+이유가 아니다.
+
+**Decision:**
+
+- `MatchHost.arm()`은 각 로봇에 `set_manual` 다음 `PUT /api/v1/safety/limits`
+  `{manual_linear, manual_angular}` (match.yaml `limits`)
+- `max_linear`가 없으면 PUT하지 않는다 (단위 시험 더블)
+- 한쪽 실패는 지금처럼 양쪽 `halt`
+- follow / navigation / swarm 경로는 여전히 없다
+- 이 PUT이 DEVICE 정지·워치독 증거를 대신하지 않는다 (D-96)
+
+**Alternatives:** gate만 믿는 안은 호스트가 죽으면 워치독 전에 프로필 최대로
+달릴 수 있다. 토큰이 operator면 건너뛰는 안은 첫 접촉 속도가 문서와 달라진다.
+
+**Consequences:** `HttpPlayerClient.set_limits`. `test_transport`는 limits를
+허용하고 follow/nav/swarm은 계속 금지.
+
+**Validation / Transition:** `test_transport.py`, `test_loop.py`. DEVICE/FIELD PARKED.
+
+**References:** D-90, D-96, D-103, SAF-004,
+[API Ref §5](../reference/ROSY%20API%20%26%20Protocol%20Reference.md).
+
+---
+
+## D-105 호스트 정지는 스페이스와 보드 /stop이며 양쪽 safety/stop이다
+
+**Status:** Accepted (2026-09-18). 호스트 입력이다. DEVICE GO가 아니다.
+
+**Context:** 설계 §5는 스페이스·창 닫기·예외가 양쪽 `POST /api/v1/safety/stop`을
+부른다고 적는다. 예외와 finally는 이미 `halt()`다. 스페이스와 보드 정지는 없었다.
+보드가 CORE FastAPI를 직접 치면 D-101을 깨뜨린다.
+
+**Decision:**
+
+- 라이브 루프는 스페이스를 보면 다음 사이클에서 빠져 `halt()`한다
+- 미리보기 `POST /stop`은 **같은 노트북 서버**만 친다. CORE URL을 열지 않는다
+- `/stop`은 플래그만 세운다. HTTP 스레드에서 teleop와 동시에 estop하지 않는다
+- 창 닫기·프로세스 종료는 기존 finally + CORE 워치독이다
+- 보드 정지 버튼은 되돌릴 수 없는 조작이다 (concept 16 Law 3). 새 CORE 색을
+  import하지 않는다
+
+**Alternatives:** 보드가 로봇 URL로 stop을 보내는 안은 D-101 위반이다. 스페이스를
+운영자 콘솔에만 두는 안은 게임 호스트에 사람이 없다.
+
+**Consequences:** `run_match(..., halt_check=...)`. 미리보기 보드에 정지 버튼.
+pytest는 `halt_check`로 키보드를 흉내 낸다.
+
+**Validation / Transition:** `test_session.py`, `test_preview.py`. DEVICE/FIELD PARKED.
+
+**References:** D-90, D-96, D-101, D-102, SAF-001.
 

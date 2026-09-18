@@ -60,6 +60,14 @@ def test_preview_server_serves_the_board():
         assert "play" in overlay
         css = urlopen(url + "styles.css", timeout=2).read().decode("utf-8")
         assert "tokens.css" not in css
+        from urllib.request import Request
+
+        req = Request(url + "stop", method="POST", data=b"")
+        stop = urlopen(req, timeout=2).read().decode("utf-8")
+        assert board.stop is True
+        assert "ok" in stop
+        html = urlopen(url, timeout=2).read().decode("utf-8")
+        assert "정지" in html
     finally:
         server.close()
 
