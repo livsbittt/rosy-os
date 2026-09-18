@@ -9,9 +9,16 @@ from rosy_games.game import MatchState, Observation, Phase
 
 
 class HeuristicPolicy:
-    def __init__(self, field: Field | None = None, *, speed: float = 0.08) -> None:
+    def __init__(
+        self,
+        field: Field | None = None,
+        *,
+        speed: float = 0.08,
+        angular: float = 0.40,
+    ) -> None:
         self.field = field or Field()
         self.speed = speed
+        self.angular = angular
         self.avoid_m = self.field.min_spacing_m
 
     def act(self, obs: Observation, state: MatchState) -> dict[str, Twist]:
@@ -27,7 +34,7 @@ class HeuristicPolicy:
             return ZERO
         heading = math.atan2(observation.ball.y - pose.y, observation.ball.x - pose.x)
         err = _wrap(heading - pose.yaw)
-        turn = max(-1.0, min(1.0, err * 2.0))
+        turn = max(-self.angular, min(self.angular, err * 2.0))
         drive = self.speed if abs(err) < 0.4 else 0.0
         goal_x = self.field.opponent_goal_x(robot_id)
         drive += 0.02 if (goal_x - pose.x) * math.cos(pose.yaw) > 0 else 0.0

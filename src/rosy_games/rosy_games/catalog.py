@@ -20,9 +20,15 @@ def make_game(kind: str, field: Field) -> Game:
     return cls(field)
 
 
-def make_policy(kind: str, field: Field, *, speed: float = 0.08) -> Policy:
+def make_policy(
+    kind: str,
+    field: Field,
+    *,
+    speed: float = 0.08,
+    angular: float = 0.40,
+) -> Policy:
     try:
         cls = POLICIES[kind]
     except KeyError as exc:
         raise ValueError(f"unknown policy {kind!r}") from exc
-    return cls(field, speed=speed)
+    return cls(field, speed=speed, angular=angular)

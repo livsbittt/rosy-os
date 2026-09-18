@@ -7,6 +7,8 @@ import time
 from rosy_games.game.state import MatchState
 from rosy_games.host.loop import MatchHost
 
+HOST_PERIOD_S = 0.05  # 20 Hz (D-102)
+
 
 def run_match(
     host: MatchHost,

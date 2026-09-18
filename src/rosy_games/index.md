@@ -18,6 +18,8 @@
 | D-99 | 학습된 축구 정책은 Policy 플러그인이며 cmd_vel을 내지 않는다 |
 | D-100 | 골대는 천장에서 ArUco+영역으로 보이고, 득점은 필드 m 폴리곤이다 |
 | D-101 | 축구 호스트 화면은 노트북 게임 표면이며 CORE `/dashboard`가 아니다 |
+| D-102 | 노트북 매치 루프는 `--ticks`가 없으면 20 Hz로 Ctrl+C까지다 |
+| D-103 | match.yaml 한계는 게이트 계약이고 유실 HOLD는 즉시다 |
 
 ## 계획·결과 문서
 
@@ -37,8 +39,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · feat(games): run live matches at 20 Hz and clamp yaml limits (D-102, D-103)
+- 2026-09-18 · uncommitted · docs(adr): D-102 20 Hz loop, D-103 yaml limits
 - 2026-09-18 · uncommitted · fix(games): keep --preview open until interrupt
 - 2026-09-18 · uncommitted · feat(games): serve a laptop match board off CORE (D-101)
 - 2026-09-18 · uncommitted · docs(adr): D-101 games board is not CORE dashboard
-- 2026-09-18 · uncommitted · feat(games): see goals as ArUco 20/21 (D-100)
-- 2026-09-18 · uncommitted · docs(adr): D-100 goal markers

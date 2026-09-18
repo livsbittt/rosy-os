@@ -163,3 +163,19 @@
 - gate 변화: 없음. DEVICE/FIELD PARKED
 - 결정: D-96 계단 1 노트북 도구가 실제로 떠 있어야 한다
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · docs(adr): lock host loop 20 Hz and yaml limits (D-102, D-103)
+
+- 변경: ADR D-102·D-103. 매치 루프는 `--ticks` 없으면 20 Hz. limits는 gate. 유실 HOLD 즉시.
+- 증거: ADR 색인
+- gate 변화: 없음
+- 결정: D-102·D-103 Accepted. DEVICE GO 아님
+- 교훈: 없음
+
+## 2026-09-18 · uncommitted · feat(games): run live matches at 20 Hz and clamp yaml limits (D-102, D-103)
+
+- 변경: 라이브 매치가 preview 없이도 20 Hz. angular 0.40 클램프. period > lost_hold_s 거부.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py test/test_harness_contracts.py -q` 121 passed
+- gate 변화: rosy_games LOCAL GO 유지. DEVICE/FIELD PARKED
+- 결정: YAML에만 있던 한계를 호스트 계약으로 옮김
+- 교훈: 없음

@@ -37,12 +37,16 @@ class MatchHost:
         game: Game | None = None,
         policy: Policy | None = None,
         preview=None,
+        max_linear: float | None = None,
+        max_angular: float | None = None,
     ) -> None:
         self.observer = observer
         self.clients = tuple(clients)
         self.game = game or SoccerGame()
         self.policy = policy or HeuristicPolicy(self.game.field)
         self.preview = preview
+        self.max_linear = max_linear
+        self.max_angular = max_angular
 
     def reset(self) -> MatchState:
         self.arm()
@@ -81,7 +85,14 @@ class MatchHost:
                     jpeg=jpeg,
                 )
             twists = self.policy.act(obs, state)
-            commands = gate(twists, obs, state, self.game.field)
+            commands = gate(
+                twists,
+                obs,
+                state,
+                self.game.field,
+                max_linear=self.max_linear,
+                max_angular=self.max_angular,
+            )
             if not commands.estop:
                 try:
                     self._teleop_all(commands)

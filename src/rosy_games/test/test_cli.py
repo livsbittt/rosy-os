@@ -31,6 +31,9 @@ def test_load_match_builds_field_and_two_endpoints():
     assert setup.policy == "heuristic"
     assert setup.camera.index == 0
     assert setup.camera.corner_ids == (10, 11, 12, 13)
+    assert setup.linear == 0.08
+    assert setup.angular == 0.40
+    assert setup.camera.lost_hold_s == 0.5
     assert setup.goals.home_id == 20
     assert setup.goals.away_id == 21
     assert setup.goals.hsv_low is None
@@ -182,4 +185,65 @@ def test_preview_without_ticks_runs_until_interrupt(monkeypatch):
     assert seen["ticks"] is None
     assert seen["period_s"] == 0.05
     assert seen["closed"] is True
+
+
+def test_match_without_ticks_is_live_even_without_preview(monkeypatch):
+    """D-102: preview가 없어도 --ticks 없으면 20 Hz 루프다."""
+    seen: dict[str, object] = {}
+
+    class FakeHttp:
+        def __init__(self, endpoint, **_kwargs):
+            self.robot_id = endpoint.id
+
+        def set_manual(self) -> None:
+            pass
+
+        def teleop(self, linear: float, angular: float) -> None:
+            pass
+
+        def estop(self) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+    def fake_run(host, ticks=1, period_s=0.0):
+        seen["ticks"] = ticks
+        seen["period_s"] = period_s
+        return []
+
+    monkeypatch.setattr("rosy_games.cli.HttpPlayerClient", FakeHttp)
+    monkeypatch.setattr("rosy_games.cli.run_match", fake_run)
+    assert main(["match", "--config", str(MATCH)]) == 0
+    assert seen["ticks"] is None
+    assert seen["period_s"] == 0.05
+
+
+def test_host_refuses_a_period_slower_than_the_watchdog(tmp_path, monkeypatch):
+    text = MATCH.read_text(encoding="utf-8").replace("lost_hold_s: 0.5", "lost_hold_s: 0.01")
+    path = tmp_path / "match.yaml"
+    path.write_text(text, encoding="utf-8")
+
+    class FakeHttp:
+        def __init__(self, endpoint, **_kwargs):
+            self.robot_id = endpoint.id
+
+        def set_manual(self) -> None:
+            pass
+
+        def teleop(self, linear: float, angular: float) -> None:
+            pass
+
+        def estop(self) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr("rosy_games.cli.HttpPlayerClient", FakeHttp)
+    try:
+        main(["match", "--config", str(path)])
+        raise AssertionError("period must not exceed lost_hold_s")
+    except ValueError as exc:
+        assert "lost_hold" in str(exc)
 

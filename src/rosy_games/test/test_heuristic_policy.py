@@ -46,3 +46,11 @@ def test_policy_does_not_hang_on_nonfinite_yaw():
     )
     out = policy.act(obs, play)
     assert out["rosy_01"].linear == 0.0 or abs(out["rosy_01"].angular) <= 1.0
+
+
+def test_policy_clamps_angular_to_its_limit():
+    policy = HeuristicPolicy(angular=0.40)
+    play = _play()
+    obs = _obs((0.0, 0.8), {"rosy_01": (0.0, 0.0, 0.0), "rosy_02": (0.0, 1.0, 0.0)})
+    out = policy.act(obs, play)
+    assert abs(out["rosy_01"].angular) <= 0.40 + 1e-9

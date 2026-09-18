@@ -1,7 +1,7 @@
 # 남은 rosy_games 트랙 → ADR 계획
 
 작성일: 2026-09-18
-상태: D-95–D-101. LOCAL 호스트·합성 천장·골 20/21·노트북 보드 분리는 있다. 현장 1v1 GO가 아니다.
+상태: D-95–D-103. LOCAL 호스트·합성 천장·골 20/21·노트북 보드·20 Hz 루프 계약은 있다. 현장 1v1 GO가 아니다.
 
 관련: D-90, D-91, D-94 ·
 [game host 설계](2026-09-17-robot-soccer-game-host-design.md) ·
@@ -29,6 +29,8 @@
 | D-41을 overhead로 닫기 | D-94 | 아니요 |
 | 골대를 QR/영역으로 보이게 | **D-100** | ArUco 20/21 + 선택 HSV 입구. 득점은 m 폴리곤 |
 | 경기 화면을 CORE 콘솔에? | **D-101** | 아니요. 노트북 `rosy_games --preview` |
+| 매치가 1틱 뒤 죽나? | **D-102** | `--ticks` 없으면 20 Hz, Ctrl+C까지 |
+| YAML angular·lost_hold 미사용? | **D-103** | angular는 gate 클램프. HOLD는 즉시. period ≤ lost_hold_s |
 
 ## 3. 새 ADR 요약
 
@@ -41,6 +43,8 @@
 | D-99 | 학습 정책은 `Policy.act`만. 최종 `cmd_vel` 금지 |
 | D-100 | 골 위치는 ArUco 20/21 + 영역. 일반 QR 아님. 호모그래피는 코너 |
 | D-101 | 축구 보드는 노트북 게임 표면. CORE `/dashboard` 금지 |
+| D-102 | `--ticks` 없으면 20 Hz 루프. preview는 보드만 |
+| D-103 | limits는 gate. 유실 HOLD 즉시. period ≤ lost_hold_s |
 
 ## 4. 실행 순서 (다음 세션)
 
@@ -54,5 +58,5 @@
 
 ## 5. 수락
 
-- ADR 로그에 D-95–D-101 색인·본문이 있다
+- ADR 로그에 D-95–D-103 색인·본문이 있다
 - `python -m pytest test/test_harness_contracts.py src/rosy_games/test test/test_rosy_games_surface.py -q`

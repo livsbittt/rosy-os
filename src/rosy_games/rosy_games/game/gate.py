@@ -21,6 +21,9 @@ def gate(
     obs: Observation,
     state: MatchState,
     field: Field,
+    *,
+    max_linear: float | None = None,
+    max_angular: float | None = None,
 ) -> CommandSet:
     roster = (field.home_id, field.away_id)
     ids = tuple(dict.fromkeys((*twists, *roster)))
@@ -35,7 +38,12 @@ def gate(
             out[robot_id] = ZERO
             continue
         linear = min(twist.linear, 0.0) if robot_id in close else twist.linear
-        out[robot_id] = Twist(linear, twist.angular)
+        angular = twist.angular
+        if max_linear is not None:
+            linear = max(-max_linear, min(max_linear, linear))
+        if max_angular is not None:
+            angular = max(-max_angular, min(max_angular, angular))
+        out[robot_id] = Twist(linear, angular)
     return CommandSet(twists=out, estop=False)
 
 

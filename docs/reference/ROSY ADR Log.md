@@ -109,6 +109,8 @@
 | D-99 | 학습된 축구 정책은 Policy 플러그인이며 cmd_vel을 내지 않는다 | Accepted |
 | D-100 | 골대는 천장에서 ArUco+영역으로 보이고, 득점은 필드 m 폴리곤이다 | Accepted |
 | D-101 | 축구 호스트 화면은 노트북 게임 표면이며 CORE `/dashboard`가 아니다 | Accepted |
+| D-102 | 노트북 매치 루프는 `--ticks`가 없으면 20 Hz로 Ctrl+C까지다 | Accepted |
+| D-103 | match.yaml 한계는 게이트 계약이고 유실 HOLD는 즉시다 | Accepted |
 
 ---
 
@@ -3077,4 +3079,69 @@ DEVICE/FIELD PARKED.
 
 **References:** D-23, D-72, D-75, D-77, D-90, D-92, D-94, D-95, D-96, D-100,
 [concept 16](../concept/16_ROSY_Interface_Design_Principles.md).
+
+---
+
+## D-102 노트북 매치 루프는 `--ticks`가 없으면 20 Hz로 Ctrl+C까지다
+
+**Status:** Accepted (2026-09-18). 호스트 루프 계약이다. DEVICE GO가 아니다.
+
+**Context:** 설계 §8은 호스트 teleop를 20 Hz로 적는다. D-101 미리보기는
+`--ticks`가 없을 때만 그 루프를 열었고, `--observer overhead`만 켜면 1틱 뒤에
+프로세스가 죽었다. D-96 계단 1–5는 보드가 있든 없든 관측·teleop가 유지돼야 한다.
+`--preview`가 루프 수명을 겸하면 화면 없는 현장 계단이 다시 1틱이 된다.
+
+**Decision:**
+
+- `--dry-run`이 아니고 `--ticks`가 없으면 매치 루프는 **20 Hz** (`period_s=0.05`)로
+  Ctrl+C까지 돈다
+- `--ticks N`은 유한 시험·스크립트용이다. 이때는 sleep 하지 않아도 된다
+- `--preview`는 보드를 켤 뿐 루프를 열거나 닫지 않는다
+- 기본 observer는 여전히 `hold`다 (D-95). 루프가 길어진다고 카메라를 열지 않는다
+- Ctrl+C는 traceback 없이 `halt()`한다 (이미 `run_match` finally)
+
+**Alternatives:** 미리보기만 길게 두는 안은 계단 2 이후 보드 없이 달리기를 막는다.
+기본을 1틱으로 두는 안은 현장 CLI가 시험 CLI와 같아진다.
+
+**Consequences:** `rosy_games match --config … --observer overhead`는 `--preview`
+없이도 천장 관측을 유지한다. pytest는 `--ticks`를 명시한다.
+
+**Validation / Transition:** `src/rosy_games/test/test_cli.py`,
+`test_session.py`. DEVICE/FIELD PARKED.
+
+**References:** D-90, D-95, D-96, D-101,
+[game host 설계 §8](../plans/2026-09-17-robot-soccer-game-host-design.md).
+
+---
+
+## D-103 match.yaml 한계는 게이트 계약이고 유실 HOLD는 즉시다
+
+**Status:** Accepted (2026-09-18). 호스트 안전 계약이다. DEVICE GO가 아니다.
+
+**Context:** `limits.linear: 0.08`은 정책 속도로 들어갔지만 `limits.angular: 0.40`은
+YAML에만 있고 휴리스틱은 각속도를 ±1.0까지 낸다. `watchdog.lost_hold_s: 0.5`도
+로드만 되고 심판은 유실 즉시 HOLD다. 0.5초를 게임에 디바운스로 넣으면 공을 잃은
+뒤에도 마지막 teleop가 남는다. 설계는 유실 즉시 양쪽 정지고, 500 ms는 CORE
+워치독(SAF-002)이다.
+
+**Decision:**
+
+- `limits.linear` / `limits.angular`는 **gate의 마지막 클램프**다. 정책이 더 크게
+  내도 호스트가 잘라 낸다
+- 휴리스틱도 같은 한계를 존중한다. gate가 없으면 안 된다
+- 유실 HOLD는 **즉시**다. `lost_hold_s`를 디바운스로 쓰지 않는다
+- `lost_hold_s`는 CORE teleop 워치독 상한이다. 호스트 `period_s`는 그 값 이하다
+  (20 Hz = 0.05 s ≪ 0.5 s)
+- 이 값이 DEVICE에서 워치독 증거를 대신하지 않는다 (D-96)
+
+**Alternatives:** 유실을 0.5 s 참는 안은 마커가 가려진 채 돌게 한다. angular를
+정책에만 두는 안은 신경망 플러그인이 한계를 우회한다 (D-99).
+
+**Consequences:** `MatchSetup.angular`가 생긴다. `gate(..., max_linear, max_angular)`.
+period > `lost_hold_s`이면 기동하지 않는다.
+
+**Validation / Transition:** `test_gate.py`, `test_cli.py`, `test_heuristic_policy.py`.
+DEVICE/FIELD PARKED.
+
+**References:** D-90, D-96, D-99, D-102, SAF-002.
 

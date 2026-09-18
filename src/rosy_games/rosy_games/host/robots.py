@@ -44,6 +44,7 @@ class MatchSetup:
     game: str = "soccer"
     policy: str = "heuristic"
     linear: float = 0.08
+    angular: float = 0.40
     camera: CameraConfig = CameraConfig()
     goals: GoalConfig = GoalConfig()
 
@@ -94,6 +95,7 @@ def load_match(path: Path) -> MatchSetup:
         game=str(data.get("game") or "soccer"),
         policy=str(data.get("policy") or "heuristic"),
         linear=float(limits.get("linear", 0.08)),
+        angular=float(limits.get("angular", 0.40)),
         camera=CameraConfig(
             index=int(cam.get("index", 0)),
             hsv_low=hsv_low,  # type: ignore[arg-type]
