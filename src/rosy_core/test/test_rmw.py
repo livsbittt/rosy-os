@@ -2,9 +2,16 @@
 
 from pathlib import Path
 
-from rosy_core.system.rmw import REQUIRED_RMW, apply_cyclone_rmw
+import pytest
+import yaml
+
+from rosy_core.system.rmw import REQUIRED_RMW, apply_cyclone_rmw, cyclone_overlay_patch
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_cyclone_overlay_patch_is_dds_rmw_only():
+    assert cyclone_overlay_patch() == {"dds": {"rmw": REQUIRED_RMW}}
 
 
 def test_empty_rmw_is_filled_with_cyclone():
@@ -49,3 +56,58 @@ def test_no_api_changes_rmw():
         text = path.read_text(encoding="utf-8")
         assert "apply_cyclone_rmw" not in text, path
         assert "/rmw" not in text, path
+
+
+@pytest.fixture
+def rmw_client(tmp_path, monkeypatch):
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from rosy_core.api.app import create_app
+    from rosy_core.profile import RobotProfile
+    from rosy_core.services import CoreServices
+    import yaml
+
+    overlay = tmp_path / "rosy.yaml"
+    monkeypatch.setattr("rosy_core.config.LOCAL_CONFIG_PATH", overlay)
+    monkeypatch.delenv("ROSY_CONFIG", raising=False)
+    config_dir = ROOT / "config"
+    config = yaml.safe_load((config_dir / "rosy_default.yaml").read_text(encoding="utf-8"))
+    profile = RobotProfile.load(config_dir / "profile.pinky_pro.yaml")
+    caps = yaml.safe_load((config_dir / "capabilities.yaml").read_text(encoding="utf-8"))
+    services = CoreServices.build(config, profile, caps, tmp_path / "wp.json")
+    return TestClient(create_app(config, services)), overlay
+
+
+ADMIN = {"Authorization": "Bearer rosy-dev-admin"}
+VIEWER = {"Authorization": "Bearer rosy-dev-viewer"}
+
+
+def test_cyclone_post_without_confirm_does_not_write_overlay(rmw_client):
+    tc, overlay = rmw_client
+    response = tc.post("/api/v1/system/dds/cyclone", json={}, headers=ADMIN)
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "CONFIRMATION_REQUIRED"
+    assert not overlay.exists()
+
+
+def test_cyclone_post_is_admin_only(rmw_client):
+    tc, overlay = rmw_client
+    denied = tc.post(
+        "/api/v1/system/dds/cyclone", json={"confirmed": True}, headers=VIEWER
+    )
+    assert denied.status_code == 403
+    assert not overlay.exists()
+
+
+def test_cyclone_post_persists_overlay_and_asks_host_to_reboot(rmw_client):
+    tc, overlay = rmw_client
+    response = tc.post(
+        "/api/v1/system/dds/cyclone", json={"confirmed": True}, headers=ADMIN
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["persisted"] is True
+    assert body["rmw"] == "rmw_cyclonedds_cpp"
+    assert body["reboot"]["available"] is False
+    saved = yaml.safe_load(overlay.read_text(encoding="utf-8"))
+    assert saved["dds"]["rmw"] == "rmw_cyclonedds_cpp"

@@ -170,3 +170,43 @@ def system_inventory(_: AuthContext = Depends(viewer), svc: CoreServices = Depen
 @system_router.get("/runtime")
 def system_runtime(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
     return svc.runtime_probe.snapshot()
+
+
+class CycloneApplyRequest(BaseModel):
+    confirmed: bool = False
+    idempotency_key: str | None = None
+
+
+@system_router.post("/dds/cyclone")
+def apply_cyclone_and_reboot(
+    body: CycloneApplyRequest,
+    auth: AuthContext = Depends(admin),
+    svc: CoreServices = Depends(get_services),
+):
+    """Persist Cyclone intent then ask Host Agent to reboot (D-123)."""
+    if not body.confirmed:
+        raise ApiError("CONFIRMATION_REQUIRED", 400, "재부팅 확인이 필요합니다")
+    from rosy_core.system.rmw import REQUIRED_RMW, cyclone_overlay_patch
+
+    try:
+        patch_local_config(cyclone_overlay_patch())
+    except (ConfigError, OSError) as exc:
+        raise ApiError("INTERNAL_ERROR", 500, f"failed to persist Cyclone intent: {exc}")
+    from rosy_core.api.v1.host import _agent, _relay
+
+    reply = _agent(svc).request(
+        "system.reboot",
+        role="administrator",
+        user_id=auth.token_id,
+        confirmed=True,
+        idempotency_key=body.idempotency_key,
+    )
+    reboot = _relay(
+        reply,
+        absent_detail=(
+            "오버레이에 Cyclone을 저장했습니다. Host Agent가 없어 재부팅하지 못했습니다. "
+            "systemctl restart rosy-runtime.service 로 런타임을 다시 띄우세요."
+        ),
+    )
+    svc.events.publish("config.changed", source="api", data={"key": "dds.rmw"})
+    return {"persisted": True, "rmw": REQUIRED_RMW, "reboot": reboot}

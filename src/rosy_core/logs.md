@@ -99,3 +99,9 @@
 - 변경: FastDDS/기타 RMW 는 거절하지 않고 Cyclone으로 고친 뒤 init. 커널 reboot 없음.
 - 증거: `python -m pytest src/rosy_core/test/test_rmw.py -q`
 - gate 변화: 없음. DEVICE PARKED
+
+## 2026-09-18 · uncommitted · feat(core): persist Cyclone then Host Agent reboot (D-123)
+
+- 변경: POST /api/v1/system/dds/cyclone. 오버레이 dds.rmw 저장 후 Host Agent system.reboot. 대시보드 확인 버튼.
+- 증거: `python -m pytest src/rosy_core/test/test_rmw.py src/rosy_core/test/test_dashboard.py src/rosy_core/test/test_host_cards.py -q`
+- gate 변화: 없음. DEVICE PARKED

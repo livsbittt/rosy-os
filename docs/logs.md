@@ -275,3 +275,11 @@
 - gate 변화: LOCAL GO 유지. DEVICE PARKED
 - 결정: 런타임 재기동으로 이웃 노드를 맞춘다. Pi reboot 는 RMW 도구가 아니다
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · feat(core): persist Cyclone then Host Agent reboot from dashboard (D-123)
+
+- 변경: ADR D-123. 관리자 POST /api/v1/system/dds/cyclone 이 오버레이에 저장한 뒤 system.reboot 중계. confirmed 없으면 저장 안 함. CORE 는 reboot() 를 직접 안 부름.
+- 증거: `python -m pytest src/rosy_core/test/test_rmw.py src/rosy_core/test/test_dashboard.py src/rosy_core/test/test_host_cards.py -q`
+- gate 변화: LOCAL GO 유지. DEVICE PARKED
+- 결정: 웹 수정 후 재부팅은 Host Agent. 라이브 RMW 패치 없음
+- 교훈: 없음

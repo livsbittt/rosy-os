@@ -197,6 +197,7 @@ def test_a_card_requires_authentication(client, path):
         "/api/v1/host/release/rollback",
         "/api/v1/host/release/clear-hold",
         "/api/v1/host/network/apply",
+        "/api/v1/host/reboot",
     ],
 )
 def test_an_action_requires_administrator(client, path):

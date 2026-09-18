@@ -137,6 +137,7 @@ def test_dashboard_exposes_ros_domain_bandwidth_and_topology_panel():
         "ros-domain-id",
         "dds-isolation",
         "dds-rmw",
+        "dds-cyclone-apply",
         "ros-node-count",
         "ros-topic-count",
         "network-rx-rate",
@@ -155,6 +156,7 @@ def test_dashboard_exposes_ros_domain_bandwidth_and_topology_panel():
     assert "networkHistory" in script
     assert "runtime.ros" in script
     assert "graph.rmw" in script
+    assert "/api/v1/system/dds/cyclone" in script
     assert "createElementNS" in script
     assert "https://" not in script
     assert ".ros-network-panel" in css

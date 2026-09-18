@@ -157,6 +157,23 @@ def host_release_clear_hold(
     return _relay(reply, absent_detail="Host Agent 에 연결할 수 없어 홀드를 해제하지 못했습니다.")
 
 
+@host_router.post("/reboot")
+def host_reboot(
+    body: HostActionRequest,
+    auth: AuthContext = Depends(admin),
+    svc: CoreServices = Depends(get_services),
+):
+    """Relay Host Agent system.reboot. CORE does not call reboot itself (D-22)."""
+    reply = _agent(svc).request(
+        "system.reboot",
+        role="administrator",
+        user_id=auth.token_id,
+        confirmed=body.confirmed,
+        idempotency_key=body.idempotency_key,
+    )
+    return _relay(reply, absent_detail="Host Agent 에 연결할 수 없어 재부팅하지 못했습니다.")
+
+
 @host_router.get("/commissioning")
 def host_commissioning(_: AuthContext = Depends(viewer), svc: CoreServices = Depends(get_services)):
     """runtime mode 와 hardware 재승인 사유.

@@ -823,6 +823,27 @@ elements["release-stop"].addEventListener("click", async () => {
 
 
 
+elements["dds-cyclone-apply"]?.addEventListener("click", async () => {
+  if (!window.confirm("CycloneDDS를 저장하고 로봇을 재부팅할까요? 모터와 화면이 잠시 내려갑니다.")) return;
+  try {
+    const payload = await api("/api/v1/system/dds/cyclone", {
+      method: "POST",
+      body: JSON.stringify({
+        confirmed: true,
+        idempotency_key: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      }),
+    });
+    const reboot = payload.reboot || {};
+    if (reboot.available === false) {
+      setText("action-message", reboot.detail || "저장했습니다. 런타임을 다시 띄우세요.");
+      return;
+    }
+    setText("action-message", reboot.ok ? "재부팅을 요청했습니다." : (reboot.detail || "재부팅이 거부되었습니다."));
+  } catch (error) {
+    setText("action-message", `Cyclone 적용 실패: ${error.message}`);
+  }
+});
+
 elements["network-apply"]?.addEventListener("click", async () => {
   const profileId = elements["network-profile-id"]?.value.trim();
   if (!profileId) {
