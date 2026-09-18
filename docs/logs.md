@@ -139,3 +139,19 @@
 - gate 변화: rosy_games LOCAL GO 유지. DEVICE/FIELD PARKED
 - 결정: D-100 LOCAL 관측 확장. 현장 계단 1은 실제 웹캠
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · docs(adr): D-101 games board is not CORE dashboard
+
+- 변경: ADR D-101. 축구 미리보기는 노트북 게임 표면. CORE `/dashboard` 금지. concept 16 §2 Game host 행.
+- 증거: ADR 색인
+- gate 변화: 없음
+- 결정: D-101 Accepted. DEVICE GO 아님
+- 교훈: 없음
+
+## 2026-09-18 · uncommitted · feat(games): serve a laptop match board off CORE (D-101)
+
+- 변경: `rosy_games match --preview`가 127.0.0.1에서 피치 보드를 연다. CORE 자산·이미지에 없음.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py test/test_harness_contracts.py -q` 114 passed
+- gate 변화: rosy_games LOCAL GO 유지. DEVICE/FIELD PARKED
+- 결정: 프론트엔드를 표면별로 나눔. 게임 보드는 콘솔이 아니다
+- 교훈: 없음

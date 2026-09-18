@@ -13,6 +13,7 @@ from rosy_games.game import MatchState, SoccerGame
 from rosy_games.game.protocol import Game
 from rosy_games.game.gate import CommandSet, gate
 from rosy_games.host.observer import Observer
+from rosy_games.host.preview import overlay_payload
 from rosy_games.policy.heuristic import HeuristicPolicy
 from rosy_games.policy.protocol import Policy
 
@@ -35,11 +36,13 @@ class MatchHost:
         *,
         game: Game | None = None,
         policy: Policy | None = None,
+        preview=None,
     ) -> None:
         self.observer = observer
         self.clients = tuple(clients)
         self.game = game or SoccerGame()
         self.policy = policy or HeuristicPolicy(self.game.field)
+        self.preview = preview
 
     def reset(self) -> MatchState:
         self.arm()
@@ -64,6 +67,13 @@ class MatchHost:
         try:
             obs = self.observer.observe()
             state = self.game.step(obs)
+            if self.preview is not None:
+                markers = getattr(self.observer, "last_markers", ())
+                jpeg = getattr(self.observer, "last_jpeg", None)
+                self.preview.publish(
+                    overlay_payload(self.game.field, obs, state, markers=markers),
+                    jpeg=jpeg,
+                )
             twists = self.policy.act(obs, state)
             commands = gate(twists, obs, state, self.game.field)
             if not commands.estop:

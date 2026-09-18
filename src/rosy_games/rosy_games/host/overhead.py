@@ -21,6 +21,8 @@ class OverheadCamera:
         self.setup = setup
         self._owns = capture is None
         self._cap = capture
+        self.last_markers: tuple[int, ...] = ()
+        self.last_jpeg: bytes | None = None
         if capture is None:
             self._cap = cv2.VideoCapture(setup.camera.index)
             if not self._cap.isOpened():
@@ -34,6 +36,8 @@ class OverheadCamera:
 
     def observe_frame(self, bgr: np.ndarray) -> Observation:
         markers = detect_markers(bgr)
+        self.last_markers = tuple(sorted(markers))
+        self.last_jpeg = _jpeg(bgr)
         homography = _homography(markers, self.setup)
         ball = detect_ball(bgr, self.setup.camera.hsv_low, self.setup.camera.hsv_high)
         robots = _robot_pixels(markers, self.setup)
@@ -54,6 +58,8 @@ class OverheadCamera:
             self._cap = None
 
     def _lost(self) -> Observation:
+        self.last_markers = ()
+        self.last_jpeg = None
         return observation_from_pixels(
             field=self.setup.field,
             homography=None,
@@ -120,6 +126,13 @@ def _robot_pixels(markers: dict[int, np.ndarray], setup: MatchSetup) -> dict[str
         tip = (float(quad[1][0]), float(quad[1][1]))
         out[robot.id] = (center, tip)
     return out
+
+
+def _jpeg(bgr: np.ndarray) -> bytes | None:
+    ok, buf = cv2.imencode(".jpg", bgr)
+    if not ok:
+        return None
+    return buf.tobytes()
 
 
 def _center(quad: np.ndarray) -> Point:

@@ -22,7 +22,8 @@ Laptop game host (D-90). CORE does not import this package. Final `cmd_vel` stay
 | `rosy_games/game/` | Referee. No policy HTTP |
 | `rosy_games/policy/` | Heuristic now, neural later |
 | `rosy_games/catalog.py` | Named plugins: `soccer` game, `heuristic` policy |
-| `rosy_games/host/` | Match loop, HoldObserver, OverheadCamera, CORE teleop |
+| `rosy_games/host/` | Match loop, HoldObserver, OverheadCamera, CORE teleop, localhost preview |
+| `rosy_games/web/` | Laptop match board (D-101). Not CORE `/dashboard` |
 | `test/` | ROS-free pytest |
 
 ## For AI Agents
@@ -30,7 +31,7 @@ Laptop game host (D-90). CORE does not import this package. Final `cmd_vel` stay
 ### Working In This Directory
 
 - Harness (D-61): read `progress.md` and `index.md` first. After a change, append `logs.md`, overwrite `progress.md` if a gate moved, then run `python tools/harness/rosy_harness.py generate` from the repo root.
-- Design: `docs/plans/2026-09-17-robot-soccer-game-host-design.md`. Live camera: `rosy_games match --config ... --observer overhead`.
+- Design: `docs/plans/2026-09-17-robot-soccer-game-host-design.md`. Live camera: `rosy_games match --config ... --observer overhead`. Board: `--preview` (D-101).
 
 ### Testing Requirements
 

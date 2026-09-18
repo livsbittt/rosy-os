@@ -17,6 +17,7 @@
 | D-98 | Isaac 축구 env는 FIELD 반복 전 폴더를 만들지 않는다 |
 | D-99 | 학습된 축구 정책은 Policy 플러그인이며 cmd_vel을 내지 않는다 |
 | D-100 | 골대는 천장에서 ArUco+영역으로 보이고, 득점은 필드 m 폴리곤이다 |
+| D-101 | 축구 호스트 화면은 노트북 게임 표면이며 CORE `/dashboard`가 아니다 |
 
 ## 계획·결과 문서
 
@@ -36,8 +37,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · feat(games): serve a laptop match board off CORE (D-101)
+- 2026-09-18 · uncommitted · docs(adr): D-101 games board is not CORE dashboard
 - 2026-09-18 · uncommitted · feat(games): see goals as ArUco 20/21 (D-100)
 - 2026-09-18 · uncommitted · docs(adr): D-100 goal markers
 - 2026-09-18 · uncommitted · docs(adr): remaining games track is D-95–D-99
-- 2026-09-18 · uncommitted · feat(games): project the ceiling camera onto the pitch
-- 2026-09-18 · uncommitted · feat(games): plug soccer in and arm CORE without a camera

@@ -31,3 +31,19 @@ def test_core_dockerfile_does_not_copy_games():
     text = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
     assert "rosy_games" not in text
     assert (ROOT / "src" / "rosy_games" / "package.xml").is_file()
+
+
+def test_games_board_is_not_the_core_dashboard():
+    """D-101: 축구 보드는 노트북 게임 표면. CORE /dashboard 자산이 아니다."""
+    core_web = ROOT / "src" / "rosy_core" / "rosy_core" / "web"
+    games_web = ROOT / "src" / "rosy_games" / "rosy_games" / "web"
+    assert (games_web / "index.html").is_file()
+    assert (games_web / "board.js").is_file()
+    core_html = (core_web / "index.html").read_text(encoding="utf-8")
+    assert "soccer" not in core_html.lower()
+    assert "골 20" not in core_html
+    app = (ROOT / "src" / "rosy_core" / "rosy_core" / "api" / "app.py").read_text(encoding="utf-8")
+    assert "board.js" not in app
+    styles = (games_web / "styles.css").read_text(encoding="utf-8")
+    assert "tokens.css" not in styles
+    assert "/dashboard/assets" not in styles

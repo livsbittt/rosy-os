@@ -18,6 +18,7 @@ colour, hierarchy and vocabulary, not about a rendering stack.
 | Fleet | dispatcher | "Which robot is the problem?" | target — Fleet server unimplemented |
 | Robot face | bystander | "What is it about to do?" | live (`rosy_emotion` LCD, `info_screen`) |
 | Control diagnostic | control-stack maintainer | "What is the absorbed IO graph showing?" | live on legacy `rosy_control/launch/robot.launch.py` only; not composed with CORE |
+| Game host | laptop match operator | "Are the pitch, ball, robots, and goals visible?" | live localhost preview in `rosy_games` (D-101); never CORE `/dashboard` |
 
 The robot face is a user interface. It is the only surface for people who never
 open a browser, and the only one with no input.

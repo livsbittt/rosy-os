@@ -80,6 +80,12 @@ def test_cli_default_observer_is_hold_not_the_camera():
     assert args.observer == "hold"
 
 
+def test_cli_default_preview_is_off():
+    """D-101: 미리보기는 명시할 때만. 기본 CLI가 포트를 열지 않는다."""
+    args = parse_args(["match", "--config", str(MATCH), "--dry-run"])
+    assert args.preview is False
+
+
 def test_load_match_assigns_home_from_attacks_not_row_order(tmp_path):
     text = MATCH.read_text(encoding="utf-8")
     swapped = text.replace("rosy_01", "TMP").replace("rosy_02", "rosy_01").replace("TMP", "rosy_02")

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rosy 경기 보드</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/board.js"></script>
+</head>
+<body>
+  <header class="rail">
+    <p class="kicker">노트북 게임 호스트</p>
+    <h1>1v1 피치</h1>
+    <p id="phase">대기</p>
+  </header>
+  <section class="score" aria-label="점수">
+    <div>
+      <span id="home-name">home</span>
+      <strong id="home-score">0</strong>
+    </div>
+    <div>
+      <span id="away-name">away</span>
+      <strong id="away-score">0</strong>
+    </div>
+  </section>
+  <canvas id="pitch" width="720" height="480" aria-label="필드 미터 보드"></canvas>
+  <img id="frame" alt="천장 프레임" hidden>
+  <ul id="markers" class="chips" aria-label="보이는 마커"></ul>
+  <p id="lost" class="lost" hidden>유실</p>
+</body>
+</html>
