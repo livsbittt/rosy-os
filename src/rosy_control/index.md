@@ -18,6 +18,8 @@
 | D-57 | ROS-native first; board and vendor differences stay in adapters |
 | D-58 | Hardware motion requires an authoritative readiness gate |
 | D-77 | 운용자 콘솔은 CORE `/dashboard` 하나다 |
+| D-118 | 생 Image는 Fleet·보드·gz_multi 브리지에 타지 않는다 |
+| D-119 | 스캔·이미지·IMU는 sensor-data QoS다 |
 
 ## 계획·결과 문서
 
@@ -40,6 +42,7 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · feat(control): camera/front publishes sensor-data QoS (D-119)
 - 2026-09-17 · 8fdd8d2 · docs(control): D-77 diagnostic surface, CSS/JS token mirror
 - 2026-09-17 · uncommitted · fix(sensing): stop writing RGB tuples into the BGR map raster
 - 2026-09-15 · uncommitted · docs(harness): rerun rosy_control LOCAL with the Windows path separator

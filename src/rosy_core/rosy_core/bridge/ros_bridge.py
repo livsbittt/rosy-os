@@ -27,7 +27,7 @@ from nav_msgs.msg import OccupancyGrid, Odometry, Path
 from nav2_msgs.action import NavigateToPose
 from nav2_msgs.msg import Costmap
 from lifecycle_msgs.msg import TransitionEvent
-from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from sensor_msgs.msg import BatteryState, Imu, LaserScan, Range
 from std_msgs.msg import Bool, Float32, String
 from std_srvs.srv import Empty
@@ -105,9 +105,9 @@ class RosBridge:
         node.create_subscription(TransitionEvent, "global_costmap/global_costmap/transition_event",
                                  self._on_global_costmap_transition, 10)
         node.create_subscription(Bool, "motor/ready", self._on_motor_ready, _LATCHED)
-        node.create_subscription(LaserScan, "scan", self._on_scan, 10)
-        node.create_subscription(Imu, "imu_raw", self._on_imu, 10)
-        node.create_subscription(Range, "us_sensor/range", self._on_us_range, 10)
+        node.create_subscription(LaserScan, "scan", self._on_scan, qos_profile_sensor_data)
+        node.create_subscription(Imu, "imu_raw", self._on_imu, qos_profile_sensor_data)
+        node.create_subscription(Range, "us_sensor/range", self._on_us_range, qos_profile_sensor_data)
         node.create_subscription(BatteryState, "batt_state", self._on_batt_state, 10)
         node.create_subscription(OccupancyGrid, "map", self._on_map, _LATCHED)
         node.create_subscription(Path, "plan", self._on_plan, 10)

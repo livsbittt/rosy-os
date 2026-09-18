@@ -87,14 +87,22 @@ class _Anything(types.ModuleType):
 
 
 def _qos_kind(qos) -> object:
-    """`10` for a plain depth, `"LATCHED"` for a `QoSProfile`.
+    """`10` for a plain depth, `"SENSOR"` for sensor-data, `"LATCHED"` for latch.
 
     Three endpoints are latched (`TRANSIENT_LOCAL`, depth 1) and the latch is
     load-bearing: PWR-003 needs a late-joining node to receive the current
     power mode immediately. Losing it is invisible on the host and presents on
     a robot as "a node that started late never learned the mode".
+
+    Scan/imu/range must not look latched (D-119). The stub `qos_profile_sensor_data`
+    is a dummy type whose name is the import name.
     """
-    return qos if isinstance(qos, int) else "LATCHED"
+    if isinstance(qos, int):
+        return qos
+    name = getattr(qos, "__name__", None) or type(qos).__name__
+    if name == "qos_profile_sensor_data":
+        return "SENSOR"
+    return "LATCHED"
 
 
 class RecordingNode:
@@ -191,9 +199,9 @@ EXPECTED_SUBSCRIPTIONS = [
     ("local_costmap/local_costmap/transition_event", "_on_local_costmap_transition", 10),
     ("global_costmap/global_costmap/transition_event", "_on_global_costmap_transition", 10),
     ("motor/ready", "_on_motor_ready", "LATCHED"),
-    ("scan", "_on_scan", 10),
-    ("imu_raw", "_on_imu", 10),
-    ("us_sensor/range", "_on_us_range", 10),
+    ("scan", "_on_scan", "SENSOR"),
+    ("imu_raw", "_on_imu", "SENSOR"),
+    ("us_sensor/range", "_on_us_range", "SENSOR"),
     ("batt_state", "_on_batt_state", 10),
     ("map", "_on_map", "LATCHED"),
     ("plan", "_on_plan", 10),

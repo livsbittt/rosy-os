@@ -237,6 +237,8 @@ def _launch_setup(context):
         map_yaml = (map_yaml or "").strip()
 
     actions = [
+        SetEnvironmentVariable("RMW_IMPLEMENTATION", "rmw_cyclonedds_cpp"),
+        SetEnvironmentVariable("ROS_AUTOMATIC_DISCOVERY_RANGE", "LOCALHOST"),
         SetEnvironmentVariable(
             "GZ_SIM_RESOURCE_PATH",
             os.path.join(rosy_desc_share, "..")

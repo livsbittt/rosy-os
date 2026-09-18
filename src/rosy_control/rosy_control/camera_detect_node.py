@@ -18,6 +18,7 @@ import json
 import numpy as np
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Float32, String
 
@@ -68,7 +69,7 @@ class CameraDetectNode(Node):
         self.block_pub = self.create_publisher(Bool, 'camera/blocked', 10)
         self.side_pub = self.create_publisher(Float32, 'camera/side', 10)
         self.dbg_pub = self.create_publisher(String, 'camera/debug', 10)
-        self.img_pub = self.create_publisher(Image, 'camera/front', 10)
+        self.img_pub = self.create_publisher(Image, 'camera/front', qos_profile_sensor_data)
         self.observation_pub = self.create_publisher(String, 'camera/observation', 10)
         self.controls_pub = self.create_publisher(String, 'camera/controls', 10)
         self.telemetry_pub = self.create_publisher(String, 'camera/telemetry', 10)

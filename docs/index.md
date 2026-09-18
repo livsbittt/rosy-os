@@ -55,6 +55,10 @@
 | D-114 | gz_multi 시뮬은 도메인 하나·네임스페이스·ros_gz_bridge다 |
 | D-115 | gz_multi는 스폰 좌표를 map initialpose로 심는다 |
 | D-116 | 관제 양보는 출발 로봇과 겹친 pose를 길로 보지 않는다 |
+| D-117 | RMW는 CycloneDDS만 쓴다 |
+| D-118 | 생 Image는 Fleet·보드·gz_multi 브리지에 타지 않는다 |
+| D-119 | 스캔·이미지·IMU는 sensor-data QoS다 |
+| D-120 | 시뮬 디스커버리는 LOCALHOST 범위이며 ROS_LOCALHOST_ONLY를 쓰지 않는다 |
 
 ## 계획·결과 문서
 
@@ -76,8 +80,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · feat(dds): Cyclone, no raw Image on bridges, sensor QoS (D-117–D-120)
 - 2026-09-18 · uncommitted · feat(sim): gz_multi bridge lock, spawn pose seed, coincident yield guard (D-114–D-116)
 - 2026-09-18 · uncommitted · feat(games): stair 1 visibility report; close host track (D-112, D-113)
 - 2026-09-18 · uncommitted · feat(games): first-contact 0.10 cap and --stair 1-5 (D-110, D-111)
 - 2026-09-18 · uncommitted · docs(adr): lock deferred catalog (D-109)
-- 2026-09-18 · uncommitted · feat(games): default to observe-only, opt in with --drive (D-107, D-108)

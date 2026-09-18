@@ -36,3 +36,9 @@
 - 변경: `gz_multi` 는 domain_bridge/ROS_DOMAIN_ID 없음. `spawn_xy` 와 `seed_initialpose` 가 nav 모드에서 map 시드를 심는다.
 - 증거: `python -m pytest src/rosy_gz_sim/test -q`
 - gate 변화: 없음. ROS-SIM HOLD. pytest ≠ GO
+
+## 2026-09-18 · uncommitted · feat(sim): pin Cyclone and keep images off gz_multi (D-117, D-118, D-120)
+
+- 변경: gz_multi 환경에 rmw_cyclonedds_cpp 와 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST. launch_sim image_bridge 는 기본 꺼짐.
+- 증거: `python -m pytest src/rosy_gz_sim/test/test_gz_package_contract.py test/test_dds_rmw_contracts.py -q`
+- gate 변화: 없음. ROS-SIM HOLD

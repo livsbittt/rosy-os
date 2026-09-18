@@ -7,6 +7,7 @@
     <arg name="world_name" default="rosy_factory.world"/>
     <arg name="world" default="$(find-pkg-share rosy_gz_sim)/worlds/$(var world_name)"/>
     <arg name="bridge_params" default="$(find-pkg-share rosy_gz_sim)/params/rosy_bridge.yaml"/>
+    <arg name="bridge_image" default="false"/>
     
     <set_env name="GZ_SIM_RESOURCE_PATH" value="$(find-pkg-share rosy_description)/../:/$(find-pkg-share rosy_gz_sim)/models:/$(env HOME)/.gazebo/models"/>
 
@@ -31,6 +32,6 @@
     </node>
 
     <node pkg="ros_gz_bridge" exec="parameter_bridge" name='parameter_bridge' output='screen' args="--ros-args -p config_file:=$(var bridge_params)"/>
-    <node pkg="ros_gz_image" exec="image_bridge" name='image_bridge' output='screen' args="/camera/image_raw"/>
-    <node pkg="ros_gz_image" exec="image_bridge" name='image_bridge' output='screen' args="/camera"/>
+    <node pkg="ros_gz_image" exec="image_bridge" name='image_bridge' output='screen'
+          args="/camera/image_raw" if="$(var bridge_image)"/>
 </launch>

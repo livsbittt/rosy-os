@@ -124,6 +124,10 @@
 | D-114 | gz_multi 시뮬은 도메인 하나·네임스페이스·ros_gz_bridge다 | Accepted |
 | D-115 | gz_multi는 스폰 좌표를 map initialpose로 심는다 | Accepted |
 | D-116 | 관제 양보는 출발 로봇과 겹친 pose를 길로 보지 않는다 | Accepted |
+| D-117 | RMW는 CycloneDDS만 쓴다 | Accepted |
+| D-118 | 생 Image는 Fleet·보드·gz_multi 브리지에 타지 않는다 | Accepted |
+| D-119 | 스캔·이미지·IMU는 sensor-data QoS다 | Accepted |
+| D-120 | 시뮬 디스커버리는 LOCALHOST 범위이며 ROS_LOCALHOST_ONLY를 쓰지 않는다 | Accepted |
 
 ---
 
@@ -3579,4 +3583,127 @@ D-93 은 폭 면제를 거절한다. 겹친 보고를 면제하는 것은 폭이
 **Validation / Transition:** `test_server_yield.py`. ROS-SIM HOLD.
 
 **References:** D-12, D-93, D-115.
+
+---
+
+## D-117 RMW는 CycloneDDS만 쓴다
+
+**Status:** Accepted (2026-09-18). 미들웨어 선택이다. FastDDS 이중 프로파일이 아니다.
+
+**Context:** ROS 2 Jazzy 기본 RMW는 종종 `rmw_fastrtps_cpp`다. Cyclone 노드와
+FastDDS 노드는 서로를 조용히 못 본다 — 토픽이 비어 보이면 코드 버그로 읽힌다.
+로봇 compose 와 `rosy_env.sh` 는 이미 `rmw_cyclonedds_cpp`다. 개발 `env.sh` 와
+`gz_multi` 는 비어 있어, 2026-09-18 WSL 시뮬은 호스트 기본 RMW에 맡겼다.
+
+**Decision:**
+
+- 로봇·개발·시뮬 모두 `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`
+- FastDDS/`rmw_fastrtps_cpp` 를 두 번째 프로파일로 두지 않는다
+- `env.sh` 가 기본값을 채운다. `gz_multi` 가 런치 환경에 고정한다
+- compose·Dockerfile·`rosy_env.sh` 의 Cyclone 지정을 지우지 않는다
+- 이 결정이 DDS 실측 GO가 아니다
+
+**Alternatives:** 시뮬만 FastDDS 로 두는 안은 "토픽이 안 보인다"를 재현한다.
+Zenoh RMW는 v1 범위 밖이다.
+
+**Consequences:** `test/test_dds_rmw_contracts.py`. ROS-SIM HOLD.
+
+**References:** D-6, D-33, D-114.
+
+---
+
+## D-118 생 Image는 Fleet·보드·gz_multi 브리지에 타지 않는다
+
+**Status:** Accepted (2026-09-18). 전송 경로 계약이다. D-41을 닫지 않는다.
+
+**Context:** `sensor_msgs/Image` 한 장은 스캔보다 수십 배 크다. DDS 로 사이트
+WiFi·관제 PC·브라우저까지 실으면 cmd_vel/scan 이 밀린다. 흔한 ROS 함정이다.
+CORE 대시보드와 게임 보드는 JPEG/HTTP 다 (D-75, D-101). `gz_multi` 의
+`parameter_bridge` 는 이미지를 안 싣는다. 옛 `launch_sim.launch.xml` 은
+`ros_gz_image` 를 `/camera/image_raw` 와 `/camera` 에 **두 번** 붙인다.
+
+로봇 안 `camera/front` 는 온보드 검출용으로 남는다. 그걸 Fleet envelope 이나
+노트북 천장 호스트로 미는 것이 금지다.
+
+**Decision:**
+
+- `gz_multi` `BRIDGE_TEMPLATE` 과 `rosy_bridge.yaml` 에 `sensor_msgs/msg/Image` 가
+  없다
+- `gz_multi` 는 `ros_gz_image` / `image_bridge` 를 띄우지 않는다
+- `launch_sim.launch.xml` 의 image_bridge 는 `bridge_image:=true` 일 때만, 토픽
+  하나 (`/camera/image_raw`)
+- Fleet 과 `rosy_games` 는 `sensor_msgs` Image 를 import 하지 않는다
+- 운용 화면은 JPEG/HTTP. 생 Image 를 브라우저에 싣지 않는다
+- D-41 ARM64 카메라 배치는 이 ADR 이 닫지 않는다
+
+**Alternatives:** compressed Image 토픽을 사이트 DDS 로 여는 안은 여전히
+cmd_vel 과 큐를 다툰다. 천장 웹캠을 CORE 대시보드에 넣는 안은 D-101 이다.
+
+**Consequences:** 온보드 `camera/front` 는 로봇 프로세스 안에 남는다.
+
+**Validation / Transition:** `test_gz_package_contract.py`, `test_dds_rmw_contracts.py`.
+
+**References:** D-34, D-41, D-75, D-94, D-101, D-114.
+
+---
+
+## D-119 스캔·이미지·IMU는 sensor-data QoS다
+
+**Status:** Accepted (2026-09-18). 매칭 계약이다. 측정 함정 2를 ADR로 올린다.
+
+**Context:** 센서 드라이버는 BEST_EFFORT + VOLATILE (`qos_profile_sensor_data`)
+인 경우가 많다. 구독이 기본 RELIABLE(depth 10)이면 샘플이 한 줄도 안 온다.
+`measure-dds-baseline.sh` 함정 2: `ros2 topic bw` 기본 RELIABLE 는 BEST_EFFORT
+퍼블리셔에 0 을 준다. `camera_detect_node` 는 `Image` 를 depth 10(기본
+RELIABLE)으로 내고, 구독은 `qos_profile_sensor_data`다. CORE `ros_bridge` 의
+scan/imu 구독도 depth 10이다.
+
+**Decision:**
+
+- 생산 코드에서 `LaserScan` / `Imu` / `Image` 의 pub·sub 은
+  `qos_profile_sensor_data` 다
+- `cmd_vel` 과 latched `map` 은 이 규칙이 아니다 (RELIABLE / TRANSIENT_LOCAL)
+- Bool 같은 소형 상태 토픽은 기본 depth 10을 유지해도 된다
+- 호스트 시험은 소스 grep 이다. DEVICE GO가 아니다
+
+**Alternatives:** 드라이버를 RELIABLE 로 올리는 안은 센서 파이프가 막히면
+cmd_vel 까지 막는다. 구독만 고치고 퍼블리셔를 두는 안은 한쪽만 고친 것이다.
+
+**Consequences:** `camera/front` 퍼블리셔와 CORE scan 구독이 같은 QoS 다.
+
+**Validation / Transition:** `test_dds_rmw_contracts.py`. DEVICE PARKED.
+
+**References:** D-34, D-118.
+
+---
+
+## D-120 시뮬 디스커버리는 LOCALHOST 범위이며 ROS_LOCALHOST_ONLY를 쓰지 않는다
+
+**Status:** Accepted (2026-09-18). Jazzy 디스커버리 계약이다. D-6 localhost
+프로파일을 대체하지 않는다.
+
+**Context:** Jazzy 는 `ROS_LOCALHOST_ONLY` 를 deprecated 로 두고
+`ROS_AUTOMATIC_DISCOVERY_RANGE` 를 쓴다. 2026-09-18 `gz_multi` 로그가 그
+경고를 냈다. 로봇 격리는 Cyclone `NetworkInterface name="lo"` 이지 이 env 가
+아니다 (D-6, D-33, `RosGraphMonitor`). 시뮬은 도메인 하나·한 기계라 범위
+LOCALHOST 면 충분하다 (D-114).
+
+**Decision:**
+
+- `gz_multi` 와 개발 `env.sh` 는 `ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST`
+- `ROS_LOCALHOST_ONLY` 를 새로 켜지 않는다
+- 로봇 compose/`rosy_env.sh` 는 Cyclone lo XML 을 유지한다. 시뮬에
+  `rosy_env.sh` 를 source 하지 않는다 (D-114)
+- 이 env 가 WiFi 실측 GO가 아니다
+
+**Alternatives:** 시뮬에도 Cyclone lo XML 만 쓰는 안은 share 경로가 없는
+부분 오버레이에서 실패한다. `SYSTEM` 범위는 같은 LAN 의 다른 ROS 그래프와
+섞인다.
+
+**Consequences:** 호스트 기본 FastDDS + 멀티캐스트 디스커버리를 시뮬이 물려받지
+않는다 (D-117과 함께).
+
+**Validation / Transition:** `test_gz_package_contract.py`, `env.sh`.
+
+**References:** D-6, D-33, D-114, D-117.
 

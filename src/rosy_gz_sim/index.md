@@ -15,6 +15,9 @@
 | D-79 | 게이트 GO는 현재 트리 재실행만 인정한다 |
 | D-114 | gz_multi 시뮬은 도메인 하나·네임스페이스·ros_gz_bridge다 |
 | D-115 | gz_multi는 스폰 좌표를 map initialpose로 심는다 |
+| D-117 | RMW는 CycloneDDS만 쓴다 |
+| D-118 | 생 Image는 Fleet·보드·gz_multi 브리지에 타지 않는다 |
+| D-120 | 시뮬 디스커버리는 LOCALHOST 범위이며 ROS_LOCALHOST_ONLY를 쓰지 않는다 |
 
 ## 계획·결과 문서
 
@@ -33,8 +36,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · feat(sim): pin Cyclone and keep images off gz_multi (D-117, D-118, D-120)
 - 2026-09-18 · uncommitted · feat(sim): lock ros_gz_bridge and seed spawn initialpose (D-114, D-115)
 - 2026-09-18 · uncommitted · fix(sim): 월드 프로필이 간격을 주도록 하고 공장 팽창을 실측으로 올린다
 - 2026-09-17 · uncommitted · feat(sim): 어려운 월드·정답 맵 생성기·맵을 만들며 주행하는 모드
 - 2026-09-17 · uncommitted · feat(sim): host-contract for world_to_map
-- 2026-09-15 · uncommitted · docs(harness): start the rosy_gz_sim harness record

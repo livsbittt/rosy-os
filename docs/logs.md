@@ -251,3 +251,11 @@
 - gate 변화: rosy_gz_sim/rosy_fleet LOCAL GO 유지. ROS-SIM HOLD
 - 결정: D-114–D-116 Accepted. 현장/시뮬 GO 아님
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · feat(dds): Cyclone, no raw Image on bridges, sensor QoS (D-117–D-120)
+
+- 변경: ADR D-117–D-120. env.sh/gz_multi 가 Cyclone+LOCALHOST. 생 Image 는 gz_multi 브리지에 없음. scan/imu/Image 는 sensor-data QoS.
+- 증거: `python -m pytest test/test_dds_rmw_contracts.py src/rosy_core/test/test_bridge_timers.py src/rosy_gz_sim/test/test_gz_package_contract.py test/test_harness_contracts.py -q`
+- gate 변화: LOCAL GO 유지. ROS-SIM/DEVICE HOLD
+- 결정: FastDDS 이중 프로파일 없음. 생 Image 는 Fleet/보드에 안 탐
+- 교훈: 없음

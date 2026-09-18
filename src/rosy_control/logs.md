@@ -31,3 +31,9 @@
 - 결정: D-77 — 운용자 콘솔은 CORE `/dashboard`
 - 교훈: 없음
 
+## 2026-09-18 · uncommitted · feat(control): camera/front publishes sensor-data QoS (D-119)
+
+- 변경: camera_detect_node Image 퍼블리셔가 qos_profile_sensor_data. 구독과 맞춤.
+- 증거: `python -m pytest test/test_dds_rmw_contracts.py -q`
+- gate 변화: 없음. DEVICE PARKED
+

@@ -32,7 +32,7 @@ class RenderedCamera(Node):
         self.floor, self.last_stamp = None, None
         self.policy = CameraPolicy(hits=int(self.get_parameter('hits').value),
                                    warmup_frames=int(self.get_parameter('warmup_frames').value))
-        self.image = self.create_publisher(Image, '/camera/front', 10)
+        self.image = self.create_publisher(Image, '/camera/front', qos_profile_sensor_data)
         self.blocked = self.create_publisher(Bool, '/camera/blocked', 10)
         self.cliff = self.create_publisher(Bool, '/camera/cliff', 10)
         self.side = self.create_publisher(Float32, '/camera/side', 10)

@@ -21,7 +21,7 @@ gates:
     state: N/A
   FIELD:
     state: N/A
-adrs: [D-4, D-33, D-49, D-79, D-114, D-115]
+adrs: [D-4, D-33, D-49, D-79, D-114, D-115, D-117, D-118, D-120]
 plans:
   - docs/plans/2026-09-08-swarm-formation-slice-design.md
   - docs/plans/2026-09-08-swarm-formation-slice.md
