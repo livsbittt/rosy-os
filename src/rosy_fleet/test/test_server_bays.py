@@ -131,9 +131,9 @@ def test_the_free_width_of_a_one_metre_corridor_is_about_one_metre():
     assert bays.free_width_at(grid, (1.3, 0.55)) == pytest.approx(0.9, abs=0.15)
 
 
-def test_a_two_metre_hall_reads_wider_than_the_passing_width():
+def test_a_two_metre_hall_is_about_two_metres_wide():
     grid = _grid(HALL)
-    assert bays.free_width_at(grid, (1.3, 1.05)) >= bays.PASSING_WIDTH_M
+    assert bays.free_width_at(grid, (1.3, 1.05)) == pytest.approx(2.0, abs=0.3)
 
 
 def test_a_point_inside_a_wall_has_no_free_width():
@@ -141,53 +141,10 @@ def test_a_point_inside_a_wall_has_no_free_width():
     assert bays.free_width_at(grid, (0.05, 0.05)) == 0.0
 
 
-# --- 그냥 지나갈 수 있는가 --------------------------------------------------------
-
-
-def test_the_passing_width_sits_between_the_measured_pass_and_fail():
-    """스윕 실측을 상수에 묶어 둔다 — 근거 없이 도로 낮아지면 좁은 통로에서 양보를 접는다.
-
-    `rosy_gauntlet.world` 에서 폭 1.4 m 는 통과했고 1.2 m 는 실패했다. 팽창을 0.15 에서
-    0.08 로 줄여도 같았다 — 한계는 공간이 아니라 협상이기 때문이다. 기준선은 실패한 폭
-    **위**, 통과한 폭 **이하**여야 한다.
-    """
-    measured_fail, measured_pass = 1.2, 1.4
-    assert measured_fail < bays.PASSING_WIDTH_M <= measured_pass
-
-
-def test_two_robots_cannot_pass_in_the_one_metre_corridor():
-    """실측과 같아야 한다 — 폭 1 m 데모룸에서 두 대는 서로를 지나가지 못했다."""
-    grid = _grid(CORRIDOR)
-    route = _line(0.2, 0.55, 2.4, 0.55)
-    assert not bays.passing_is_possible(grid, route, (1.3, 0.55))
-
-
-def test_two_robots_pass_in_the_wide_hall_without_fleet_help():
-    """넓은 방에서까지 양보를 시키면 로봇이 쓸데없이 구석으로 물러난다."""
-    grid = _grid(HALL)
-    route = _line(0.2, 1.05, 2.4, 1.05)
-    assert bays.passing_is_possible(grid, route, (1.3, 1.05))
-
-
-def test_without_a_map_passing_is_assumed_possible():
-    """맵을 모른다는 이유로 양보를 시키면 현장이 근거 없이 느려진다."""
-    assert bays.passing_is_possible(None, _line(0, 0, 2, 0), (1.0, 0.0))
-
-
-def test_a_route_that_runs_through_a_wall_never_forces_a_yield():
-    """계획 경로가 아직 없어 직선으로 대신할 때, 그 직선은 모서리를 가로지를 수 있다.
-
-    그때 만나는 지점은 벽 속이고 자유 폭은 0 이다. 그것을 "못 지나간다"로 읽으면 벽에
-    대한 짐작을 근거로 멀쩡한 로봇을 구석으로 보낸다.
-    """
-    grid = _grid(ALCOVE)
-    through_wall = _line(1.25, 0.55, 1.25, 1.45)      # 벽감 위쪽 벽을 뚫고 나가는 직선
-    assert bays.passing_is_possible(grid, through_wall, (1.25, 1.45))
-
-
-def test_an_empty_route_never_forces_a_yield():
-    grid = _grid(CORRIDOR)
-    assert bays.passing_is_possible(grid, [], (1.3, 0.55))
+def test_corridor_width_is_not_a_passing_exemption():
+    """D-93: 면제 상수와 분기가 없다. 6x6 m 빈 방도 스스로 교행하지 못했다."""
+    assert not hasattr(bays, "PASSING_WIDTH_M")
+    assert not hasattr(bays, "passing_is_possible")
 
 
 # --- 자리 고르기 -----------------------------------------------------------------

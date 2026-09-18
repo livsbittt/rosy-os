@@ -20,7 +20,7 @@ gates:
     state: N/A
   FIELD:
     state: N/A
-adrs: [D-17, D-18, D-45, D-61, D-72, D-75, D-77, D-78, D-79, D-80, D-81, D-82, D-83, D-84, D-85, D-86, D-87, D-88, D-89, D-90, D-91]
+adrs: [D-17, D-18, D-45, D-61, D-72, D-75, D-77, D-78, D-79, D-80, D-81, D-82, D-83, D-84, D-85, D-86, D-87, D-88, D-89, D-90, D-91, D-92, D-93]
 plans:
   - docs/plans/2026-09-15-module-harness-design.md
   - docs/plans/2026-09-17-interface-design-implementation-design.md

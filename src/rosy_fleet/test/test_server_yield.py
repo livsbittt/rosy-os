@@ -281,15 +281,11 @@ def test_a_yield_still_in_progress_is_not_called_a_failure():
 # --- 끼어들지 않아야 할 때 --------------------------------------------------------
 
 
-def test_nobody_yields_in_a_hall_wide_enough_to_pass():
-    """넓은 방에서까지 양보를 시키면 로봇이 근거 없이 구석으로 물러난다.
-
-    서 있는 로봇이 경로 **옆**에 있는 경우다 - 돌아 갈 자리가 있으면 로봇 안의 지역
-    코스트맵이 알아서 돌아 간다. Fleet 이 끼어들 이유가 없다.
-    """
+def test_a_robot_clear_of_the_path_is_not_moved():
+    """폭이 아니라 경로 거리로 뺀다 (D-93). keep-out 밖이면 구석으로 안 보낸다."""
     grid = payload(HALL)
     left = SimRobot("rosy_01", (0.4, 1.05), grid)
-    beside = SimRobot("rosy_02", (1.3, 1.35), grid)
+    beside = SimRobot("rosy_02", (1.3, 1.7), grid)
     console = _console(left, beside)
 
     result = run(console.goal("rosy_01", 2.2, 1.05))

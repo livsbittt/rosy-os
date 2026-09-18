@@ -71,7 +71,6 @@ class FleetConsole:
         map_ttl_s: float = MAP_TTL_S,
         fleet_name: str = "rosy-site",
         clearance_m: float = traffic.DEFAULT_CLEARANCE_M,
-        passing_width_m: float = bays.PASSING_WIDTH_M,
         yield_keep_out_m: float = bays.YIELD_KEEP_OUT_M,
         relay_factory=None,
     ) -> None:
@@ -94,7 +93,6 @@ class FleetConsole:
         #: 남의 경로와 부딪혀 아직 못 내려간 미션. 앞이 비면 그대로 다시 내려간다.
         self._queued: dict[str, dict] = {}
         self._clearance_m = clearance_m
-        self._passing_width_m = passing_width_m
         self._yield_keep_out_m = yield_keep_out_m
         #: 비켜서라고 한 뒤 "안 움직인다"고 판단하기까지 참아 주는 스냅샷 수. 목표를 막
         #: 받은 로봇은 아직 NAVIGATING 을 보고하지 않는다 - 한 틱만 보면 시작도 하기 전에
@@ -245,9 +243,7 @@ class FleetConsole:
         틈으로 나가 상대 0.19 m 앞까지 밀고 들어갔다. 관제가 막았다고 말한 통로였다.
 
         어디로 갈지는 몰라도 **어디서 어디로** 가는지는 안다. 직선은 실제 경로보다
-        넓게 잡힐 수 있지만, 그래서 생기는 손해는 넓은 데서 한 대가 잠깐 비켜서는
-        것뿐이고 - 넓은 곳은 `passing_is_possible` 이 이미 걸러 낸다 - 좁은 통로에서는
-        직선이 곧 경로다.
+        넓게 잡힐 수 있다. 폭이 넓다고 해서 경로 위의 로봇을 무시하지 않는다 (D-93).
         """
         if route:
             return traffic.thin(list(route))
@@ -263,10 +259,16 @@ class FleetConsole:
                              goal: tuple) -> list[str]:
         """이 경로 위에 **서서** 길을 막은 로봇들. 순서로는 풀리지 않는 쪽이다.
 
-        거르는 조건이 둘이다. 달리는 로봇은 뺀다 - 그쪽은 경로 대 경로 판정이 이미 봤고,
-        곧 지나갈 것을 붙잡고 비켜서라 할 이유가 없다. 그리고 **그냥 지나갈 수 있으면
-        뺀다** - 넓은 방에서는 로봇 안의 지역 코스트맵이 알아서 돌아 간다. Fleet 이
-        끼어들어야 하는 곳은 돌아 갈 자리 자체가 없는 좁은 데뿐이다.
+        거르는 조건은 하나다 - 달리는 로봇은 뺀다. 그쪽은 경로 대 경로 판정이 이미 봤고,
+        곧 지나갈 것을 붙잡고 비켜서라 할 이유가 없다.
+
+        **폭은 묻지 않는다 (D-93).** 한때 "넓으면 알아서 돌아 가니 빼자"는 조건이 있었다.
+        실측이 그것을 부정했다 - 6 x 6 m 빈 방에서 마주 오는 두 대가 3 번 다 한가운데에서
+        맞물려 섰다. 면제가 성립하는 폭은 없다.
+
+        과잉 개입을 막는 것은 **경로 자체**다. 계획 경로는 이미 아는 장애물을 피해 나오므로,
+        넓은 곳에 선 로봇 옆으로는 애초에 0.45 m 안을 지나지 않는다. 그런데도 지난다면
+        돌아갈 자리가 없다는 뜻이고, 그때는 중재가 맞다.
 
         "길을 막았다"의 반경은 `_route_still_occupied` 가 "이제 비켰다"를 판단하는 반경과
         **같은 값**이어야 한다. 경로 대 경로의 `clearance_m`(0.7) 을 여기 쓰면, 0.45 만
@@ -285,18 +287,14 @@ class FleetConsole:
             nearest = bays.nearest_on_route(route, pose)
             if nearest is None or math.dist(nearest, pose) >= self._yield_keep_out_m:
                 continue
-            # 목표 자리를 깔고 앉았으면 폭도 맵도 볼 것 없다. 지나갈 수 있느냐는 물음은
-            # 지나가려는 경우의 물음이고, 여기서는 **거기 서려고** 가는 것이다. 이 규칙은
-            # 맵이 없어도 성립한다 - 실환경에서 갓 시작한 콘솔이 아직 맵을 못 받아
-            # "지나갈 수 있다"로 떨어지자, 상대가 서 있는 좌표로 미션이 그냥 나갔다.
-            #
-            # 경로의 끝이 아니라 **지시한 목표**와 견준다. 장애물 레이어가 살아난 뒤로는
-            # 상대가 선 자리가 치명 비용이라 계획 경로가 목표에 닿지 못하고 잘린다 -
-            # 실측으로 0.13 m 짧았다. 잘린 끝을 목표로 알면 "목표를 깔고 앉았다"가 그만큼
-            # 물러난 자리에서 판정된다.
-            if math.dist(pose, goal) >= self._goal_blocked_m:
-                if bays.passing_is_possible(grid, route, pose, self._passing_width_m):
-                    continue
+            if grid is None and math.dist(pose, goal) >= self._goal_blocked_m:
+                # 맵이 없으면 중재할 수 없다 - 비켜설 자리를 고를 근거가 없으므로, 여기서
+                # 막으면 모든 미션이 이유 없이 대기열로 간다. 로봇 쪽 지역 코스트맵은
+                # 살아 있으니 그쪽에 맡긴다.
+                #
+                # 예외는 **목표를 깔고 앉은 경우**다. 그 자리에 두 대가 설 수 없다는 것은
+                # 맵을 몰라도 참이고, 보내 봐야 도착하지 못한다.
+                continue
             out.append(robot_id)
         return out
 

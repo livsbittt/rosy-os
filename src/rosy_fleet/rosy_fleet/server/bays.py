@@ -10,6 +10,15 @@ A 는 B 가 선 곳으로 가야 하고 B 는 A 가 선 곳으로 가야 하는�
 (2) 상대 경로에서 충분히 떨어져 있고 (3) 지금 자리에서 걸어갈 수 있는 칸을 고른다.
 가장 가까운 것 하나면 된다 — 비켜서는 거리는 짧을수록 좋다.
 
+**폭은 면제 사유가 아니다 (D-93).** 한때 "이 통로는 충분히 넓으니 Fleet 이 빠져도
+된다"는 기준이 여기 있었다. 실측이 그것을 부정했다 - 6 x 6 m 빈 방에서 마주 오는 두
+대가 3 번 다 방 한가운데에서 0.13~0.17 m 간격으로 맞물려 섰다. 로봇 폭(0.111 m)의
+54 배 공간이다. RPP 는 옆으로 피하지 않고 앞이 막히면 서며, 두 대가 대칭이라 같은 쪽으로
+돌고 거기서 다시 만난다. 그래서 면제가 성립하는 폭은 없다.
+
+과잉 개입을 막는 것은 폭이 아니라 **경로**다. 계획 경로는 이미 아는 장애물을 피해
+나오므로, 그런데도 경로가 선 로봇 가까이를 지난다면 돌아갈 자리가 없다는 뜻이다.
+
 **없으면 없다고 말한다.** 폭 1 m 방에는 그런 칸이 없고, 이 모듈은 그때 `None` 을
 돌려준다. 관제는 그것을 "길이 막혔는데 비켜설 자리가 없다"로 운영자에게 보여야 한다 —
 있는 척하고 로봇을 벽으로 보내는 것보다 낫다.
@@ -35,28 +44,6 @@ OCCUPIED_COST = 65
 #: 좁은 칸은 "설 수 있는 자리"가 아니다.
 ROBOT_RADIUS_M = 0.12
 
-#: 두 대가 나란히 지나갈 수 있다고 보는 **자유 폭**. 스윕 실측이다.
-#:
-#: `rosy_gauntlet.world` 는 폭만 다른 통로 여섯(1.4/1.2/1.0/0.9/0.8/0.7 m)을 나란히 둔
-#: 월드다. 두 대를 양 끝에 세우고 서로의 자리로 보내면 결과가 이렇다.
-#:
-#:     폭      팽창 0.15   팽창 0.08
-#:     1.4 m   PASS        PASS
-#:     1.2 m   FAIL        FAIL
-#:     1.0 m   FAIL        FAIL
-#:     0.9 m   FAIL        FAIL
-#:     0.8 m   FAIL        FAIL
-#:     0.7 m   FAIL        FAIL
-#:
-#: **팽창을 절반으로 줄여도 한계가 움직이지 않는다.** 기하학적 최소는 0.36 m 이고 팽창을
-#: 완전히 존중해도 0.66 m 인데 실제 한계는 1.4 m 다. 남는 차이는 공간이 아니라 협상이다 -
-#: 마주 오는 두 nav2 는 서로를 움직이는 장애물로만 보고, 둘 다 같은 쪽으로 피했다가 그
-#: 자리에서 다시 만난다. 로그에 `detected collision ahead` 가 수천 번 찍히고 `Controller
-#: patience exceeded` 뒤 복구 동작으로 끝난다.
-#:
-#: 그래서 이 값은 "여기서는 Fleet 이 빠져도 된다"의 기준이지 물리적 한계가 아니다.
-#: 1.2 로 두면 폭 1.3 m 통로에서 양보를 접고, 실제로는 지나가지 못한다.
-PASSING_WIDTH_M = 1.4
 
 #: 비켜선 로봇이 상대 경로에서 떨어져 있어야 하는 거리. 지나가는 쪽 반폭 0.12 에
 #: 비켜선 쪽 반폭 0.12, 그리고 측위 오차와 벽 쏠림 몫 0.2 를 더한 값이다.
@@ -88,8 +75,7 @@ BAY_SLACK_M = 0.5
 BAY_MARGIN_M = 0.15
 
 #: 자유 폭은 이 위로는 재지 않는다. 넓은 방 한가운데의 정확한 값은 쓸 데가 없고,
-#: 상한이 있어야 거리장을 계산할 창을 유한하게 잡을 수 있다. `PASSING_WIDTH_M` 보다
-#: 넉넉히 커야 한다 - 상한이 기준선에 붙어 있으면 넓은 방이 "겨우 통과"로 읽힌다.
+#: 상한이 있어야 거리장을 계산할 창을 유한하게 잡을 수 있다.
 CAP_M = 2.2
 
 _SQRT2 = math.sqrt(2.0)
@@ -277,28 +263,6 @@ def nearest_on_route(route: Sequence[Point], point: Point) -> Optional[Point]:
     if not route:
         return None
     return min(route, key=lambda p: math.dist(p, point))
-
-
-def passing_is_possible(grid: Optional[Grid], route: Sequence[Point], point: Point,
-                        passing_width_m: float = PASSING_WIDTH_M) -> bool:
-    """서 있는 로봇 옆으로 상대가 그냥 지나갈 수 있는가.
-
-    **맵을 모르면 참이다.** 모른다는 이유로 양보를 시키면, 넓은 방에서도 로봇이 쓸데없이
-    구석으로 물러난다. 지역 코스트맵은 로봇 안에 있고, 공간만 있으면 nav2 가 알아서 돈다 -
-    Fleet 이 끼어들어야 하는 곳은 nav2 가 돌 자리 자체가 없는 좁은 데뿐이다.
-    """
-    if grid is None:
-        return True
-    meeting = nearest_on_route(route, point)
-    if meeting is None:
-        return True
-    width = free_width_at(grid, meeting)
-    if width <= 0.0:
-        # 만나는 지점이 벽 속이면 경로에 대한 우리 짐작이 틀린 것이다 - 계획 경로가 아직
-        # 없어 직선으로 대신할 때 모서리를 가로지르면 이렇게 된다. 벽에 대한 짐작을
-        # 근거로 로봇을 옮기지는 않는다.
-        return True
-    return width >= passing_width_m
 
 
 def best_bay(grid: Optional[Grid], route: Sequence[Point], robot_xy: Point, *,
