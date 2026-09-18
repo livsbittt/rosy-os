@@ -93,3 +93,9 @@
 - 변경: `apply_cyclone_rmw` 를 `rclpy.init` 앞에. 스냅샷 `rmw` 필드와 대시보드 표시. FastDDS 기동 거절.
 - 증거: `python -m pytest src/rosy_core/test/test_rmw.py src/rosy_core/test/test_ros_graph_monitor.py src/rosy_core/test/test_dashboard.py -q`
 - gate 변화: 없음. DEVICE PARKED
+
+## 2026-09-18 · uncommitted · feat(core): correct foreign RMW on next CORE start (D-122)
+
+- 변경: FastDDS/기타 RMW 는 거절하지 않고 Cyclone으로 고친 뒤 init. 커널 reboot 없음.
+- 증거: `python -m pytest src/rosy_core/test/test_rmw.py -q`
+- gate 변화: 없음. DEVICE PARKED

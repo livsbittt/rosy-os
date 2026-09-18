@@ -26,6 +26,7 @@
 | D-82 | 팔레트는 OKLCH에서 생성하고 수치 게이트로 지킨다 |
 | D-119 | 스캔·이미지·IMU는 sensor-data QoS다 |
 | D-121 | Cyclone 적용은 CORE 기동 전이고 웹은 보고만 한다 |
+| D-122 | 잘못된 RMW는 다음 CORE 기동에서 Cyclone으로 고친다. OS reboot가 아니다 |
 
 ## 계획·결과 문서
 
@@ -46,8 +47,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · feat(core): correct foreign RMW on next CORE start (D-122)
 - 2026-09-18 · uncommitted · feat(core): apply Cyclone before rclpy.init (D-121)
 - 2026-09-18 · uncommitted · feat(core): scan/imu/range use sensor-data QoS (D-119)
 - 2026-09-18 · uncommitted · refactor(web): rewrite the surface rules as one design system
 - 2026-09-18 · uncommitted · refactor(web): float the map controls so the map gets the observe region back
-- 2026-09-18 · uncommitted · refactor(web): give the dashboard the spatial grammar it was designed for

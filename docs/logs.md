@@ -267,3 +267,11 @@
 - gate 변화: LOCAL GO 유지. DEVICE PARKED
 - 결정: 웹 적용 버튼 없음. init 이후 env 변경은 거짓 성공
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · feat(core): correct foreign RMW on next CORE start (D-122)
+
+- 변경: ADR D-122. FastDDS env 는 거절이 아니라 Cyclone으로 고친 뒤 init. 커널 reboot 아님. 웹 `system.reboot` 연동 없음.
+- 증거: `python -m pytest src/rosy_core/test/test_rmw.py src/rosy_core/test/test_ros_graph_monitor.py -q`
+- gate 변화: LOCAL GO 유지. DEVICE PARKED
+- 결정: 런타임 재기동으로 이웃 노드를 맞춘다. Pi reboot 는 RMW 도구가 아니다
+- 교훈: 없음

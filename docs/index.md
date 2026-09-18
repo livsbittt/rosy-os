@@ -60,6 +60,7 @@
 | D-119 | 스캔·이미지·IMU는 sensor-data QoS다 |
 | D-120 | 시뮬 디스커버리는 LOCALHOST 범위이며 ROS_LOCALHOST_ONLY를 쓰지 않는다 |
 | D-121 | Cyclone 적용은 CORE 기동 전이고 웹은 보고만 한다 |
+| D-122 | 잘못된 RMW는 다음 CORE 기동에서 Cyclone으로 고친다. OS reboot가 아니다 |
 
 ## 계획·결과 문서
 
@@ -81,8 +82,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · feat(core): correct foreign RMW on next CORE start (D-122)
 - 2026-09-18 · uncommitted · feat(core): apply Cyclone before rclpy.init; web reports only (D-121)
 - 2026-09-18 · uncommitted · feat(dds): Cyclone, no raw Image on bridges, sensor QoS (D-117–D-120)
 - 2026-09-18 · uncommitted · feat(sim): gz_multi bridge lock, spawn pose seed, coincident yield guard (D-114–D-116)
 - 2026-09-18 · uncommitted · feat(games): stair 1 visibility report; close host track (D-112, D-113)
-- 2026-09-18 · uncommitted · feat(games): first-contact 0.10 cap and --stair 1-5 (D-110, D-111)

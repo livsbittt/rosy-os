@@ -7,22 +7,13 @@ from typing import MutableMapping
 REQUIRED_RMW = "rmw_cyclonedds_cpp"
 
 
-class RmwError(ValueError):
-    """RMW is set to something Rosy will not run."""
-
-
 def apply_cyclone_rmw(env: MutableMapping[str, str]) -> str:
-    """Fill empty RMW with Cyclone. Refuse a foreign implementation.
+    """Put Cyclone in this process env before ``rclpy.init`` (D-122).
 
-    Must run before ``rclpy.init``. Changing env afterwards does not retarget
-    an already loaded RMW.
+    Empty and foreign values are corrected. Changing env after init does not
+    retarget an already loaded RMW — bounce the CORE process, not the kernel.
     """
     current = str(env.get("RMW_IMPLEMENTATION") or "").strip()
-    if not current:
-        env["RMW_IMPLEMENTATION"] = REQUIRED_RMW
-        return REQUIRED_RMW
     if current != REQUIRED_RMW:
-        raise RmwError(
-            f"RMW_IMPLEMENTATION={current}; Rosy requires {REQUIRED_RMW}"
-        )
-    return current
+        env["RMW_IMPLEMENTATION"] = REQUIRED_RMW
+    return REQUIRED_RMW
