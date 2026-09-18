@@ -24,6 +24,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     match.add_argument("--observer", choices=("hold", "overhead"), default="hold")
     match.add_argument("--preview", action="store_true")
     match.add_argument("--preview-port", type=int, default=8765)
+    drive = match.add_mutually_exclusive_group()
+    drive.add_argument("--observe-only", action="store_true")
+    drive.add_argument("--drive", nargs="*", metavar="ROBOT_ID")
     return parser.parse_args(argv)
 
 
@@ -36,6 +39,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         for robot in setup.robots:
             print(f"{robot.id} {robot.url} aruco={robot.aruco_id} attacks={robot.attacks}")
         print(f"goals {setup.goals.home_id}/{setup.goals.away_id}")
+        print(_drive_line(args.drive, setup))
         if args.preview:
             print("preview 127.0.0.1 (not started in dry-run)")
         return 0
@@ -51,6 +55,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     server = PreviewServer(board, port=args.preview_port) if board is not None else None
     clients = [HttpPlayerClient(endpoint) for endpoint in setup.robots]
     observer = _observer(args.observer, setup)
+    drive_ids = _drive_ids(args.drive, setup)
     host = MatchHost(
         observer,
         clients,
@@ -64,6 +69,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         preview=board,
         max_linear=setup.linear,
         max_angular=setup.angular,
+        observe_only=drive_ids is None,
+        drive_ids=drive_ids,
     )
     try:
         if server is not None:
@@ -85,6 +92,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         if close is not None:
             close()
     return 0
+
+
+def _drive_ids(drive: list[str] | None, setup):
+    if drive is None:
+        return None
+    roster = {robot.id for robot in setup.robots}
+    chosen = roster if not drive else set(drive)
+    unknown = chosen - roster
+    if unknown:
+        raise ValueError(f"unknown drive id {sorted(unknown)}")
+    return frozenset(chosen)
+
+
+def _drive_line(drive: list[str] | None, setup) -> str:
+    ids = _drive_ids(drive, setup)
+    if ids is None:
+        return "drive off (observe-only)"
+    return "drive " + ",".join(robot.id for robot in setup.robots if robot.id in ids)
 
 
 def _observer(kind: str, setup):

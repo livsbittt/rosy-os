@@ -1,7 +1,7 @@
 # 남은 rosy_games 트랙 → ADR 계획
 
 작성일: 2026-09-18
-상태: D-95–D-106. LOCAL 호스트와 Fleet/games 절단까지 있다. 현장 1v1 GO가 아니다.
+상태: D-95–D-108. 계단 1 호스트는 관측만. `--drive`는 계단 2+. 현장 GO가 아니다.
 
 관련: D-90, D-91, D-94 ·
 [game host 설계](2026-09-17-robot-soccer-game-host-design.md) ·
@@ -21,6 +21,8 @@
 |---|---|---|
 | 합성 overhead pytest를 DEVICE GO로? | **D-95** | 아니요. `--observer hold`가 기본 |
 | 실기 천장 1v1 순서 | **D-96** | 카메라만 → 한 대 0.08 → 두 대 이격 → 저속 1v1 → 킥오프 반복 |
+| 계단 1이 달리면? | **D-107** | 기본 관측만. `--observe-only` |
+| 계단 2+ 드라이브? | **D-108** | `--drive` / `--drive rosy_01`. FIELD GO 아님 |
 | 온보드 앞 카메라 지금? | **D-97** | 아니요. 계단 4 반복 뒤 CMD-001 |
 | Isaac / `isaac/` 폴더 | **D-98** | 계단 4 반복 전 금지. env는 `game`만 |
 | 신경망을 cmd_vel에? | **D-99** | 아니요. `Policy` 플러그인 |
@@ -50,11 +52,13 @@
 | D-104 | arm은 MANUAL 다음 PUT safety/limits |
 | D-105 | 스페이스·보드 /stop은 양쪽 safety/stop. 보드는 CORE를 직접 안 침 |
 | D-106 | Fleet 매치 시작은 나중. 지금 버튼 없음. fleet↛games import |
+| D-107 | 계단 1 기본은 관측만. arm/teleop 없음 |
+| D-108 | `--drive`는 계단 2+. 한 id면 그 대만. FIELD GO 아님 |
 
 ## 4. 실행 순서 (다음 세션)
 
 1. **기록 (이 커밋)**
-2. 노트북에서 `--observer overhead` — 모터 없이 구장·공·로봇·골 20/21이 보이는지 (D-96 계단 1, D-100)
+2. 노트북에서 `--observer overhead --preview` — 모터 없음 (D-107, D-96 계단 1)
 3. 그 기기 정지·워치독·단일 `cmd_vel` 증거가 있으면 한 대 0.08 m/s (계단 2)
 4. 두 대 이격 → 저속 1v1 → 킥오프 반복 (계단 3–5)
 5. 계단 4가 여러 번 나온 뒤에만 D-97 온보드, D-98 Isaac, D-99 신경망
@@ -63,5 +67,5 @@
 
 ## 5. 수락
 
-- ADR 로그에 D-95–D-106 색인·본문이 있다
+- ADR 로그에 D-95–D-108 색인·본문이 있다
 - `python -m pytest test/test_harness_contracts.py src/rosy_games/test test/test_rosy_games_surface.py -q`

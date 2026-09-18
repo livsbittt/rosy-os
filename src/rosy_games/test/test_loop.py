@@ -39,6 +39,30 @@ def test_arm_puts_both_robots_in_manual_before_ticks():
     assert home.limits == [] and away.limits == []
 
 
+def test_observe_only_skips_arm_and_teleop():
+    home, away = _clients()
+    host = MatchHost(FakeObserver(_obs()), (home, away), observe_only=True)
+    host.reset()
+    host.tick()
+    assert home.manual == 0 and away.manual == 0
+    assert home.teleops == [] and away.teleops == []
+
+
+def test_drive_ids_arm_only_the_named_robot():
+    home, away = _clients()
+    host = MatchHost(
+        FakeObserver(_obs()),
+        (home, away),
+        drive_ids=frozenset({"rosy_01"}),
+        max_linear=0.08,
+        max_angular=0.40,
+    )
+    host.arm()
+    assert home.manual == 1 and away.manual == 0
+    assert home.limits == [(0.08, 0.40)]
+    assert away.limits == []
+
+
 def test_arm_puts_safety_limits_after_manual():
     home, away = _clients()
     host = MatchHost(

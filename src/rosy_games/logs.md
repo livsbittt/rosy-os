@@ -127,3 +127,15 @@
 - 변경: Fleet 소스는 rosy_games를 모르고, 게임 보드/CLI에 fleet 시작이 없다. RobotMode.SOCCER 없음.
 - 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py src/rosy_fleet/test/test_boundaries.py -q`
 - gate 변화: 없음. DEVICE/FIELD PARKED
+
+## 2026-09-18 · uncommitted · docs(adr): D-107 observe-only, D-108 --drive
+
+- 변경: progress `adrs`에 D-107·D-108. 계단 1 기본 관측만
+- 증거: ADR 로그
+- gate 변화: 없음
+
+## 2026-09-18 · uncommitted · feat(games): default to observe-only, opt in with --drive (D-107, D-108)
+
+- 변경: 기본은 arm/teleop 없음. `--drive` 또는 `--drive rosy_01`. `--observe-only`와 배타.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 85 passed
+- gate 변화: LOCAL GO 유지. DEVICE/FIELD PARKED

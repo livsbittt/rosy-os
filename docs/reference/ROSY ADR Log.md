@@ -114,6 +114,8 @@
 | D-104 | 호스트 arm은 MANUAL 다음에 PUT safety/limits를 건다 | Accepted |
 | D-105 | 호스트 정지는 스페이스와 보드 /stop이며 양쪽 safety/stop이다 | Accepted |
 | D-106 | Fleet 매치 시작은 나중에 Fleet→games 한 방향이며 지금은 버튼을 만들지 않는다 | Accepted |
+| D-107 | D-96 계단 1 호스트는 관측만이며 기본은 모터를 무장하지 않는다 | Accepted |
+| D-108 | `--drive`는 계단 2+ 스위치이며 FIELD GO가 아니다 | Accepted |
 
 ---
 
@@ -2918,6 +2920,9 @@ HOLD teleop 0으로 무장한다.
 **Amendment (2026-09-18):** 계단 1에 골 마커/영역을 넣는다. 피치는 코너 10–13, 골
 위치는 20/21이다 (D-100).
 
+**Amendment (2026-09-18):** 계단 1 호스트 스위치는 D-107 (`--observe-only`가
+기본). `--drive`는 D-108. 이 두 플래그가 DEVICE 증거를 대신하지 않는다.
+
 ---
 
 ## D-97 온보드 축구 시야는 FIELD 반복 뒤 CMD-001 후보다
@@ -3247,4 +3252,65 @@ Fleet 소스가 `rosy_games`를 모르고, 게임 보드/CLI에 fleet 시작이 
 `RobotMode.SOCCER` 없음. DEVICE/FIELD PARKED.
 
 **References:** D-12, D-62, D-81, D-88, D-90, D-101.
+
+---
+
+## D-107 D-96 계단 1 호스트는 관측만이며 기본은 모터를 무장하지 않는다
+
+**Status:** Accepted (2026-09-18). 계단 1 호스트 계약이다. DEVICE GO가 아니다.
+
+**Context:** D-96 계단 1은 모터 없이 천장에서 구장·공·로봇·골이 보이는지다.
+`rosy_games match --observer overhead --preview`는 MANUAL을 무장하고
+`PUT limits`와 teleop 0을 냈다. 공이 중앙에 보이면 휴리스틱이 0.08 m/s를 낼 수
+있다. 기본 CLI가 계단 2를 계단 1처럼 열면 안 된다.
+
+**Decision:**
+
+- 라이브 매치 **기본은 관측만**이다. `arm()` / `PUT limits` / teleop를 하지 않는다
+- `--observe-only`는 그 기본을 명시한다
+- 미리보기·스페이스 halt·`POST /stop`은 그대로다. halt는 무장하지 않은 대에도
+  `safety/stop`을 부를 수 있다
+- `--observer overhead`가 기본을 드라이브로 바꾸지 않는다 (D-95)
+- 합성 pytest로 계단 1 FIELD GO를 하지 않는다 (D-95, D-91)
+
+**Alternatives:** 기본을 드라이브로 두는 안은 계단 1에서 공이 보이면 달린다.
+관측만 할 때 HTTP 클라이언트를 안 만드는 안은 스페이스 정지가 없어진다.
+
+**Consequences:** 기존 무장 시험은 `--drive`가 필요하다. 계단 1 CLI:
+`rosy_games match --config … --observer overhead --preview`.
+
+**Validation / Transition:** `test_cli.py`, `test_loop.py`. DEVICE/FIELD PARKED.
+
+**References:** D-95, D-96, D-101, D-104, D-105.
+
+---
+
+## D-108 `--drive`는 계단 2+ 스위치이며 FIELD GO가 아니다
+
+**Status:** Accepted (2026-09-18). 호스트 스위치다. DEVICE/FIELD GO가 아니다.
+
+**Context:** D-96 계단 2는 한 대 0.08 m/s, 계단 3–4는 두 대다. 기본이 관측만
+(D-107)이므로 달리려면 명시해야 한다. `--drive`가 pytest 통과를 현장 GO로
+읽히면 D-91이다. 한 대만 CORE가 살아 있는데 둘 다 무장하면 계단 2가 실패한다.
+
+**Decision:**
+
+- `--drive`는 arm + PUT limits + teleop를 연다
+- 인자 없이 `--drive`면 **두 대** (계단 3–4)
+- `--drive rosy_01`처럼 id를 주면 **그 대만** 무장·teleop (계단 2). 다른 대는
+  teleop하지 않는다. halt는 양쪽
+- 없는 id면 기동하지 않는다
+- `--drive`와 `--observe-only`는 같이 쓰지 않는다
+- `--drive`는 그 기기 정지·워치독·단일 `cmd_vel` 증거가 있기 전에는 FIELD GO가
+  아니다 (D-96)
+
+**Alternatives:** 항상 두 대를 무장하는 안은 계단 2에서 꺼둔 CORE가 arm 실패로
+둘 다 halt한다. 한 대 경기를 기본으로 하는 안은 D-96 "한 대만 뛰는 1v1은 없다"와
+계단 4를 섞는다.
+
+**Consequences:** `MatchHost.drive_ids`. pytest 무장 시험은 `--drive`.
+
+**Validation / Transition:** `test_cli.py`, `test_loop.py`. FIELD PARKED.
+
+**References:** D-91, D-96, D-104, D-107.
 

@@ -52,6 +52,7 @@ def test_dry_run_prints_both_robots_without_opening_a_socket(monkeypatch, capsys
     assert main(["match", "--config", str(MATCH), "--dry-run"]) == 0
     out = capsys.readouterr().out
     assert "goals 20/21" in out
+    assert "drive off (observe-only)" in out
     assert "rosy_01" in out
     assert "rosy_02" in out
 
@@ -82,6 +83,48 @@ def test_cli_default_observer_is_hold_not_the_camera():
     """D-95: 기본은 hold. overhead는 명시할 때만."""
     args = parse_args(["match", "--config", str(MATCH), "--dry-run"])
     assert args.observer == "hold"
+
+
+def test_cli_default_is_observe_only_not_drive():
+    args = parse_args(["match", "--config", str(MATCH), "--dry-run"])
+    assert args.drive is None
+    assert args.observe_only is False
+
+
+def test_observe_only_does_not_arm_or_teleop(monkeypatch):
+    created = []
+
+    class FakeHttp:
+        def __init__(self, endpoint, **_kwargs):
+            self.robot_id = endpoint.id
+            self.manual = 0
+            self.teleops: list = []
+            self.estops = 0
+            self.limits: list = []
+            created.append(self)
+
+        def set_manual(self) -> None:
+            self.manual += 1
+
+        def set_limits(self, linear: float, angular: float) -> None:
+            self.limits.append((linear, angular))
+
+        def teleop(self, linear: float, angular: float) -> None:
+            self.teleops.append((linear, angular))
+
+        def estop(self) -> None:
+            self.estops += 1
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr("rosy_games.cli.HttpPlayerClient", FakeHttp)
+    assert main(["match", "--config", str(MATCH), "--ticks", "2"]) == 0
+    assert created
+    assert all(c.manual == 0 for c in created)
+    assert all(c.limits == [] for c in created)
+    assert all(c.teleops == [] for c in created)
+    assert all(c.estops >= 1 for c in created)
 
 
 def test_cli_default_preview_is_off():
@@ -141,7 +184,7 @@ def test_live_match_arms_manual_and_holds_without_a_camera(monkeypatch):
             pass
 
     monkeypatch.setattr("rosy_games.cli.HttpPlayerClient", FakeHttp)
-    assert main(["match", "--config", str(MATCH), "--ticks", "2"]) == 0
+    assert main(["match", "--config", str(MATCH), "--ticks", "2", "--drive"]) == 0
     assert [c.robot_id for c in created] == ["rosy_01", "rosy_02"]
     assert all(c.manual == 1 for c in created)
     assert all(c.limits == [(0.08, 0.40)] for c in created)

@@ -41,6 +41,8 @@ class MatchHost:
         preview=None,
         max_linear: float | None = None,
         max_angular: float | None = None,
+        observe_only: bool = False,
+        drive_ids: frozenset[str] | None = None,
     ) -> None:
         self.observer = observer
         self.clients = tuple(clients)
@@ -49,6 +51,15 @@ class MatchHost:
         self.preview = preview
         self.max_linear = max_linear
         self.max_angular = max_angular
+        if observe_only:
+            self.drive_ids: frozenset[str] = frozenset()
+        elif drive_ids is None:
+            self.drive_ids = frozenset(client.robot_id for client in self.clients)
+        else:
+            self.drive_ids = drive_ids
+
+    def _driven(self) -> tuple[PlayerClient, ...]:
+        return tuple(client for client in self.clients if client.robot_id in self.drive_ids)
 
     def reset(self) -> MatchState:
         self.arm()
@@ -57,7 +68,7 @@ class MatchHost:
     def arm(self) -> None:
         """Put every robot in MANUAL before the first tick. Failure stops both."""
         try:
-            for client in self.clients:
+            for client in self._driven():
                 client.set_manual()
                 if self.max_linear is not None:
                     angular = 0.40 if self.max_angular is None else self.max_angular
@@ -89,6 +100,8 @@ class MatchHost:
                     ),
                     jpeg=jpeg,
                 )
+            if not self.drive_ids:
+                return state
             twists = self.policy.act(obs, state)
             commands = gate(
                 twists,
@@ -111,7 +124,10 @@ class MatchHost:
             raise
 
     def _teleop_all(self, commands: CommandSet) -> None:
+        driven = {client.robot_id for client in self._driven()}
         for client in self.clients:
+            if client.robot_id not in driven:
+                continue
             twist = commands.twists.get(client.robot_id, ZERO)
             client.teleop(twist.linear, twist.angular)
 

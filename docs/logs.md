@@ -203,3 +203,19 @@
 - gate 변화: 없음
 - 결정: D-106 Accepted. 콘솔 버튼 미구현
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · docs(adr): D-96 stair 1 is observe-only (D-107, D-108)
+
+- 변경: ADR D-107·D-108. 기본 관측만. `--drive`는 계단 2+이며 FIELD GO 아님.
+- 증거: ADR 색인
+- gate 변화: 없음
+- 결정: D-107·D-108 Accepted. DEVICE GO 아님
+- 교훈: 없음
+
+## 2026-09-18 · uncommitted · feat(games): default to observe-only, opt in with --drive (D-107, D-108)
+
+- 변경: CLI 기본은 모터 무장 없음. `--drive` / `--drive rosy_01`.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py test/test_harness_contracts.py -q` 130 passed
+- gate 변화: rosy_games LOCAL GO 유지. DEVICE/FIELD PARKED
+- 결정: D-96 계단 1 호스트가 공을 보면 달리지 않는다
+- 교훈: 없음

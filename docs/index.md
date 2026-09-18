@@ -45,6 +45,8 @@
 | D-104 | 호스트 arm은 MANUAL 다음에 PUT safety/limits를 건다 |
 | D-105 | 호스트 정지는 스페이스와 보드 /stop이며 양쪽 safety/stop이다 |
 | D-106 | Fleet 매치 시작은 나중에 Fleet→games 한 방향이며 지금은 버튼을 만들지 않는다 |
+| D-107 | D-96 계단 1 호스트는 관측만이며 기본은 모터를 무장하지 않는다 |
+| D-108 | `--drive`는 계단 2+ 스위치이며 FIELD GO가 아니다 |
 
 ## 계획·결과 문서
 
@@ -66,8 +68,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · feat(games): default to observe-only, opt in with --drive (D-107, D-108)
+- 2026-09-18 · uncommitted · docs(adr): D-96 stair 1 is observe-only (D-107, D-108)
 - 2026-09-18 · uncommitted · docs(adr): Fleet match-start is later one-way (D-106)
 - 2026-09-18 · uncommitted · feat(games): arm PUT limits and halt on space or board stop (D-104, D-105)
 - 2026-09-18 · uncommitted · docs(adr): lock PUT limits and host halt input (D-104, D-105)
-- 2026-09-18 · uncommitted · feat(games): run live matches at 20 Hz and clamp yaml limits (D-102, D-103)
-- 2026-09-18 · uncommitted · docs(adr): lock host loop 20 Hz and yaml limits (D-102, D-103)
