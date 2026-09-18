@@ -12,6 +12,21 @@ def test_games_is_not_a_runtime_slice_or_hardware_package():
     assert "rosy_games" not in hardware_packages()
 
 
+def test_games_overhead_cv2_does_not_close_the_robot_camera_adr():
+    """D-94: 노트북 천장 웹캠 ≠ D-41 ARM64 카메라 배치."""
+    overhead = ROOT / "src" / "rosy_games" / "rosy_games" / "host" / "overhead.py"
+    assert "import cv2" in overhead.read_text(encoding="utf-8")
+    homography = ROOT / "src" / "rosy_games" / "rosy_games" / "field" / "homography.py"
+    assert "cv2" not in homography.read_text(encoding="utf-8")
+    adr = (ROOT / "docs" / "reference" / "ROSY ADR Log.md").read_text(encoding="utf-8")
+    row = next(line for line in adr.splitlines() if line.startswith("| D-41 |"))
+    assert "Proposed" in row
+    core = ROOT / "src" / "rosy_core" / "rosy_core"
+    for path in core.rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        assert "import cv2" not in text and "from cv2" not in text, path
+
+
 def test_core_dockerfile_does_not_copy_games():
     text = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
     assert "rosy_games" not in text

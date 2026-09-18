@@ -27,6 +27,7 @@ origin을 푸시하지 않는다.
 | IMU / 도크 ESP32 / hardware COPY | D-56, D-84, D-85 | 기존 유지 |
 | deploy identity SHA | D-86 | POSIX에서만 |
 | Pinky 1v1 축구를 CORE 모드로? | **D-90** | 아니요. 노트북 게임 호스트 |
+| games overhead가 D-41인가? | **D-94** | 아니요. 노트북 관측. D-41은 Proposed |
 
 ## 3. 새 ADR 요약
 

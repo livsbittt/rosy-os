@@ -101,6 +101,7 @@
 | D-91 | Device 비교 ADR은 호스트 pytest로 Accepted 하지 않는다 | Accepted |
 | D-92 | L2 컴포넌트는 파일이 아니라 어휘 표로 공유한다 | Accepted |
 | D-93 | 마주 오는 두 대는 폭으로 풀리지 않는다 — 교행은 Fleet이 중재한다 | Accepted |
+| D-94 | rosy_games 천장 OpenCV는 노트북 호스트이며 D-41을 닫지 않는다 | Accepted |
 
 ---
 
@@ -2806,3 +2807,35 @@ L1 **값**뿐이고 그 동기화는 각 모듈이 자기 시험으로 지킨다
 [site middleware role fabric](../plans/2026-09-14-site-middleware-role-fabric-design.md),
 `src/rosy_navigation/logs.md` 2026-09-18 코스트맵 관측 토픽 수정,
 `src/rosy_fleet/logs.md` 2026-09-18 양보 항목.
+
+---
+
+## D-94 rosy_games 천장 OpenCV는 노트북 호스트이며 D-41을 닫지 않는다
+
+**Status:** Accepted (2026-09-18). D-90의 관측 경계다.
+
+**Context:** `rosy_games/host/overhead.py`가 `cv2`를 import한다. D-66은 CORE 이미지에
+OpenCV가 없다고 했고, D-41·D-52는 **로봇** ARM64에서 카메라 worker가 어디에 사는지
+실측을 요구한다. 노트북 천장 웹캠 코드가 있으면 D-41을 Accepted로 올리려는 혼선이
+생긴다.
+
+**Decision:**
+
+- `cv2`는 `rosy_games`의 `host/overhead.py`에만 산다. `field/homography.py`는 순수 기하
+- CORE 생산 코드와 CORE 이미지는 OpenCV를 갖지 않는다 (D-66)
+- 이 파일은 **관제 노트북 관측 어댑터**다. Pinky 앞 카메라·Picamera2·컨테이너
+  배치(D-41, D-52)를 닫지 않는다
+- LOCAL pytest는 overhead를 import하지 않고 통과해야 한다. 웹캠 실측은 DEVICE/FIELD
+
+**Alternatives:** overhead를 rosy_control 카메라 worker로 합치는 안은 게임 호스트를
+로봇 안에 넣는다 (D-90 위반). D-41을 이 코드로 닫는 안은 Validation 실측을 지운다
+(D-91).
+
+**Consequences:** 천장 1v1은 노트북에서만 켠다. 로봇 이미지에 `rosy_games`를 COPY하지
+않는다.
+
+**Validation / Transition:** `test/test_rosy_games_surface.py`,
+`src/rosy_games/test/test_games_boundaries.py`. ADR 색인 D-41 Status는 Proposed.
+
+**References:** D-41, D-52, D-66, D-90, D-91,
+[overhead plan](../plans/2026-09-18-rosy-games-overhead-plan.md).

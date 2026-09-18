@@ -2,7 +2,7 @@
 
 작성일: 2026-09-15
 
-상태: 설계 제안(P0). ADR D-61 후보(Proposed) — 승인 전에는 기존 규칙이 유효하다. 코드·기존 문서는 아직 바꾸지 않았다.
+상태: **Accepted (D-61).** 모듈 progress/logs와 생성 index가 계약 시험으로 산다. ARTIFACT/DEVICE 판정과 구분한다.
 
 관련: [ADR Log](../reference/ROSY%20ADR%20Log.md) D-17, D-45 · [폴더 구조 정리](2026-09-13-folder-structure-governance.md) · [모듈 평가·유지보수 설계](2026-09-12-rosy-os-module-evaluation-maintenance-design.md) · [solutions](../solutions/AGENTS.md)
 

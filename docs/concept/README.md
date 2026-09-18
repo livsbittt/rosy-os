@@ -85,9 +85,9 @@ ROSY OS uses six primary domain objects:
 | 11 AI & Physical AI | vision/ai catalog only | D-41, D-71 | **not v1** |
 | 12 Dataset & learning | — | D-71 | **not v1** |
 | 13 Current-to-target | Phase 0–3 live; 4–5 = D-71 | D-65, D-71 | Phase 0–3 live |
-| 14 Verification | Device validation ARTIFACT/DEVICE/FIELD; ARTIFACT builder is native Pi; ROS-SIM needs colcon install | D-71, D-78–D-80, D-83–D-85, **D-87**, **D-88**, **D-89** | Device GO not claimed; D-35 waits on Task 14 |
+| 14 Verification | Device validation ARTIFACT/DEVICE/FIELD; ARTIFACT builder is native Pi; ROS-SIM needs colcon install; crossing is Fleet mediation | D-71, D-78–D-80, D-83–D-85, D-87–D-89, **D-93** | Device GO not claimed; D-35 waits on Task 14 |
 | 15 Ubuntu modular install | D-62 slices, not apt/`rosyctl` | D-62, D-69, D-71 | apt path **not v1** |
-| 16 Interface design principles | operator console is CORE `/dashboard`; control `web_node` is not that console; Fleet and composite rules are target | D-23, D-68, D-71, **D-72**, D-75, **D-77** | L1 colour + evidence + capability states live; G4 DEVICE HOLD |
+| 16 Interface design principles | operator console is CORE `/dashboard`; L2 is a vocabulary table not a shared CSS file | D-23, D-68, D-71, D-72, D-75, D-77, **D-92** | L1 colour + evidence live; G4 DEVICE HOLD |
 
 ## First Refactoring Priority
 
