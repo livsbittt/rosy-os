@@ -16,6 +16,8 @@ def observation_from_pixels(
     ball_uv: Point | None,
     robots: dict[str, tuple[Point, Point]],
     roster: tuple[str, str],
+    home_goal: tuple[tuple[float, float], ...] | None = None,
+    away_goal: tuple[tuple[float, float], ...] | None = None,
 ) -> Observation:
     if homography is None:
         return Observation(
@@ -47,4 +49,6 @@ def observation_from_pixels(
         robots=poses,
         lost_ball=lost_ball,
         lost_robots=frozenset(lost),
+        home_goal=home_goal,
+        away_goal=away_goal,
     )

@@ -131,3 +131,11 @@
 - gate 변화: 없음
 - 결정: D-100 Accepted (관측). 구현 GO 아님
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · feat(games): see goals as ArUco 20/21 (D-100)
+
+- 변경: 골 마커 20/21과 선택 HSV 입구를 overhead가 필드 m 폴리곤으로 투영. 양쪽 없으면 필드 끝. 합성 시험 ≠ DEVICE (D-95).
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py test/test_harness_contracts.py -q` 109 passed
+- gate 변화: rosy_games LOCAL GO 유지. DEVICE/FIELD PARKED
+- 결정: D-100 LOCAL 관측 확장. 현장 계단 1은 실제 웹캠
+- 교훈: 없음

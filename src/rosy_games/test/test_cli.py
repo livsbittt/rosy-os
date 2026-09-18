@@ -31,6 +31,10 @@ def test_load_match_builds_field_and_two_endpoints():
     assert setup.policy == "heuristic"
     assert setup.camera.index == 0
     assert setup.camera.corner_ids == (10, 11, 12, 13)
+    assert setup.goals.home_id == 20
+    assert setup.goals.away_id == 21
+    assert setup.goals.hsv_low is None
+    assert setup.goals.hsv_high is None
 
 
 def test_dry_run_prints_both_robots_without_opening_a_socket(monkeypatch, capsys):
@@ -46,6 +50,28 @@ def test_dry_run_prints_both_robots_without_opening_a_socket(monkeypatch, capsys
     out = capsys.readouterr().out
     assert "rosy_01" in out
     assert "rosy_02" in out
+
+
+def test_load_match_defaults_goal_markers_when_yaml_omits_them(tmp_path):
+    text = MATCH.read_text(encoding="utf-8")
+    lines = [line for line in text.splitlines() if not line.startswith("goals:") and "home_id: 20" not in line and "away_id: 21" not in line]
+    path = tmp_path / "match.yaml"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    setup = load_match(path)
+    assert setup.goals.home_id == 20
+    assert setup.goals.away_id == 21
+
+
+def test_load_match_overlays_goal_hsv(tmp_path):
+    (tmp_path / "match.yaml").write_text(MATCH.read_text(encoding="utf-8"), encoding="utf-8")
+    (tmp_path / "match.local.yaml").write_text(
+        "goals:\n  hsv_low: [40, 80, 80]\n  hsv_high: [80, 255, 255]\n",
+        encoding="utf-8",
+    )
+    setup = load_match(tmp_path / "match.yaml")
+    assert setup.goals.home_id == 20
+    assert setup.goals.hsv_low == (40, 80, 80)
+    assert setup.goals.hsv_high == (80, 255, 255)
 
 
 def test_cli_default_observer_is_hold_not_the_camera():

@@ -77,8 +77,9 @@ class SoccerGame:
     def _goal_scorer(self, obs: Observation) -> Optional[str]:
         if obs.ball is None:
             return None
-        if self.field.in_away_goal(obs.ball.x, obs.ball.y):
+        field = self.field.with_goals(home=obs.home_goal, away=obs.away_goal)
+        if field.in_away_goal(obs.ball.x, obs.ball.y):
             return self.field.home_id
-        if self.field.in_home_goal(obs.ball.x, obs.ball.y):
+        if field.in_home_goal(obs.ball.x, obs.ball.y):
             return self.field.away_id
         return None

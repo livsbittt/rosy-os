@@ -10,7 +10,7 @@ gates:
     cmd: "python -m pytest src/rosy_games/test/test_games_boundaries.py test/test_rosy_games_surface.py -q"
   LOCAL:
     state: GO
-    evidence: "53 passed including synthetic overhead frames (2026-09-18 Windows)"
+    evidence: "64 passed including goal markers 20/21 and HSV mouths (2026-09-18 Windows)"
     cmd: "python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q"
   ROS-SIM:
     state: N/A
@@ -30,11 +30,11 @@ plans:
 ## 지금 상태
 
 - 노트북 게임 호스트 (D-90). CORE 모드 아님. 최종 `cmd_vel` 없음.
-- LOCAL 호스트: 플러그인 심판 + HoldObserver 또는 `--observer overhead`. `field/homography.py`는 cv2 없음. `host/overhead.py`만 OpenCV.
+- LOCAL 호스트: 플러그인 심판 + HoldObserver 또는 `--observer overhead`. `field/homography.py`는 cv2 없음. `host/overhead.py`만 OpenCV. 골 20/21·선택 HSV 입구는 합성 프레임까지 (D-100).
 - DEVICE/FIELD는 실제 천장 웹캠·마커 실측. 합성 프레임 pytest로 승격하지 않는다.
 
 ## 다음 gate
 
-1. D-96 계단 1 / D-100: `--observer overhead`, 모터 없음, 코너·로봇·공·골 20/21
+1. D-96 계단 1: 실제 웹캠 `--observer overhead`, 모터 없음, 코너·로봇·공·골 20/21
 2. 그 기기 정지·워치독·단일 publisher 뒤 계단 2–5
 3. 계단 4 반복 뒤에만 D-97 온보드, D-98 Isaac, D-99 신경망

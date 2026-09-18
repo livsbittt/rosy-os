@@ -67,3 +67,9 @@
 - 변경: progress `adrs`에 D-100. 골 20/21 + 영역
 - 증거: ADR 로그
 - gate 변화: 없음
+
+## 2026-09-18 · uncommitted · feat(games): see goals as ArUco 20/21 (D-100)
+
+- 변경: `match.yaml` `goals.home_id`/`away_id`(기본 20/21), 선택 HSV 입구. overhead가 마커·영역을 필드 m 폴리곤으로 투영. 양쪽 없으면 필드 끝 기하. 득점은 `in_home_goal`/`in_away_goal`. cv2는 overhead만.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 64 passed
+- gate 변화: LOCAL GO 유지 (합성). DEVICE/FIELD PARKED

@@ -72,6 +72,27 @@ def test_hold_recovery_does_not_score_a_ball_in_the_away_goal():
     assert recovered.scorer is None
 
 
+def test_observed_away_polygon_can_score_inside_the_pitch():
+    """D-100: 심판은 관측된 필드 m 폴리곤으로 득점한다."""
+    from dataclasses import replace
+
+    game = SoccerGame()
+    game.step(_obs())
+    mouth = (
+        (0.50, -0.12),
+        (0.80, -0.12),
+        (0.80, 0.12),
+        (0.50, 0.12),
+    )
+    obs = replace(
+        _obs(ball=(0.60, 0.0), r1=(0.2, 0.0, 0.0), r2=(0.4, 0.0, 0.0)),
+        away_goal=mouth,
+    )
+    result = game.step(obs)
+    assert result.scorer == "rosy_01"
+    assert result.phase is Phase.GOAL
+
+
 def test_hold_recovery_plays_only_when_kickoff_ready():
     game = SoccerGame()
     game.step(_obs())

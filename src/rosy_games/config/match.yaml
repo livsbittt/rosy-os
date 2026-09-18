@@ -19,6 +19,9 @@ robots:
 ball:
   hsv_low: [5, 120, 80]
   hsv_high: [25, 255, 255]
+goals:
+  home_id: 20
+  away_id: 21
 limits:
   linear: 0.08
   angular: 0.40

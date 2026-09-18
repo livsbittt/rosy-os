@@ -60,8 +60,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · feat(games): see goals as ArUco 20/21 (D-100)
 - 2026-09-18 · uncommitted · docs(adr): goals are ArUco 20/21 plus a mouth region (D-100)
 - 2026-09-18 · uncommitted · docs(adr): lock remaining rosy_games track as D-95–D-99
 - 2026-09-18 · uncommitted · docs(adr): record that L2 components are shared as a vocabulary table, not a file
 - 2026-09-18 · uncommitted · docs(c6): rule the profile velocity reaches a seam lie, not an accepted duck-type
-- 2026-09-17 · uncommitted · docs(adr): accept D-54–D-56 source gates, park Device ADRs (D-91)

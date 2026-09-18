@@ -23,6 +23,8 @@ class Observation:
     robots: Mapping[str, Pose2D]
     lost_ball: bool
     lost_robots: frozenset[str]
+    home_goal: Optional[tuple[tuple[float, float], ...]] = None
+    away_goal: Optional[tuple[tuple[float, float], ...]] = None
 
 
 @dataclass(frozen=True)

@@ -1,7 +1,7 @@
 # 남은 rosy_games 트랙 → ADR 계획
 
 작성일: 2026-09-18
-상태: D-95–D-100. LOCAL 호스트·합성 천장 프레임은 있다. 현장 1v1 GO가 아니다.
+상태: D-95–D-100. LOCAL 호스트·합성 천장·골 20/21 폴리곤은 있다. 현장 1v1 GO가 아니다.
 
 관련: D-90, D-91, D-94 ·
 [game host 설계](2026-09-17-robot-soccer-game-host-design.md) ·
