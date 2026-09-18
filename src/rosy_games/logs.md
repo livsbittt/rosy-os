@@ -61,3 +61,9 @@
 - 변경: progress `adrs`에 D-94–D-99. 다음 게이트는 D-96 계단 1
 - 증거: ADR 로그 색인
 - gate 변화: 없음. DEVICE/FIELD PARKED
+
+## 2026-09-18 · uncommitted · docs(adr): D-100 goal markers
+
+- 변경: progress `adrs`에 D-100. 골 20/21 + 영역
+- 증거: ADR 로그
+- gate 변화: 없음

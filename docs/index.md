@@ -38,6 +38,7 @@
 | D-97 | 온보드 축구 시야는 FIELD 반복 뒤 CMD-001 후보다 |
 | D-98 | Isaac 축구 env는 FIELD 반복 전 폴더를 만들지 않는다 |
 | D-99 | 학습된 축구 정책은 Policy 플러그인이며 cmd_vel을 내지 않는다 |
+| D-100 | 골대는 천장에서 ArUco+영역으로 보이고, 득점은 필드 m 폴리곤이다 |
 
 ## 계획·결과 문서
 
@@ -59,8 +60,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · docs(adr): goals are ArUco 20/21 plus a mouth region (D-100)
 - 2026-09-18 · uncommitted · docs(adr): lock remaining rosy_games track as D-95–D-99
 - 2026-09-18 · uncommitted · docs(adr): record that L2 components are shared as a vocabulary table, not a file
 - 2026-09-18 · uncommitted · docs(c6): rule the profile velocity reaches a seam lie, not an accepted duck-type
 - 2026-09-17 · uncommitted · docs(adr): accept D-54–D-56 source gates, park Device ADRs (D-91)
-- 2026-09-17 · uncommitted · docs(adr): lock soccer as a game host (D-90)

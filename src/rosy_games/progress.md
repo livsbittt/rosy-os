@@ -20,7 +20,7 @@ gates:
     state: PARKED
   FIELD:
     state: PARKED
-adrs: [D-90, D-94, D-95, D-96, D-97, D-98, D-99]
+adrs: [D-90, D-94, D-95, D-96, D-97, D-98, D-99, D-100]
 plans:
   - docs/plans/2026-09-17-robot-soccer-game-host-design.md
   - docs/plans/2026-09-18-rosy-games-local-host.md
@@ -35,6 +35,6 @@ plans:
 
 ## 다음 gate
 
-1. D-96 계단 1: `--observer overhead`, 모터 없음, 실제 웹캠
+1. D-96 계단 1 / D-100: `--observer overhead`, 모터 없음, 코너·로봇·공·골 20/21
 2. 그 기기 정지·워치독·단일 publisher 뒤 계단 2–5
 3. 계단 4 반복 뒤에만 D-97 온보드, D-98 Isaac, D-99 신경망

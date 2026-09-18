@@ -16,6 +16,7 @@
 | D-97 | 온보드 축구 시야는 FIELD 반복 뒤 CMD-001 후보다 |
 | D-98 | Isaac 축구 env는 FIELD 반복 전 폴더를 만들지 않는다 |
 | D-99 | 학습된 축구 정책은 Policy 플러그인이며 cmd_vel을 내지 않는다 |
+| D-100 | 골대는 천장에서 ArUco+영역으로 보이고, 득점은 필드 m 폴리곤이다 |
 
 ## 계획·결과 문서
 
@@ -35,8 +36,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · docs(adr): D-100 goal markers
 - 2026-09-18 · uncommitted · docs(adr): remaining games track is D-95–D-99
 - 2026-09-18 · uncommitted · feat(games): project the ceiling camera onto the pitch
 - 2026-09-18 · uncommitted · feat(games): plug soccer in and arm CORE without a camera
 - 2026-09-18 · uncommitted · docs(games): mark LOCAL host complete without overhead camera
-- 2026-09-18 · uncommitted · chore(games): bootstrap pytest path and drop empty isaac

@@ -123,3 +123,11 @@
 - gate 변화: 없음. rosy_games DEVICE/FIELD PARKED 유지
 - 결정: D-95–D-99 Accepted (방향). 현장 GO 아님
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · docs(adr): goals are ArUco 20/21 plus a mouth region (D-100)
+
+- 변경: ADR D-100. 골 위치는 천장 ArUco 20/21과 선택 HSV 영역. 일반 QR 아님. 득점은 필드 m 폴리곤. D-96 계단 1에 골 가시성 포함.
+- 증거: ADR 색인 연속, `python -m pytest test/test_harness_contracts.py -q`
+- gate 변화: 없음
+- 결정: D-100 Accepted (관측). 구현 GO 아님
+- 교훈: 없음

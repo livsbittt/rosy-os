@@ -46,7 +46,7 @@ Dated design and execute plans (2026-08-31 onward). These are the working trail 
 | `2026-09-17-robot-soccer-game-host-design.md` | 실기 Pinky 1v1 푸시볼. 경기는 `rosy_games` 소유, Fleet은 통로, Isaac은 학습 어댑터 (D-90). CORE 모드 없음 |
 | `2026-09-18-rosy-games-local-host.md` | rosy_games LOCAL 실행 계획: 스켈레톤 → gate·MatchHost·teleop 클라이언트. Isaac/overhead 제외 |
 | `2026-09-18-rosy-games-overhead-plan.md` | 천장 카메라 관측 어댑터. OpenCV는 overhead만. 합성 시험 ≠ DEVICE (D-94, D-95) |
-| `2026-09-18-rosy-games-remaining-adr-plan.md` | 남은 games 트랙 → D-95–D-99; 현장 다섯 계단, 온보드/Isaac/신경망은 FIELD 뒤 |
+| `2026-09-18-rosy-games-remaining-adr-plan.md` | 남은 games 트랙 → D-95–D-100; 골은 ArUco 20/21+영역, 온보드/Isaac은 FIELD 뒤 |
 | D-73 | `tools/harness/harness.yaml` `functional` + `test/test_module_functional_surface.py` |
 
 ## Subdirectories
