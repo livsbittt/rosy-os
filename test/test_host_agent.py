@@ -52,6 +52,15 @@ class SpyCommands:
     def apply_network_profile(self, profile_id: str) -> dict:
         return self._record("apply_network_profile", profile_id)
 
+    def set_network_mode(self, mode: str) -> dict:
+        return self._record("set_network_mode", mode)
+
+    def connect_wifi(self, ssid: str, psk: str) -> dict:
+        self.calls.append(("connect_wifi", (ssid, psk)))
+        if self.fail_with is not None:
+            raise self.fail_with
+        return {"called": "connect_wifi", "ssid": ssid}
+
     def release_status(self) -> dict:
         return self._record("release_status")
 
@@ -108,10 +117,12 @@ def _request(command: str, *, role: str = "administrator", confirmed: bool = Tru
 
 
 def test_the_allowlist_matches_the_contract():
-    """Eight commands, no more. Adding one is a contract change."""
+    """Ten commands, no more. Adding one is a contract change."""
     assert set(ALLOWLIST) == {
         "network.status",
         "network.apply_profile",
+        "network.set_mode",
+        "network.connect",
         "release.status",
         "release.install",
         "release.rollback",
@@ -145,6 +156,20 @@ def test_a_parameterised_command_passes_only_its_parameter(agent, commands):
     assert commands.calls == [("apply_network_profile", ("rosy-site-sta",))]
 
 
+def test_set_mode_passes_only_the_enumerated_mode(agent, commands):
+    response = agent.handle(_request("network.set_mode", mode="RELAY_AP_STA"))
+
+    assert response["ok"], response
+    assert commands.calls == [("set_network_mode", ("RELAY_AP_STA",))]
+
+
+def test_connect_passes_ssid_and_psk_to_the_action(agent, commands):
+    response = agent.handle(_request("network.connect", ssid="shop wifi", psk="supersecretpsk"))
+
+    assert response["ok"], response
+    assert commands.calls == [("connect_wifi", ("shop wifi", "supersecretpsk"))]
+
+
 @pytest.mark.parametrize(
     "command",
     ["network.reset", "release.delete", "system.shutdown", "", "network", "NETWORK.STATUS"],
@@ -167,12 +192,24 @@ def test_the_refusal_names_what_is_allowed(agent):
 
 @pytest.mark.parametrize(
     "command",
-    ["network.apply_profile", "release.install", "release.rollback", "release.clear_hold", "system.reboot"],
+    [
+        "network.apply_profile",
+        "network.set_mode",
+        "network.connect",
+        "release.install",
+        "release.rollback",
+        "release.clear_hold",
+        "system.reboot",
+    ],
 )
 def test_a_viewer_cannot_run_an_administrator_command(agent, commands, command):
     params = {"profile_id": "rosy-site-sta"} if "profile" in command else {}
     if command == "release.install":
         params = {"release_id": "2026.09.05-002"}
+    if command == "network.set_mode":
+        params = {"mode": "SITE_STA"}
+    if command == "network.connect":
+        params = {"ssid": "shop-wifi", "psk": "supersecretpsk"}
 
     response = agent.handle(_request(command, role="viewer", **params))
 
@@ -211,6 +248,8 @@ def test_a_missing_actor_is_refused(agent, commands):
     "command,params",
     [
         ("network.apply_profile", {"profile_id": "rosy-site-sta"}),
+        ("network.set_mode", {"mode": "SITE_STA"}),
+        ("network.connect", {"ssid": "shop-wifi", "psk": "supersecretpsk"}),
         ("release.install", {"release_id": "2026.09.05-002"}),
         ("release.rollback", {}),
         ("release.clear_hold", {}),
@@ -239,6 +278,33 @@ def test_a_read_only_command_needs_no_confirmation(agent):
 
 
 # --- parameters are enumerated, never interpolated -------------------------
+
+
+@pytest.mark.parametrize("mode", ["AP_ONLY", "site_sta", "relay", "SITE-STA", ""])
+def test_an_unknown_operating_mode_is_refused(agent, commands, mode):
+    response = agent.handle(_request("network.set_mode", mode=mode))
+
+    assert response["code"] in {"HOST_AGENT_MODE_UNKNOWN", "HOST_AGENT_PARAM_INVALID"}
+    assert commands.calls == []
+
+
+@pytest.mark.parametrize("ssid", ["", "x" * 33, "ssid\nwith\nnewline"])
+def test_a_malformed_ssid_is_refused(agent, commands, ssid):
+    response = agent.handle(_request("network.connect", ssid=ssid, psk="supersecretpsk"))
+
+    assert response["code"] == "HOST_AGENT_PARAM_INVALID"
+    assert commands.calls == []
+
+
+@pytest.mark.parametrize("psk", ["short", "x" * 64, ""])
+def test_a_malformed_psk_is_refused_without_echoing_it(agent, commands, psk):
+    response = agent.handle(_request("network.connect", ssid="shop-wifi", psk=psk))
+
+    assert response["code"] == "HOST_AGENT_PARAM_INVALID"
+    assert commands.calls == []
+    blob = json.dumps(response, ensure_ascii=False)
+    if psk:
+        assert psk not in blob
 
 
 @pytest.mark.parametrize(
@@ -286,14 +352,15 @@ def test_no_command_accepts_a_location():
             assert not offending, f"{spec.name} takes a caller-chosen location: {param}"
 
 
-def test_the_whole_parameter_surface_is_three_identifiers():
+def test_the_whole_parameter_surface_is_enumerated():
     """Every parameter any command accepts, enumerated.
 
     A new one is a contract change and should fail here first, so that adding
-    a parameter is a decision rather than a side effect.
+    a parameter is a decision rather than a side effect. ``psk`` is a secret,
+    not an identifier; the agent still lists it so the surface stays closed.
     """
     every_param = {param for spec in ALLOWLIST.values() for param in spec.params}
-    assert every_param == {"profile_id", "release_id", "unit"}
+    assert every_param == {"profile_id", "release_id", "unit", "mode", "ssid", "psk"}
 
 
 def test_a_missing_required_parameter_is_refused(agent, commands):
@@ -513,6 +580,18 @@ def test_every_decision_is_audited_including_refusals(agent, audit):
     assert all(record.at for record in audit)
 
 
+def test_connect_does_not_put_the_psk_on_the_wire_or_in_audit(agent, commands, audit):
+    """PSK reaches NetworkManager through the action. It does not come back."""
+    secret = "supersecretpsk"
+    response = agent.handle(_request("network.connect", ssid="shop-wifi", psk=secret))
+
+    assert response["ok"], response
+    blob = json.dumps(response, ensure_ascii=False)
+    blob += json.dumps([record.__dict__ for record in audit], default=str)
+    assert secret not in blob
+    assert "psk" not in (response.get("data") or {})
+
+
 def test_the_audit_names_the_actor_and_the_command(agent, audit):
     agent.handle(_request("system.reboot"))
 
@@ -599,6 +678,8 @@ def test_actions_never_go_through_a_shell():
 
     commands.network_status()
     commands.apply_network_profile("rosy-site-sta")
+    commands.set_network_mode("SITE_STA")
+    commands.connect_wifi("shop-wifi", "supersecretpsk")
     commands.release_status()
     commands.install_release("2026.09.05-002")
     commands.rollback_release()
@@ -606,7 +687,7 @@ def test_actions_never_go_through_a_shell():
     commands.service_status("rosy-runtime.service")
     commands.reboot()
 
-    assert len(runner.argvs) == 8
+    assert runner.argvs
     for argv in runner.argvs:
         assert isinstance(argv, list)
         assert all(isinstance(part, str) for part in argv)
@@ -619,6 +700,81 @@ def test_an_identifier_reaches_the_command_as_one_argument():
     SubprocessCommands(runner=runner).apply_network_profile("rosy-site-sta")
 
     assert runner.argvs[0] == ["nmcli", "connection", "up", "id", "rosy-site-sta"]
+
+
+def test_set_mode_up_site_sta_and_downs_the_relay():
+    runner = RecordingRunner()
+    SubprocessCommands(runner=runner).set_network_mode("SITE_STA")
+
+    assert ["nmcli", "connection", "up", "id", "rosy-site-sta"] in runner.argvs
+    assert ["nmcli", "connection", "down", "id", "rosy-relay-ap-sta"] in runner.argvs
+    for argv in runner.argvs:
+        assert isinstance(argv, list)
+
+
+def test_set_mode_up_relay_keeps_site_sta():
+    runner = RecordingRunner()
+    SubprocessCommands(runner=runner).set_network_mode("RELAY_AP_STA")
+
+    assert ["nmcli", "connection", "up", "id", "rosy-relay-ap-sta"] in runner.argvs
+    assert ["nmcli", "connection", "down", "id", "rosy-site-sta"] not in runner.argvs
+
+
+def test_connect_modifies_the_site_profile_then_brings_it_up():
+    runner = RecordingRunner()
+    SubprocessCommands(runner=runner).connect_wifi("shop wifi", "supersecretpsk")
+
+    modify = next(argv for argv in runner.argvs if argv[:3] == ["nmcli", "connection", "modify"])
+    assert "rosy-site-sta" in modify
+    assert "shop wifi" in modify
+    assert "supersecretpsk" in modify
+    assert ["nmcli", "connection", "up", "id", "rosy-site-sta"] in runner.argvs
+
+
+def test_network_status_is_structured_site_sta_not_raw_nmcli():
+    from host_agent_server import parse_network_status
+
+    active = "rosy-site-sta:802-11-wireless:wlan0:activated\nlo:loopback:lo:activated\n"
+    device = "IP4.ADDRESS[1]:192.168.0.42/24\nIP4.GATEWAY:192.168.0.1\nIP4.DNS[1]:1.1.1.1\n"
+    wifi = "802-11-wireless.ssid:factory-wifi\n802-11-wireless.mode:infrastructure\n"
+    data = parse_network_status(active, device_show=device, wifi_show=wifi)
+
+    assert data["mode"] == "SITE_STA"
+    assert data["ap_active"] is False
+    assert data["ssid"] == "factory-wifi"
+    assert data["ipv4"] == "192.168.0.42"
+    assert data["default_route"] is True
+    assert data["dns"] == ["1.1.1.1"]
+    assert data["profile_id"] == "rosy-site-sta"
+    assert "psk" not in data
+    assert "output" not in data
+
+
+def test_network_status_marks_relay_as_ap_on():
+    from host_agent_server import parse_network_status
+
+    active = (
+        "rosy-site-sta:802-11-wireless:wlan0:activated\n"
+        "rosy-relay-ap-sta:802-11-wireless:wlan0:activated\n"
+    )
+    wifi = "802-11-wireless.ssid:ROSY-01\n802-11-wireless.mode:ap\n"
+    data = parse_network_status(active, wifi_show=wifi)
+
+    assert data["mode"] == "RELAY_AP_STA"
+    assert data["ap_active"] is True
+    assert data["profile_id"] == "rosy-relay-ap-sta"
+
+
+def test_network_status_names_setup_ap_without_inventing_operating_mode():
+    from host_agent_server import parse_network_status
+
+    active = "rosy-setup-ap:802-11-wireless:wlan0:activated\n"
+    wifi = "802-11-wireless.ssid:ROSY-SETUP\n802-11-wireless.mode:ap\n"
+    data = parse_network_status(active, wifi_show=wifi)
+
+    assert data["mode"] == "PROVISIONING_AP"
+    assert data["ap_active"] is True
+    assert data["ssid"] == "ROSY-SETUP"
 
 
 def test_a_failing_process_raises_rather_than_reporting_success():

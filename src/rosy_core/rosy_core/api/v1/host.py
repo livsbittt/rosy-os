@@ -67,6 +67,19 @@ class NetworkApplyRequest(BaseModel):
     idempotency_key: str | None = None
 
 
+class NetworkModeRequest(BaseModel):
+    mode: str = Field(min_length=1, max_length=32)
+    confirmed: bool = False
+    idempotency_key: str | None = None
+
+
+class NetworkConnectRequest(BaseModel):
+    ssid: str = Field(min_length=1, max_length=32)
+    psk: str = Field(min_length=8, max_length=63, repr=False)
+    confirmed: bool = False
+    idempotency_key: str | None = None
+
+
 @host_router.post("/network/apply")
 def host_network_apply(
     body: NetworkApplyRequest,
@@ -83,6 +96,56 @@ def host_network_apply(
         idempotency_key=body.idempotency_key,
     )
     return _relay(reply, absent_detail="Host Agent 에 연결할 수 없어 네트워크 프로파일을 바꾸지 못했습니다.")
+
+
+@host_router.post("/network/mode")
+def host_network_mode(
+    body: NetworkModeRequest,
+    auth: AuthContext = Depends(admin),
+    svc: CoreServices = Depends(get_services),
+):
+    """SITE_STA (AP off) or RELAY_AP_STA (AP on). CORE never calls nmcli (D-22)."""
+    reply = _agent(svc).request(
+        "network.set_mode",
+        role="administrator",
+        user_id=auth.token_id,
+        confirmed=body.confirmed,
+        params={"mode": body.mode},
+        idempotency_key=body.idempotency_key,
+    )
+    return _relay(reply, absent_detail="Host Agent 에 연결할 수 없어 네트워크 모드를 바꾸지 못했습니다.")
+
+
+def _without_secrets(payload: dict) -> dict:
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return payload
+    payload["data"] = {
+        key: value
+        for key, value in data.items()
+        if not str(key).lower() in {"psk", "passphrase", "password"}
+    }
+    return payload
+
+
+@host_router.post("/network/connect")
+def host_network_connect(
+    body: NetworkConnectRequest,
+    auth: AuthContext = Depends(admin),
+    svc: CoreServices = Depends(get_services),
+):
+    """Join a site SSID. PSK transits once and is never returned or stored."""
+    reply = _agent(svc).request(
+        "network.connect",
+        role="administrator",
+        user_id=auth.token_id,
+        confirmed=body.confirmed,
+        params={"ssid": body.ssid, "psk": body.psk},
+        idempotency_key=body.idempotency_key,
+    )
+    return _without_secrets(
+        _relay(reply, absent_detail="Host Agent 에 연결할 수 없어 Wi-Fi에 연결하지 못했습니다.")
+    )
 
 
 @host_router.get("/release")

@@ -153,6 +153,8 @@ Host Agent는 아래 명령만 안다. 임의 명령, 임의 경로, 임의 인�
 |---|---|---|---|
 | `network.status` | — | viewer | 불필요 |
 | `network.apply_profile` | `profile_id` (등록된 프로파일 id만) | administrator | 필요 |
+| `network.set_mode` | `mode` (`SITE_STA` 또는 `RELAY_AP_STA`) | administrator | 필요 |
+| `network.connect` | `ssid`, `psk` (PSK는 감사·응답에 남기지 않음) | administrator | 필요 |
 | `release.status` | — | viewer | 불필요 |
 | `release.install` | `release_id` (staging에 존재하는 것만) | administrator | 필요 |
 | `release.rollback` | — | administrator | 필요 |
@@ -208,7 +210,8 @@ Host Agent는 아래 명령만 안다. 임의 명령, 임의 경로, 임의 인�
 `idempotency_key`, `command`, `actor`, 결과 `code`. 기록에서 제외하는 것은
 설계 §11이 정한 대로 토큰, Wi-Fi 비밀번호, 개인키, 전체 설정 파일이다.
 
-`network.apply_profile`은 SSID를 남기되 PSK는 남기지 않는다.
+`network.apply_profile`은 SSID를 남기되 PSK는 남기지 않는다. `network.connect`는
+SSID를 남기고 PSK는 요청에서만 쓰며 감사 기록·응답 `data`에 넣지 않는다.
 
 ## 9. 구현 상태
 

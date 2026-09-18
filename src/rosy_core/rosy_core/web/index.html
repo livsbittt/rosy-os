@@ -252,6 +252,7 @@
             </header>
             <dl class="host-facts">
               <div><dt>SSID</dt><dd id="network-ssid"></dd></div>
+              <div><dt>AP</dt><dd id="network-ap"></dd></div>
               <div><dt>WLAN IPv4</dt><dd id="network-ipv4"></dd></div>
               <div><dt>기본 경로</dt><dd id="network-route"></dd></div>
               <div><dt>DNS</dt><dd id="network-dns"></dd></div>
@@ -259,6 +260,19 @@
               <div><dt>같은 WLAN 단말 접근</dt><dd id="network-peer"></dd></div>
             </dl>
             <p class="host-note" id="network-note" role="status"></p>
+            <div class="host-actions">
+              <button type="button" id="network-ap-off" data-role="administrator" disabled>AP 끄기</button>
+              <button type="button" id="network-ap-on" data-role="administrator" disabled>AP 켜기</button>
+            </div>
+            <form id="network-connect-form">
+              <label for="network-ssid-input">Wi-Fi SSID</label>
+              <input id="network-ssid-input" name="ssid" maxlength="32" autocomplete="off">
+              <label for="network-psk-input">암호</label>
+              <div class="settings-row">
+                <input id="network-psk-input" name="psk" type="password" maxlength="63" autocomplete="new-password">
+                <button type="button" id="network-connect" class="primary-button" disabled>Wi-Fi 연결</button>
+              </div>
+            </form>
             <form id="network-apply-form">
               <label for="network-profile-id">네트워크 프로파일</label>
               <div class="settings-row">

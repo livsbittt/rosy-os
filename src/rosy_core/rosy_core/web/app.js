@@ -552,6 +552,9 @@ function renderHostNetwork(payload) {
     setChip("network-mode", "UNKNOWN");
     setCardUnavailable("network-card", "network-note", payload);
     setEnabled("network-apply", false);
+    setEnabled("network-ap-off", false);
+    setEnabled("network-ap-on", false);
+    setEnabled("network-connect", false);
     return;
   }
 
@@ -562,6 +565,7 @@ function renderHostNetwork(payload) {
   setChip("network-mode", data.mode);
   // The SSID is displayable; a PSK never is, and the agent does not send one.
   setText("network-ssid", data.ssid || "—");
+  setText("network-ap", data.ap_active === true ? "켜짐" : data.ap_active === false ? "꺼짐" : "—");
   setText("network-ipv4", data.ipv4 || "—");
   setText("network-route", data.default_route || "—");
   setText("network-dns", (data.dns || []).join(", ") || "—");
@@ -580,7 +584,15 @@ function renderHostNetwork(payload) {
   if (profile && document.activeElement !== profile) {
     profile.value = data.profile_id || data.mode || profile.value || "rosy-site-sta";
   }
-  setEnabled("network-apply", isAdmin() && payload.available === true);
+  const ssidInput = elements["network-ssid-input"];
+  if (ssidInput && document.activeElement !== ssidInput && data.ssid) {
+    ssidInput.value = data.ssid;
+  }
+  const adminOn = isAdmin() && payload.available === true;
+  setEnabled("network-apply", adminOn);
+  setEnabled("network-ap-off", adminOn);
+  setEnabled("network-ap-on", adminOn);
+  setEnabled("network-connect", adminOn);
 }
 
 function renderHostRelease(payload) {
@@ -645,7 +657,11 @@ function updateAdminControls() {
   setEnabled("identity-save", isAdmin());
   setEnabled("token-add", isAdmin());
   const networkCard = document.getElementById("network-card");
-  setEnabled("network-apply", isAdmin() && networkCard?.dataset.available === "true");
+  const networkOn = isAdmin() && networkCard?.dataset.available === "true";
+  setEnabled("network-apply", networkOn);
+  setEnabled("network-ap-off", networkOn);
+  setEnabled("network-ap-on", networkOn);
+  setEnabled("network-connect", networkOn);
 }
 
 async function detectRole() {
@@ -844,6 +860,73 @@ elements["dds-cyclone-apply"]?.addEventListener("click", async () => {
   }
 });
 
+async function applyNetworkMode(mode, prompt) {
+  if (!window.confirm(prompt)) return;
+  try {
+    const payload = await api("/api/v1/host/network/mode", {
+      method: "POST",
+      body: JSON.stringify({
+        mode,
+        confirmed: true,
+        idempotency_key: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      }),
+    });
+    if (payload.available === false) {
+      setText("network-note", payload.detail || "Host Agent가 없어 적용하지 못했습니다.");
+      return;
+    }
+    setText("network-note", payload.ok ? `${mode} 를 적용했습니다.` : (payload.detail || "적용이 거부되었습니다."));
+    const status = await api("/api/v1/host/network");
+    renderHostNetwork(status);
+  } catch (error) {
+    setText("network-note", `네트워크 모드 변경 실패: ${error.message}`);
+  }
+}
+
+elements["network-ap-off"]?.addEventListener("click", () => {
+  applyNetworkMode("SITE_STA", "AP를 끌까요? 로봇은 사업장 Wi-Fi(SITE_STA)만 씁니다. 연결이 잠깐 끊길 수 있습니다.");
+});
+
+elements["network-ap-on"]?.addEventListener("click", () => {
+  applyNetworkMode("RELAY_AP_STA", "AP를 켤까요? 로봇이 릴레이(AP+STA)를 엽니다. 연결이 잠깐 끊길 수 있습니다.");
+});
+
+elements["network-connect"]?.addEventListener("click", async () => {
+  const ssid = elements["network-ssid-input"]?.value.trim();
+  const psk = elements["network-psk-input"]?.value ?? "";
+  if (!ssid) {
+    setText("network-note", "SSID를 입력하세요.");
+    return;
+  }
+  if (psk.length < 8) {
+    setText("network-note", "암호는 8자 이상이어야 합니다.");
+    return;
+  }
+  if (!window.confirm(`${ssid} 에 연결할까요? 연결이 잠깐 끊길 수 있습니다.`)) return;
+  try {
+    const payload = await api("/api/v1/host/network/connect", {
+      method: "POST",
+      body: JSON.stringify({
+        ssid,
+        psk,
+        confirmed: true,
+        idempotency_key: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      }),
+    });
+    if (elements["network-psk-input"]) elements["network-psk-input"].value = "";
+    if (payload.available === false) {
+      setText("network-note", payload.detail || "Host Agent가 없어 연결하지 못했습니다.");
+      return;
+    }
+    setText("network-note", payload.ok ? `${ssid} 에 연결했습니다.` : (payload.detail || "연결이 거부되었습니다."));
+    const status = await api("/api/v1/host/network");
+    renderHostNetwork(status);
+  } catch (error) {
+    if (elements["network-psk-input"]) elements["network-psk-input"].value = "";
+    setText("network-note", `Wi-Fi 연결 실패: ${error.message}`);
+  }
+});
+
 elements["network-apply"]?.addEventListener("click", async () => {
   const profileId = elements["network-profile-id"]?.value.trim();
   if (!profileId) {
@@ -872,6 +955,7 @@ elements["network-apply"]?.addEventListener("click", async () => {
   }
 });
 
+bindFormSave("network-connect-form", "network-connect");
 bindFormSave("network-apply-form", "network-apply");
 
 initSettings({

@@ -105,3 +105,9 @@
 - 변경: POST /api/v1/system/dds/cyclone. 오버레이 dds.rmw 저장 후 Host Agent system.reboot. 대시보드 확인 버튼.
 - 증거: `python -m pytest src/rosy_core/test/test_rmw.py src/rosy_core/test/test_dashboard.py src/rosy_core/test/test_host_cards.py -q`
 - gate 변화: 없음. DEVICE PARKED
+
+## 2026-09-18 · uncommitted · feat(core): dashboard AP toggle and Wi-Fi connect (D-124)
+
+- 변경: 네트워크 카드에 AP 켜기/끄기와 SSID·암호 연결. POST /host/network/mode, /connect. PSK는 GET/응답에 안 채움
+- 증거: `python -m pytest src/rosy_core/test/test_host_cards.py src/rosy_core/test/test_dashboard.py -q`
+- gate 변화: 없음. DEVICE PARKED

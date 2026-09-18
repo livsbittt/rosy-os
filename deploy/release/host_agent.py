@@ -72,6 +72,8 @@ ALLOWLIST: dict[str, CommandSpec] = {
     for spec in (
         CommandSpec("network.status", Role.VIEWER, False),
         CommandSpec("network.apply_profile", Role.ADMINISTRATOR, True, frozenset({"profile_id"})),
+        CommandSpec("network.set_mode", Role.ADMINISTRATOR, True, frozenset({"mode"})),
+        CommandSpec("network.connect", Role.ADMINISTRATOR, True, frozenset({"ssid", "psk"})),
         CommandSpec("release.status", Role.VIEWER, False),
         CommandSpec("release.install", Role.ADMINISTRATOR, True, frozenset({"release_id"})),
         CommandSpec("release.rollback", Role.ADMINISTRATOR, True),
@@ -85,14 +87,19 @@ ALLOWLIST: dict[str, CommandSpec] = {
 #: first so a malformed value is refused before it is compared to anything.
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]{0,127}$")
 
-#: Keys whose values never appear in an audit record. The allowlist already
-#: keeps secrets out of requests — apply_profile takes a profile id, not a PSK
-#: — so this is the second line, for detail strings assembled elsewhere.
+#: Keys whose values never appear in an audit record. apply_profile still takes
+#: a profile id; network.connect takes a PSK that must die in this process.
 _REDACTED_KEYS = re.compile(
     r"psk|passphrase|passwo?rd|secret|token|private[_-]?key|credential",
     re.IGNORECASE,
 )
 _REDACTED = "[redacted]"
+
+#: Dashboard operating modes (ADR D-26 / D-124). Not NetworkManager profile ids.
+_OPERATING_MODES = frozenset({"SITE_STA", "RELAY_AP_STA"})
+
+#: Printable SSID, same bound as deploy/release/network.py SetupRequest.
+_SSID = re.compile(r"^[\x20-\x7e]{1,32}$")
 
 
 class HostCommands(Protocol):
@@ -100,6 +107,8 @@ class HostCommands(Protocol):
 
     def network_status(self) -> dict: ...
     def apply_network_profile(self, profile_id: str) -> dict: ...
+    def set_network_mode(self, mode: str) -> dict: ...
+    def connect_wifi(self, ssid: str, psk: str) -> dict: ...
     def release_status(self) -> dict: ...
     def install_release(self, release_id: str) -> dict: ...
     def rollback_release(self) -> dict: ...
@@ -331,6 +340,30 @@ class HostAgent:
             )
 
         for name, value in params.items():
+            if name == "psk":
+                if not isinstance(value, str) or not 8 <= len(value) <= 63:
+                    return (
+                        "HOST_AGENT_PARAM_INVALID",
+                        "psk length is invalid",
+                        "a WPA2 passphrase is 8 to 63 characters",
+                    )
+                continue
+            if name == "ssid":
+                if not isinstance(value, str) or not _SSID.match(value):
+                    return (
+                        "HOST_AGENT_PARAM_INVALID",
+                        f"ssid is not a well-formed SSID: {value!r}",
+                        "SSID 는 1–32자의 인쇄 가능 문자입니다.",
+                    )
+                continue
+            if name == "mode":
+                if not isinstance(value, str) or value not in _OPERATING_MODES:
+                    return (
+                        "HOST_AGENT_MODE_UNKNOWN",
+                        f"{value!r} is not an operating mode",
+                        f"허용된 모드: {sorted(_OPERATING_MODES)}",
+                    )
+                continue
             if not isinstance(value, str) or not _IDENTIFIER.match(value):
                 return (
                     "HOST_AGENT_PARAM_INVALID",
@@ -358,6 +391,8 @@ class HostAgent:
         actions: dict[str, Callable[[], dict]] = {
             "network.status": self._commands.network_status,
             "network.apply_profile": lambda: self._commands.apply_network_profile(params["profile_id"]),
+            "network.set_mode": lambda: self._commands.set_network_mode(params["mode"]),
+            "network.connect": lambda: self._commands.connect_wifi(params["ssid"], params["psk"]),
             "release.status": self._commands.release_status,
             "release.install": lambda: self._commands.install_release(params["release_id"]),
             "release.rollback": self._commands.rollback_release,

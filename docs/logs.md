@@ -283,3 +283,11 @@
 - gate 변화: LOCAL GO 유지. DEVICE PARKED
 - 결정: 웹 수정 후 재부팅은 Host Agent. 라이브 RMW 패치 없음
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · feat(core): dashboard AP toggle and Wi-Fi connect via Host Agent (D-124)
+
+- 변경: ADR D-124. network.status 구조화. POST /api/v1/host/network/mode 와 /connect. 대시보드 AP 켜기/끄기·SSID 연결. PSK는 응답/감사에 안 남김. CORE는 nmcli 안 부름
+- 증거: `python -m pytest test/test_host_agent.py src/rosy_core/test/test_host_cards.py src/rosy_core/test/test_dashboard.py test/test_harness_contracts.py -q`
+- gate 변화: LOCAL GO 유지. DEVICE PARKED
+- 결정: AP on/off는 SITE_STA/RELAY_AP_STA. Wi-Fi 연결은 Host Agent network.connect
+- 교훈: 없음

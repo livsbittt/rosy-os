@@ -259,6 +259,8 @@ def test_dashboard_field_settings_use_click_handlers_not_form_submit():
     assert "/api/v1/safety/limits" in script
     assert "/api/v1/docking/types" in script
     assert "/api/v1/host/network/apply" in script
+    assert "/api/v1/host/network/mode" in script
+    assert "/api/v1/host/network/connect" in script
     assert "battery_warning_percent" in script
     assert "fleet_loss_policy" in script
     assert "/api/v1/system/tokens" in script
@@ -289,6 +291,12 @@ def test_dashboard_exposes_local_field_settings_not_fleet():
         "battery-critical-policy",
         "network-apply",
         "network-profile-id",
+        "network-ap",
+        "network-ap-off",
+        "network-ap-on",
+        "network-ssid-input",
+        "network-psk-input",
+        "network-connect",
         "identity-form",
         "robot-id-input",
         "robot-name-input",

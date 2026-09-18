@@ -16,6 +16,7 @@
 | D-36 | Signed runtime delivery and writable generation data |
 | D-46 | Device 설치 후 readback 증거 계약 |
 | D-53 | Device signature/readback trust evidence |
+| D-124 | 대시보드는 AP on/off와 Wi-Fi 연결을 Host Agent로 확인하고 적용한다 |
 
 ## 계획·결과 문서
 
@@ -34,5 +35,6 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · feat(host-agent): structured network status, set_mode, connect (D-124)
 - 2026-09-15 · uncommitted · docs(harness): state excluded gates and rerunnable source evidence
 - 2026-09-15 · uncommitted · docs(harness): start the deploy harness pilot

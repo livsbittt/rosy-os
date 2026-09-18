@@ -16,3 +16,11 @@
 - gate 변화: 없음 (누락 키를 N/A로 명시)
 - 결정: 없음
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · feat(host-agent): structured network status, set_mode, connect (D-124)
+
+- 변경: network.status 를 D-26 필드로 파싱. network.set_mode, network.connect 허용. PSK는 감사/응답에서 제거
+- 증거: `python -m pytest test/test_host_agent.py -q`
+- gate 변화: 없음. DEVICE HOLD 유지
+- 결정: D-124
+- 교훈: 없음

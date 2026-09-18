@@ -23,6 +23,10 @@ from pathlib import Path
 
 from host_agent import MAX_REQUEST_BYTES, HostAgent
 
+SITE_PROFILE = "rosy-site-sta"
+RELAY_PROFILE = "rosy-relay-ap-sta"
+SETUP_PROFILE = "rosy-setup-ap"
+
 #: Where CORE looks for us. /run is tmpfs, so a stale socket cannot outlive a
 #: reboot and be mistaken for a live agent.
 DEFAULT_SOCKET_PATH = Path("/run/rosy/host-agent.sock")
@@ -156,6 +160,74 @@ def _run(argv: Sequence[str]) -> subprocess.CompletedProcess:
     return subprocess.run(list(argv), capture_output=True, text=True, check=False)
 
 
+def parse_network_status(
+    active: str, *, device_show: str = "", wifi_show: str = ""
+) -> dict:
+    """Map nmcli tabular text into the D-26 fields the dashboard already reads.
+
+    Raw ``connection show --active`` is not a mode. The card needs ``SITE_STA``
+    vs ``RELAY_AP_STA`` vs a setup AP, and it must never grow a PSK field.
+    """
+    names: list[str] = []
+    for line in active.splitlines():
+        if not line.strip():
+            continue
+        names.append(line.split(":", 1)[0])
+
+    if SETUP_PROFILE in names:
+        mode = "PROVISIONING_AP"
+        profile_id = SETUP_PROFILE
+        ap_active = True
+    elif RELAY_PROFILE in names:
+        mode = "RELAY_AP_STA"
+        profile_id = RELAY_PROFILE
+        ap_active = True
+    elif SITE_PROFILE in names:
+        mode = "SITE_STA"
+        profile_id = SITE_PROFILE
+        ap_active = False
+    else:
+        mode = "UNKNOWN"
+        profile_id = names[0] if names else None
+        ap_active = False
+
+    wifi = _nmcli_fields(wifi_show)
+    if wifi.get("802-11-wireless.mode") == "ap":
+        ap_active = True
+    ssid = wifi.get("802-11-wireless.ssid") or None
+
+    ipv4 = None
+    default_route = False
+    dns: list[str] = []
+    for key, value in _nmcli_fields(device_show).items():
+        if key.startswith("IP4.ADDRESS") and ipv4 is None:
+            ipv4 = value.split("/", 1)[0] or None
+        elif key.startswith("IP4.GATEWAY"):
+            default_route = bool(value)
+        elif key.startswith("IP4.DNS") and value:
+            dns.append(value)
+
+    return {
+        "mode": mode,
+        "ap_active": ap_active,
+        "ssid": ssid,
+        "ipv4": ipv4,
+        "default_route": default_route,
+        "dns": dns,
+        "profile_id": profile_id,
+    }
+
+
+def _nmcli_fields(text: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for line in text.splitlines():
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        fields[key] = value
+    return fields
+
+
 @dataclass
 class SubprocessCommands:
     """The real actions, as argument lists.
@@ -177,12 +249,55 @@ class SubprocessCommands:
             return {"output": result.stdout.strip()}
 
     def network_status(self) -> dict:
-        argv = ["nmcli", "-t", "-f", "NAME,TYPE,DEVICE,STATE", "connection", "show", "--active"]
-        return self._json_or_text(self.runner(argv), argv)
+        active_argv = ["nmcli", "-t", "-f", "NAME,TYPE,DEVICE,STATE", "connection", "show", "--active"]
+        active = self.runner(active_argv)
+        if active.returncode != 0:
+            raise RuntimeError(f"{active_argv[0]} exited {active.returncode}: {active.stderr.strip()}")
+        names = [line.split(":", 1)[0] for line in active.stdout.splitlines() if line.strip()]
+        wifi_profile = next(
+            (name for name in (SITE_PROFILE, RELAY_PROFILE, SETUP_PROFILE) if name in names),
+            None,
+        )
+        wifi_show = ""
+        if wifi_profile is not None:
+            wifi_argv = [
+                "nmcli", "-t", "-f", "802-11-wireless.ssid,802-11-wireless.mode",
+                "connection", "show", wifi_profile,
+            ]
+            wifi = self.runner(wifi_argv)
+            if wifi.returncode == 0:
+                wifi_show = wifi.stdout
+        device_argv = ["nmcli", "-t", "-f", "IP4.ADDRESS,IP4.GATEWAY,IP4.DNS", "device", "show", "wlan0"]
+        device = self.runner(device_argv)
+        device_show = device.stdout if device.returncode == 0 else ""
+        return parse_network_status(active.stdout, device_show=device_show, wifi_show=wifi_show)
 
     def apply_network_profile(self, profile_id: str) -> dict:
         argv = ["nmcli", "connection", "up", "id", profile_id]
         return self._json_or_text(self.runner(argv), argv)
+
+    def set_network_mode(self, mode: str) -> dict:
+        if mode == "RELAY_AP_STA":
+            argv = ["nmcli", "connection", "up", "id", RELAY_PROFILE]
+            self._json_or_text(self.runner(argv), argv)
+            return {"mode": mode, "profile_id": RELAY_PROFILE, "ap_active": True}
+        up = ["nmcli", "connection", "up", "id", SITE_PROFILE]
+        self._json_or_text(self.runner(up), up)
+        down = ["nmcli", "connection", "down", "id", RELAY_PROFILE]
+        self.runner(down)
+        return {"mode": mode, "profile_id": SITE_PROFILE, "ap_active": False}
+
+    def connect_wifi(self, ssid: str, psk: str) -> dict:
+        modify = [
+            "nmcli", "connection", "modify", SITE_PROFILE,
+            "802-11-wireless.ssid", ssid,
+            "802-11-wireless-security.key-mgmt", "wpa-psk",
+            "802-11-wireless-security.psk", psk,
+        ]
+        self._json_or_text(self.runner(modify), modify)
+        up = ["nmcli", "connection", "up", "id", SITE_PROFILE]
+        self._json_or_text(self.runner(up), up)
+        return {"ssid": ssid, "profile_id": SITE_PROFILE}
 
     def release_status(self) -> dict:
         argv = [self.release_cli, "status", "--json"]

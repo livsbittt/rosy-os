@@ -197,11 +197,20 @@ def test_a_card_requires_authentication(client, path):
         "/api/v1/host/release/rollback",
         "/api/v1/host/release/clear-hold",
         "/api/v1/host/network/apply",
+        "/api/v1/host/network/mode",
+        "/api/v1/host/network/connect",
         "/api/v1/host/reboot",
     ],
 )
 def test_an_action_requires_administrator(client, path):
-    body = {"confirmed": True, "release_id": "2026.09.05-002", "profile_id": "rosy-site-sta"}
+    body = {
+        "confirmed": True,
+        "release_id": "2026.09.05-002",
+        "profile_id": "rosy-site-sta",
+        "mode": "SITE_STA",
+        "ssid": "shop-wifi",
+        "psk": "supersecretpsk",
+    }
 
     assert client.post(path, json=body, headers=_auth(VIEWER_TOKEN)).status_code == 403
     # An administrator gets through the role gate and is stopped by the absent
@@ -475,6 +484,29 @@ def test_the_script_never_renders_a_wifi_secret():
 
     for secret in ("psk", "passphrase", "password"):
         assert f"data.{secret}" not in body, f"the network card reads data.{secret}"
+    assert "network-psk-input" not in body, "GET status must not fill the passphrase box"
+
+
+def test_the_script_toggles_ap_mode_and_connects_wifi():
+    script = _script()
+    render = _function_body(script, "renderHostNetwork")
+    assert "ap_active" in render
+    assert "network-ap-off" in script
+    assert "network-ap-on" in script
+    assert "/api/v1/host/network/mode" in script
+    assert "/api/v1/host/network/connect" in script
+    assert "SITE_STA" in script
+    assert "RELAY_AP_STA" in script
+    assert "network-ssid-input" in script
+    assert "network-psk-input" in script
+    html = (WEB / "index.html").read_text(encoding="utf-8")
+    assert 'id="network-ap-off"' in html
+    assert 'id="network-ap-on"' in html
+    assert 'id="network-connect"' in html
+    assert 'id="network-ssid-input"' in html
+    assert 'id="network-psk-input"' in html
+    psk_tag = html.split('id="network-psk-input"', 1)[1].split(">", 1)[0]
+    assert 'type="password"' in psk_tag
 
 
 def test_rollback_is_offered_only_when_there_is_somewhere_to_go():
@@ -509,3 +541,47 @@ def test_core_never_sends_a_piece_of_the_caller_token_to_the_agent(client, monke
     for size in range(4, len(ADMIN_TOKEN) + 1):
         assert ADMIN_TOKEN[:size] != user_id
     assert sent["actor"]["role"] == "administrator"
+
+
+def test_connect_relays_ssid_and_psk_but_does_not_echo_the_secret(client, monkeypatch):
+    connection = FakeConnection({"ok": True, "code": "OK", "data": {"ssid": "shop-wifi"}})
+
+    def fake_agent(_svc):
+        return HostAgentClient(connect=lambda: connection)
+
+    monkeypatch.setattr("rosy_core.api.v1.host._agent", fake_agent)
+
+    secret = "supersecretpsk"
+    body = client.post(
+        "/api/v1/host/network/connect",
+        json={"ssid": "shop-wifi", "psk": secret, "confirmed": True},
+        headers=_auth(ADMIN_TOKEN),
+    ).json()
+
+    sent = json.loads(connection.sent.decode("utf-8"))
+    assert sent["command"] == "network.connect"
+    assert sent["params"]["ssid"] == "shop-wifi"
+    assert sent["params"]["psk"] == secret
+    rendered = json.dumps(body, ensure_ascii=False)
+    assert secret not in rendered
+    assert "psk" not in (body.get("data") or {})
+
+
+def test_set_mode_relays_enumerated_d26_mode(client, monkeypatch):
+    connection = FakeConnection({"ok": True, "code": "OK", "data": {"mode": "SITE_STA"}})
+    monkeypatch.setattr(
+        "rosy_core.api.v1.host._agent",
+        lambda _svc: HostAgentClient(connect=lambda: connection),
+    )
+
+    body = client.post(
+        "/api/v1/host/network/mode",
+        json={"mode": "SITE_STA", "confirmed": True},
+        headers=_auth(ADMIN_TOKEN),
+    ).json()
+
+    sent = json.loads(connection.sent.decode("utf-8"))
+    assert sent["command"] == "network.set_mode"
+    assert sent["params"] == {"mode": "SITE_STA"}
+    assert body["available"] is True
+    assert body["data"]["mode"] == "SITE_STA"
