@@ -13,8 +13,8 @@ gates:
     evidence: "235 passed, 5 skipped (2026-09-17 Windows, 미커밋 WIP 포함 작업 트리). Fleet 서버 v1 시험 19건 포함"
     cmd: "python3 -m pytest src/rosy_fleet/test -q"
   ROS-SIM:
-    state: GO
-    evidence: "Task 14 sim bench 실행 (2026-09-17, WSL ROS 2 Jazzy + Gazebo, rosy_swarm_bench 2대). follow: relay_tx_hz 9.93~10.07, leader_rx_hz 9.45~10.07 (D-31 요구 >=10 Hz), slot_err_m 최소 0.04 / 마지막 10 표본 최대 0.59. hold: 릴레이 pause(t=30.7) -> 팔로워 holding(t=31.8) = 1.07 s, stream_timeout_ms 1000 과 일치"
+    state: HOLD
+    blocker: "D-87: 현재 트리의 colcon install/setup.bash가 없다. 2026-09-17 WSL Task 14 로그는 설계 입력이며 GO가 아니다 (D-89)"
     cmd: "python3 src/rosy_gz_sim/scripts/swarm_bench.py --robots <robots.yaml> --leader rosy_01 --scenario follow|hold"
   ARTIFACT:
     state: PARKED

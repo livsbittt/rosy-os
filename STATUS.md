@@ -8,8 +8,8 @@
 | [rosy_core](src/rosy_core/progress.md) | CORE | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [deploy](deploy/progress.md) | 릴리스·플랫폼 | uncommitted (2026-09-15) | GO | GO | N/A | HOLD | HOLD | N/A |
 | [rosy_control](src/rosy_control/progress.md) | CONTROL | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
-| [rosy_fleet](src/rosy_fleet/progress.md) | FLEET | dc89264 (2026-09-17) | GO | GO | GO | PARKED | PARKED | PARKED |
-| [rosy_games](src/rosy_games/progress.md) | GAMES | uncommitted (2026-09-18) | GO | GO | N/A | N/A | PARKED | PARKED |
+| [rosy_fleet](src/rosy_fleet/progress.md) | FLEET | dc89264 (2026-09-17) | GO | GO | HOLD | PARKED | PARKED | PARKED |
+| [rosy_games](src/rosy_games/progress.md) | GAMES | 411a303 (2026-09-18) | GO | GO | N/A | N/A | PARKED | PARKED |
 | [rosy_gz_sim](src/rosy_gz_sim/progress.md) | SIM | dc89264 (2026-09-17) | GO | GO | HOLD | N/A | N/A | N/A |
 | [rosy_navigation](src/rosy_navigation/progress.md) | NAV | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [rosy_bringup](src/rosy_bringup/progress.md) | BRINGUP | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
@@ -33,6 +33,7 @@
 - rosy_control ROS-SIM: ROS 2 Jazzy 노드 그래프(sensing/camera/planning/safety-policy) 재실행 증거 없음. 레거시 전체 스택(launch/robot.launch.py)은 CORE와 병행 기동하지 않는다(AGENTS.md, D-38)
 - rosy_control ARTIFACT: 서명된 ARM64 manifest·immutable digest 발행 전. 흡수된 코드는 deploy가 소유하는 OS 이미지에 번들된다
 - rosy_control DEVICE: Pi bench Device 설치와 device-readback.sh --json 증거 없음. Control sensor adapter 활성화는 Device 보정 generation에 묶인다(D-47)
+- rosy_fleet ROS-SIM: D-87: 현재 트리의 colcon install/setup.bash가 없다. 2026-09-17 WSL Task 14 로그는 설계 입력이며 GO가 아니다 (D-89)
 - rosy_gz_sim ROS-SIM: gz_multi.launch.py 멀티로봇 시나리오 미실행. ROS 2 Jazzy + Gazebo 필요 (Task 14)
 - rosy_navigation ROS-SIM: Nav2/SLAM Toolbox 실물 launch 미재실행. 현재는 ament_lint와 조합 계약 시험뿐 — ROS 2 Jazzy 환경에서 hardware.launch.py/gz_*.launch.xml 재실행 필요
 - rosy_navigation ARTIFACT: ARM64 로봇 이미지에 포함되나(Dockerfile/compose) 서명 manifest와 immutable digest 발행 전

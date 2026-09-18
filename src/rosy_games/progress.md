@@ -2,7 +2,7 @@
 module: rosy_games
 logical_modules: []
 owner: GAMES
-last_verified: { commit: "uncommitted", date: 2026-09-18 }
+last_verified: { commit: "411a303", date: 2026-09-18 }
 gates:
   SOURCE:
     state: GO
