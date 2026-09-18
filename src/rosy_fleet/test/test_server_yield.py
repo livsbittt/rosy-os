@@ -94,6 +94,21 @@ def _goals(robot):
 # --- 공간 만들기 -----------------------------------------------------------------
 
 
+def test_coincident_origin_reports_do_not_look_like_a_blocked_corridor():
+    """D-116: 둘 다 odom (0,0) 이면 양보 미션을 만들지 않는다."""
+    grid = payload(ALCOVE)
+    left = SimRobot("rosy_01", (0.0, 0.0), grid)
+    right = SimRobot("rosy_02", (0.0, 0.0), grid)
+    console = _console(left, right)
+
+    result = run(console.goal("rosy_01", 0.3, 1.05))
+
+    assert result.get("reason") != "YIELDING"
+    assert result.get("queued") is not True
+    assert _goals(right) == []
+    assert _goals(left) == [(0.3, 1.05)]
+
+
 def test_the_robot_in_the_way_is_sent_to_a_bay_and_the_mission_waits():
     left, right, console = _corridor()
 

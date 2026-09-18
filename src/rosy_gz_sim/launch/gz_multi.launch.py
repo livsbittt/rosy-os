@@ -26,7 +26,7 @@ import tempfile
 _LAUNCH_DIR = os.path.dirname(os.path.abspath(__file__))
 if _LAUNCH_DIR not in sys.path:
     sys.path.insert(0, _LAUNCH_DIR)
-from world_profiles import resolve_world
+from world_profiles import resolve_world, spawn_xy
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -288,7 +288,7 @@ def _launch_setup(context):
         )
 
         # 2) spawn — spawn_x/spawn_y 에서 x축으로 spacing 간격 배치
-        x = spawn_x + (i - 1) * spacing
+        x, y = spawn_xy(i, spawn_x, spawn_y, spacing)
         group_actions.append(
             Node(
                 package="ros_gz_sim",
@@ -298,7 +298,7 @@ def _launch_setup(context):
                 arguments=[
                     "-name", ns,
                     "-topic", f"{ns}/robot_description",
-                    "-x", str(x), "-y", str(spawn_y), "-z", "0.1",
+                    "-x", str(x), "-y", str(y), "-z", "0.1",
                 ],
                 parameters=[{"use_sim_time": True}],
             )
@@ -394,7 +394,25 @@ def _launch_setup(context):
                     ])
                 )
 
-        # 5) rosy_core (core:=true) — 로봇마다 포트·HOME·설정을 가른다.
+        # 5) map 시드 — odom (0,0) 을 관제 pose 로 쓰지 않는다 (D-115)
+        if mode in ("nav", "slam_nav"):
+            group_actions.append(
+                Node(
+                    package="rosy_gz_sim",
+                    executable="seed_initialpose",
+                    name="seed_initialpose",
+                    namespace=ns,
+                    output="screen",
+                    parameters=[{
+                        "use_sim_time": True,
+                        "x": x,
+                        "y": y,
+                        "yaw": 0.0,
+                    }],
+                )
+            )
+
+        # 6) rosy_core (core:=true) — 로봇마다 포트·HOME·설정을 가른다.
         #    HOME 을 가르는 이유: waypoints.json 과 audit.jsonl 이 Path.home()/.rosy 에
         #    고정돼 있어, 같은 HOME 이면 N대가 한 파일을 쓴다.
         #    HOME 을 가르면 ROS 로그도 따라간다: 각 코어의 ~/.ros/log 는 그 임시 HOME

@@ -278,11 +278,15 @@ class FleetConsole:
         if not route:
             return []
         out = []
+        here = self._pose_of(mover)
         for robot_id in self._order:
             if robot_id == mover or robot_id in self._claims:
                 continue
             pose = self._pose_of(robot_id)
             if pose is None:
+                continue
+            if here is not None and traffic.coincident(pose, here):
+                # 출발점과 같은 보고는 길을 막은 로봇이 아니라 측위가 안 된 겹침이다 (D-116).
                 continue
             nearest = bays.nearest_on_route(route, pose)
             if nearest is None or math.dist(nearest, pose) >= self._yield_keep_out_m:

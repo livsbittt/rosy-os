@@ -52,6 +52,9 @@
 | D-111 | `--stair 1–5`는 호스트 프리셋이며 FIELD GO가 아니다 |
 | D-112 | 계단 1 가시성은 호스트 보고이며 FIELD GO가 아니다 |
 | D-113 | D-96 남은 실행은 현장 실측이며 LOCAL 호스트 트랙은 닫힌다 |
+| D-114 | gz_multi 시뮬은 도메인 하나·네임스페이스·ros_gz_bridge다 |
+| D-115 | gz_multi는 스폰 좌표를 map initialpose로 심는다 |
+| D-116 | 관제 양보는 출발 로봇과 겹친 pose를 길로 보지 않는다 |
 
 ## 계획·결과 문서
 
@@ -73,8 +76,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · feat(sim): gz_multi bridge lock, spawn pose seed, coincident yield guard (D-114–D-116)
 - 2026-09-18 · uncommitted · feat(games): stair 1 visibility report; close host track (D-112, D-113)
 - 2026-09-18 · uncommitted · feat(games): first-contact 0.10 cap and --stair 1-5 (D-110, D-111)
 - 2026-09-18 · uncommitted · docs(adr): lock deferred catalog (D-109)
 - 2026-09-18 · uncommitted · feat(games): default to observe-only, opt in with --drive (D-107, D-108)
-- 2026-09-18 · uncommitted · docs(adr): D-96 stair 1 is observe-only (D-107, D-108)

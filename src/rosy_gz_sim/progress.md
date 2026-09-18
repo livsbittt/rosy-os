@@ -10,7 +10,7 @@ gates:
     cmd: "python -m pytest src/rosy_gz_sim/test/test_gz_package_contract.py src/rosy_gz_sim/test/test_world_to_map.py -q"
   LOCAL:
     state: GO
-    evidence: "동일 8 passed. Gazebo/launch 없는 호스트에서 도는 정답 맵 생성기"
+    evidence: "D-114 ros_gz_bridge lock, D-115 spawn_xy/initialpose seed (2026-09-18 Windows). Gazebo 런타임은 ROS-SIM"
     cmd: "python -m pytest src/rosy_gz_sim/test/test_gz_package_contract.py src/rosy_gz_sim/test/test_world_to_map.py -q"
   ROS-SIM:
     state: HOLD
@@ -21,7 +21,7 @@ gates:
     state: N/A
   FIELD:
     state: N/A
-adrs: [D-4, D-33, D-49, D-79]
+adrs: [D-4, D-33, D-49, D-79, D-114, D-115]
 plans:
   - docs/plans/2026-09-08-swarm-formation-slice-design.md
   - docs/plans/2026-09-08-swarm-formation-slice.md
@@ -30,7 +30,8 @@ plans:
 ---
 ## 지금 상태
 
-- `gz_multi.launch.py`로 N대 네임스페이스 로봇을 띄운다. spawn_x/spawn_y로 원점 구조물을 피한다.
+- `gz_multi.launch.py`로 N대 네임스페이스 로봇을 띄운다. 도메인 하나 + ros_gz_bridge (D-114). `domain_bridge` 없음.
+- `mode:=nav` 는 spawn 좌표를 `{ns}/initialpose` 로 심는다 (D-115). odom (0,0) 을 관제 pose 로 쓰지 않는다.
 - `world_to_map.py`가 박스 충돌체에서 정답 점유 격자를 만든다. Gazebo 없이 Windows에서 돈다.
 - aarch64 CMake는 `return()` — Pi 이미지에 Gazebo를 싣지 않는다.
 - ROS-SIM(Task 14 실측)은 HOLD. SOURCE/LOCAL은 host-contract + world_to_map이다.

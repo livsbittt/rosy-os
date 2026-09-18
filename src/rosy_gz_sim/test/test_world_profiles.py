@@ -5,6 +5,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "launch" / "world_profiles.py"
 
@@ -46,6 +48,17 @@ def test_factory_and_maze_do_not_share_inflation():
     assert maze.map == "rosy_maze.yaml"
     assert (factory.spawn_x, factory.spawn_y) != (0.0, 0.0)
     assert (maze.spawn_x, maze.spawn_y) != (factory.spawn_x, factory.spawn_y)
+
+
+def test_spawn_xy_spaces_robots_along_x_and_keeps_factory_off_the_origin():
+    """D-115: 시드와 spawn 은 같은 숫자다. factory 두 대는 (0,0) 이 아니다."""
+    factory = profile_for("rosy_factory.world")
+    first = _mod().spawn_xy(1, factory.spawn_x, factory.spawn_y, factory.spawn_spacing)
+    second = _mod().spawn_xy(2, factory.spawn_x, factory.spawn_y, factory.spawn_spacing)
+    assert first == pytest.approx((-0.2, 1.05))
+    assert second == pytest.approx((0.4, 1.05))
+    assert first != (0.0, 0.0)
+    assert second != first
 
 
 def test_launch_args_override_the_catalog_not_the_other_way_around():

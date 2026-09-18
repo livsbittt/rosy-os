@@ -5,13 +5,15 @@
 
 ## Purpose
 
-Host-side swarm formation bench. Uses `rosy_fleet` over the robot HTTP/WS contract. No `rclpy`. Not installed as a ROS node.
+Host-side swarm bench (`swarm_bench.py`, no `rclpy`) and `seed_initialpose.py` (rclpy node for D-115). `world_to_map.py` is ROS-free.
 
 ## Key Files
 
 | File | Description |
 |------|-------------|
 | `swarm_bench.py` | Async bench: `follow` / `reform` / `hold` / `stuck` scenarios; CSV of slot error, stream age, relay Hz |
+| `world_to_map.py` | World collision boxes → nav2 occupancy. No rclpy |
+| `seed_initialpose.py` | D-115: publish `{ns}/initialpose` at spawn. rclpy. Host pytest does not import this file |
 
 ## Subdirectories
 

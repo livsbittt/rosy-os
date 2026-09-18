@@ -66,6 +66,13 @@ def load_worlds(path: Path | None = None) -> dict[str, WorldProfile]:
     return out
 
 
+def spawn_xy(index: int, spawn_x: float, spawn_y: float, spacing: float) -> tuple[float, float]:
+    """1-based robot index. x grows by spacing. Same numbers seed AMCL (D-115)."""
+    if index < 1:
+        raise ValueError(f"robot index must be >= 1, got {index}")
+    return spawn_x + (index - 1) * spacing, spawn_y
+
+
 def profile_for(world_name: str, path: Path | None = None) -> WorldProfile:
     worlds = load_worlds(path)
     key = _key(world_name)

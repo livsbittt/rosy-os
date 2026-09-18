@@ -23,7 +23,16 @@ DEFAULT_CLEARANCE_M = 0.7
 #: 20 cm 간격이면 충돌 판정에 충분하고 비교량은 1/16 로 줄어든다.
 SAMPLE_STEP_M = 0.2
 
+#: mover 와 같은 점으로 보고되면 길을 막았다고 말할 수 없다 (D-116).
+#: 풋프린트(~0.12 m)보다 작고 factory spawn 간격(0.6 m)보다 훨씬 작다.
+COINCIDENT_M = 0.05
+
 Point = tuple[float, float]
+
+
+def coincident(a: Point, b: Point, eps: float = COINCIDENT_M) -> bool:
+    """두 보고가 같은 점인지. 측위 실패로 겹친 원점을 길로 보지 않기 위해 쓴다."""
+    return math.dist(a, b) < eps
 
 
 def route_points(payload: object) -> list[Point]:

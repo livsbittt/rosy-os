@@ -17,6 +17,14 @@ def _line(x0, y0, x1, y1, n=40):
 # --- 순수 기하 -------------------------------------------------------------------
 
 
+def test_coincident_poses_are_closer_than_a_footprint():
+    """D-116: 0.05 m 는 겹친 보고이지, 0.6 m spawn 간격이 아니다."""
+    assert traffic.coincident((0.0, 0.0), (0.0, 0.0))
+    assert traffic.coincident((0.0, 0.0), (0.04, 0.0))
+    assert not traffic.coincident((0.0, 0.0), (0.6, 0.0))
+    assert not traffic.coincident((-0.2, 1.05), (0.4, 1.05))
+
+
 def test_head_on_routes_in_the_same_corridor_conflict():
     """폭 1.4 m 통로를 마주 보고 지나는 두 경로. 실제로 두 대가 0.10 m 간격으로 갇혔던 장면이다."""
     assert traffic.routes_conflict(_line(-2.2, 0, 2.2, 0), _line(2.2, 0.1, -2.2, 0.1))

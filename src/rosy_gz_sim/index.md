@@ -13,6 +13,8 @@
 | D-33 | 로봇 신원은 하나의 로봇 번호에서 나온다 |
 | D-49 | Gazebo motion provenance hashes use the absorbed package root |
 | D-79 | 게이트 GO는 현재 트리 재실행만 인정한다 |
+| D-114 | gz_multi 시뮬은 도메인 하나·네임스페이스·ros_gz_bridge다 |
+| D-115 | gz_multi는 스폰 좌표를 map initialpose로 심는다 |
 
 ## 계획·결과 문서
 
@@ -31,6 +33,7 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · feat(sim): lock ros_gz_bridge and seed spawn initialpose (D-114, D-115)
 - 2026-09-18 · uncommitted · fix(sim): 월드 프로필이 간격을 주도록 하고 공장 팽창을 실측으로 올린다
 - 2026-09-17 · uncommitted · feat(sim): 어려운 월드·정답 맵 생성기·맵을 만들며 주행하는 모드
 - 2026-09-17 · uncommitted · feat(sim): host-contract for world_to_map

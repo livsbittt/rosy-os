@@ -30,3 +30,9 @@
 - gate 변화: 없음
 - 결정: 없음
 - 교훈: 비어 있지 않은 런치 기본값은 프로필을 무력화한다. "인자가 없으면 프로필" 을 하려면 기본값이 비어 있어야 한다
+
+## 2026-09-18 · uncommitted · feat(sim): lock ros_gz_bridge and seed spawn initialpose (D-114, D-115)
+
+- 변경: `gz_multi` 는 domain_bridge/ROS_DOMAIN_ID 없음. `spawn_xy` 와 `seed_initialpose` 가 nav 모드에서 map 시드를 심는다.
+- 증거: `python -m pytest src/rosy_gz_sim/test -q`
+- gate 변화: 없음. ROS-SIM HOLD. pytest ≠ GO

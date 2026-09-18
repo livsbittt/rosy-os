@@ -85,3 +85,9 @@
 - 변경: `test_boundaries.py`가 패키지 전체 `rosy_games` import를 금지. 매치 시작 버튼은 만들지 않음.
 - 증거: `python -m pytest src/rosy_fleet/test/test_boundaries.py test/test_rosy_games_surface.py -q`
 - gate 변화: 없음. D-90/D-106 경계만.
+
+## 2026-09-18 · uncommitted · feat(fleet): coincident poses are not a blocked corridor (D-116)
+
+- 변경: mover 와 0.05 m 안 pose 는 양보 대상이 아니다. odom 원점 겹침으로 양보 미션을 만들지 않는다.
+- 증거: `python -m pytest src/rosy_fleet/test/test_server_yield.py src/rosy_fleet/test/test_server_traffic.py -q`
+- gate 변화: 없음. ROS-SIM HOLD

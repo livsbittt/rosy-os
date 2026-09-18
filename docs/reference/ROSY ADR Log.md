@@ -121,6 +121,9 @@
 | D-111 | `--stair 1–5`는 호스트 프리셋이며 FIELD GO가 아니다 | Accepted |
 | D-112 | 계단 1 가시성은 호스트 보고이며 FIELD GO가 아니다 | Accepted |
 | D-113 | D-96 남은 실행은 현장 실측이며 LOCAL 호스트 트랙은 닫힌다 | Accepted |
+| D-114 | gz_multi 시뮬은 도메인 하나·네임스페이스·ros_gz_bridge다 | Accepted |
+| D-115 | gz_multi는 스폰 좌표를 map initialpose로 심는다 | Accepted |
+| D-116 | 관제 양보는 출발 로봇과 겹친 pose를 길로 보지 않는다 | Accepted |
 
 ---
 
@@ -3475,4 +3478,105 @@ D-41 행은 Proposed. DEVICE/FIELD PARKED.
 **Validation / Transition:** `progress.md` FIELD PARKED. `test_rosy_games_surface.py`.
 
 **References:** D-91, D-95, D-96, D-107, D-108, D-109, D-110, D-111, D-112.
+
+---
+
+## D-114 gz_multi 시뮬은 도메인 하나·네임스페이스·ros_gz_bridge다
+
+**Status:** Accepted (2026-09-18). 시뮬 통신 모델이다. ROS-SIM GO가 아니다.
+
+**Context:** 실기는 `ROS_DOMAIN_ID = 40+N` 과 localhost CycloneDDS 로 로봇 간 DDS를
+끊고, 관제는 CORE REST 다 (D-33, D-81). `gz_multi` 는 Gazebo 하나 위에 N대를
+띄우므로 도메인을 나누면 spawn·clock·`/tf` 가 깨진다. ROS 2 `domain_bridge` 와
+`rosy_env.sh` 를 시뮬에 얹으면 실기 격리를 흉내 내는 것처럼 보이지만, 관제가 쓰는
+경로는 HTTP 라 그 브리지는 관제를 닫지 않는다.
+
+2026-09-18 WSL 실측: `parameter_bridge` 두 개가 `rosy_01`/`rosy_02` 의
+scan/cmd_vel/odom 을 이었고 `domain_bridge` 프로세스는 없었다. 관제
+`127.0.0.1:8090` 은 8080/8081 REST 로 2/2 online 이었다.
+
+**Decision:**
+
+- `gz_multi` 는 **도메인 하나** + `rosy_XX` 네임스페이스다
+- Gazebo↔ROS 는 **`ros_gz_bridge` `parameter_bridge`** 다. 로봇마다 YAML 을 만든다
+- ROS 2 `domain_bridge` 를 `gz_multi` 에 넣지 않는다
+- `rosy_env.sh` / 로봇별 `ROS_DOMAIN_ID` 를 `gz_multi` 에 source 하지 않는다
+- 시뮬 관제는 계속 CORE REST (D-81). 관제 UI 가 DDS/`cmd_vel` 에 붙지 않는다
+- 이 결정이 ROS-SIM GO 가 아니다 (D-79, D-83, D-87)
+
+**Alternatives:** 시뮬에도 로봇별 도메인을 쓰는 안은 한 Gazebo 월드의 clock/TF 를
+나눈다. `domain_bridge` 로 관제 PC 를 도메인 0 에 두는 안은 관제가 이미 HTTP 라
+중복이다.
+
+**Consequences:** 실기 D-33 과 시뮬 네임스페이스는 다른 모델이다. 시뮬 DDS
+디스커버리 흔들림을 실기 격리가 안 된 증거로 쓰지 않는다.
+
+**Validation / Transition:** `test_gz_package_contract.py`. ROS-SIM HOLD.
+
+**References:** D-6, D-33, D-79, D-81, D-83, D-87.
+
+---
+
+## D-115 gz_multi는 스폰 좌표를 map initialpose로 심는다
+
+**Status:** Accepted (2026-09-18). 시뮬 측위 시드다. ROS-SIM GO가 아니다.
+
+**Context:** 각 로봇 odom 원점은 자기 spawn 이다. AMCL 에 map 시드가 없으면 CORE 는
+map TF 가 없어 odom (0,0) 을 보고 pose 로 쓴다 (`odometry.odom_owns_pose`).
+2026-09-18 factory `gz_multi` 에서 두 CORE 가 둘 다 pose ≈ (0,0) 을 보고, 관제가
+겹친 줄 알고 양보를 걸었다. spawn 은 `(-0.2, 1.05)` / `(0.4, 1.05)` 였다.
+
+CORE 는 이미 `POST /api/v1/localization/initialpose` 와 `{ns}/initialpose` 퍼블리셔가
+있다. `gz_multi` 가 스폰 뒤 심지 않을 뿐이다.
+
+**Decision:**
+
+- `mode:=nav` (AMCL) 에서 로봇 i 의 map 시드는
+  `(spawn_x + (i-1)*spacing, spawn_y, yaw=0)`
+- `gz_multi` 가 `{ns}/initialpose` 로 반복 publish 한다. AMCL 이 늦게 구독해도 받게
+- odom (0,0) 을 관제 pose 로 승격하지 않는 것이 목적이다. 시드가 곧 현장 GO 는 아니다
+- `seed_initialpose` 는 rosy_core 를 import 하지 않는다
+
+**Alternatives:** 운영자가 콘솔에서 initialpose 를 누르는 안은 매 시뮬마다 원점 겹침
+양보가 먼저 난다. CORE 가 odom 폴백을 끄는 안은 맵 없는 teleop 화면을 지운다.
+
+**Consequences:** 스폰 숫자와 시드 숫자는 같은 함수다 (`spawn_xy`). pytest 가
+Gazebo 를 대신하지 않는다.
+
+**Validation / Transition:** `test_world_profiles.py`, `test_gz_package_contract.py`.
+ROS-SIM HOLD.
+
+**References:** D-79, D-81, D-114, D-116.
+
+---
+
+## D-116 관제 양보는 출발 로봇과 겹친 pose를 길로 보지 않는다
+
+**Status:** Accepted (2026-09-18). 관제 기하 가드다. DEVICE/FIELD GO가 아니다.
+
+**Context:** 양보는 경로 위 `yield_keep_out` 안의 **서 있는** 로봇을 치운다. 출발
+로봇과 차단 로봇이 같은 좌표(측위 실패·odom 원점)면, 출발점에서 목표로 그은 직선이
+그 좌표를 지나 **자기 원점의 유령**을 길로 본다. 2026-09-18 시뮬에서 `rosy_01` 목표
+하달이 `YIELDING` / `blocked_by rosy_02` 가 되고 `rosy_02` 가 양보 벽감으로 돌기
+시작했다. 둘 다 pose ≈ (0,0) 이었다.
+
+D-93 은 폭 면제를 거절한다. 겹친 보고를 면제하는 것은 폭이 아니라 **같은 점이라서
+누가 길을 막는지 말할 수 없음**이다.
+
+**Decision:**
+
+- mover 와 후보의 pose 거리가 `COINCIDENT_M` (0.05 m) 미만이면 길로 보지 않는다
+- 0.05 m 는 풋프린트보다 작고, factory spawn 간격(0.6 m)보다 훨씬 작다
+- 이 가드가 AMCL 시드(D-115)를 대신하지 않는다. 둘 다 필요하다
+- 실제 0.05 m 안에 두 대가 있는 배치는 이 가드가 중재를 포기한다. 그 배치는 시뮬
+  spawn 계약이 아니다
+
+**Alternatives:** (0,0) 만 특수 처리하는 안은 맵 원점 spawn 월드에서 실패한다.
+양보를 끄면 D-93 실측(빈 방 맞물림)이 돌아온다.
+
+**Consequences:** `traffic.coincident`. 호스트 pytest 로 DEVICE GO 하지 않는다.
+
+**Validation / Transition:** `test_server_yield.py`. ROS-SIM HOLD.
+
+**References:** D-12, D-93, D-115.
 

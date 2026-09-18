@@ -243,3 +243,11 @@
 - gate 변화: rosy_games LOCAL GO 유지. DEVICE/FIELD PARKED
 - 결정: `ready`와 pytest는 FIELD GO가 아니다
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · feat(sim): gz_multi bridge lock, spawn pose seed, coincident yield guard (D-114–D-116)
+
+- 변경: ADR D-114·D-115·D-116. 시뮬은 ros_gz_bridge. spawn 을 map initialpose 로 심음. 관제는 겹친 pose 를 길로 보지 않음.
+- 증거: `python -m pytest src/rosy_gz_sim/test src/rosy_fleet/test/test_server_yield.py src/rosy_fleet/test/test_server_traffic.py test/test_harness_contracts.py -q`
+- gate 변화: rosy_gz_sim/rosy_fleet LOCAL GO 유지. ROS-SIM HOLD
+- 결정: D-114–D-116 Accepted. 현장/시뮬 GO 아님
+- 교훈: 없음
