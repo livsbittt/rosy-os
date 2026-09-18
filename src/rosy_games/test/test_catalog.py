@@ -1,7 +1,11 @@
-from rosy_games.catalog import make_game, make_policy
+from pathlib import Path
+
+from rosy_games.catalog import GAMES, POLICIES, make_game, make_policy
 from rosy_games.field import Field
 from rosy_games.game import SoccerGame
 from rosy_games.policy import HeuristicPolicy
+
+PKG = Path(__file__).resolve().parents[1]
 
 
 def test_catalog_builds_soccer_and_heuristic_from_names():
@@ -26,3 +30,11 @@ def test_catalog_rejects_unknown_kinds():
         raise AssertionError("unknown policy must fail")
     except ValueError as exc:
         assert "neural" in str(exc)
+
+
+def test_catalog_has_only_soccer_and_heuristic_until_field_repeats():
+    """D-98/D-99: Isaac 폴더와 NeuralPolicy는 FIELD 반복 전 없다."""
+    assert set(GAMES) == {"soccer"}
+    assert set(POLICIES) == {"heuristic"}
+    assert not (PKG / "rosy_games" / "isaac").exists()
+    assert not (PKG / "rosy_games" / "policy" / "neural.py").exists()

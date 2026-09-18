@@ -1,7 +1,7 @@
 # 남은 게이트 → ADR 계획
 
 작성일: 2026-09-17
-상태: D-78–D-81을 기록한다. G0–G3·카메라·OMX·IMU 융합은 기존 Proposed를 재사용한다.
+상태: D-78–D-81 기록. D-54–D-56은 이후 소스 게이트 Accepted. G0–G3·카메라·OMX는 계속 Proposed (D-91).
 
 관련: D-5, D-36, D-38, D-41–D-44, D-46, D-47, D-51–D-56, D-59, D-61, D-66, D-72, D-77 ·
 [device-validation](2026-09-13-rosy-os-device-validation-implementation-plan.md) ·

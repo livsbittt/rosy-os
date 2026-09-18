@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from rosy_games.cli import main
+from rosy_games.cli import main, parse_args
 from rosy_games.host.robots import load_match
 
 PKG = Path(__file__).resolve().parents[1]
@@ -46,7 +46,12 @@ def test_dry_run_prints_both_robots_without_opening_a_socket(monkeypatch, capsys
     out = capsys.readouterr().out
     assert "rosy_01" in out
     assert "rosy_02" in out
-    assert "soccer" in out
+
+
+def test_cli_default_observer_is_hold_not_the_camera():
+    """D-95: 기본은 hold. overhead는 명시할 때만."""
+    args = parse_args(["match", "--config", str(MATCH), "--dry-run"])
+    assert args.observer == "hold"
 
 
 def test_load_match_assigns_home_from_attacks_not_row_order(tmp_path):

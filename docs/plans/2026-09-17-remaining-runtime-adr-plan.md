@@ -1,7 +1,7 @@
 # 남은 런타임 게이트 → ADR 계획
 
 작성일: 2026-09-17
-상태: D-83–D-86을 기록한다. G0–G3·카메라·OMX·IMU 융합은 기존 Proposed를 재사용한다.
+상태: D-83–D-86 기록. IMU 융합은 D-56 Accepted(엔코더 기본). G0–G3·카메라는 D-91 Proposed.
 
 관련: D-38, D-46, D-51–D-56, D-62, D-66, D-78–D-81 ·
 [남은 게이트](2026-09-17-remaining-gates-adr-plan.md) ·
