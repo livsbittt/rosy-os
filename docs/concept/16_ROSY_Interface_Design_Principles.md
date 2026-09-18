@@ -224,6 +224,11 @@ guidance:
   (`src/rosy_core/test/test_capability_descriptors.py`)
 - evidence state is present on every rendered telemetry binding
   (`src/rosy_core/test/test_dashboard.py`, `test_evidence.py`)
+- a surface stylesheet declares no tokens of its own — no alias vocabulary
+  beside the token file (`src/rosy_core/test/test_ui_token_contracts.py`, D-92)
+- spacing comes from `--space-*` and type size from `--text-*` (same)
+- the operate view does not scroll and the map keeps the observe region
+  (`src/rosy_core/test/test_console_layout.py`)
 
 D-73: a test that opened both `rosy_core/web/tokens.css` and
 `rosy_control/web/dashboard.html` would have no owning module. Do not add one.
