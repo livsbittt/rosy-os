@@ -21,6 +21,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     match.add_argument("--config", required=True, type=Path)
     match.add_argument("--dry-run", action="store_true")
     match.add_argument("--ticks", type=int, default=None)
+    match.add_argument("--observer", choices=("hold", "overhead"), default="hold")
     return parser.parse_args(argv)
 
 
@@ -34,8 +35,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"{robot.id} {robot.url} aruco={robot.aruco_id} attacks={robot.attacks}")
         return 0
     clients = [HttpPlayerClient(endpoint) for endpoint in setup.robots]
+    observer = _observer(args.observer, setup)
     host = MatchHost(
-        HoldObserver(setup.field.home_id, setup.field.away_id),
+        observer,
         clients,
         game=make_game(setup.game, setup.field),
         policy=make_policy(setup.policy, setup.field, speed=setup.linear),
@@ -47,7 +49,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             close = getattr(client, "close", None)
             if close is not None:
                 close()
+        close = getattr(observer, "close", None)
+        if close is not None:
+            close()
     return 0
+
+
+def _observer(kind: str, setup):
+    if kind == "hold":
+        return HoldObserver(setup.field.home_id, setup.field.away_id)
+    from rosy_games.host.overhead import OverheadCamera
+
+    return OverheadCamera(setup)
 
 
 if __name__ == "__main__":

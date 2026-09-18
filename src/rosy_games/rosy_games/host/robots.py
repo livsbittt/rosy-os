@@ -21,12 +21,22 @@ class RobotEndpoint:
 
 
 @dataclass(frozen=True)
+class CameraConfig:
+    index: int = 0
+    hsv_low: tuple[int, int, int] = (5, 120, 80)
+    hsv_high: tuple[int, int, int] = (25, 255, 255)
+    corner_ids: tuple[int, int, int, int] = (10, 11, 12, 13)
+    lost_hold_s: float = 0.5
+
+
+@dataclass(frozen=True)
 class MatchSetup:
     field: Field
     robots: tuple[RobotEndpoint, ...]
     game: str = "soccer"
     policy: str = "heuristic"
     linear: float = 0.08
+    camera: CameraConfig = CameraConfig()
 
 
 def load_match(path: Path) -> MatchSetup:
@@ -58,12 +68,27 @@ def load_match(path: Path) -> MatchSetup:
         home_id=home.id,
         away_id=away.id,
     )
+    cam = data.get("camera") or {}
+    ball = data.get("ball") or {}
+    watch = data.get("watchdog") or {}
+    corners = tuple(int(v) for v in (cam.get("corners") or (10, 11, 12, 13)))
+    if len(corners) != 4:
+        raise ValueError(f"{path}: camera.corners needs four ArUco ids")
+    hsv_low = tuple(int(v) for v in (ball.get("hsv_low") or (5, 120, 80)))
+    hsv_high = tuple(int(v) for v in (ball.get("hsv_high") or (25, 255, 255)))
     return MatchSetup(
         field=field,
         robots=(home, away),
         game=str(data.get("game") or "soccer"),
         policy=str(data.get("policy") or "heuristic"),
         linear=float(limits.get("linear", 0.08)),
+        camera=CameraConfig(
+            index=int(cam.get("index", 0)),
+            hsv_low=hsv_low,  # type: ignore[arg-type]
+            hsv_high=hsv_high,  # type: ignore[arg-type]
+            corner_ids=corners,  # type: ignore[arg-type]
+            lost_hold_s=float(watch.get("lost_hold_s", 0.5)),
+        ),
     )
 
 

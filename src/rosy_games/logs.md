@@ -49,3 +49,9 @@
 - 변경: `catalog`로 soccer/heuristic 플러그인. `match.local.yaml` 오버레이. `HoldObserver`+`run_match`로 카메라 없이 MANUAL 무장·정지 teleop. 관측 예외 시 양쪽 halt. 빈 토큰은 Authorization 생략.
 - 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 42 passed
 - gate 변화: 없음. LOCAL GO 유지. DEVICE/FIELD PARKED.
+
+## 2026-09-18 · uncommitted · feat(games): project the ceiling camera onto the pitch
+
+- 변경: `field/homography.py` 순수 호모그래피. `host/project.py` 픽셀→Observation. `host/overhead.py`만 cv2 (ArUco 코너 10–13, 로봇 마커, 주황 blob). CLI `--observer overhead|hold`.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 53 passed
+- gate 변화: LOCAL GO 유지 (합성 프레임). DEVICE/FIELD PARKED.

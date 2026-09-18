@@ -29,6 +29,8 @@ def test_load_match_builds_field_and_two_endpoints():
     assert robots[1].attacks == "negative_x"
     assert setup.game == "soccer"
     assert setup.policy == "heuristic"
+    assert setup.camera.index == 0
+    assert setup.camera.corner_ids == (10, 11, 12, 13)
 
 
 def test_dry_run_prints_both_robots_without_opening_a_socket(monkeypatch, capsys):
