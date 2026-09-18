@@ -9,6 +9,12 @@ from __future__ import annotations
 
 
 def main() -> None:
+    import os
+
+    from rosy_core.system.rmw import apply_cyclone_rmw
+
+    apply_cyclone_rmw(os.environ)
+
     import rclpy
 
     from rosy_core.config import load_config

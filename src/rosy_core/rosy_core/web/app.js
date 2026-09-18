@@ -295,6 +295,7 @@ function renderRosNetwork(runtime) {
   };
   setText("dds-isolation", isolationLabels[graph.isolation?.mode] || "—");
   setText("dds-interface", graph.isolation?.interface ? `interface ${graph.isolation.interface}` : "인터페이스 확인 불가");
+  setText("dds-rmw", graph.rmw || "—");
   setText("ros-node-count", graph.node_count);
   setText("ros-topic-count", graph.topic_count);
   setText("network-rx-rate", rate(throughput.rx_bytes_per_second));

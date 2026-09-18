@@ -79,6 +79,35 @@ def test_snapshot_reports_duplicate_and_foreign_nodes_with_topic_edges():
     assert snapshot['status'] == 'WARNING'
 
 
+def test_snapshot_reports_cyclone_rmw():
+    monitor = RosGraphMonitor(
+        FakeGraphNode([], []),
+        domain_id='42',
+        namespace='rosy_01',
+        dds_uri='file:///etc/rosy/cyclonedds.xml',
+        dds_config_reader=lambda _: '<NetworkInterface name="lo"/>',
+        environment={'RMW_IMPLEMENTATION': 'rmw_cyclonedds_cpp'},
+    )
+    snapshot = monitor.snapshot()
+    assert snapshot['rmw'] == 'rmw_cyclonedds_cpp'
+    assert 'RMW_NOT_CYCLONE' not in {risk['code'] for risk in snapshot['risks']}
+
+
+def test_foreign_rmw_is_an_explicit_error():
+    monitor = RosGraphMonitor(
+        FakeGraphNode([], []),
+        domain_id='42',
+        namespace='rosy_01',
+        dds_uri='file:///etc/rosy/cyclonedds.xml',
+        dds_config_reader=lambda _: '<NetworkInterface name="lo"/>',
+        environment={'RMW_IMPLEMENTATION': 'rmw_fastrtps_cpp'},
+    )
+    snapshot = monitor.snapshot()
+    assert snapshot['rmw'] == 'rmw_fastrtps_cpp'
+    assert snapshot['status'] == 'ERROR'
+    assert 'RMW_NOT_CYCLONE' in {risk['code'] for risk in snapshot['risks']}
+
+
 def test_invalid_domain_and_non_loopback_dds_are_explicit_errors():
     monitor = RosGraphMonitor(
         FakeGraphNode([], []),

@@ -10,6 +10,8 @@ import time
 from typing import Any, Callable, Mapping, Optional
 from xml.etree import ElementTree
 
+from rosy_core.system.rmw import REQUIRED_RMW
+
 
 MAX_NODES = 64
 MAX_TOPICS = 96
@@ -108,6 +110,7 @@ class RosGraphMonitor:
             env.get('ROSY_NAMESPACE', '') if namespace is None else namespace
         )
         self._dds_uri = str(env.get('CYCLONEDDS_URI', '') if dds_uri is None else dds_uri)
+        self._rmw = str(env.get('RMW_IMPLEMENTATION') or '').strip()
         self._dds_config_reader = dds_config_reader or _default_dds_config_reader
         self._monotonic = monotonic
         self._cache_seconds = max(0.0, float(cache_seconds))
@@ -138,6 +141,7 @@ class RosGraphMonitor:
                 'status': 'UNAVAILABLE',
                 'domain_id': None,
                 'namespace': self._namespace,
+                'rmw': self._rmw or None,
                 'isolation': {'mode': 'unknown', 'interface': None, 'uri': self._dds_uri or None},
                 'node_count': None,
                 'unique_node_count': None,
@@ -157,6 +161,11 @@ class RosGraphMonitor:
             risks.append({'code': 'DOMAIN_ID_INVALID', 'message': str(error)})
 
         isolation = _dds_isolation(self._dds_uri, self._dds_config_reader)
+        if self._rmw and self._rmw != REQUIRED_RMW:
+            risks.append({
+                'code': 'RMW_NOT_CYCLONE',
+                'message': f'RMW_IMPLEMENTATION={self._rmw}; Rosy requires {REQUIRED_RMW}',
+            })
         if isolation['mode'] == 'network_visible':
             risks.append({
                 'code': 'DDS_NOT_LOOPBACK',
@@ -245,7 +254,7 @@ class RosGraphMonitor:
                     'kind': 'subscribes',
                 })
 
-        error_codes = {'DOMAIN_ID_INVALID', 'DDS_NOT_LOOPBACK'}
+        error_codes = {'DOMAIN_ID_INVALID', 'DDS_NOT_LOOPBACK', 'RMW_NOT_CYCLONE'}
         status = 'ERROR' if any(risk['code'] in error_codes for risk in risks) else (
             'WARNING' if risks else 'OK'
         )
@@ -253,6 +262,7 @@ class RosGraphMonitor:
             'status': status,
             'domain_id': domain_id,
             'namespace': self._namespace,
+            'rmw': self._rmw or None,
             'isolation': isolation,
             'node_count': len(raw_nodes),
             'unique_node_count': len(node_order),

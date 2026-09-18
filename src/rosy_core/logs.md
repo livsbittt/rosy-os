@@ -87,3 +87,9 @@
 - 변경: ros_bridge LaserScan/Imu/Range 구독이 qos_profile_sensor_data. RELIABLE depth 10 과 센서 BEST_EFFORT 가 어긋나지 않게.
 - 증거: `python -m pytest src/rosy_core/test/test_bridge_timers.py test/test_dds_rmw_contracts.py -q`
 - gate 변화: 없음. DEVICE PARKED
+
+## 2026-09-18 · uncommitted · feat(core): apply Cyclone before rclpy.init (D-121)
+
+- 변경: `apply_cyclone_rmw` 를 `rclpy.init` 앞에. 스냅샷 `rmw` 필드와 대시보드 표시. FastDDS 기동 거절.
+- 증거: `python -m pytest src/rosy_core/test/test_rmw.py src/rosy_core/test/test_ros_graph_monitor.py src/rosy_core/test/test_dashboard.py -q`
+- gate 변화: 없음. DEVICE PARKED

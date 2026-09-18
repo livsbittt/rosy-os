@@ -136,6 +136,7 @@ def test_dashboard_exposes_ros_domain_bandwidth_and_topology_panel():
         "ros-network-panel",
         "ros-domain-id",
         "dds-isolation",
+        "dds-rmw",
         "ros-node-count",
         "ros-topic-count",
         "network-rx-rate",
@@ -153,6 +154,7 @@ def test_dashboard_exposes_ros_domain_bandwidth_and_topology_panel():
     assert "renderRosGraph" in script
     assert "networkHistory" in script
     assert "runtime.ros" in script
+    assert "graph.rmw" in script
     assert "createElementNS" in script
     assert "https://" not in script
     assert ".ros-network-panel" in css

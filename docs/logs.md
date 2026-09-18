@@ -259,3 +259,11 @@
 - gate 변화: LOCAL GO 유지. ROS-SIM/DEVICE HOLD
 - 결정: FastDDS 이중 프로파일 없음. 생 Image 는 Fleet/보드에 안 탐
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · feat(core): apply Cyclone before rclpy.init; web reports only (D-121)
+
+- 변경: ADR D-121. `apply_cyclone_rmw` 는 init 전. 빈 RMW 채움, FastDDS 거절. 대시보드는 rmw 표시만. REST로 RMW를 바꾸지 않음.
+- 증거: `python -m pytest src/rosy_core/test/test_rmw.py src/rosy_core/test/test_ros_graph_monitor.py src/rosy_core/test/test_dashboard.py -q`
+- gate 변화: LOCAL GO 유지. DEVICE PARKED
+- 결정: 웹 적용 버튼 없음. init 이후 env 변경은 거짓 성공
+- 교훈: 없음
