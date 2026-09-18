@@ -227,3 +227,11 @@
 - gate 변화: 없음
 - 결정: D-97·D-98·D-99 호스트 잠금. 구현 아님
 - 교훈: 없음
+
+## 2026-09-18 · uncommitted · feat(games): first-contact 0.10 cap and --stair 1-5 (D-110, D-111)
+
+- 변경: ADR D-110·D-111. `limits.linear` ≤ 0.10. `--stair 1–5` 호스트 프리셋. pytest ≠ FIELD GO.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py test/test_harness_contracts.py -q`
+- gate 변화: rosy_games LOCAL GO 유지. DEVICE/FIELD PARKED
+- 결정: D-96 계단 2–5 호스트 스위치. 현장 GO 아님
+- 교훈: 없음

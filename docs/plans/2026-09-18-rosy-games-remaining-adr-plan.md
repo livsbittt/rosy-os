@@ -1,7 +1,7 @@
 # 남은 rosy_games 트랙 → ADR 계획
 
 작성일: 2026-09-18
-상태: D-95–D-109. 계단 4 전 카탈로그는 soccer/heuristic/hold/overhead. 현장 GO가 아니다.
+상태: D-95–D-111. 계단 프리셋과 첫 접촉 0.10 상한까지. 현장 GO가 아니다.
 
 관련: D-90, D-91, D-94 ·
 [game host 설계](2026-09-17-robot-soccer-game-host-design.md) ·
@@ -23,6 +23,8 @@
 | 실기 천장 1v1 순서 | **D-96** | 카메라만 → 한 대 0.08 → 두 대 이격 → 저속 1v1 → 킥오프 반복 |
 | 계단 1이 달리면? | **D-107** | 기본 관측만. `--observe-only` |
 | 계단 2+ 드라이브? | **D-108** | `--drive` / `--drive rosy_01`. FIELD GO 아님 |
+| YAML을 0.20으로? | **D-110** | 아니요. linear ≤ 0.10 |
+| 계단을 CLI로? | **D-111** | `--stair 1–5` 프리셋. FIELD GO 아님 |
 | 온보드 앞 카메라 지금? | **D-97**, **D-109** | 아니요. observer 카탈로그에 없음 |
 | Isaac / `isaac/` 폴더 | **D-98**, **D-109** | 아니요. 폴더 없음 |
 | 신경망을 cmd_vel에? | **D-99**, **D-109** | 아니요. `neural` 거절 |
@@ -55,18 +57,19 @@
 | D-107 | 계단 1 기본은 관측만. arm/teleop 없음 |
 | D-108 | `--drive`는 계단 2+. 한 id면 그 대만. FIELD GO 아님 |
 | D-109 | 카탈로그는 soccer/heuristic/hold/overhead만. onboard/isaac/neural 거절 |
+| D-110 | 첫 접촉 linear ≤ 0.10. 0.20은 계단 4 기록 다음 |
+| D-111 | `--stair 1–5` 호스트 프리셋. pytest ≠ FIELD GO |
 
 ## 4. 실행 순서 (다음 세션)
 
-1. **기록 (이 커밋)**
-2. 노트북에서 `--observer overhead --preview` — 모터 없음 (D-107, D-96 계단 1)
-3. 그 기기 정지·워치독·단일 `cmd_vel` 증거가 있으면 한 대 0.08 m/s (계단 2)
-4. 두 대 이격 → 저속 1v1 → 킥오프 반복 (계단 3–5)
-5. 계단 4가 여러 번 나온 뒤에만 D-97 온보드, D-98 Isaac, D-99 신경망
+1. `--stair 1 --observer overhead --preview` (D-111, D-107). 실제 웹캠
+2. 기기 안전 증거 뒤 `--stair 2 --drive rosy_01 --observer overhead --preview`
+3. `--stair 3` 이격 → `--stair 4` 1v1 → `--stair 5` 킥오프 반복
+4. 계단 4가 여러 번 나온 뒤에만 D-97 온보드, D-98 Isaac, D-99 신경망. 0.20은 그 다음 ADR
 
 **하지 않음** — 합성 pytest로 FIELD GO, 기본 CLI가 `/dev/video0`을 염, `isaac/`을 지금 만듦, 온보드 blob이 `cmd_vel`을 냄, D-41 Status를 Accepted로 올림.
 
 ## 5. 수락
 
-- ADR 로그에 D-95–D-109 색인·본문이 있다
+- ADR 로그에 D-95–D-111 색인·본문이 있다
 - `python -m pytest test/test_harness_contracts.py src/rosy_games/test test/test_rosy_games_surface.py -q`

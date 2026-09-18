@@ -117,6 +117,8 @@
 | D-107 | D-96 계단 1 호스트는 관측만이며 기본은 모터를 무장하지 않는다 | Accepted |
 | D-108 | `--drive`는 계단 2+ 스위치이며 FIELD GO가 아니다 | Accepted |
 | D-109 | 계단 4 전 카탈로그는 soccer/heuristic/hold/overhead만이다 | Accepted |
+| D-110 | 첫 접촉 limits.linear는 0.10을 넘지 않는다 | Accepted |
+| D-111 | `--stair 1–5`는 호스트 프리셋이며 FIELD GO가 아니다 | Accepted |
 
 ---
 
@@ -2924,6 +2926,9 @@ HOLD teleop 0으로 무장한다.
 **Amendment (2026-09-18):** 계단 1 호스트 스위치는 D-107 (`--observe-only`가
 기본). `--drive`는 D-108. 이 두 플래그가 DEVICE 증거를 대신하지 않는다.
 
+**Amendment (2026-09-18):** 첫 접촉 속도 상한은 D-110. 계단 프리셋은 D-111.
+`--stair`와 pytest가 현장 GO가 아니다.
+
 ---
 
 ## D-97 온보드 축구 시야는 FIELD 반복 뒤 CMD-001 후보다
@@ -3355,4 +3360,59 @@ overhead를 항상 import하는 안은 hold pytest에 cv2가 필요해진다.
 D-41 행은 Proposed. DEVICE/FIELD PARKED.
 
 **References:** D-41, D-94, D-96, D-97, D-98, D-99.
+
+---
+
+## D-110 첫 접촉 limits.linear는 0.10을 넘지 않는다
+
+**Status:** Accepted (2026-09-18). 호스트 속도 상한이다. 0.20 m/s FIELD GO가 아니다.
+
+**Context:** D-96은 첫 접촉을 0.08–0.10 m/s로 두고, 프로필 0.20은 그 기기 안전
+증거와 계단 4 반복 다음이다. `match.yaml` `limits.linear`를 0.20으로 올리면
+호스트 gate가 그대로 CORE에 밀어 넣는다 (D-103, D-104).
+
+**Decision:**
+
+- `load_match`는 `limits.linear` > **0.10** 이면 거부한다
+- 기본 0.08은 그대로다
+- 0.20은 계단 4 기록이 있는 **다음 ADR**에서만 연다
+- 이 상한이 DEVICE 워치독 증거를 대신하지 않는다
+
+**Alternatives:** YAML만 믿고 0.20을 허용하는 안은 계단을 건너뛴다. 0.08만
+허용하는 안은 설계의 0.08–0.10 구간을 자른다.
+
+**Consequences:** `FIRST_CONTACT_LINEAR_M = 0.10`. 현장 속도 올리기는 별도 결정.
+
+**Validation / Transition:** `test_cli.py` load_match. DEVICE/FIELD PARKED.
+
+**References:** D-96, D-103, D-104.
+
+---
+
+## D-111 `--stair 1–5`는 호스트 프리셋이며 FIELD GO가 아니다
+
+**Status:** Accepted (2026-09-18). D-96 계단의 CLI 매핑이다. 현장 GO가 아니다.
+
+**Context:** 계단 2는 한 대, 3–5는 두 대다. `--drive`만 있으면 실수가 두 대를
+계단 2로 연다. `--stair` 없이 현장 순서를 기억하면 건너뛰기 쉽다.
+
+**Decision:**
+
+- `--stair 1` 관측만. `--drive`와 같이 쓰지 않는다
+- `--stair 2`는 `--drive <한 id>`가 필요하다 (한 대)
+- `--stair 3|4|5`는 두 대. `--drive`가 없으면 둘 다 연다. 한 id만 주면 거부
+- `--stair`는 overhead를 강제하지 않는다. 기본 observer는 여전히 hold (D-95)
+- `--stair N` pytest 통과 ≠ 그 계단 FIELD GO (D-91, D-96)
+- 킥오프(계단 5)는 계속 사람이 공을 둔다. 호스트는 중앙 공 전에는 PLAY로 넘기지
+  않는다 (이미 SoccerGame)
+
+**Alternatives:** 계단 번호를 문서에만 두는 안은 CLI가 두 대를 계단 2로 연다.
+`--stair 2`가 첫 로봇을 추측하는 안은 yaml 순서를 드라이브 명단으로 승격한다.
+
+**Consequences:** 현장 명령은 `--stair 1 --observer overhead --preview` 다음
+`--stair 2 --drive rosy_01 --drive`가 아니라 `--stair 2 --drive rosy_01`.
+
+**Validation / Transition:** `test_cli.py`. FIELD PARKED.
+
+**References:** D-91, D-95, D-96, D-107, D-108.
 

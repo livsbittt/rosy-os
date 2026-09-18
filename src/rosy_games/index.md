@@ -26,6 +26,8 @@
 | D-107 | D-96 계단 1 호스트는 관측만이며 기본은 모터를 무장하지 않는다 |
 | D-108 | `--drive`는 계단 2+ 스위치이며 FIELD GO가 아니다 |
 | D-109 | 계단 4 전 카탈로그는 soccer/heuristic/hold/overhead만이다 |
+| D-110 | 첫 접촉 limits.linear는 0.10을 넘지 않는다 |
+| D-111 | `--stair 1–5`는 호스트 프리셋이며 FIELD GO가 아니다 |
 
 ## 계획·결과 문서
 
@@ -45,8 +47,8 @@
 
 ## 최근 기록
 
+- 2026-09-18 · uncommitted · feat(games): first-contact 0.10 cap and --stair 1-5 (D-110, D-111)
 - 2026-09-18 · uncommitted · test(games): reject onboard, isaac, neural until stair 4 (D-109)
 - 2026-09-18 · uncommitted · docs(adr): D-109 catalog lock for deferred track
 - 2026-09-18 · uncommitted · feat(games): default to observe-only, opt in with --drive (D-107, D-108)
 - 2026-09-18 · uncommitted · docs(adr): D-107 observe-only, D-108 --drive
-- 2026-09-18 · uncommitted · test(games): lock the Fleet/games one-way cut (D-106)

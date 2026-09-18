@@ -60,6 +60,14 @@ def test_fleet_does_not_own_the_match_and_games_has_no_fleet_start():
     assert "def reset(" in loop
 
 
+def test_stair_presets_are_host_not_field_go():
+    """D-111: --stair는 노트북 프리셋. pytest 통과 ≠ FIELD GO."""
+    cli = (ROOT / "src" / "rosy_games" / "rosy_games" / "cli.py").read_text(encoding="utf-8")
+    assert '"--stair"' in cli
+    progress = (ROOT / "src" / "rosy_games" / "progress.md").read_text(encoding="utf-8")
+    assert "FIELD:\n    state: PARKED" in progress
+
+
 def test_deferred_soccer_track_is_not_in_the_tree():
     """D-97/D-98/D-99/D-109: onboard·isaac·neural 없음. D-41은 Proposed."""
     games = ROOT / "src" / "rosy_games" / "rosy_games"

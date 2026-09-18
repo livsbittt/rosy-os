@@ -1,4 +1,4 @@
-"""rosy_games match --config ... [--dry-run] [--ticks N] [--preview]"""
+"""rosy_games match --config ... [--dry-run] [--ticks N] [--preview] [--stair N]"""
 
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     match.add_argument("--observer", choices=tuple(sorted(OBSERVERS)), default="hold")
     match.add_argument("--preview", action="store_true")
     match.add_argument("--preview-port", type=int, default=8765)
+    match.add_argument("--stair", type=int, choices=(1, 2, 3, 4, 5), default=None)
     drive = match.add_mutually_exclusive_group()
     drive.add_argument("--observe-only", action="store_true")
     drive.add_argument("--drive", nargs="*", metavar="ROBOT_ID")
@@ -38,7 +39,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         for robot in setup.robots:
             print(f"{robot.id} {robot.url} aruco={robot.aruco_id} attacks={robot.attacks}")
         print(f"goals {setup.goals.home_id}/{setup.goals.away_id}")
-        print(_drive_line(args.drive, setup))
+        print(_drive_line(_motion(args, setup), setup))
         if args.preview:
             print("preview 127.0.0.1 (not started in dry-run)")
         return 0
@@ -54,7 +55,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     server = PreviewServer(board, port=args.preview_port) if board is not None else None
     clients = [HttpPlayerClient(endpoint) for endpoint in setup.robots]
     observer = make_observer(args.observer, setup)
-    drive_ids = _drive_ids(args.drive, setup)
+    drive_ids = _motion(args, setup)
     host = MatchHost(
         observer,
         clients,
@@ -93,6 +94,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     return 0
 
 
+def _motion(args, setup):
+    stair = args.stair
+    drive = args.drive
+    if stair == 1:
+        if drive is not None:
+            raise ValueError("--stair 1 is observe-only; do not pass --drive")
+        return None
+    if stair == 2:
+        if drive is None or len(drive) != 1:
+            raise ValueError("--stair 2 needs --drive <one robot id>")
+        return _drive_ids(drive, setup)
+    if stair in (3, 4, 5):
+        if args.observe_only:
+            raise ValueError(f"--stair {stair} drives both robots; not observe-only")
+        if drive is not None and len(drive) == 1:
+            raise ValueError(
+                f"--stair {stair} drives both robots; do not pass a single --drive id"
+            )
+        return _drive_ids([] if drive is None else drive, setup)
+    return _drive_ids(drive, setup)
+
+
 def _drive_ids(drive: list[str] | None, setup):
     if drive is None:
         return None
@@ -104,8 +127,7 @@ def _drive_ids(drive: list[str] | None, setup):
     return frozenset(chosen)
 
 
-def _drive_line(drive: list[str] | None, setup) -> str:
-    ids = _drive_ids(drive, setup)
+def _drive_line(ids, setup) -> str:
     if ids is None:
         return "drive off (observe-only)"
     return "drive " + ",".join(robot.id for robot in setup.robots if robot.id in ids)

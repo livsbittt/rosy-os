@@ -151,3 +151,9 @@
 - 변경: `OBSERVERS` 카탈로그. `make_observer("onboard")` 거절. isaac/neural/onboard 파일 없음. catalog는 cv2를 상단 import하지 않음.
 - 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q`
 - gate 변화: 없음. DEVICE/FIELD PARKED
+
+## 2026-09-18 · uncommitted · feat(games): first-contact 0.10 cap and --stair 1-5 (D-110, D-111)
+
+- 변경: `load_match`는 `limits.linear` > 0.10을 거절. `--stair 1` 관측만, `--stair 2`는 `--drive <한 id>`, `--stair 3|4|5`는 두 대. pytest ≠ FIELD GO.
+- 증거: `python -m pytest src/rosy_games/test test/test_rosy_games_surface.py -q` 103 passed
+- gate 변화: 없음. DEVICE/FIELD PARKED

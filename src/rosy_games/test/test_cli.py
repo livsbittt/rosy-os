@@ -303,3 +303,139 @@ def test_host_refuses_a_period_slower_than_the_watchdog(tmp_path, monkeypatch):
     except ValueError as exc:
         assert "lost_hold" in str(exc)
 
+
+def test_load_match_rejects_linear_above_first_contact(tmp_path):
+    """D-110: 0.20은 계단 4 기록 다음 ADR에서만."""
+    text = MATCH.read_text(encoding="utf-8").replace("linear: 0.08", "linear: 0.20")
+    path = tmp_path / "match.yaml"
+    path.write_text(text, encoding="utf-8")
+    try:
+        load_match(path)
+        raise AssertionError("limits.linear 0.20 must be rejected")
+    except ValueError as exc:
+        assert "0.10" in str(exc)
+
+
+def test_load_match_allows_linear_at_first_contact_cap(tmp_path):
+    text = MATCH.read_text(encoding="utf-8").replace("linear: 0.08", "linear: 0.10")
+    path = tmp_path / "match.yaml"
+    path.write_text(text, encoding="utf-8")
+    setup = load_match(path)
+    assert setup.linear == 0.10
+
+
+def test_cli_stair_is_off_by_default():
+    args = parse_args(["match", "--config", str(MATCH), "--dry-run"])
+    assert args.stair is None
+
+
+def test_stair_does_not_force_overhead():
+    """D-111 / D-95: --stair는 observer를 overhead로 바꾸지 않는다."""
+    args = parse_args(["match", "--config", str(MATCH), "--stair", "1"])
+    assert args.observer == "hold"
+
+
+def test_stair_1_dry_run_is_observe_only(capsys):
+    assert main(["match", "--config", str(MATCH), "--dry-run", "--stair", "1"]) == 0
+    assert "drive off (observe-only)" in capsys.readouterr().out
+
+
+def test_stair_1_rejects_drive():
+    try:
+        main(["match", "--config", str(MATCH), "--dry-run", "--stair", "1", "--drive"])
+        raise AssertionError("--stair 1 must not take --drive")
+    except ValueError as exc:
+        assert "stair 1" in str(exc)
+
+
+def test_stair_2_requires_one_drive_id():
+    try:
+        main(["match", "--config", str(MATCH), "--dry-run", "--stair", "2"])
+        raise AssertionError("--stair 2 must not guess a robot")
+    except ValueError as exc:
+        assert "stair 2" in str(exc)
+
+
+def test_stair_2_rejects_drive_both():
+    try:
+        main(["match", "--config", str(MATCH), "--dry-run", "--stair", "2", "--drive"])
+        raise AssertionError("--stair 2 must not drive both robots")
+    except ValueError as exc:
+        assert "stair 2" in str(exc)
+
+
+def test_stair_2_dry_run_drives_the_named_id(capsys):
+    assert main(
+        ["match", "--config", str(MATCH), "--dry-run", "--stair", "2", "--drive", "rosy_01"]
+    ) == 0
+    out = capsys.readouterr().out
+    assert "drive rosy_01,rosy_02" not in out
+    assert "drive rosy_01" in out
+
+
+def test_stair_3_drives_both_when_drive_omitted(capsys):
+    assert main(["match", "--config", str(MATCH), "--dry-run", "--stair", "3"]) == 0
+    assert "drive rosy_01,rosy_02" in capsys.readouterr().out
+
+
+def test_stair_4_rejects_a_single_drive_id():
+    try:
+        main(
+            ["match", "--config", str(MATCH), "--dry-run", "--stair", "4", "--drive", "rosy_01"]
+        )
+        raise AssertionError("--stair 4 must drive both robots")
+    except ValueError as exc:
+        assert "stair 4" in str(exc)
+
+
+def test_stair_5_drives_both(capsys):
+    assert main(["match", "--config", str(MATCH), "--dry-run", "--stair", "5"]) == 0
+    assert "drive rosy_01,rosy_02" in capsys.readouterr().out
+
+
+def test_stair_3_rejects_observe_only():
+    try:
+        main(["match", "--config", str(MATCH), "--dry-run", "--stair", "3", "--observe-only"])
+        raise AssertionError("--stair 3 is not observe-only")
+    except ValueError as exc:
+        assert "stair 3" in str(exc)
+
+
+def test_stair_2_live_arms_only_the_named_robot(monkeypatch):
+    created = []
+
+    class FakeHttp:
+        def __init__(self, endpoint, **_kwargs):
+            self.robot_id = endpoint.id
+            self.manual = 0
+            self.teleops: list[tuple[float, float]] = []
+            self.estops = 0
+            self.limits: list[tuple[float, float]] = []
+            created.append(self)
+
+        def set_manual(self) -> None:
+            self.manual += 1
+
+        def set_limits(self, linear: float, angular: float) -> None:
+            self.limits.append((linear, angular))
+
+        def teleop(self, linear: float, angular: float) -> None:
+            self.teleops.append((linear, angular))
+
+        def estop(self) -> None:
+            self.estops += 1
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr("rosy_games.cli.HttpPlayerClient", FakeHttp)
+    assert main(
+        ["match", "--config", str(MATCH), "--ticks", "2", "--stair", "2", "--drive", "rosy_01"]
+    ) == 0
+    by_id = {c.robot_id: c for c in created}
+    assert by_id["rosy_01"].manual == 1
+    assert by_id["rosy_01"].limits == [(0.08, 0.40)]
+    assert by_id["rosy_02"].manual == 0
+    assert by_id["rosy_02"].limits == []
+    assert all(c.estops >= 1 for c in created)
+

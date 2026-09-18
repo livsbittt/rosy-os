@@ -10,6 +10,8 @@ import yaml
 
 from rosy_games.field import Field
 
+FIRST_CONTACT_LINEAR_M = 0.10
+
 
 @dataclass(frozen=True)
 class RobotEndpoint:
@@ -89,12 +91,17 @@ def load_match(path: Path) -> MatchSetup:
     goals = data.get("goals") or {}
     goal_hsv_low = goals.get("hsv_low")
     goal_hsv_high = goals.get("hsv_high")
+    linear = float(limits.get("linear", 0.08))
+    if linear > FIRST_CONTACT_LINEAR_M:
+        raise ValueError(
+            f"{path}: limits.linear {linear:.2f} exceeds first-contact {FIRST_CONTACT_LINEAR_M:.2f}"
+        )
     return MatchSetup(
         field=field,
         robots=(home, away),
         game=str(data.get("game") or "soccer"),
         policy=str(data.get("policy") or "heuristic"),
-        linear=float(limits.get("linear", 0.08)),
+        linear=linear,
         angular=float(limits.get("angular", 0.40)),
         camera=CameraConfig(
             index=int(cam.get("index", 0)),
