@@ -42,32 +42,33 @@ jobs:
       - name: Lint (flake8)
         run: |
           cd src
-          flake8 rosy_core/rosy_core rosy_fleet/rosy_fleet rosy_fleet/test rosy_gz_sim/launch rosy_gz_sim/scripts rosy_gz_sim/test --count --max-line-length=120 --show-source --statistics || true
+          flake8 core/core/core core/core_common/core_common core/core_events/core_events core/core_features/core_features core/core_api_web/core_api_web site/fleet/fleet site/fleet/test sim/gz_sim/launch sim/gz_sim/scripts sim/gz_sim/test --count --max-line-length=120 --show-source --statistics || true
 
-      - name: Test (rosy_core protocol schemas, P1-19)
+      - name: Test (core protocol schemas, P1-19)
         run: |
-          cd src/rosy_core
+          cd src/core/core
           python3 -m pytest test/ -v
 
-      # rosy_fleet 은 ROS 를 import 하지 않는다. conftest 가 src/rosy_core 를 sys.path 에
-      # 얹으므로 colcon 오버레이 없이도 돈다 — Windows 개발 환경과 같은 조건이다.
-      - name: Test (rosy_fleet formation, relay, session)
-        run: python3 -m pytest src/rosy_fleet/test/ -v
+      # fleet 은 ROS 를 import 하지 않는다. conftest 가 src/core/core_common 과
+      # src/core/core_features 를 sys.path 에 얹으므로 colcon 오버레이 없이도
+      # 돈다 — Windows 개발 환경과 같은 조건이다.
+      - name: Test (fleet formation, relay, session)
+        run: python3 -m pytest src/site/fleet/test/ -v
 
       # 멀티 인스턴스 런치는 로봇마다 포트·HOME·설정을 갈라야 한다. 그 계약은 런치
       # 파일을 실제로 실행해야 검증되므로 ROS 오버레이가 필요하다. ros_gz_sim share 가
       # 없는 러너에서는 테스트가 스스로 skip 한다 — 조용히 통과하는 것이 아니라
       # skip 으로 드러난다.
-      - name: Test (rosy_gz_sim multi-instance launch)
+      - name: Test (gz_sim multi-instance launch)
         run: |
           # ROS setup.sh 는 미정의 변수를 참조하므로 -u 를 쓰지 않는다.
           set -eo pipefail
           . /opt/ros/jazzy/setup.sh
           . src/install/setup.sh
-          python3 -m pytest src/rosy_gz_sim/test -v
+          python3 -m pytest src/sim/gz_sim/test -v
 
       # 루트 test/ 는 배포·릴리스 계약을 담고 있으면서도 지금까지 CI 에서 한 번도
-      # 실행되지 않았다. 위 스텝이 src/rosy_core/test 만 돌기 때문이다. 그래서
+      # 실행되지 않았다. 위 스텝이 src/core/core/test 만 돌기 때문이다. 그래서
       # compose 권한 경계와 Wi-Fi 배포 계약이 검증 없이 지나갔다.
       # ROS 오버레이는 필요 없다 — test_motor_control.py 가 직접 sys.path 를 잡는다.
       - name: Test (deployment and release contracts)
@@ -86,17 +87,17 @@ jobs:
           . /opt/ros/jazzy/setup.sh
           . src/install/setup.sh
           export HOME=/tmp ROS_LOG_DIR=/tmp/ros-logs
-          timeout 60 ros2 run rosy_core rosy_core > /tmp/boot.log 2>&1 &
+          timeout 60 ros2 run core core > /tmp/boot.log 2>&1 &
           node_pid=$!
           for _ in $(seq 1 60); do
-            grep -q 'rosy_core up' /tmp/boot.log && break
+            grep -q 'core up' /tmp/boot.log && break
             kill -0 "$node_pid" 2>/dev/null || break
             sleep 1
           done
           kill "$node_pid" 2>/dev/null || true
           cat /tmp/boot.log
-          if ! grep -q 'rosy_core up' /tmp/boot.log; then
-            echo '::error::rosy_core did not reach startup'
+          if ! grep -q 'core up' /tmp/boot.log; then
+            echo '::error::core did not reach startup'
             exit 1
           fi
           # 러너가 slam_toolbox 를 갖게 되면 이 검사는 의도한 조건을 더 이상
