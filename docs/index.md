@@ -87,8 +87,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · docs(adr): gate the grammar split, pre-decide headless behaviour sharing (D-130)
+- 2026-09-20 · uncommitted · ci: add ros-jazzy-realtime-tools to the runner deps
 - 2026-09-20 · uncommitted · ci: unblock the build runner — xacro, gz_sim exclusion, D-128 step tolerance
 - 2026-09-20 · uncommitted · ci: source the ROS overlay in the colcon build step
 - 2026-09-20 · uncommitted · chore(release): push main directly to origin, superseding the D-127 slice-staged integration
-- 2026-09-20 · uncommitted · docs: realign the AGENTS.md network, ci.yml, and current-facing docs to the domain regroup
-- 2026-09-20 · uncommitted · docs(adr): gate the grammar split, pre-decide headless behaviour sharing (D-130)
