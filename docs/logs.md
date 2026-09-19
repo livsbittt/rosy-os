@@ -372,3 +372,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: D-129 Proposed — L1 토큰 파일은 트리 전체에서 하나(`/ui/tokens.css` 링크)이고, D-92 어휘 표의 유일한 렌더링으로 CORE `/styleguide` 갤러리를 둔다. 컴포넌트·L2 공유 금지와 공용 컴포넌트 패키지 기각(`rosy_ui` 제안)은 유지. 구현(/ui 라우트·fleet 사본 삭제·게이트 이동·갤러리)이 착지해야 Accepted
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · docs: realign the AGENTS.md network, ci.yml, and current-facing docs to the domain regroup
+
+- 변경: AGENTS.md 56개를 regroup 후 경로로 재정렬(도메인 그룹 `src/{core,apps,hardware,navigation,sim,site}` 신설 6개 포함, `core` 커널 분해 구조 반영). ci.yml을 regroup 트리로 실정(flake8·pytest 경로, `ros2 run core core`, 부팅 로그 `core up`). README 구조 트리 갱신. env.sh·deployment runbook 3건·concept 3건의 현재형 경로를 새 패키지명으로 수정
+- 증거: grep `rosy_(core|control|fleet|gz_sim|bringup|navigation|description)` — AGENTS.md·ci.yml 잔여 0(레거시 ci.yml 서술과 역사 문서 표기만 보존). ci.yml YAML 파스 통과. 참조 대상 존재 검증 — `navigation/hardware.launch.py`, `core_api_web/web/{map.js,tokens.css}`, `control/web/dashboard.html`, `adapter.manifest.yaml` 2건, `bringup/scripts/rosy_env.sh`
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 역사 기록(docs/plans·logs·solutions)과 SRS 계약 문서는 개명하지 않았고, test/ 루트 구 경로는 D-128 백로그대로 두었다. 배포 서비스명(`rosy-core` 등)은 deploy 계약이라 유지
+- 교훈: 없음

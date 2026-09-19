@@ -13,11 +13,11 @@ colour, hierarchy and vocabulary, not about a rendering stack.
 
 | Surface | Audience | Question it answers | v1 status |
 |---|---|---|---|
-| Robot console | field operator | "Can I send this robot now?" | live (`rosy_core` `/dashboard` only — D-77) |
+| Robot console | field operator | "Can I send this robot now?" | live (`core` `/dashboard` only — D-77) |
 | Device runtime | installer, maintainer | "Is this hardware standing up correctly?" | live (`/dashboard` host and ROS-graph panels) |
 | Fleet | dispatcher | "Which robot is the problem?" | target — Fleet server unimplemented |
 | Robot face | bystander | "What is it about to do?" | live (`rosy_emotion` LCD, `info_screen`) |
-| Control diagnostic | control-stack maintainer | "What is the absorbed IO graph showing?" | live on legacy `rosy_control/launch/robot.launch.py` only; not composed with CORE |
+| Control diagnostic | control-stack maintainer | "What is the absorbed IO graph showing?" | live on legacy `control/launch/robot.launch.py` only; not composed with CORE |
 | Game host | laptop match operator | "Are the pitch, ball, robots, and goals visible?" | live localhost preview in `rosy_games` (D-101); never CORE `/dashboard` |
 
 The robot face is a user interface. It is the only surface for people who never
@@ -108,11 +108,11 @@ Gauges read as margin: neutral until a threshold is crossed. A metric is not
 assigned a colour because it is a different metric.
 
 Map rasters are a shared contract **inside one pipeline**: the free and occupied
-values `rosy_control/web/dashboard.html` draws must equal
+values `control/web/dashboard.html` draws must equal
 `sensing/map_raster.py` (BGR in the PNG, RGB in the CSS tokens). This is
-checked in `rosy_control` (`test_map_raster_color_contract.py`), not commented.
+checked in `control` (`test_map_raster_color_contract.py`), not commented.
 
-`rosy_core/web/map.js` is a different pipeline. It paints `/api/v1/map` in the
+`core_api_web/web/map.js` is a different pipeline. It paints `/api/v1/map` in the
 browser (four occupancy buckets, different thresholds) and is bound by the
 colour-set law only. A `tokens.css` ↔ `dashboard.html` assertion has no legal
 home under D-73: no harness module owns both packages. That limit is recorded
@@ -216,23 +216,23 @@ These are contract tests, in the style the repository already uses, not review
 guidance:
 
 - surface stylesheets contain no raw colour outside the token file
-  (`src/rosy_core/test/test_ui_token_contracts.py`)
+  (`src/core/core/test/test_ui_token_contracts.py`)
 - a status colour never appears in a categorical position (same)
 - client map raster values equal the server renderer's values
-  (`src/rosy_control/test/test_map_raster_color_contract.py` — control
+  (`src/apps/control/test/test_map_raster_color_contract.py` — control
   pipeline only; see §6)
 - a `blocked` capability without a reason fails
-  (`src/rosy_core/test/test_capability_descriptors.py`)
+  (`src/core/core/test/test_capability_descriptors.py`)
 - evidence state is present on every rendered telemetry binding
-  (`src/rosy_core/test/test_dashboard.py`, `test_evidence.py`)
+  (`src/core/core/test/test_dashboard.py`, `test_evidence.py`)
 - a surface stylesheet declares no tokens of its own — no alias vocabulary
-  beside the token file (`src/rosy_core/test/test_ui_token_contracts.py`, D-92)
+  beside the token file (`src/core/core/test/test_ui_token_contracts.py`, D-92)
 - spacing comes from `--space-*` and type size from `--text-*` (same)
 - the operate view does not scroll and the map keeps the observe region
-  (`src/rosy_core/test/test_console_layout.py`)
+  (`src/core/core/test/test_console_layout.py`)
 
-D-73: a test that opened both `rosy_core/web/tokens.css` and
-`rosy_control/web/dashboard.html` would have no owning module. Do not add one.
+D-73: a test that opened both `core_api_web/web/tokens.css` and
+`control/web/dashboard.html` would have no owning module. Do not add one.
 
 ## 11. v1 Mapping
 

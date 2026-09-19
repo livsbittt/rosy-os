@@ -74,8 +74,8 @@ ROSY OS uses six primary domain objects:
 | 00 Vision & definition | CORE SRS product scope | D-15, D-65 | live contract |
 | 01 Target architecture | CORE + D-62 slices; Fleet console v1 is REST gather | D-1, D-62, D-71, **D-81** | hub listen / FleetAgent outbound not v1-blocking |
 | 02 Domain model | CONCEPTS.md Node / Device / Component / Capability / Asset / Task | D-65 | live |
-| 03 Runtime architecture | `rosy_core` process; no `rosy-runtime-*` apt | D-1, D-69 | live |
-| 04 Device adapter | `rosy_bringup`, `rosy_omx_adapter` (disabled) + YAML manifests | D-57, D-69 | live |
+| 03 Runtime architecture | `core` process; no `rosy-runtime-*` apt | D-1, D-69 | live |
+| 04 Device adapter | `bringup`, `omx_adapter` (disabled) + YAML manifests | D-57, D-69 | live |
 | 05 ROS 2 interface | REST/WS is the external API; TaskKind sinks to internal ROS | D-65, D-71, **D-74** | concept `/rosy/{device_id}/…` is **not** the API |
 | 06 Device state & lifecycle | `RobotMode` operational; inventory `device_state` derived | D-67 | live |
 | 07 Capability | CAP-001 on `/capabilities`; descriptors on inventory | D-11, D-68 | live |

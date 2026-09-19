@@ -44,7 +44,7 @@ Done for v1 identity + inventory: robot number / namespace bind, `GET /api/v1/sy
 
 ### Phase 2 - Move Device-Specific Code
 
-Manifests, not a package move: `rosy_bringup/config/adapter.manifest.yaml` (Pinky) and `rosy_omx_adapter/config/adapter.manifest.yaml` (disabled). UART/Dynamixel stay in `rosy_bringup`.
+Manifests, not a package move: `src/hardware/bringup/config/adapter.manifest.yaml` (Pinky) and `src/apps/omx_adapter/config/adapter.manifest.yaml` (disabled). UART/Dynamixel stay in `bringup`.
 
 ### Phase 3 - Introduce Capability Registry
 

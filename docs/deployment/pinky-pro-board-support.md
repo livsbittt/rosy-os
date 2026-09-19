@@ -16,7 +16,7 @@ Pinky Pro는 ROSY OS의 첫 하드웨어다. 이 문서는 그 보드 지원 범
 | `motor` | + `rosy-motor` | UART4 Dynamixel만 | teleop + encoder. lidar/nav 꺼짐 |
 | `hardware` | + `rosy-io` | 모터 + RPLidar (`/dev/ttyAMA0`) | teleop + encoder + lidar + Nav2 goal/return-home. **slam 꺼짐** |
 
-`hardware`는 `rosy_navigation/hardware.launch.py`로 모터·LiDAR와 Nav2
+`hardware`는 `navigation/hardware.launch.py`로 모터·LiDAR와 Nav2
 localization/navigation을 같이 띄운다. velocity_smoother 출력은 `nav_cmd_vel`이라
 Command Manager만 `cmd_vel`을 발행한다(D-2). odom/base TF는 `ROSY_NAMESPACE`(로봇 번호에서 유도, 예: `rosy_01/`) 접두를
 붙이고 `map`은 전역으로 둔다(D-4). 현장 맵은 호스트

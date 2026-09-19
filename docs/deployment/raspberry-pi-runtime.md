@@ -19,11 +19,11 @@ while `rosy-io` owns the Pinky Pro motor, LiDAR, and Nav2 adapters in full hardw
 > ADC, LCD, LED, or lamp nodes. Those drivers need a separate Raspberry Pi 5
 > compatibility port and physical verification before device access is added.
 > The robot-side image also omits the 32 MB visualization meshes; an operator
-> workstation that runs RViz should keep the full `rosy_description` package.
+> workstation that runs RViz should keep the full `description` package.
 
 ## 1. Safety boundary
 
-`rosy_core` publishes the final `cmd_vel`. `rosy_bringup` consumes it and
+`core` publishes the final `cmd_vel`. `bringup` consumes it and
 controls the Dynamixel bus. The driver-side command deadman requests zero RPM
 after a 500 ms stale-command threshold and keeps retrying until the driver
 accepts the stop. The 30 Hz polling loop adds up to about 34 ms plus serial and
@@ -157,7 +157,7 @@ DDS bandwidth measurements.
 
 ### Motor command contract
 
-`rosy_bringup.motor_control.MotorController` is the single command boundary
+`bringup.motor_control.MotorController` is the single command boundary
 between ROS `cmd_vel` and the two-wheel DYNAMIXEL write. Every call returns one
 of four statuses:
 

@@ -28,5 +28,5 @@ export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
 export ROS_AUTOMATIC_DISCOVERY_RANGE="${ROS_AUTOMATIC_DISCOVERY_RANGE:-LOCALHOST}"
 echo "rosy env: RMW=$RMW_IMPLEMENTATION discovery=$ROS_AUTOMATIC_DISCOVERY_RANGE"
 
-# 로봇(실기기)에서는 대신 rosy_bringup의 로봇별 격리 스크립트 사용:
-#   source $(ros2 pkg prefix rosy_bringup)/share/rosy_bringup/scripts/rosy_env.sh 1
+# 로봇(실기기)에서는 대신 bringup의 로봇별 격리 스크립트 사용:
+#   source $(ros2 pkg prefix bringup)/share/bringup/scripts/rosy_env.sh 1
