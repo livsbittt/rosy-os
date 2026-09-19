@@ -437,6 +437,14 @@
 - 결정: 없음 — 파이프 실패 전파 의도를 유지하기 위해 pipefail을 덜지 않고 셸을 고정했다
 - 교훈: 없음
 
+## 2026-09-20 · uncommitted · revert(fleet): put the console tokens copy back until D-129 lands as one commit
+
+- 변경: 680dc41이 다른 세션이 스테이지 해둔 `fleet/server/web/tokens.css` 삭제를 함께 실어 버렸고(공유 작업 트리+공유 인덱스), 커밋된 `test_console_palette.py`는 그 사본을 아직 읽어 main CI의 fleet 스텝이 ERROR — 삭제를 되돌려 main을 자기일관 상태로 되돌린다. D-129 세션이 자신의 커밋에서 삭제·재배선을 한 번에 하면 된다
+- 증거: run 35452948155 — `test_console_palette.py` ERROR 군(토큰 파일 개봉 실패). 680dc41 stat에 본 의도 밖 `tokens.css | 75 -` 포함
+- gate 변화: 없음
+- 결정: 공유 트리에서는 pathspec 커밋만 쓴다. `git status`에 남의 스테이지가 보이면 절대 bare `git commit`하지 않는다
+- 교훈: D-126의 교훈("이동과 경로 갱신은 같은 커밋에")은 삭제에도 그대로 적용된다 — 반만 착지된 삭제는 남의 테스트를 깨뜨린다
+
 ## 2026-09-20 · uncommitted · docs(adr): gate the grammar split, pre-decide headless behaviour sharing (D-130)
 
 - 변경: ADR **D-130** 신규(색인 행 포함, Accepted — 방향). 실행 계획 `docs/plans/2026-09-20-ui-grammar-boundary-plan.md` 신규. `docs/progress.md`의 `adrs`에 D-130, `plans`에 실행 계획 추가
@@ -444,3 +452,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: D-130 Accepted(방향) — (1) L2 문법 분리는 각 표면 모듈의 게이트가 지킨다(남의 표면 관용구 금지·스타일시트 참조는 자기 것과 `/ui/tokens.css`뿐·allowlist 이중 잠금) (2) 로직 행위는 둘 이상의 웹 표면이 필요할 때 스타일 없는 headless 커스텀 엘리먼트로 한 번 뽑고 시각 문법은 표면이 소유한다(D-92 제2항 유지, 처소는 CORE 웹 패키지) (3) D-129의 `/ui/tokens.css`는 릴리스에 해시 고정하고 불일치 시 기동 경고. 게이트 착지 전까지 L2 분리는 리뷰 의존인 간극을 본문에 명시
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · feat(ui): serve the single tokens file at /ui, delete the fleet copy, open the styleguide (D-129 Accepted)
+
+- 변경: D-129 이행 — core_api_web 이 `/ui/tokens.css`(SHA256 헤더 + D-130.3 핀 불일치 기동 경고)와 `/styleguide`(어휘 표 렌더링 + 자산 allowlist)를 서빙. 단일 파일에 fleet 로봇 사다리 robot-1..3 흡수(공용 31토큰 값 0차이 사전 실측). `fleet console`에 `--ui-tokens` 추가, `/console` 링크 전환, tokens.css 사본 삭제, allowlist에서 이름 제거. test_console_palette는 단일 파일을 읽는 값 게이트 + 정상 색 참조 금지로 역할 전환, test_grammar_separation.py 신설(D-130.1), core_api_web/test 신설(라우트·갤러리·핀 6게이트). D-129 색인·본문 Proposed→Accepted
+- 증거: `python -m pytest src/site/fleet/test -q` 318 passed 5 skipped, `python -m pytest src/core/core_api_web/test -q` 6 passed, flake8(변경 파일) 0. core test_ui_token_contracts 12 failed는 D-128 백로그의 구 경로(core/core/web) FileNotFoundError로 HEAD와 동일 — 이번 변경이 추가한 실패 아님(9d2bd14 실측과 일치)
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: fleet 의 토큰 경로 해석은 launch·compose 가 `--ui-tokens`로 주입하고 fleet 의 ROS import 금지는 유지된다. 정상 색 금지는 선언 부재에서 참조 부재로 옮겨 갔다 — 콘솔은 status-good 을 쓰고 fleet 은 절대 쓰지 않는다
+- 교훈: append-only 로그를 여러 세션이 같이 쓰면 내 항목이 남의 커밋에 동봉될 수 있다 — 이번에 D-130 항목이 afefa86 에 끼어 들었고 move 시도가 append-only 위반으로 잡혔다. 항목 추가 전 파일 끝을 다시 읽는다
