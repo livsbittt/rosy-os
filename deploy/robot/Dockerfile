@@ -22,7 +22,7 @@ RUN apt-get -o Acquire::Retries=5 update \
         ros-jazzy-rmw-cyclonedds-cpp \
     && rm -rf /var/lib/apt/lists/*
 
-COPY src/rosy_bringup/config/cyclonedds_localhost.xml /etc/rosy/cyclonedds.xml
+COPY src/hardware/bringup/config/cyclonedds_localhost.xml /etc/rosy/cyclonedds.xml
 
 FROM runtime-common AS core-runtime
 
@@ -54,11 +54,11 @@ RUN apt-get -o Acquire::Retries=5 update \
 
 WORKDIR /opt/rosy_ws
 # omx/imu/vision/control belong to optional slices, not this core image.
-COPY src/rosy_interfaces ./src/rosy_interfaces
-COPY src/rosy_core ./src/rosy_core
+COPY src/core/interfaces ./src/core/interfaces
+COPY src/core/core ./src/core/core
 RUN set -eo pipefail \
     && source /opt/ros/jazzy/setup.bash \
-    && colcon build --merge-install --packages-up-to rosy_core \
+    && colcon build --merge-install --packages-up-to core \
     && test -d /opt/rosy_ws/install
 
 FROM core-runtime AS core
@@ -70,7 +70,7 @@ ENV HOME=/var/lib/rosy \
     ROSY_CONFIG=/etc/rosy/rosy.yaml \
     CYCLONEDDS_URI=file:///etc/rosy/cyclonedds.xml
 ENTRYPOINT ["/usr/local/bin/rosy-entrypoint"]
-CMD ["ros2", "run", "rosy_core", "rosy_core"]
+CMD ["ros2", "run", "core", "core"]
 
 FROM runtime-common AS io-runtime
 
@@ -104,16 +104,16 @@ RUN git clone https://github.com/Slamtec/sllidar_ros2.git src/sllidar_ros2 \
     && cd src/sllidar_ros2 \
     && git checkout --detach ${SLLIDAR_COMMIT} \
     && rm -rf .git
-COPY src/rosy_interfaces ./src/rosy_interfaces
-COPY src/rosy_description ./src/rosy_description
-COPY src/rosy_bringup ./src/rosy_bringup
-COPY src/rosy_navigation ./src/rosy_navigation
-COPY src/rosy_omx_adapter ./src/rosy_omx_adapter
-RUN mkdir -p src/rosy_description/meshes
+COPY src/core/interfaces ./src/core/interfaces
+COPY src/sim/description ./src/sim/description
+COPY src/hardware/bringup ./src/hardware/bringup
+COPY src/navigation/navigation ./src/navigation/navigation
+COPY src/apps/omx_adapter ./src/apps/omx_adapter
+RUN mkdir -p src/sim/description/meshes
 RUN set -eo pipefail \
     && source /opt/ros/jazzy/setup.bash \
     && colcon build --merge-install \
-        --packages-select sllidar_ros2 rosy_interfaces rosy_description rosy_bringup rosy_navigation rosy_omx_adapter \
+        --packages-select sllidar_ros2 interfaces description bringup navigation omx_adapter \
     && test -d /opt/rosy_ws/install
 
 FROM io-runtime AS io
@@ -124,5 +124,5 @@ RUN chmod 0755 /usr/local/bin/rosy-entrypoint
 ENV HOME=/var/lib/rosy \
     CYCLONEDDS_URI=file:///etc/rosy/cyclonedds.xml
 ENTRYPOINT ["/usr/local/bin/rosy-entrypoint"]
-CMD ["ros2", "launch", "rosy_bringup", "bringup_robot.launch.py", \
+CMD ["ros2", "launch", "bringup", "bringup_robot.launch.py", \
      "cmd_vel_timeout_s:=0.5", "enable_battery:=false"]

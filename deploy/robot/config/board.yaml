@@ -32,8 +32,8 @@ aliases:
   pi5-lite: hardware
 # D-84: Device hardware 프로필이 열리기 전까지 CORE/io 이미지에 넣지 않는 패키지.
 hardware_packages:
-  - rosy_led
-  - rosy_sensor_adc
-  - rosy_lamp_control
-  - rosy_emotion
-  - rosy_imu_bno055
+  - led
+  - sensor_adc
+  - lamp_control
+  - emotion
+  - imu_bno055

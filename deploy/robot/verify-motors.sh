@@ -94,7 +94,7 @@ fi
 pass "UART4 overlay, console isolation, and device node are ready"
 "${compose[@]}" --profile motor build rosy-motor
 "${compose[@]}" --profile motor run --rm --no-deps --entrypoint python3 rosy-motor \
-    -m rosy_bringup.dynamixel_probe \
+    -m bringup.dynamixel_probe \
     --device /dev/rosy-motor \
     --baudrate "$motor_baudrate" \
     --ids "${motor_ids[@]}"
