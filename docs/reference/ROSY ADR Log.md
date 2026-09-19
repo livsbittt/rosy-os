@@ -134,6 +134,7 @@
 | D-124 | 대시보드는 AP on/off와 Wi-Fi 연결을 Host Agent로 확인하고 적용한다 | Accepted |
 | D-125 | Core 패키지를 논리적 도메인 라이브러리로 분할 (Option A) | Accepted |
 | D-126 | 완전 모듈 분리 — CORE는 슬라이스 코드를 import하지 않는다 | Accepted |
+| D-127 | 276커밋 백로그는 직접 FF 푸시하지 않고 슬라이스별 단계 통합한다 | Accepted |
 
 ---
 
@@ -3967,3 +3968,36 @@ ARTIFACT/DEVICE/FIELD gate는 변하지 않는다.
 **References:** D-1, D-2, D-38, D-62, D-63, D-64, D-125.
 설계: `docs/plans/2026-09-19-full-module-separation-design.md`,
 실행: `docs/plans/2026-09-19-full-module-separation.md`.
+
+---
+
+## D-127 276커밋 백로그는 직접 FF 푸시하지 않고 슬라이스별 단계 통합한다
+
+**Status:** Accepted (2026-09-19). 커밋 합치기(merge/push) 방식과 남은 작업 순서에 대한 결정이다.
+
+**Context:** 2026-09-19 현재 로컬 `main`은 `origin/main`(2026-09-09)보다 276커밋·1141파일(+87k/−4k) 앞서 있다.
+동시에 20개 이상의 작업 worktree·브랜치가 살아 있고, 작업 트리에는 타 세션의 미커밋 변경
+(`robot.launch.py`)과 생성물(`fix.sh`, `resource/*`)이 섞여 있다. ROS 전체 회귀와
+ARTIFACT/DEVICE 게이트는 이 호스트에서 닫을 수 없다.
+
+**Decision:**
+
+- `origin/main`으로의 276커밋 일괄 fast-forward 푸시를 하지 않는다. D-125(도메인 분할),
+  D-126(모듈 분리), sim, games 등 결정 슬라이스별 단계적 PR로 통합한다. 각 PR은 자신의
+  증거(가드·회귀)를 싣는다.
+- 병합은 머지 커밋으로 하며 public history를 rebase하지 않는다. 세션별 작은 커밋 이력은
+  추적 자산이므로 squash하지 않는다.
+- 남은 작업 순서: (a) D-126 범위 커밋 완료 — `387cf89`로 닫힘. (b) 타 세션 파일(sim launch,
+  `fix.sh`, `resource/*`)은 손대지 않는다 — 주인이 커밋한다. (c) Level-3 구 경로 시험
+  잔재(web 자산·swarm 경로·triage/palette 등)는 별도 백로그로 추적하며 D-125/D-126 수용을
+  막지 않는다. (d) ARTIFACT/DEVICE 게이트는 Pi 실물이 있을 때까지 PARKED를 유지한다.
+
+**Alternatives:** 일괄 FF 푸시 — 빠르지만 87k줄 홍수를 리뷰 없이 올리고, 진행 중 worktree의
+기준점을 한꺼번에 옮기며, 미커밋 잡음이 섞여 들어갈 여지가 있다. 반려.
+
+**Consequences:** `origin/main` 갱신은 느려지지만 각 단계가 검증 가능해진다. D-127 자체는
+SOURCE 증거(본 로그 + `docs/logs.md`)만 만들며 어떤 게이트도 움직이지 않는다.
+
+**Validation / Transition:** 다음 푸시는 슬라이스 PR 첫 건(D-125 또는 D-126 범위)으로 시작한다.
+
+**References:** D-61, D-79, D-125, D-126.

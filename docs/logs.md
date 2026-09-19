@@ -330,3 +330,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: D-126 Accepted (분리 계약 범위). Level-3 구 경로 잔재 백로그는 수용을 막지 않는다
 - 교훈: 구조 개편 커밋이 시험의 경로 상수를 함께 옮기지 않으면, 다음 작업의 회귀가 개편 잔재와 자기 결함을 구분하는 데 반나절이 든다 — 이동과 경로 갱신은 같은 커밋에
+
+## 2026-09-19 · uncommitted · docs(adr): lock merge strategy as D-127, stage integration by slice
+
+- 변경: ADR D-127 색인·본문(Accepted). 276커밋 일괄 FF 푸시 금지, 슬라이스별 단계 PR + 머지 커밋 + public history 비rebase. 남은 순서: D-126 닫힘(`387cf89`), 타 세션 파일 불간섭, Level-3 시험 잔재 별도 백로그, ARTIFACT/DEVICE PARKED 유지
+- 증거: `git rev-list --left-right --count HEAD...origin/main` → 276 ahead 0 behind, FF 가능 확인. `git diff --stat origin/main...HEAD` → 1141 files +87k/−4k. `git worktree list` → 20+ 활성 worktree. 작업 트리 미커밋: 타 세션 `robot.launch.py` 1건 + 생성물만
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: D-127 Accepted. 다음 푸시는 슬라이스 PR 첫 건부터
+- 교훈: 없음
