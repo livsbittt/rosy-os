@@ -501,6 +501,14 @@
 - 결정: manifest 컨테이너 키(rosy_core/rosy_io)·서비스명(rosy-core 등)·ROS 노드명 문자열은 배포 계약과 런타임 정체로 유지한다. D-128의 "수정은 주인 세션" 규정은 소유자 지시로 본 세션이 흡수했다
 - 교훈: 수집 에러 4건이 140건의 실패를 가리고 있었다 — 중단된 수집은 스위트의 상태가 아니다. 경로를 옮기는 커밋에는 그 경로를 문자열로 고정하는 계약 테스트의 갱신이 반드시 함께 가야 한다
 
+## 2026-09-20 · uncommitted · fix(test): rename the module-level setup helper pytest auto-collects
+
+- 변경: `test_control_absorption_safety.py`의 `setup(provider=None)` 헬퍼를 `setup_safety()`로 개명 — CI의 pytest 7.x 는 모듈 레벨 `setup`을 xunit/nose 셋업으로 자동 수집해 provider 없이 호출되고, 소유자가 없는 bind_policy 호출 경로가 ValueError를 냈다(20 errors). 로컬 pytest 8.x 에서는 재현하지 않는 플랫폼·버전 차이였다
+- 증거: run 35457751899 — 872 passed 20 errors, 전부 같은 파일의 "ERROR at setup", traceback이 `setup` 프레임→bind_policy→ValueError
+- gate 변화: 없음
+- 결정: 없음
+- 교훈: pytest 특수명(setup/teardown)과 같은 이름의 헬퍼는 버전이 바뀌면 의미가 뒤집힌다 — 이름부터 피한다
+
 ## 2026-09-20 · uncommitted · docs(adr): the fleet console repeats what swarm control says, in three phases (D-131)
 
 - 변경: ADR **D-131** 신규(색인 행 포함, Accepted — 방향). 실행 계획 `docs/plans/2026-09-20-fleet-console-ops-plan.md` 신설 — 백엔드–전단 불일치 장부와 T1–T7. `docs/progress.md`의 `adrs`에 D-131, `plans`에 실행 계획 추가
