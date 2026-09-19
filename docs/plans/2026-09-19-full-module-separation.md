@@ -97,44 +97,45 @@ S1은 D-63이 예고한 토픽 경계 이행이며 D-64의 `ALLOWED` 집합을 �
 
 ---
 
-### Task 4: S1 — 어댑터를 토픽 경계로 (D-64 `ALLOWED`를 비운다)
+### Task 4: S1 — provider 역전으로 어댑터의 `control` import 제거 (완료)
 
-**Files:** `src/core/core/core/bridge/control_sensor_adapter.py`, `test/test_module_separation.py`
+**Files:** `src/core/core/core/bridge/control_sensor_adapter.py`, `src/apps/control/control/sensor_provider.py` (신규), `src/apps/control/setup.py`, `src/core/core/test/test_control_sensor_adapter.py`, `src/core/core/test/conftest.py`
 
-가장 큰 작업이므로 쪼갠다:
+당초 "증거 토픽 소비"안은 worker 생성·보정 바인딩이 스트림이 아니라 조립이라 토픽으로 바꿀 수 없고,
+ROS 없이는 검증도 불가능하므로 폐기했다. 대신 provider 역전:
 
-- [ ] **Step 1:** `control.calibration_snapshot` 로드(`:118`)를 파일 스냅샷 리더 경유로 바꾼다.
-  calibration digest·generation 검증 의미 유지.
-- [ ] **Step 2:** `control.safety.node.SafetyNode`(`:140`) sensor-only 생명주기 검사를
-  노드 공개 속성 프로브(duck-type, D-64 방식 유지)로 바꾼다. import 없이 검사한다.
-- [ ] **Step 3:** `control.control.command_gate.CommandPolicy`(`:213`) 생성을 증거 토픽
-  (`TranslationEvidence`·`TrackedEvidence` 수신) 소비로 바꾼다. 정책 교체 시 무효화 유지.
-- [ ] **Step 4:** `ALLOWED_ROSY_CONTROL`에 해당하는 구 가드 상수를 신 가드에서 삭제한다.
-  가드 1·3이 PASS해야 한다: `python -m pytest test/test_module_separation.py -q` 5 passed.
-- [ ] **Step 5:** `src/core/core/test` + `src/apps/control/test` 전체 PASS.
-- [ ] **Step 6: Commit:** `git commit -m "refactor(core): sensor adapter consumes evidence topics, not control code"`
-
-각 Step마다 기존 `test_control_sensor_adapter.py` 계열이 PASS해야 한다. 깨지면 Step을 더 쪼갠다.
+- [x] **Step 1:** `control/sensor_provider.py` 신규 — `make_node`/`make_policy`/`load_snapshot` + `PROVIDER`. ROS import는 `make_node` 함수 안에만.
+- [x] **Step 2:** `setup.py`에 `rosy.sensor_provider` 엔트리포인트 등록.
+- [x] **Step 3:** 어댑터의 `control.*` import 3건 삭제. `policy_factory`/`calibration_loader` 주입점 추가, 기본값은 엔트리포인트 해소. 검증 로직은 그대로 덕타입 데이터에 동작.
+- [x] **Step 4:** 기존 어댑터 시험은 실제 provider를 주입해 PASS. 배선 계약 시험 3건 추가(엔트리포인트 선언·provider 표면·미설치 시 fail-closed), 변이 증명 완료.
+- [x] **Step 5:** core conftest 경로를 신 구조에 맞게 수정.
+- [x] **Step 6: Commit:** 아래 일괄 커밋에 포함.
 
 ---
 
-### Task 5: S5 — api_web은 `deps`만 본다
+### Task 5: S5 — api_web의 `core` 역참조 제거 (완료, 파사드는 제외)
 
-**Files:** `src/core/core_api_web/core_api_web/api/deps.py`, `api/v1/*.py` 12개
+**Files:** `src/core/core_api_web/core_api_web/api/deps.py`, `api/v1/*.py` 13개, `core_common/rmw.py`·`api/host_agent_client.py`로 이동한 2모듈
 
-- [ ] **Step 1:** `deps.py`에 features 접근자(`command_arb()`, `nav_manager()`, `dock_db()`,
-  `diag_collector()`, `map_store()`, `swarm_mgr()`, `waypoints_mgr()`)를 둔다.
-- [ ] **Step 2:** 라우터 파일을 하나씩 옮긴다. 한 파일당: 옮기기 → 해당 api 시험 PASS → 다음.
-- [ ] **Step 3:** AST 검사(신규 가드 6 또는 기존 가드 확장): `api/v1/*.py`에 `core_features.` 직접 참조 0건.
-- [ ] **Step 4: Commit:** `git commit -m "refactor(api): route feature access through deps facade"`
+당초 "features 파사드 + 가드 6"안은 폐기했다. `core_features.*` 참조는 선언 범위 안의 하향 의존이라
+결함이 없고(X5: 결함 없는 쪼개기 금지), 가드 3을 빨갛게 만드는 것은 `core.services`·`core.system.*`
+14곳의 역참조뿐이다. 그래서 역참조만 끊었다:
+
+- [x] **Step 1:** `deps.py`에 `CoreServicesLike` Protocol(21개 `Any` 멤버 — 어노테이션만 교체, 동작 불변).
+- [x] **Step 2:** 13개 라우터 파일의 `CoreServices` 어노테이션을 교체. `core_features.*` 직접 참조는 유지.
+- [x] **Step 3:** `core/system/rmw.py → core_common/rmw.py`, `core/system/host_agent_client.py → core_api_web/api/host_agent_client.py` 이동 + 참조 6곳 갱신. 덤으로 9b77daa가 깨뜨린 `auth_dependency`의 `app.state.core_common.config`를 `app.state.core.config`로 복원.
+- [x] **Step 4: Commit:** 아래 일괄 커밋에 포함.
 
 ---
 
 ### Task 6: 회귀와 ADR 수용
 
-- [ ] **Step 1:** `python -m pytest test/test_module_separation.py test/ -q` PASS.
+- [ ] **Step 1:** 아래 스위트를 **각각 별도 호출**로 PASS (한 호출에 합치면 fleet/games의 동명
+  테스트 파일(`test_cli.py` 등)이 수집 충돌을 일으킨다 — 기존 조건, D-126과 무관).
   `src/core/core/test`, `src/apps/control/test`, `src/site/fleet/test`,
-  `src/apps/omx_adapter/test`, `src/apps/games/test` PASS (Windows는 rclpy 불필요 분만).
+  `src/apps/omx_adapter/test`, `src/apps/games/test`, `src/sim/gz_sim/test`,
+  `test/test_module_separation.py` + `test/` (Windows는 rclpy 불필요 분만).
+  기존 환경성 실패(별도 기록, D-126 변경과 무관한 것만)는 D-126을 막지 않는다.
 - [ ] **Step 2:** 설계 문서 상태를 "구현 완료"로 한 줄 갱신. D-126 Status Proposed→Accepted는
   5개 가드 초록 + 위 회귀가 모두 있어야 한다. 하나라도 빠지면 Proposed 유지.
 - [ ] **Step 3:** `docs/logs.md`에 항목 추가, gate 변화가 있으면 `docs/progress.md` 갱신.
@@ -143,7 +144,7 @@ S1은 D-63이 예고한 토픽 경계 이행이며 D-64의 `ALLOWED` 집합을 �
 
 ## 완료 판정
 
-- 가드 5개 초록 + 가드 6(S5) 초록.
-- `grep -rn "from control\|import control" src/core --include=*.py` 0건 (주석 제외).
-- 최종 `cmd_vel` 발행 1곳, `control`의 최종 토픽 참조 0건.
+- 가드 5개 초록.
+- `grep -rn "from control\|import control" src/core --include=*.py` 생산 코드 0건 (시험·주석 제외).
+- 최종 `cmd_vel` 발행 1곳, `control`의 최종 토픽 참조는 핀된 레거시 선언 1곳만.
 - DEVICE/ARTIFACT/FIELD gate는 변하지 않는다. 이 계획은 SOURCE/LOCAL 증거만 만든다.
