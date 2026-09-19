@@ -5,7 +5,7 @@
 
 ## Purpose
 
-Pinky Pro board overlays mounted into `rosy-core`. `ROSY_RUNTIME_MODE` selects `core`, `motor`, or `hardware`. `board.yaml` catalogs slices (`required: [core]`) and presets that map onto those modes. The full in-tree `src/rosy_core/config/capabilities.yaml` is the Pinky source profile; these files are what the robot actually advertises.
+Pinky Pro board overlays mounted into `rosy-core`. `ROSY_RUNTIME_MODE` selects `core`, `motor`, or `hardware`. `board.yaml` catalogs slices (`required: [core]`) and presets that map onto those modes. The full in-tree `src/core/core/config/capabilities.yaml` is the Pinky source profile; these files are what the robot actually advertises.
 
 ## Key Files
 
@@ -27,14 +27,14 @@ None.
 
 ### Working In This Directory
 
-- Compose bind-mounts profile/capabilities over `/etc/rosy/`. Keep keys aligned with `src/rosy_core/config/` schemas.
+- Compose bind-mounts profile/capabilities over `/etc/rosy/`. Keep keys aligned with `src/core/core/config/` schemas.
 - Overlay YAML exists only for `core` / `motor` / `hardware`. Do not copy YAML for aliases.
 - Presets: `core` → `[core]`; `motor` → `[core, motor]`; `hardware` → `[core, motor, io, nav]`. vision/omx/ai are catalog-only (`enabled: false`); do not add overlay YAML or compose services for them.
 - Do not enable slam/swarm here unless the hardware image actually launches those stacks. `hardware` may advertise Nav2 only because `hardware.launch.py` starts it.
 
 ### Testing Requirements
 
-Covered by `test/test_robot_runtime.py` and `src/rosy_core/test/test_runtime_config.py`.
+Covered by `test/test_robot_runtime.py` and `src/core/core/test/test_runtime_config.py`.
 
 ### Common Patterns
 
@@ -44,7 +44,7 @@ YAML only; no code.
 
 ### Internal
 
-- `src/rosy_core/config/rosy_default.yaml` structure
+- `src/core/core/config/rosy_default.yaml` structure
 - `deploy/robot/compose.yaml` volume mounts
 
 ### External

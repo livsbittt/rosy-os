@@ -24,7 +24,7 @@ None.
 
 - CORE SRS §1.3: no external `cmd_vel`; Fleet never drives motors directly.
 - Implement against requirement IDs (`CORE-001`, `SAF-001`…) not heading numbers.
-- FLEET SRS must not be implemented inside `rosy_core`. Phase 4 is a separate server.
+- FLEET SRS must not be implemented inside `core`. Phase 4 is a separate server.
 
 ### Testing Requirements
 
@@ -39,7 +39,7 @@ Both docs inherited PKY-* IDs and were renamed ROSY (D-15/D-16).
 ### Internal
 
 - `docs/reference/ROSY API & Protocol Reference.md` for the shared contract
-- `src/rosy_core` implements CORE SRS
+- `src/core/core` implements CORE SRS
 
 ### External
 

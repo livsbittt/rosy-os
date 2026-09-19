@@ -30,7 +30,7 @@ MotorController/Dynamixel tests live in **repo-root** `test/`, not here. Add ROS
 ### Testing Requirements
 
 ```bash
-python3 -m pytest src/bringup/test/test_command_deadman.py -v
+python3 -m pytest src/hardware/bringup/test/test_command_deadman.py -v
 ```
 
 ### Common Patterns

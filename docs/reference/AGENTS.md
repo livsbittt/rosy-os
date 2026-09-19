@@ -23,13 +23,13 @@ None.
 
 ### Working In This Directory
 
-- Schema source of truth for Python is still `rosy_core.protocol.schemas` (D-18); this API ref is the human contract.
-- Host Agent: CORE client is `rosy_core.system.host_agent_client`; server is `deploy/release/host_agent.py`.
+- Schema source of truth for Python is still `core_common.protocol.schemas` (D-18); this API ref is the human contract.
+- Host Agent: CORE client is `core_api_web.api.host_agent_client`; server is `deploy/release/host_agent.py`.
 - Important ADRs: D-1 single process, D-2 cmd_vel mux, D-3 FastAPI replaces Flask, D-8 in-process event bus, D-22 Core/IO split + deadman, D-23 embedded dashboard, D-24/D-25 power (STANDBY not hibernate), D-27 deep-battery halt exception, D-33 robot identity from one robot number (supersedes D-6), D-34 publish rates matched to the consumer, D-38 CORE owns final cmd_vel, D-59 site fabric is a per-role contract bus, D-60 swarm follow is not owned by navigation, D-65 concept objects on CORE+D-62, D-67–D-71 concept folder freeze, D-73 per-module functional test surface, D-74 TaskKind sinks to internal ROS.
 
 ### Testing Requirements
 
-Protocol tests: `src/rosy_core/test/test_protocol_schemas.py`. Host Agent: `test/test_host_agent.py`.
+Protocol tests: `src/core/core/test/test_protocol_schemas.py`. Host Agent: `test/test_host_agent.py`.
 
 ### Common Patterns
 
@@ -39,8 +39,8 @@ API versioning is path-based (`/api/v1`). Additive schema changes bump protocol 
 
 ### Internal
 
-- `src/rosy_core/rosy_core/protocol/schemas.py`
-- `src/rosy_core/rosy_core/api/`
+- `src/core/core_common/core_common/protocol/schemas.py`
+- `src/core/core_api_web/core_api_web/api/`
 - `deploy/release/host_agent.py`
 
 ### External

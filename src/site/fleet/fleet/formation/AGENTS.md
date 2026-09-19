@@ -30,7 +30,7 @@ None.
 ### Testing Requirements
 
 ```bash
-python -m pytest src/fleet/test/test_geometry.py src/fleet/test/test_assignment.py src/fleet/test/test_boundaries.py -v
+python -m pytest src/site/fleet/test/test_geometry.py src/site/fleet/test/test_assignment.py src/site/fleet/test/test_boundaries.py -v
 ```
 
 ### Common Patterns
@@ -41,7 +41,7 @@ Dataclasses + enums. Input numbers, output numbers. Follower pose is leader head
 
 ### Internal
 
-- Spacing rationale cites `src/navigation/params/nav2_params.yaml`
+- Spacing rationale cites `src/navigation/navigation/params/nav2_params.yaml`
 - Slot offsets feed `core.navigation.swarm.follow_goal` (contract, not an import)
 
 ### External

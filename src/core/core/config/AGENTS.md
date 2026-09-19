@@ -30,7 +30,7 @@ None.
 
 ### Testing Requirements
 
-`src/core/test/test_runtime_config.py`, `test_battery.py`, `test_power.py`.
+`src/core/core/test/test_runtime_config.py`, `test_battery.py`, `test_power.py`.
 
 ### Common Patterns
 

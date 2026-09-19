@@ -29,7 +29,7 @@ None.
 
 ### Testing Requirements
 
-`src/core/test/test_core_logic.py`
+`src/core/core/test/test_core_logic.py`
 
 ### Common Patterns
 

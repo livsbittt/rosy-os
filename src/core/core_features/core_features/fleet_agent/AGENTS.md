@@ -28,7 +28,7 @@ None.
 
 ### Testing Requirements
 
-`src/core/test/test_fleet_agent.py`, commissioning fields in `test_host_cards.py`.
+`src/core/core/test/test_fleet_agent.py`, commissioning fields in `test_host_cards.py`.
 
 ### Common Patterns
 

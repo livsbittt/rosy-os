@@ -27,7 +27,7 @@ None.
 ### Testing Requirements
 
 ```bash
-python3 -m pytest src/gz_sim/test/test_gz_multi_core.py -v
+python3 -m pytest src/sim/gz_sim/test/test_gz_multi_core.py -v
 ```
 
 Requires `launch` / `launch_ros` (skipped otherwise).

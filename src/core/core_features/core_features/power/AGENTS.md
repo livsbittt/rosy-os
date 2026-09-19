@@ -31,7 +31,7 @@ None.
 ### Testing Requirements
 
 ```bash
-python3 -m pytest src/core/test/test_power.py src/core/test/test_battery.py -v
+python3 -m pytest src/core/core/test/test_power.py src/core/core/test/test_battery.py -v
 ```
 
 ### Common Patterns

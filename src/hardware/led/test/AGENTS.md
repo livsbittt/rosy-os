@@ -28,7 +28,7 @@ Do not add tests that import `rosylib` unless you mock it — CI may not have th
 ### Testing Requirements
 
 ```bash
-python3 -m pytest src/led/test/ -v
+python3 -m pytest src/hardware/led/test/ -v
 ```
 
 ### Common Patterns

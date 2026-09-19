@@ -33,7 +33,7 @@ None.
 
 ### Testing Requirements
 
-`src/core/test/test_dashboard.py`, `test_host_cards.py`; browser: `test/test_dashboard_browser.py`.
+`src/core/core/test/test_dashboard.py`, `test_host_cards.py`; browser: `test/test_dashboard_browser.py`.
 
 ### Common Patterns
 

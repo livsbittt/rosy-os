@@ -55,8 +55,8 @@ None (ignore `__pycache__/`).
 ### Testing Requirements
 
 ```bash
-python3 -m pytest src/core/test/ -v
-python3 -m pytest src/core/test/test_battery.py src/core/test/test_api.py -v
+python3 -m pytest src/core/core/test/ -v
+python3 -m pytest src/core/core/test/test_battery.py src/core/core/test/test_api.py -v
 ```
 
 ### Common Patterns

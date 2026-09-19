@@ -12,7 +12,7 @@ session, CLI, hub, and the import-boundary check. No ROS. Fakes only — no netw
 
 | File | Description |
 |------|-------------|
-| `conftest.py` | Puts `src/fleet` and `src/core` on `sys.path` so pytest runs without colcon install |
+| `conftest.py` | Puts `src/site/fleet`, `src/core/core_common`, `src/core/core_features` on `sys.path` so pytest runs without colcon install |
 | `fakes.py` | Fake `RobotClient` + `FakeClock` shared by relay/session/hub tests — no network |
 | `test_package.py` | Package import and D-18 schema reuse |
 | `test_geometry.py` | FOR-001 formation slot offsets |
@@ -23,7 +23,7 @@ session, CLI, hub, and the import-boundary check. No ROS. Fakes only — no netw
 | `test_arming.py` | Pure pre-check/assignment planning before the relay is touched |
 | `test_session.py` | FormationSession arm → relay → watch → HOLD/ABORT |
 | `test_cli.py` | CLI parsing and wiring |
-| `test_boundaries.py` | Package-wide `rclpy` ban; hub may import `core.protocol.schemas` only |
+| `test_boundaries.py` | Package-wide `rclpy` ban; hub may import `core_common.protocol.schemas` only |
 | `test_hub.py` | SiteHub gather/scatter and role-violation tests (D-59) |
 
 ## Subdirectories
@@ -41,17 +41,17 @@ None (ignore `__pycache__/`).
 ### Testing Requirements
 
 ```bash
-python -m pytest src/fleet/test -v
+python -m pytest src/site/fleet/test -v
 ```
 
-No ROS required — `conftest.py` puts `src/core` on `sys.path` for the schema import.
+No ROS required — `conftest.py` puts `src/core/core_common` on `sys.path` for the schema import.
 
 ## Dependencies
 
 ### Internal
 
 - `fleet` package (source tree import)
-- `core.protocol.schemas` (D-18)
+- `core_common.protocol.schemas` (D-18)
 
 ### External
 

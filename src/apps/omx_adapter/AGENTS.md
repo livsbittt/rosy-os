@@ -35,8 +35,8 @@ ROS-native OMX profile boundary. Validates a model-neutral YAML profile and emit
 ### Testing Requirements
 
 ```bash
-python3 -m pytest src/omx_adapter/test/test_omx_profile.py -v
-python -m omx_adapter.cli src/omx_adapter/config/omx.disabled.yaml
+python3 -m pytest src/apps/omx_adapter/test/test_omx_profile.py -v
+python -m omx_adapter.cli src/apps/omx_adapter/config/omx.disabled.yaml
 ```
 
 The CLI on the disabled profile must print `{}`.

@@ -37,7 +37,7 @@ Python LED service server (`led_service_server`) wrapping `rosylib.LED`. Service
 
 ```bash
 # linters only unless hardware is present
-python3 -m pytest src/led/test/ -v
+python3 -m pytest src/hardware/led/test/ -v
 ```
 
 ### Common Patterns

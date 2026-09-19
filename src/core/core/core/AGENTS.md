@@ -1,47 +1,29 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-15 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-20 -->
 
 # core (Python package)
 
 ## Purpose
 
-Importable middleware. `main.py` starts rclpy; `node.py` builds `CoreServices`, `RosBridge`, `RosGraphMonitor`, and the API thread. Subpackages are the feature managers.
+Importable middleware kernel. `main.py` starts rclpy; `node.py` wires the process and starts the API thread; `services.py` builds `CoreServices` by assembling managers from `core_features`, schemas/profile/identity/capability from `core_common`, and the event bus / audit log from `core_events`. All ROS I/O is confined to `bridge/ros_bridge`.
 
 ## Key Files
 
 | File | Description |
 |------|-------------|
 | `__init__.py` | Package marker |
-| `main.py` | Entry: `rclpy.init` → `RosyCoreNode.run` → shutdown |
-| `node.py` | Assembles profile/capabilities/services, starts uvicorn thread |
-| `services.py` | `CoreServices` DI; battery/power config mapping; shutdown sentinel name |
-| `config.py` | YAML load/merge + local overlay patch (`~/.rosy/rosy.yaml` / `ROSY_CONFIG`) |
-| `identity.py` | IDN-001 robot id/name/IP/version |
-| `profile.py` | HWA-001 `RobotProfile` loader |
-| `capability.py` | CAP-001 dotted lookup + `CapabilityError` |
-| `domain/` | Concept inventory, adapter registry, TaskKind (ROS-free) |
-| `maps.py` | MAP-003/004 **grid frames for the render path** — last OccupancyGrid / Path / Costmap snapshot (ROS-free). Not map artifacts: authoring and persistence are not its concern |
+| `main.py` | Entry (`core=core.main:main`): applies Cyclone RMW via `core_common.rmw`, then `rclpy.init` → `RosyCoreNode.run` → shutdown |
+| `node.py` | Assembles profile/capabilities/services (`SOFTWARE_VERSION` from `core_common.identity`), starts uvicorn thread |
+| `services.py` | `CoreServices` DI: ModeMachine/CommandManager, Docking*, Navigation*, Swarm, Power*, SafetyManager, StateManager (`core_features`), EventBus/FileAuditLog (`core_events`), inventory/protocol/evidence (`core_common`); `SHUTDOWN_SENTINEL_NAME` |
 
 ## Subdirectories
 
 | Directory | Purpose |
 |-----------|---------|
-| `api/` | FastAPI app, auth, REST, WS (see `api/AGENTS.md`) |
-| `web/` | Dashboard HTML/CSS/JS (see `web/AGENTS.md`) |
 | `bridge/` | All ROS I/O (see `bridge/AGENTS.md`) |
-| `command/` | Mode machine + cmd_vel mux (see `command/AGENTS.md`) |
-| `safety/` | E-stop, speed limits, battery policy (see `safety/AGENTS.md`) |
-| `state/` | 10 Hz snapshot (see `state/AGENTS.md`) |
-| `events/` | In-process event bus (see `events/AGENTS.md`) |
-| `protocol/` | Pydantic fleet/API schemas (see `protocol/AGENTS.md`) |
-| `navigation/` | Nav facade; Nav2 behind protocol (see `navigation/AGENTS.md`) |
-| `swarm/` | robot-side follow (see `swarm/AGENTS.md`) |
-| `waypoints/` | JSON waypoint store (see `waypoints/AGENTS.md`) |
-| `power/` | IDLE/STANDBY + battery monitor (see `power/AGENTS.md`) |
-| `docking/` | Dock SM, DB, detector (see `docking/AGENTS.md`) |
-| `diagnostics/` | Health providers (see `diagnostics/AGENTS.md`) |
-| `system/` | Host probe, ROS graph, host-agent client (see `system/AGENTS.md`) |
-| `fleet_agent/` | Disabled outbound Fleet WS; does not connect (see `fleet_agent/AGENTS.md`) |
+| `system/` | Host probe, ROS graph (see `system/AGENTS.md`) |
+
+Feature managers, protocol schemas, config/identity/profile, and the API/web surface no longer live here: see `../../core_features/core_features/AGENTS.md`, `../../core_common/core_common/AGENTS.md`, `../../core_events/core_events/AGENTS.md`, and `../../core_api_web/core_api_web/AGENTS.md`.
 
 ## For AI Agents
 
@@ -49,7 +31,7 @@ Importable middleware. `main.py` starts rclpy; `node.py` builds `CoreServices`, 
 
 #### Split criteria — before making a module a package, or splitting a file
 
-Full reasoning: `docs/plans/2026-09-06-module-split-criteria.md`. Operative rules:
+Full reasoning: `docs/plans/2026-09-06-module-split-criteria.md` (repo root). Operative rules:
 
 - **Size is never a reason.** `waypoints/` is 85 lines and is a package; `docking/manager.py` is 511 and is one file.
 - **Promote a module only if all three hold:** it owns a requirement family no package claims, it needs a second file with a
@@ -59,9 +41,10 @@ Full reasoning: `docs/plans/2026-09-06-module-split-criteria.md`. Operative rule
   `test/test_module_criteria.py` fails on any new reach. C7: one service field spanning two requirement families.
 - **Record the "leave it alone" verdicts too.** They are what stops the next round of churn.
 
-- `SOFTWARE_VERSION` lives in `identity.py` and must match `package.xml`. `node.py` imports it.
-- Waypoints default path: `~/.rosy/waypoints.json` (on Pi, `HOME=/var/lib/rosy`).
+- `SOFTWARE_VERSION` lives in `core_common.identity` and must match this package's `package.xml`. `node.py` imports it.
+- Waypoint store (`core_features.waypoints`) defaults to `~/.rosy/waypoints.json` (on Pi, `HOME=/var/lib/rosy`).
 - `SHUTDOWN_SENTINEL_NAME = "battery-shutdown-request.json"` in `services.py`. Dock database JSON lives beside waypoints.
+- Optional ROS pkgs: wrap slam_toolbox (and similar) in constructor try/except.
 
 ### Testing Requirements
 
@@ -69,16 +52,16 @@ See sibling `../test/AGENTS.md`.
 
 ### Common Patterns
 
-Managers take an injected clock. Events via `EventBus.publish(type, source, data)`.
+Managers take an injected clock. Events via `EventBus.publish(type, source, data)` (bus lives in `core_events`).
 
 ## Dependencies
 
 ### Internal
 
-- Subpackages listed above; assembled only in `node.py` / `services.py`
+- `core_common` (schemas, config, identity, profile, capability, domain, rmw), `core_events`, `core_features`, `core_api_web` — assembled only in `node.py` / `services.py`
 
 ### External
 
-- rclpy (node/main/bridge only), yaml, fastapi/uvicorn (api thread)
+- rclpy (node/main/bridge only), yaml, fastapi/uvicorn (API thread via `core_api_web`)
 
 <!-- MANUAL: -->

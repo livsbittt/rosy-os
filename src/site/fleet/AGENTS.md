@@ -12,7 +12,7 @@ session, and the **Fleet 서버 v1** (`fleet console`) — 관제 PC 에서 N대
 모으고 로봇별 목표·취소·전체 정지를 내리는 사이트 오케스트레이터다(site-fabric 설계 §2,
 전환 순서 3단계). SiteHub는 계약 gather/scatter이며 ROS가 없다. SiteHub 자체는 UI가
 아니다 — UI 는 `server/` 가 들고, scatter 는 SiteHub 를 통해 나간다. Consumes the robot contract
-only — it never modifies `core` — and imports `core.protocol.schemas` for
+only — it never modifies `core` — and imports `core_common.protocol.schemas` for
 schema reuse (D-18). No ROS imports anywhere in this package.
 
 ## Key Files
@@ -35,7 +35,7 @@ schema reuse (D-18). No ROS imports anywhere in this package.
 | `fleet/server/app.py` | FastAPI 표면 — `/api/fleet/*` 와 `/console` UI |
 | `fleet/server/web/` | 관제 UI 정적 자산 (CSP `style-src 'self'` — 인라인 스타일 금지) |
 | `test/fakes.py` | Fake `RobotClient` + `FakeClock` shared by relay/session tests — no network |
-| `test/conftest.py` | Puts `src/fleet` and `src/core` on `sys.path` so pytest runs without colcon install |
+| `test/conftest.py` | Puts `src/site/fleet`, `src/core/core_common`, and `src/core/core_features` on `sys.path` so pytest runs without colcon install |
 | `progress.md` | Current gate snapshot (SOURCE…FIELD). Overwrite; state of record over this file |
 | `logs.md` | Append-only work journal, one entry per change |
 | `index.md` | Generated: ADRs, plans, solutions, tests, recent logs. Do not edit |
@@ -66,11 +66,11 @@ schema reuse (D-18). No ROS imports anywhere in this package.
 ### Testing Requirements
 
 ```bash
-python -m pytest src/fleet/test -v
-python -m flake8 src/fleet --max-line-length=120
+python -m pytest src/site/fleet/test -v
+python -m flake8 src/site/fleet --max-line-length=120
 ```
 
-No ROS required — `conftest.py` puts `src/core` on `sys.path` for the schema import.
+No ROS required — `conftest.py` puts `src/core/core_common` on `sys.path` for the schema import.
 
 ### Common Patterns
 

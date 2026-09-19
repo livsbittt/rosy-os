@@ -37,7 +37,7 @@ LCD emotion GIFs (`set_emotion` service) and PWR-003 info-card renderer (`info_s
 ### Testing Requirements
 
 ```bash
-python3 -m pytest src/emotion/test/test_info_screen.py -v
+python3 -m pytest src/apps/emotion/test/test_info_screen.py -v
 ```
 
 ### Common Patterns

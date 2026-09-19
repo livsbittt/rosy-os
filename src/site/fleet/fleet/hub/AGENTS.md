@@ -15,4 +15,4 @@ D-59 SiteHub: hello/heartbeat/event gather, REST scatter. No rclpy, no cmd_vel, 
 
 ## Testing Requirements
 
-`src/fleet/test/test_hub.py`, `test_boundaries.py`
+`src/site/fleet/test/test_hub.py`, `test_boundaries.py`

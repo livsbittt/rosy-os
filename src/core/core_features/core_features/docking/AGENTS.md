@@ -33,7 +33,7 @@ None.
 ### Testing Requirements
 
 ```bash
-python3 -m pytest src/core/test/test_docking.py -v
+python3 -m pytest src/core/core/test/test_docking.py -v
 ```
 
 ### Common Patterns

@@ -1,11 +1,11 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-14 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-20 -->
 
 # ROSY
 
 ## Purpose
 
-ROSY is a robot middleware and fleet-control platform (ROS 2 Jazzy, first hardware Pinky Pro). This repository is the robot-side workspace: `rosy_core` is the only external API gateway (FastAPI + rclpy in one process), plus hardware bringup, Nav2/SLAM, Gazebo, Raspberry Pi 5 deploy/release tooling, and charging-dock ESP32 firmware. `src/rosy_control` contains the absorbed Control package; its legacy final publisher must not run beside CORE. `src/rosy_fleet` contains formation/relay/CLI seed code; the central Fleet server remains unimplemented. Upstream was pinky_pro; the tree was fully renamed (ADR D-16). License: Apache-2.0.
+ROSY is a robot middleware and fleet-control platform (ROS 2 Jazzy, first hardware Pinky Pro). This repository is the robot-side workspace: `core` (`src/core/core`) is the only external API gateway (FastAPI + rclpy in one process), supported by `core_common` (protocol schemas, config, identity), `core_events`, `core_features` (command/safety/navigation/power/docking/…), and `core_api_web` (REST/WS + dashboard) — plus hardware bringup, Nav2/SLAM, Gazebo, Raspberry Pi 5 deploy/release tooling, and charging-dock ESP32 firmware. `src/apps/control` contains the absorbed Control package; its legacy final publisher must not run beside CORE. `src/site/fleet` contains formation/relay/CLI and the v1 Fleet console seed; the full central Fleet platform remains unimplemented. `src` packages are grouped by domain (`core` / `apps` / `hardware` / `navigation` / `sim` / `site`); upstream was pinky_pro, fully renamed (ADR D-16) and later regrouped out of flat `rosy_*` directories. License: Apache-2.0.
 
 ## Key Files
 
@@ -15,13 +15,16 @@ ROSY is a robot middleware and fleet-control platform (ROS 2 Jazzy, first hardwa
 | `LICENSE` | Apache License 2.0 |
 | `env.sh` | Dev env: source ROS 2 Jazzy then workspace `install/setup.bash` |
 | `CONCEPTS.md` | Shared domain vocabulary — entities, named processes, status concepts with project-specific meaning |
+| `STATUS.md` | Generated: per-module gate snapshot (SOURCE…FIELD) linking each module's `progress.md`. Edit progress/logs/ADRs, not this file |
+| `fix.sh` | WSL helper: recreate ament `resource/<pkg>` markers for Python packages under the domain groups |
+| `run_fleet_sim.sh` | One-click multi-robot Gazebo + fleet orchestration launcher |
 | `.gitignore` | Ignores colcon `build/` `install/` `log/`, `__pycache__`, `.omc/` |
 
 ## Subdirectories
 
 | Directory | Purpose |
 |-----------|---------|
-| `src/` | ROS 2 colcon workspace (see `src/AGENTS.md`) |
+| `src/` | ROS 2 colcon workspace, domain-grouped (see `src/AGENTS.md`) |
 | `docs/` | Governance docs: spec, API contract, ADR, plans (see `docs/AGENTS.md`) |
 | `deploy/` | Image build, signed release, Pi 5 Docker/systemd runtime (see `deploy/AGENTS.md`) |
 | `dock/` | Charging-dock firmware and ROSY-DOCK-001 contract (see `dock/AGENTS.md`) |
@@ -35,13 +38,15 @@ ROSY is a robot middleware and fleet-control platform (ROS 2 Jazzy, first hardwa
 
 ### Working In This Directory
 
-- Treat `docs/spec/ROSY CORE SRS.md`, `docs/reference/ROSY API & Protocol Reference.md`, and `docs/reference/ROSY ADR Log.md` as contracts. Do not invent REST paths, modes, or protocol fields that are not in the API ref or `rosy_core.protocol.schemas`.
-- External clients must not speak ROS. `rosy_core` is the only gateway (CORE SRS §1.3). Command Manager is the only `cmd_vel` publisher (D-2).
-- Single process: main thread rclpy `MultiThreadedExecutor`, worker thread uvicorn+FastAPI (D-1). Do not split into two processes.
+- Treat `docs/spec/ROSY CORE SRS.md`, `docs/reference/ROSY API & Protocol Reference.md`, and `docs/reference/ROSY ADR Log.md` as contracts. Do not invent REST paths, modes, or protocol fields that are not in the API ref or `core_common.protocol.schemas` (`src/core/core_common/core_common/protocol/schemas.py`).
+- External clients must not speak ROS. `core` is the only gateway (CORE SRS §1.3). Command Manager (`core_features.command`) is the only `cmd_vel` publisher (D-2).
+- Single process: main thread rclpy `MultiThreadedExecutor`, worker thread uvicorn+FastAPI (D-1). Entry point is `core=core.main:main` — `ros2 run core core`. Do not split into two processes.
 - `slam_toolbox` is optional. `ros_bridge` must import it inside try/except, never at module top (`package.xml` comment). CI boots the node without it.
-- Config merge order: `config/rosy_default.yaml` → `~/.rosy/rosy.yaml` → `ROSY_CONFIG`.
+- Config merge order: `src/core/core/config/rosy_default.yaml` → `~/.rosy/rosy.yaml` → `ROSY_CONFIG`.
 - Do not commit colcon `build/`, `install/`, `log/`, or `__pycache__/`.
-- Hardware profile is YAML. In-tree Pinky full spec is `src/rosy_core/config/profile.pinky_pro.yaml`. The robot advertises `deploy/robot/config/{profile,capabilities}.${ROSY_RUNTIME_MODE}.yaml` (`core` / `motor` / `hardware`).
+- Hardware profile is YAML. In-tree Pinky full spec is `src/core/core/config/profile.pinky_pro.yaml`. The robot advertises `deploy/robot/config/{profile,capabilities}.${ROSY_RUNTIME_MODE}.yaml` (`core` / `motor` / `hardware`).
+- Package names are grouped by domain: `src/{core,apps,hardware,navigation,sim,site}`. Do not reintroduce `rosy_*` or `pinky_*` package names. As of 2026-09-20, `.github/workflows/ci.yml` and the repo README still reference pre-regroup `rosy_*` paths and are pending realignment.
+- Dashboard is FastAPI static files under `core_api_web` (`src/core/core_api_web/core_api_web/web/`), not a Node server (D-23). D-7 (React+Vite) is not the current dashboard.
 
 ### Testing Requirements
 
@@ -50,16 +55,19 @@ ROSY is a robot middleware and fleet-control platform (ROS 2 Jazzy, first hardwa
 source env.sh
 cd src && colcon build --symlink-install
 
-# rosy_core unit tests (no live ROS required for most)
-python3 -m pytest src/rosy_core/test/ -v
+# core unit tests (no live ROS required for most)
+python3 -m pytest src/core/core/test/ -v
 
-# Deploy, release, motor, Wi-Fi, host-agent contracts
+# Fleet formation/relay/session/console (no ROS)
+python3 -m pytest src/site/fleet/test/ -v
+
+# Deploy, release, motor, Wi-Fi, host-agent contracts (host)
 python3 -m pytest test/ -v
 
-# CI also: flake8 rosy_core (max 120), boot smoke without slam_toolbox
+# CI also: flake8 (max 120), boot smoke without slam_toolbox
 ```
 
-CI (`.github/workflows/ci.yml`) on `main` / PRs: colcon build in `ros:jazzy-ros-base`, pytest both trees, `ros2 run rosy_core rosy_core` boot smoke, SaveMap type guard.
+CI (`.github/workflows/ci.yml`) on `main` / PRs: colcon build in `ros:jazzy-ros-base`, pytest, boot smoke, SaveMap type guard. Note: ci.yml still targets pre-regroup paths (`src/rosy_core/test`, `src/rosy_fleet/test`, `ros2 run rosy_core rosy_core`) and needs realignment to the domain tree.
 
 ### Common Patterns
 
@@ -69,13 +77,13 @@ CI (`.github/workflows/ci.yml`) on `main` / PRs: colcon build in `ros:jazzy-ros-
   `ROS_DOMAIN_ID` = 40 + N and `ROSY_NAMESPACE` = `rosy_%02d` are derived from
   `ROSY_ROBOT_NUMBER` at install, and a missing identity stops the runtime (D-33).
   A default here is what once shipped every unit as 42/`rosy_01`.
-- Dashboard is FastAPI static files under `rosy_core/web/`, not a Node server (D-23). D-7 (React+Vite) is not the current dashboard.
+- Dashboard is FastAPI static files under `core_api_web/web/`, not a Node server (D-23). D-7 (React+Vite) is not the current dashboard.
 
 ## Dependencies
 
 ### Internal
 
-- `src/rosy_core` depends on `src/rosy_interfaces` and (at runtime) bringup/Nav2 topics.
+- `src/core/core` depends on `src/core/core_common`, `src/core/core_events`, `src/core/core_features`, `src/core/core_api_web`, and `src/core/interfaces` (plus, at runtime, bringup/Nav2 topics).
 - `deploy/` consumes `src/` via `deploy/robot/Dockerfile`.
 - `test/` imports `deploy/release` via `test/conftest.py` `sys.path`.
 
@@ -85,4 +93,4 @@ CI (`.github/workflows/ci.yml`) on `main` / PRs: colcon build in `ros:jazzy-ros-
 - FastAPI, uvicorn, pydantic, PyYAML, httpx, websockets
 - Optional: slam_toolbox, sllidar_ros2, Gazebo (ros_gz), wiringPi I2C, ws2811, Dynamixel SDK
 
-<!-- MANUAL: Any manually added notes below this line are preserved on regeneration -->
+<!-- MANUAL: -->

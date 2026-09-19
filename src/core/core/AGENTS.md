@@ -45,7 +45,7 @@ Robot middleware (ROSY-CORE-SRS-001). One process: rclpy node `core` + uvicorn F
 ### Testing Requirements
 
 ```bash
-python3 -m pytest src/core/test/ -v
+python3 -m pytest src/core/core/test/ -v
 ```
 
 ### Common Patterns

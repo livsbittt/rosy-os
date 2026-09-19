@@ -5,7 +5,7 @@
 
 ## Purpose
 
-Robot-host delivery: build a signed ROSY OS image, store/activate releases, and run CORE/motor/IO as Docker Compose services on Raspberry Pi 5. Host privilege (network, reboot, release activate) lives in Host Agent, never in `rosy_core` (D-22).
+Robot-host delivery: build a signed ROSY OS image, store/activate releases, and run CORE/motor/IO as Docker Compose services on Raspberry Pi 5. Host privilege (network, reboot, release activate) lives in Host Agent, never in `core` (D-22).
 
 ## Key Files
 
@@ -30,7 +30,7 @@ Three sibling pipelines below; at this level only the harness records.
 ### Working In This Directory
 
 - Harness (D-61 Proposed): read `progress.md` and `index.md` first. After a change, append `logs.md`, overwrite `progress.md` if a gate moved, then run `python tools/harness/rosy_harness.py generate` from the repo root.
-- CORE is internet-facing and unprivileged. Do not add `nmcli`, `reboot`, or docker-compose control inside `rosy_core`.
+- CORE is internet-facing and unprivileged. Do not add `nmcli`, `reboot`, or docker-compose control inside `core`.
 - Compose services: `rosy-core` (always), `rosy-motor` (profile `motor`), hardware/LiDAR (profile `hardware`). `runtime-mode.sh` modes are `core` | `motor` | `hardware`.
 - Release images must be built on native arm64, not x86 QEMU (`deploy/image/build-image.sh`).
 - `test/` at repo root is the contract suite for this tree; `test/conftest.py` puts `deploy/release` on `sys.path`.

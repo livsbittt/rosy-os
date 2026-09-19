@@ -46,7 +46,7 @@ Physical robot bringup: Dynamixel differential drive, odometry/TF, optional LiDA
 
 ```bash
 python3 -m pytest test/test_motor_control.py test/test_bringup_motor_contracts.py \
-  test/test_dynamixel_driver_safety.py src/bringup/test/test_command_deadman.py -v
+  test/test_dynamixel_driver_safety.py src/hardware/bringup/test/test_command_deadman.py -v
 ```
 
 ### Common Patterns

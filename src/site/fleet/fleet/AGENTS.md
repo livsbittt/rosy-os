@@ -32,7 +32,7 @@ Python package root for the fleet seed: operator CLI plus `formation/` (pure geo
 ### Testing Requirements
 
 ```bash
-python -m pytest src/fleet/test -v
+python -m pytest src/site/fleet/test -v
 ```
 
 ### Common Patterns

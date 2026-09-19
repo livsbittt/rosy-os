@@ -35,7 +35,7 @@ None.
 ### Testing Requirements
 
 ```bash
-python -m pytest src/fleet/test/test_relay.py src/fleet/test/test_session.py src/fleet/test/test_arming.py src/fleet/test/test_transport.py src/fleet/test/test_robots.py -v
+python -m pytest src/site/fleet/test/test_relay.py src/site/fleet/test/test_session.py src/site/fleet/test/test_arming.py src/site/fleet/test/test_transport.py src/site/fleet/test/test_robots.py -v
 ```
 
 ### Common Patterns

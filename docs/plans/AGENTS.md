@@ -63,7 +63,7 @@ None.
 
 ### Testing Requirements
 
-Each execute plan names pytest modules (usually `src/rosy_core/test/test_power.py`, `test_battery.py`, `test_docking.py`, or repo `test/`).
+Each execute plan names pytest modules (usually `src/core/core/test/test_power.py`, `test_battery.py`, `test_docking.py`, or repo `test/`).
 
 ### Common Patterns
 
@@ -73,7 +73,7 @@ Filename `YYYY-MM-DD-kebab.md`; design and execute are separate files.
 
 ### Internal
 
-- Code under `src/rosy_core`, `src/rosy_bringup`, `deploy/`
+- Code under `src/core/core`, `src/hardware/bringup`, `deploy/`
 
 ### External
 

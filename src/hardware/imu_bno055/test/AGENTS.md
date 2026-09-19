@@ -30,7 +30,7 @@ None.
 ### Testing Requirements
 
 ```bash
-python3 -m pytest src/imu_bno055/test/test_package_contract.py src/imu_bno055/test/test_driver_faults.py -v
+python3 -m pytest src/hardware/imu_bno055/test/test_package_contract.py src/hardware/imu_bno055/test/test_driver_faults.py -v
 ```
 
 `test_driver_faults.py` may skip off ARM64/Linux. C++ decoder test is built by the package CMake even when the driver `return()`s on non-aarch64.

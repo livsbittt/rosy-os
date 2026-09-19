@@ -51,5 +51,5 @@ Fleet 쪽에 남는다(D-12): 하달한 목표를 기억하는 곳은 여기지 
 
 ## Testing Requirements
 
-`src/fleet/test/test_server_console.py`, `test_server_app.py`, `test_server_traffic.py`, `test_server_formation.py` — 가짜 로봇만 쓰고
+`src/site/fleet/test/test_server_console.py`, `test_server_app.py`, `test_server_traffic.py`, `test_server_formation.py` — 가짜 로봇만 쓰고
 네트워크는 없다. `test_server_app.py` 는 `fastapi.testclient` 를 쓰므로 fastapi 가 필요하다.

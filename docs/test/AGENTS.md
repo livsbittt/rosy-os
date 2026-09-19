@@ -5,7 +5,7 @@
 
 ## Purpose
 
-Phase 1 (P1) test report. Not the pytest tree — executable tests live in `src/rosy_core/test` and repo-root `test/`.
+Phase 1 (P1) test report. Not the pytest tree — executable tests live in `src/core/core/test` and repo-root `test/`.
 
 ## Key Files
 
@@ -22,7 +22,7 @@ None.
 ### Working In This Directory
 
 - Update this report when P1 acceptance status changes. Do not put new automated tests here.
-- Distinguish from `docs/plan` (WBS) and `src/rosy_core/test` (code).
+- Distinguish from `docs/plan` (WBS) and `src/core/core/test` (code).
 
 ### Testing Requirements
 
@@ -36,7 +36,7 @@ Narrative evidence, not pytest output dumps.
 
 ### Internal
 
-- `src/rosy_core/test/`
+- `src/core/core/test/`
 
 ### External
 

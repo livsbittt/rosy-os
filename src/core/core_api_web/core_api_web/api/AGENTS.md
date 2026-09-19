@@ -38,7 +38,7 @@ FastAPI surface for ROSY-API-REF-001. Factory builds the app, serves `/dashboard
 
 ### Testing Requirements
 
-`src/core/test/test_api.py`, `test_dashboard.py`.
+`src/core/core/test/test_api.py`, `test_dashboard.py`.
 
 ### Common Patterns
 

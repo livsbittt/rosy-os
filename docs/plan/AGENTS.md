@@ -37,7 +37,7 @@ None.
 
 ### Testing Requirements
 
-Parity is checked by `src/rosy_core/test/test_api.py` plus the checklist, not by running Flask.
+Parity is checked by `src/core/core/test/test_api.py` plus the checklist, not by running Flask.
 
 ### Common Patterns
 

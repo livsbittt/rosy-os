@@ -36,7 +36,7 @@ Content lives in the subdirectories below; at this root only the harness records
 
 - Harness (D-61 Proposed): read `progress.md` and `index.md` first. After a change, append `logs.md`, overwrite `progress.md` if a gate moved, then run `python tools/harness/rosy_harness.py generate` from the repo root.
 - Do not put implementation code here. Specs constrain `src/`; deployment docs constrain `deploy/`.
-- Changing API paths or envelope fields requires updating `reference/ROSY API & Protocol Reference.md` **and** `rosy_core/protocol/schemas.py` together (D-18).
+- Changing API paths or envelope fields requires updating `reference/ROSY API & Protocol Reference.md` **and** `core_common/protocol/schemas.py` together (D-18).
 - ADRs are append-only: mark old ones `Superseded`, add a new ID. Do not silently rewrite D-n.
 - Dated files in `plans/` are the working design trail; `plan/ROSY Implementation Plan.md` is the WBS tracker.
 
@@ -58,7 +58,7 @@ python3 tools/harness/rosy_harness.py lint
 
 ### Internal
 
-- Implementation: `src/rosy_core`, `src/rosy_bringup`, `deploy/`
+- Implementation: `src/core/core`, `src/hardware/bringup`, `deploy/`
 - Traceability matrix in Implementation Plan §11
 
 ### External

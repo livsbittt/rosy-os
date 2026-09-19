@@ -5,7 +5,7 @@
 
 ## Purpose
 
-Host-side pytest for deploy/release/motor/network contracts. These tests do **not** need a ROS overlay; CI runs `python3 -m pytest test/ -v` separately from `src/rosy_core/test`. `conftest.py` inserts `deploy/release` onto `sys.path` so modules shipped as scripts remain importable.
+Host-side pytest for deploy/release/motor/network contracts. These tests do **not** need a ROS overlay; CI runs `python3 -m pytest test/ -v` separately from `src/core/core/test`. `conftest.py` inserts `deploy/release` onto `sys.path` so modules shipped as scripts remain importable.
 
 ## Key Files
 
@@ -44,7 +44,7 @@ None (ignore `__pycache__/`).
 
 ### Working In This Directory
 
-- Keep tests ROS-free. Import `rosy_bringup.motor_control` / `deploy/release` modules directly.
+- Keep tests ROS-free. Import `bringup.motor_control` / `deploy/release` modules directly.
 - If you add a deploy script, add a contract test here — CI only started covering this tree after a comment in `.github/workflows/ci.yml`.
 - Do not mock away the refusal paths in Host Agent; they are the product.
 - Changing SITE_STA / relay wording in one doc without the others fails `test_network_topology_contracts.py`.
@@ -68,7 +68,7 @@ python3 -m pytest test/test_motor_control.py test/test_host_agent.py -v
 
 ### Internal
 
-- `src/rosy_bringup/rosy_bringup/motor_control.py`, `dynamixel_driver.py`
+- `src/hardware/bringup/bringup/motor_control.py`, `dynamixel_driver.py`
 - `deploy/release/*`, `deploy/robot/*`, `deploy/image/*`
 
 ### External
