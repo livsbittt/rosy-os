@@ -445,6 +445,14 @@
 - 결정: 공유 트리에서는 pathspec 커밋만 쓴다. `git status`에 남의 스테이지가 보이면 절대 bare `git commit`하지 않는다
 - 교훈: D-126의 교훈("이동과 경로 갱신은 같은 커밋에")은 삭제에도 그대로 적용된다 — 반만 착지된 삭제는 남의 테스트를 깨뜨린다
 
+## 2026-09-20 · uncommitted · ci: install Cyclone so the smoke can boot the node
+
+- 변경: apt 줄에 `ros-jazzy-rmw-cyclonedds-cpp` 추가. `core_common.rmw.apply_cyclone_rmw`가 D-117대로 RMW를 Cyclone으로 고정하는데 러너 컨테이너엔 Cyclone 공유 라이브러리가 없어 rcl이 부팅 직전에 죽었다
+- 증거: run 35453206473 — Build·Lint·core(비차단)·fleet(복원 후 GREEN)·gz_sim(bash 수정으로 GREEN) 통과, Smoke이 `librmw_cyclonedds_cpp.so: cannot open shared object file`로 `core did not reach startup`
+- gate 변화: 없음
+- 결정: Cyclone은 제품 계약(D-117)이므로 러너가 따라가는 게 맞다. slam_toolbox 없음 전제는 그대로 유지된다
+- 교훈: 없음
+
 ## 2026-09-20 · uncommitted · docs(adr): gate the grammar split, pre-decide headless behaviour sharing (D-130)
 
 - 변경: ADR **D-130** 신규(색인 행 포함, Accepted — 방향). 실행 계획 `docs/plans/2026-09-20-ui-grammar-boundary-plan.md` 신규. `docs/progress.md`의 `adrs`에 D-130, `plans`에 실행 계획 추가

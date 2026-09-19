@@ -89,6 +89,6 @@
 
 - 2026-09-20 · uncommitted · feat(ui): serve the single tokens file at /ui, delete the fleet copy, open the styleguide (D-129 Accepted)
 - 2026-09-20 · uncommitted · docs(adr): gate the grammar split, pre-decide headless behaviour sharing (D-130)
+- 2026-09-20 · uncommitted · ci: install Cyclone so the smoke can boot the node
+- 2026-09-20 · uncommitted · revert(fleet): put the console tokens copy back until D-129 lands as one commit
 - 2026-09-20 · uncommitted · ci: run pipefail steps under bash
-- 2026-09-20 · uncommitted · ci: tolerate the D-128 core test backlog so Smoke and Guard can run
-- 2026-09-20 · uncommitted · fix(ament): restore the fleet resource marker the fix.sh loop missed
