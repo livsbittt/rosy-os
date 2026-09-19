@@ -360,6 +360,15 @@ def _run_gate(tmp_path: Path) -> subprocess.CompletedProcess:
     tmp_path.mkdir(parents=True, exist_ok=True)
     tools = _bash_view(ROOT / "deploy" / "release")
     layout = _bash_view(tmp_path)
+    # The hold path calls systemctl to disable the runtime unit. The CI
+    # container has no systemd — a stub on PATH keeps the test judging the
+    # gate's decision (hold vs boot), not the systemd transport.
+    stub_bin = tmp_path / "bin"
+    stub_bin.mkdir(exist_ok=True)
+    stub = stub_bin / "systemctl"
+    stub.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    stub.chmod(0o755)
+    stub_view = _bash_view(stub_bin)
 
     return subprocess.run(
         [
@@ -367,7 +376,7 @@ def _run_gate(tmp_path: Path) -> subprocess.CompletedProcess:
             "-c",
             (
                 f'ROSY_RELEASE_TOOLS="{tools}" ROSY_LAYOUT_ROOT="{layout}" '
-                f"ROSY_PYTHON=python3 ./release-recover.sh"
+                f'ROSY_PYTHON=python3 PATH="{stub_view}:$PATH" ./release-recover.sh'
             ),
         ],
         cwd=str(ROOT / "deploy" / "robot"),

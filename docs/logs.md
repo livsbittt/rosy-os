@@ -541,3 +541,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 추적 오차는 클라이언트 계산으로 백엔드 계약을 늘리지 않는다. 맵 칩은 D-92 오버레이 칩 규칙(scrim 바탕+surface-line 테두리). 임계값(STREAM_HZ_FLOOR 2 Hz·LEADER_AGE_MAX_S 1.0 s·TRACK_WARN_M 0.3 m)은 상수로 명시 — T7 벤치 전까지 보수적 값이다
 - 교훈: 스크린샷 육안 검증이 시험 코드의 경로 버그를 잡았다 — 단언이 녹색이어도 화면이 검정이면 무언가 틀리다
+
+## 2026-09-20 · uncommitted · fix(test): stub systemctl for the recovery gate tests
+
+- 변경: `_run_gate`가 tmp bin/에 `systemctl` 스텁을 만들어 PATH에 넣는다. HOLD 경로의 `disable_runtime`이 systemctl을 호출하는데 CI 컨테이너엔 systemd가 없어 traceback으로 죽었고(stdout이 비어 RECOVERY_HOLD 단언 실패), exec bit 복원으로 fresh-boot 시나리오는 먼저 GREEN이 됐다
+- 증거: run 35458661989 — `FileNotFoundError: 'systemctl'` (updater.recover → _systemctl). 로컬 `pytest test/test_image_pipeline.py` 43 passed(스텁 적용 후)
+- gate 변화: 없음
+- 결정: harness 계약 2건(test_every_module_log_is_valid·test_full_lint)은 구조적으로만 해결된다 — is_append_only가 `new.startswith(old)`라 커밋된 4개 malformed 헤딩(재그룹 세션)의 정형화는 누가 하든 위반으로 잡힌다. 소유 세션의 몫이며, 계약 변경은 ADR을 요구한다
+- 교훈: 없음
