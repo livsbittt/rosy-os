@@ -7,17 +7,17 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src" / "rosy_navigation"))
+sys.path.insert(0, str(ROOT / "src" / "navigation" / "navigation"))
 
-from rosy_navigation.footprint_profile import (  # noqa: E402
+from navigation.footprint_profile import (  # noqa: E402
     FootprintProfile,
     load_footprint_profile,
 )
-from rosy_navigation.params_rewrite import write_prefixed_nav2_params  # noqa: E402
+from navigation.params_rewrite import write_prefixed_nav2_params  # noqa: E402
 
 
 MOTION_PROFILES = ROOT / "deploy" / "robot" / "config" / "motion_profiles.yaml"
-NAV2 = ROOT / "src" / "rosy_navigation" / "params" / "nav2_params.yaml"
+NAV2 = ROOT / "src" / "navigation" / "navigation" / "params" / "nav2_params.yaml"
 
 
 def measured_mapping():

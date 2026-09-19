@@ -13,8 +13,8 @@ from robot_contracts import (
     runtime_launch_closure,
 )
 
-sys.path.insert(0, str(ROOT / "src" / "rosy_navigation"))
-from rosy_navigation.profile_limits import load_motion_limits
+sys.path.insert(0, str(ROOT / "src" / "navigation" / "navigation"))
+from navigation.profile_limits import load_motion_limits
 
 
 def _hardware_motion_tokens() -> tuple[str, str]:
@@ -93,7 +93,7 @@ def test_runtime_builds_distinct_targets_from_shared_dockerfile():
     assert "COPY --from=core-build /opt/rosy_ws/install" in dockerfile
     assert "COPY --from=io-build /opt/rosy_ws/install" in dockerfile
     dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
-    assert "src/rosy_description/meshes/**" in dockerignore
+    assert "src/sim/description/meshes/**" in dockerignore
 
 
 def test_motion_profile_is_mounted_into_each_device_runtime():
@@ -112,11 +112,11 @@ def test_motion_profile_is_mounted_into_each_device_runtime():
 
 
 def test_core_image_does_not_ship_the_absorbed_sensor_worker_runtime():
-    """CORE boots without rosy_control; the adapter is an optional slice."""
+    """CORE boots without control; the adapter is an optional slice."""
     dockerfile = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
     core = dockerfile.split("FROM runtime-common AS io-runtime")[0]
 
-    assert "COPY src/rosy_control ./src/rosy_control" not in core
+    assert "COPY src/apps/control ./src/apps/control" not in core
     assert "python3-opencv" not in core
     assert "ros-jazzy-visualization-msgs" in core
     assert "ros-jazzy-tf2-ros" in core
@@ -128,10 +128,10 @@ def test_io_image_contains_the_disabled_omx_adapter_contract():
     """The Device image ships the model-neutral OMX boundary without enabling hardware."""
     dockerfile = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
 
-    assert "COPY src/rosy_omx_adapter ./src/rosy_omx_adapter" in dockerfile
-    assert "rosy_omx_adapter" in dockerfile
+    assert "COPY src/apps/omx_adapter ./src/apps/omx_adapter" in dockerfile
+    assert "omx_adapter" in dockerfile
     disabled = (
-        ROOT / "src" / "rosy_omx_adapter" / "config" / "omx.disabled.yaml"
+        ROOT / "src" / "apps" / "omx_adapter" / "config" / "omx.disabled.yaml"
     ).read_text(encoding="utf-8")
     assert "enabled: false" in disabled
     assert "hardware_plugin: \"\"" in disabled
@@ -140,7 +140,7 @@ def test_io_image_contains_the_disabled_omx_adapter_contract():
 def test_initial_io_slice_disables_unavailable_adc_battery_driver():
     compose_command = compose()["services"]["rosy-io"]["command"]
     launch = (
-        ROOT / "src" / "rosy_bringup" / "launch" / "bringup_robot.launch.py"
+        ROOT / "src" / "hardware" / "bringup" / "launch" / "bringup_robot.launch.py"
     ).read_text(encoding="utf-8")
 
     assert "enable_battery:=false" in compose_command
@@ -198,7 +198,7 @@ def test_io_health_requires_the_motor_node_to_be_discoverable():
     io = compose()["services"]["rosy-io"]
 
     assert "healthcheck" in io
-    assert "/${ROSY_NAMESPACE}/rosy_bringup" in " ".join(
+    assert "/${ROSY_NAMESPACE}/bringup" in " ".join(
         io["healthcheck"]["test"]
     )
 
@@ -307,7 +307,7 @@ def test_core_reads_only_bounded_host_telemetry_paths():
 
 def test_core_image_prepares_dashboard_and_host_mount_directories():
     dockerfile = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
-    setup = (ROOT / "src" / "rosy_core" / "setup.py").read_text(encoding="utf-8")
+    setup = (ROOT / "src" / "core" / "core" / "setup.py").read_text(encoding="utf-8")
 
     assert (
         "mkdir -p /host/proc/net /host/etc /host/sys/class/thermal "
@@ -329,7 +329,7 @@ def test_systemd_unit_delegates_to_runtime_mode_wrapper():
 
 
 def test_teleop_watchdog_lives_in_safety_manager_not_a_stub():
-    safety = ROOT / "src" / "rosy_core" / "rosy_core" / "safety"
+    safety = ROOT / "src" / "core" / "core_features" / "core_features" / "safety"
     assert not (safety / "watchdog.py").is_file()
     assert "class TeleopWatchdog" in (safety / "manager.py").read_text(encoding="utf-8")
 
