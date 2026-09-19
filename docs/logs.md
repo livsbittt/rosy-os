@@ -453,6 +453,14 @@
 - 결정: Cyclone은 제품 계약(D-117)이므로 러너가 따라가는 게 맞다. slam_toolbox 없음 전제는 그대로 유지된다
 - 교훈: 없음
 
+## 2026-09-20 · uncommitted · ci: add nav2-msgs for the core boot
+
+- 변경: apt 줄에 `ros-jazzy-nav2-msgs` 추가. `core`의 선언 의존인 nav2_msgs가 ros-base에 없어 부팅 import가 죽었다 — 메시지 패키지만 설치하고 Nav2 스택(slam_toolbox)은 계속 없는 전제를 지킨다
+- 증거: run 35453353737 — Cyclone 오류 소멸, `ModuleNotFoundError: No module named 'nav2_msgs'`
+- gate 변화: 없음
+- 결정: 없음
+- 교훈: 없음
+
 ## 2026-09-20 · uncommitted · docs(adr): gate the grammar split, pre-decide headless behaviour sharing (D-130)
 
 - 변경: ADR **D-130** 신규(색인 행 포함, Accepted — 방향). 실행 계획 `docs/plans/2026-09-20-ui-grammar-boundary-plan.md` 신규. `docs/progress.md`의 `adrs`에 D-130, `plans`에 실행 계획 추가
