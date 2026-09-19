@@ -63,6 +63,7 @@
 | D-122 | 잘못된 RMW는 다음 CORE 기동에서 Cyclone으로 고친다. OS reboot가 아니다 |
 | D-123 | 웹은 Cyclone을 오버레이에 저장한 뒤 Host Agent 재부팅을 요청한다 |
 | D-124 | 대시보드는 AP on/off와 Wi-Fi 연결을 Host Agent로 확인하고 적용한다 |
+| D-129 | L1 토큰 파일은 하나이고 어휘 표는 보인다 — D-92 제1항을 대체한다 |
 
 ## 계획·결과 문서
 
@@ -84,8 +85,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · docs(adr): record the L1 single-token-file and styleguide decision as D-129
 - 2026-09-19 · uncommitted · docs(adr): bundle Level-3 stale test paths as backlog (D-128)
 - 2026-09-19 · uncommitted · chore(release): open stacked slice PRs #1 (D-125) and #2 (D-126)
 - 2026-09-19 · uncommitted · chore(release): push local main to staging branch, origin/main untouched
 - 2026-09-19 · uncommitted · docs(adr): lock merge strategy as D-127, stage integration by slice
-- 2026-09-19 · uncommitted · docs(adr): accept D-126 after the five guards and affected suites go green

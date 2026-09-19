@@ -364,3 +364,11 @@
 - gate 변화: 없음
 - 결정: D-128 Accepted
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · docs(adr): record the L1 single-token-file and styleguide decision as D-129
+
+- 변경: ADR **D-129** 신규(색인 행 포함, Proposed). D-92 본문 Status에 "제1항은 D-129가 대체" 표기(본문 나머지 무변경). `docs/progress.md`의 `adrs`에 D-129 추가. index 재생성
+- 증거: `python tools/harness/rosy_harness.py lint` — D-129 관련 에러 0. 선존재 에러 4건(2026-09-19 타 세션 헤딩 형식)은 D-128 규정대로 소유 세션 몫으로 남김 — 커밋된 항목이라 남이 고치면 append-only 위반이 됨을 lint가 실증. `python -m pytest test/test_harness_contracts.py -q` — D-129 관련 실패 없음(실패 2건은 동일 선존재 에러). D-129 번호는 색인·본문 끝(D-128) 직후 빈 번호 확인 후 부여
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: D-129 Proposed — L1 토큰 파일은 트리 전체에서 하나(`/ui/tokens.css` 링크)이고, D-92 어휘 표의 유일한 렌더링으로 CORE `/styleguide` 갤러리를 둔다. 컴포넌트·L2 공유 금지와 공용 컴포넌트 패키지 기각(`rosy_ui` 제안)은 유지. 구현(/ui 라우트·fleet 사본 삭제·게이트 이동·갤러리)이 착지해야 Accepted
+- 교훈: 없음
