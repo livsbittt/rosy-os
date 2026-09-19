@@ -492,3 +492,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: D-127 슬라이스 절차는 재정의 푸시로 실질 통합이 먼저 끝났고, 이 표기로 절차도 종결했다
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · docs(adr): the fleet console repeats what swarm control says, in three phases (D-131)
+
+- 변경: ADR **D-131** 신규(색인 행 포함, Accepted — 방향). 실행 계획 `docs/plans/2026-09-20-fleet-console-ops-plan.md` 신설 — 백엔드–전단 불일치 장부와 T1–T7. `docs/progress.md`의 `adrs`에 D-131, `plans`에 실행 계획 추가
+- 증거: 실측 — formation_status()가 assignment·relay(Hz/age/connected/paused)·reason을 주고 스냅샷이 queued·yielding·bay를 주는데, console.js 맵 캔버스는 맵·로봇·목표 셋만 그리고 assignment·relay는 소비처가 없음. FOR-001이 Formation Parameter로 Robot Selection을 이미 명시 — formation_start의 "리더+전원"은 미구현 파라미터다
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: D-131 Accepted(방향) — 1단계 맵이 있는 말을 듣게 한다(슬롯 고스트·추적 오차·릴레이 증거·중재 시각화, 백엔드 무변경), 2단계 Robot Selection을 구현한다(FOR-001 파라미터 — 새 계약 아님, D-35/D-89는 열지 않음), 3단계 N 폴링 벤치로 상한을 수치로 고정한다. 측정 전 규모 주장 금지
+- 교훈: 없음

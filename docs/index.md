@@ -65,6 +65,7 @@
 | D-124 | 대시보드는 AP on/off와 Wi-Fi 연결을 Host Agent로 확인하고 적용한다 |
 | D-129 | L1 토큰 파일은 하나이고 어휘 표는 보인다 — D-92 제1항을 대체한다 |
 | D-130 | L2 문법 분리는 게이트가 지키고, 로직 행위는 headless로 한 번 뽑는다 |
+| D-131 | Fleet 콘솔은 군집 제어의 말을 되풀이한다 — 세 단계로 |
 
 ## 계획·결과 문서
 
@@ -74,6 +75,7 @@
 - [2026-09-17-remaining-gates-adr-plan.md](plans/2026-09-17-remaining-gates-adr-plan.md)
 - [2026-09-17-remaining-runtime-adr-plan.md](plans/2026-09-17-remaining-runtime-adr-plan.md)
 - [2026-09-18-rosy-games-remaining-adr-plan.md](plans/2026-09-18-rosy-games-remaining-adr-plan.md)
+- [2026-09-20-fleet-console-ops-plan.md](plans/2026-09-20-fleet-console-ops-plan.md)
 - [2026-09-20-ui-grammar-boundary-plan.md](plans/2026-09-20-ui-grammar-boundary-plan.md)
 
 ## 교훈 (docs/solutions)
@@ -87,8 +89,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · docs(adr): the fleet console repeats what swarm control says, in three phases (D-131)
 - 2026-09-20 · uncommitted · chore(release): close the slice integration — PR #1/#2 both MERGED
 - 2026-09-20 · uncommitted · feat(ui): serve the single tokens file at /ui, delete the fleet copy, open the styleguide (D-129 Accepted)
 - 2026-09-20 · uncommitted · docs(adr): gate the grammar split, pre-decide headless behaviour sharing (D-130)
 - 2026-09-20 · uncommitted · ci: add nav2-msgs for the core boot
-- 2026-09-20 · uncommitted · ci: run the SaveMap guard under bash
