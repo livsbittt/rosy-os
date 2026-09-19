@@ -7,7 +7,7 @@
 
 ## 구조
 
-Rosy Control의 개발 기준은 이 저장소의 `src/rosy_control`로 통합했다.
+Rosy Control의 개발 기준은 이 저장소의 `src/apps/control`로 통합했다.
 별도 Control 저장소·웹 서버를 새 운영 구성으로 사용하지 않는다.
 현재 소스 편입과 보정 노드 경계 정리는 완료했으며, 전체 runtime·안전 중재·이미지·Pi 인수는 진행 중이다.
 현황은 [흡수 실행 결과](docs/plans/2026-09-12-control-absorption-results.md),
@@ -20,15 +20,13 @@ rosy/ (이 리포지토리)
 ├── deploy/                   # OS 이미지·릴리스·장치 운영
 ├── dock/                     # 충전 도크 펌웨어
 ├── test/                     # 호스트 배포·소유권 계약 시험
-├── src/                      # ROS 2 패키지 (colcon workspace)
-│   ├── rosy_core/            # 핵심 미들웨어 (API·Safety·Event·Waypoint·...)
-│   ├── rosy_control/         # 흡수한 감지·보정·주행 로직 (CORE sensor adapter 연동, Device 단계 진행 중)
-│   ├── rosy_fleet/           # 편대·relay·CLI seed (중앙 Fleet 서버는 미구현)
-│   ├── rosy_bringup/         # 모터·오도메트리·배터리
-│   ├── rosy_navigation/      # Nav2/SLAM 설정·런치
-│   ├── rosy_description/     # URDF
-│   ├── rosy_gz_sim/          # Gazebo 시뮬레이션 (gz_multi.launch.py로 N대)
-│   └── rosy_* (sensor/imu/led/emotion/lamp/interfaces)
+├── src/                      # ROS 2 패키지 (colcon workspace, 도메인 그룹)
+│   ├── core/                 # CORE: core(게이트웨이)·core_common·core_events·core_features·core_api_web·interfaces
+│   ├── apps/                 # control(흡수 Control)·emotion·games·omx_adapter
+│   ├── hardware/             # bringup·led·lamp_control·imu_bno055·sensor_adc
+│   ├── navigation/           # Nav2/SLAM 설정·런치
+│   ├── sim/                  # description(URDF)·gz_sim(Gazebo, gz_multi.launch.py로 N대)
+│   └── site/                 # fleet(편대·relay·CLI·콘솔 v1)
 └── .github/workflows/ci.yml  # colcon build + 테스트
 ```
 
@@ -55,10 +53,10 @@ cd src && colcon build --symlink-install
 source install/setup.bash
 
 # 시뮬레이션 2대 (멀티 인스턴스)
-ros2 launch rosy_gz_sim gz_multi.launch.py robots:=2
+ros2 launch gz_sim gz_multi.launch.py robots:=2
 
-# rosy_core (Phase 1 구현 예정)
-ros2 launch rosy_core rosy_core.launch.py
+# core 게이트웨이
+ros2 launch core rosy_core.launch.py
 ```
 
 ## Raspberry Pi 5 런타임
@@ -97,6 +95,6 @@ ARM64 빌드 경계와 컨테이너 포함 범위는
 
 ## 로드맵
 
-Phase 0 리네임·멀티로봇 리팩토링 → **Phase 1 rosy_core** → Phase 2 rosy_web →
-Phase 3 2대 검증 → Phase 4 rosy_fleet → Phase 5 Formation → Phase 6 확장.
+Phase 0 리네임·멀티로봇 리팩토링 → **Phase 1 core** → Phase 2 웹 대시보드 →
+Phase 3 2대 검증 → Phase 4 fleet → Phase 5 Formation → Phase 6 확장.
 상세: `docs/plans/2026-09-13-rosy-os-device-validation-implementation-plan.md`
