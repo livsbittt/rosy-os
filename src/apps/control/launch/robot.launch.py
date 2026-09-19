@@ -1,4 +1,4 @@
-﻿"""LEGACY_FULL_STACK: Select processing features; hardware bringup and ADC are separate prerequisites.
+"""LEGACY_FULL_STACK: Select processing features; hardware bringup and ADC are separate prerequisites.
 
 Do not launch this file beside core. CORE owns the final cmd_vel publisher.
 """
@@ -52,7 +52,14 @@ def _processing_actions(context):
         displays.append(node('lcd_node', [robot, _share('lcd_control', 'config', 'lcd.yaml')],
                              package='lcd_control'))
     if enabled['web']:
-        displays.append(node('web_node', [robot, os.path.join(cfg, 'web.yaml')]))
+        web_params = [robot, os.path.join(cfg, 'web.yaml')]
+        web_port = LaunchConfiguration('web_port').perform(context)
+        web_backend = LaunchConfiguration('web_backend_port').perform(context)
+        if web_port:
+            web_params.append({'port': int(web_port)})
+        if web_backend:
+            web_params.append({'backend_port': int(web_backend)})
+        displays.append(node('web_node', web_params))
     if enabled['watch']:
         displays.append(node('watch_node', [robot, {'hz': 1.0, 'once': False}]))
         actions.append(LogInfo(msg='watch_node checks the full hardware graph; disabled feature nodes remain reported missing.'))
@@ -69,6 +76,8 @@ def generate_launch_description():
         DeclareLaunchArgument('profile', default_value='full', choices=['full', 'sensing']),
         DeclareLaunchArgument('localization_required', default_value='false', choices=['true', 'false']),
         DeclareLaunchArgument('calibration_sensing_only', default_value='auto', choices=['auto', 'true', 'false']),
+        DeclareLaunchArgument('web_port', default_value=''),
+        DeclareLaunchArgument('web_backend_port', default_value=''),
     ]
     arguments += [DeclareLaunchArgument('start_' + name, default_value='auto',
                   choices=['auto', 'true', 'false']) for name in FEATURES]
