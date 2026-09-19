@@ -92,5 +92,5 @@
 - 2026-09-20 · uncommitted · feat(fleet): the console map repeats swarm control — slots, relay evidence, mediation (D-131 phase 1)
 - 2026-09-20 · uncommitted · docs(acceptance): define per-module actual-operation criteria
 - 2026-09-20 · uncommitted · docs(adr): the fleet console repeats what swarm control says, in three phases (D-131)
+- 2026-09-20 · uncommitted · fix(deploy): restore the executable bit on every shell script
 - 2026-09-20 · uncommitted · fix(test): rename the module-level setup helper pytest auto-collects
-- 2026-09-20 · uncommitted · fix(test): absorb the D-128 stale-path backlog — root and core suites green

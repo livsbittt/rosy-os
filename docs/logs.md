@@ -509,6 +509,14 @@
 - 결정: 없음
 - 교훈: pytest 특수명(setup/teardown)과 같은 이름의 헬퍼는 버전이 바뀌면 의미가 뒤집힌다 — 이름부터 피한다
 
+## 2026-09-20 · uncommitted · fix(deploy): restore the executable bit on every shell script
+
+- 변경: git 인덱스의 모든 .sh를 100755로 복원(device-readback.sh만 살아 있었다). 2026-09-13 폴더 전환 과정에서 실행 비트가 일괄 소실되어, 리눅스 체크아웃에서 `./release-recover.sh`가 Permission denied(126)로 죽고 image gate 시험 3건이 함께 넘어졌다. Windows 로컬에서는 exec bit가 강제되지 않아 재현되지 않았다
+- 증거: run 35458188321 — `bash: ./release-recover.sh: Permission denied`, `git ls-files -s "*.sh"` 전부 100644(단 1개 제외)
+- gate 변화: 없음
+- 결정: env.sh처럼 source 전용 스크립트도 포함한다 — 비트는 실행 수단이지 문서가 아니며, 통일이 소유 비용이 가장 낮다
+- 교훈: Windows 호스트에서 관리하는 저장소는 파일 모드가 조용히 사라진다 — bash로 도는 계약 시험은 체크아웃된 비트까지 검증한다
+
 ## 2026-09-20 · uncommitted · docs(adr): the fleet console repeats what swarm control says, in three phases (D-131)
 
 - 변경: ADR **D-131** 신규(색인 행 포함, Accepted — 방향). 실행 계획 `docs/plans/2026-09-20-fleet-console-ops-plan.md` 신설 — 백엔드–전단 불일치 장부와 T1–T7. `docs/progress.md`의 `adrs`에 D-131, `plans`에 실행 계획 추가
