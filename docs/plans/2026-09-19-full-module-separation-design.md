@@ -18,7 +18,7 @@ D-125가 `core`를 5개 도메인 라이브러리로 나눈 뒤에도 남은 패
 | S1 | `core → control` 미선언 import | `src/core/core/core/bridge/control_sensor_adapter.py:118,140,213`이 `control.*` 3모듈 import. `src/core/core/package.xml`에는 `control` 없음 | 어댑터가 증거 토픽 구독으로 전환, `control` import 0건. D-63 "그다음 단계에서 그 파일도 토픽 경계로"의 이행 |
 | S2 | `control`의 최종 `cmd_vel` 구독 잔재 | `src/apps/control/control/web_node.py:431`, `control/wander/node.py:36`이 `'cmd_vel'` 구독 | `cmd_vel_raw`/세션 계열로 개명·삭제. 운영 launch 미포함 계약 고정 |
 | S3 | `fleet` 선언이 실제보다 넓음 | `package.xml`은 `exec_depend: core`이나 비테스트 생산 코드는 `core_common.protocol.schemas` 5파일만 참조 (`hub/hub.py`, `hub/registry.py`, `swarm/arming.py`, `swarm/session.py`, `swarm/transport.py`). `core_features.swarm` 참조는 `test_geometry.py`뿐 | `exec_depend`를 `core_common`으로 축소, 시험용은 `test_depend: core_features`로 명시 |
-| S4 | `gz_sim → fleet` 직접 import | `src/sim/gz_sim/scripts/swarm_bench.py`가 `fleet.formation.geometry`, `fleet.swarm.{robots,session,transport}` 직접 참조 | fleet CLI/스키마 경유 또는 시뮬 스텁 격리 |
+| S4 | `gz_sim → fleet` 직접 import | `src/sim/gz_sim/scripts/swarm_bench.py`가 `fleet.formation.geometry`, `fleet.swarm.{robots,session,transport}` 직접 참조. 벤치의 목적 자체가 fleet 세션을 시뮬에서 돌리는 것이라 CLI 경유 재작성은 이득 없이 깨지기만 한다. `package.xml`에 선언으로 고정하고, 같은 파일의 미선언 `navigation` import도 함께 선언 | `exec_depend: fleet`(기존 유지) + `exec_depend: navigation`(추가). 시뮬→함대/내비는 하향 의존이라 허용 |
 | S5 | `core_api_web` fan-out | `api/v1/*` 12개 모듈이 `core_features` 하위 7개 영역(`command.arbitration`, `navigation.manager`, `docking.database`, `diagnostics.collector`, `maps`, `swarm`, `waypoints`) 직접 참조 | `api/deps.py` 파사드 뒤로 통합. 라우터는 `deps`만 본다 |
 
 비고: `test/test_runtime_slices.py`의 D-64 가드는 구 경로(`src/rosy_core`)를 가리켜 신 구조에서 검사하지 않는다.

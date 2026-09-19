@@ -24,7 +24,7 @@ S1은 D-63이 예고한 토픽 경계 이행이며 D-64의 `ALLOWED` 집합을 �
 | `src/apps/control/control/web_node.py` | S2: 최종 `cmd_vel` 구독 제거 |
 | `src/apps/control/control/wander/node.py` | S2: 최종 `cmd_vel` 구독 제거 |
 | `src/site/fleet/package.xml` | S3: `exec_depend: core` → `core_common` (+ `test_depend: core_features`) |
-| `src/sim/gz_sim/scripts/swarm_bench.py` | S4: `fleet.swarm.*` 직접 import 제거 |
+| `src/sim/gz_sim/package.xml` | S4: `fleet`(유지 확인) + `navigation` `exec_depend` 선언으로 고정 |
 | `src/core/core/core/bridge/control_sensor_adapter.py` | S1: `control.*` import 3건 제거, 증거 토픽 구독으로 전환 |
 | `src/core/core_api_web/core_api_web/api/deps.py` | S5: features 접근 파사드 |
 | `src/core/core_api_web/core_api_web/api/v1/*.py` | S5: `core_features.*.manager` 직접 참조를 `deps` 경유로 |
@@ -80,14 +80,20 @@ S1은 D-63이 예고한 토픽 경계 이행이며 D-64의 `ALLOWED` 집합을 �
 
 ---
 
-### Task 3: S4 — gz_sim 벤치를 fleet 내부에서 떼어낸다
+### Task 3: S4 — gz_sim의 fleet·navigation 참조를 선언으로 고정
 
-**Files:** `src/sim/gz_sim/scripts/swarm_bench.py`
+**Files:** `src/sim/gz_sim/package.xml`
 
-- [ ] **Step 1:** `fleet.formation.geometry`, `fleet.swarm.{robots,session,transport}` 직접 import를
-  fleet CLI 진입점 호출 또는 시뮬 전용 스텁으로 교체한다. 벤치 수치의 의미는 바꾸지 않는다.
-- [ ] **Step 2:** `python -m pytest src/sim/gz_sim/test -q` PASS.
-- [ ] **Step 3: Commit:** `git commit -m "refactor(sim): decouple swarm bench from fleet internals"`
+`swarm_bench.py`의 존재 이유가 fleet 세션을 시뮬에서 돌리는 것이므로 import 자체는 유지한다.
+닫을 것은 미선언 상태뿐이다: `fleet`은 이미 선언되어 있고, `launch/gz_multi.launch.py`의
+`navigation.frame_prefix` import에 `exec_depend: navigation`을 추가한다.
+시뮬→함대/내비는 하향 의존이라 허용한다 (D-126이 금지하는 것은 CORE의 상향·횡단 import다).
+
+- [ ] **Step 1:** `package.xml`에 `exec_depend: navigation` 추가 (위 edit 완료).
+  `fleet` 선언은 유지한다.
+- [ ] **Step 2:** `python -m pytest src/sim/gz_sim/test test/test_module_separation.py::test_package_xml_covers_imports -q`
+  — 가드 3 위반에서 gz_sim 항목이 사라졌는지 확인 (S1·S5 항목은 Task 4·5까지 잔류).
+- [ ] **Step 3: Commit:** `git commit -m "refactor(sim): declare the fleet/navigation deps the sim already uses"`
 
 ---
 
