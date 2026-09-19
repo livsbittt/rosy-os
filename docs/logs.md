@@ -413,6 +413,14 @@
 - 결정: x86 Configure가 aarch64 전용 드라이버의 의존을 요구하는 구조는 몫이 남아 있다(가드 뒤로 find_package 이동 후보) — 기기 없이 검증 불가하므로 CI 의존 추가로만 처리
 - 교훈: 없음
 
+## 2026-09-20 · uncommitted · fix(ament): restore the fleet resource marker the fix.sh loop missed
+
+- 변경: `src/site/fleet/resource/fleet` 마커 복구(구 `rosy_fleet` 마커는 git rename으로 정리). `fix.sh` 루프에 `src/site/*` 추가 — 개명 때 이 폴더가 빠져 fleet 마커가 재생성되지 않았고, git에도 없어 colcon build가 `can't copy .../resource/fleet`로 죽었다
+- 증거: run 35452450062 — 이제 유일 실패는 `fleet [setup.py] error: can't copy 'resource/fleet'`. description·imu_bno055·sensor_adc·lamp_control·gz_sim(제외) 전부 통과
+- gate 변화: 없음
+- 결정: 마커는 저장소에 있다(다른 패키지와 동일). fix.sh는 도메인 그룹 전체를 순회한다
+- 교훈: 없음
+
 ## 2026-09-20 · uncommitted · docs(adr): gate the grammar split, pre-decide headless behaviour sharing (D-130)
 
 - 변경: ADR **D-130** 신규(색인 행 포함, Accepted — 방향). 실행 계획 `docs/plans/2026-09-20-ui-grammar-boundary-plan.md` 신규. `docs/progress.md`의 `adrs`에 D-130, `plans`에 실행 계획 추가
