@@ -125,6 +125,7 @@ jobs:
       # 아니라 SIGABRT 다. 호스트 테스트로는 잡히지 않으므로 실제 타입으로 검사한다.
       # 전체 설치(Qt/assimp 의존성)는 무겁다 — deb 만 받아 풀면 바인딩이 임포트된다.
       - name: Guard (SaveMap request type and result codes)
+        shell: bash
         run: |
           set -eo pipefail
           . /opt/ros/jazzy/setup.sh

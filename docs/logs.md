@@ -453,6 +453,14 @@
 - 결정: Cyclone은 제품 계약(D-117)이므로 러너가 따라가는 게 맞다. slam_toolbox 없음 전제는 그대로 유지된다
 - 교훈: 없음
 
+## 2026-09-20 · uncommitted · ci: run the SaveMap guard under bash
+
+- 변경: Guard 스텝에 `shell: bash` 명시 — 같은 `sh` pipefail 문제의 마지막 항목
+- 증거: run 35453460962 — **Smoke 최초 GREEN**(`core`가 CI에서 처음 부팅), Guard만 exit 2(테스트 미실행)
+- gate 변화: 없음
+- 결정: 없음
+- 교훈: 없음
+
 ## 2026-09-20 · uncommitted · ci: add nav2-msgs for the core boot
 
 - 변경: apt 줄에 `ros-jazzy-nav2-msgs` 추가. `core`의 선언 의존인 nav2_msgs가 ros-base에 없어 부팅 import가 죽었다 — 메시지 패키지만 설치하고 Nav2 스택(slam_toolbox)은 계속 없는 전제를 지킨다
