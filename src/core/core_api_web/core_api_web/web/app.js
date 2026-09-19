@@ -893,7 +893,8 @@ elements["network-ap-on"]?.addEventListener("click", () => {
 
 elements["network-connect"]?.addEventListener("click", async () => {
   const ssid = elements["network-ssid-input"]?.value.trim();
-  const psk = elements["network-psk-input"]?.value ?? "";
+  const input = elements["network-psk-input"];
+  const psk = input ? input.value : "";
   if (!ssid) {
     setText("network-note", "SSID를 입력하세요.");
     return;

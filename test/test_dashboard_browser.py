@@ -10,7 +10,7 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WEB = ROOT / "src" / "rosy_core" / "rosy_core" / "web"
+WEB = ROOT / "src" / "core" / "core_api_web" / "core_api_web" / "web"
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("ROSY_RUN_BROWSER_TESTS") != "1",

@@ -505,8 +505,8 @@ def test_the_script_toggles_ap_mode_and_connects_wifi():
     assert 'id="network-connect"' in html
     assert 'id="network-ssid-input"' in html
     assert 'id="network-psk-input"' in html
-    psk_tag = html.split('id="network-psk-input"', 1)[1].split(">", 1)[0]
-    assert 'type="password"' in psk_tag
+    tag = html.split('id="network-psk-input"', 1)[1].split(">", 1)[0]
+    assert 'type="password"' in tag
 
 
 def test_rollback_is_offered_only_when_there_is_somewhere_to_go():

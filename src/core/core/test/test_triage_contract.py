@@ -13,7 +13,7 @@ CI의 `node`는 ROS 노드 프로세스이지 Node.js 스텝이 아니며, 기�
 from pathlib import Path
 import re
 
-WEB_ROOT = Path(__file__).parent.parent / "core" / "web"
+WEB_ROOT = Path(__file__).parent.parent.parent / "core_api_web" / "core_api_web" / "web"
 TRIAGE = WEB_ROOT / "triage.js"
 STYLES = WEB_ROOT / "styles.css"
 

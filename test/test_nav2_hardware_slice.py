@@ -17,7 +17,7 @@ from robot_contracts import (
     hardware_packages,
 )
 
-_PKG = str(ROOT / "src" / "rosy_navigation")
+_PKG = str(ROOT / "src" / "navigation" / "navigation")
 if _PKG not in sys.path:
     sys.path.append(_PKG)
 
@@ -38,7 +38,7 @@ def test_hardware_mode_advertises_lidar_and_goal_navigation():
         {"lidar": "rplidar_c1"},
         {"encoder": "dynamixel"},
     ]
-    assert "rosy_navigation" in command
+    assert "navigation" in command
     assert "hardware.launch.py" in command
     assert "enable_lidar:=true" in command
     assert "enable_battery:=false" in command
@@ -46,7 +46,7 @@ def test_hardware_mode_advertises_lidar_and_goal_navigation():
     assert io["healthcheck"]["start_period"] == "60s"
     assert io["healthcheck"]["timeout"] == "10s"
     health = " ".join(io["healthcheck"]["test"])
-    assert "rosy_bringup" in health
+    assert "bringup" in health
     assert "lifecycle_manager_navigation" in health
     assert health.count("ros2 node list") == 1
 
@@ -66,7 +66,7 @@ def test_hardware_config_requires_runtime_readiness_evidence():
 
 
 def test_core_bridge_subscribes_to_lifecycle_and_motor_readiness_sources():
-    bridge = (ROOT / "src" / "rosy_core" / "rosy_core" / "bridge" / "ros_bridge.py").read_text(
+    bridge = (ROOT / "src" / "core" / "core" / "core" / "bridge" / "ros_bridge.py").read_text(
         encoding="utf-8"
     )
     for topic in (
@@ -84,9 +84,9 @@ def test_core_bridge_subscribes_to_lifecycle_and_motor_readiness_sources():
 def test_motor_profile_does_not_launch_nav2():
     command = compose()["services"]["rosy-motor"]["command"]
 
-    assert "rosy_bringup" in command
+    assert "bringup" in command
     assert "bringup_robot.launch.py" in command
-    assert "rosy_navigation" not in command
+    assert "navigation" not in command
     assert "hardware.launch.py" not in command
 
 
@@ -94,15 +94,15 @@ def test_io_image_packages_nav2_without_slam_or_aux_drivers():
     dockerfile = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
     dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
 
-    assert "COPY src/rosy_navigation" in dockerfile
-    assert "rosy_navigation" in dockerfile
+    assert "COPY src/navigation/navigation" in dockerfile
+    assert "navigation" in dockerfile
     assert "ros-jazzy-navigation2" in dockerfile
     assert "ros-jazzy-nav2-bringup" in dockerfile
     assert "python3-yaml" in dockerfile
     assert "ros-jazzy-slam-toolbox" not in dockerfile
     for package in hardware_packages():
         assert package not in dockerfile, package
-    assert "!src/rosy_navigation/" in dockerignore
+    assert "!src/navigation/navigation/" in dockerignore
 
 
 def test_hardware_launch_composes_bringup_and_imports_nav_policy():
@@ -111,14 +111,14 @@ def test_hardware_launch_composes_bringup_and_imports_nav_policy():
     assert "bringup_robot.launch.py" in launch
     assert "bringup_launch.xml" in launch
     assert "my_map.yaml" in launch
-    assert "from rosy_navigation.params_rewrite import write_prefixed_nav2_params" in launch
-    assert "from rosy_navigation.profile_limits import" in launch
+    assert "from navigation.params_rewrite import write_prefixed_nav2_params" in launch
+    assert "from navigation.profile_limits import" in launch
     assert "validate_requested_limits" in launch
     assert "DeclareLaunchArgument" in launch
     assert '"profile_file"' in launch
     assert '"allow_demo_map"' in launch
     assert "state_unknown" in launch
-    assert "from rosy_navigation.site_map import resolve_occupancy_map" in launch
+    assert "from navigation.site_map import resolve_occupancy_map" in launch
     assert "sys.path.insert" not in launch
     assert "map_building" not in launch
     assert "slam_toolbox" not in launch
@@ -139,7 +139,7 @@ def test_hardware_io_mounts_a_host_site_map_directory():
 
 
 def test_resolve_occupancy_map_uses_site_yaml_only_when_the_image_exists(tmp_path):
-    from rosy_navigation.site_map import resolve_occupancy_map
+    from navigation.site_map import resolve_occupancy_map
 
     fallback = tmp_path / "demo.yaml"
     fallback.write_text("image: demo.pgm\n", encoding="utf-8")
@@ -158,7 +158,7 @@ def test_resolve_occupancy_map_uses_site_yaml_only_when_the_image_exists(tmp_pat
 
 
 def test_resolve_occupancy_map_can_fail_closed_for_field_mode(tmp_path):
-    from rosy_navigation.site_map import resolve_occupancy_map
+    from navigation.site_map import resolve_occupancy_map
 
     missing = tmp_path / "maps" / "site.yaml"
     fallback = tmp_path / "demo.yaml"
@@ -169,7 +169,7 @@ def test_resolve_occupancy_map_can_fail_closed_for_field_mode(tmp_path):
 
 
 def test_nav2_frame_prefix_module_prefixes_odom_not_map():
-    from rosy_navigation.frame_prefix import apply_nav2_frame_prefix
+    from navigation.frame_prefix import apply_nav2_frame_prefix
 
     raw = yaml.safe_load(NAV_PARAMS.read_text(encoding="utf-8"))
     prefixed = apply_nav2_frame_prefix(raw, "rosy_01")
@@ -211,7 +211,7 @@ def test_costmap_observation_topic_is_absolute_so_the_obstacle_layer_hears_the_l
 
 
 def test_the_namespaced_sim_points_the_obstacle_layer_at_that_robots_lidar():
-    from rosy_navigation.frame_prefix import apply_nav2_frame_prefix
+    from navigation.frame_prefix import apply_nav2_frame_prefix
 
     raw = yaml.safe_load(NAV_PARAMS.read_text(encoding="utf-8"))
     prefixed = apply_nav2_frame_prefix(raw, "rosy_01")
@@ -226,7 +226,7 @@ def test_the_namespaced_sim_points_the_obstacle_layer_at_that_robots_lidar():
 
 
 def test_write_prefixed_nav2_params_writes_a_unique_file(tmp_path):
-    from rosy_navigation.params_rewrite import write_prefixed_nav2_params
+    from navigation.params_rewrite import write_prefixed_nav2_params
 
     out = Path(write_prefixed_nav2_params(NAV_PARAMS, "rosy_01", directory=tmp_path))
     assert out.parent == tmp_path

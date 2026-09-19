@@ -493,6 +493,14 @@
 - 결정: D-127 슬라이스 절차는 재정의 푸시로 실질 통합이 먼저 끝났고, 이 표기로 절차도 종결했다
 - 교훈: 없음
 
+## 2026-09-20 · uncommitted · fix(test): absorb the D-128 stale-path backlog — root and core suites green
+
+- 변경: 소유자 지시로 D-128 백로그를 이 세션이 흡수한다. 루트 계약 스위트 19개 파일과 core 스위트 13개 파일의 구 경로(import·WEB 자산·bridge·swarm·navigation·protocol·setup.py)를 regroup 후 위치로 수정했다. deploy 계약도 함께 실정했다 — Dockerfile COPY/--packages-select/CMD, compose command·healthcheck(노드명 bringup), .dockerignore 화이트리스트, board.yaml hardware_packages, verify-motors·install-pi. secret_scan은 fixture 문맥을 test/ 세그먼트로 일반화하고 supersecretpsk를 등록했고, app.js 슬롯 바인딩으로 오탐을 제거했다. core_common.config의 소스 폴백이 core 패키지 config를 보도록 고쳐 부팅 경로도 복구했다
+- 증거: `python -m pytest test/ -q` → 901 passed, 잔여 failed/error는 전부 Windows 환경 한계(WSL bash 경로 13건·openssl 부재 20여 건 — CI 리눅스 대상)와 타 세션 선존재(harness 헤딩 4건, docs/plan 이동 진행 1건)뿐. `python -m pytest src/core/core/test/ -q` → 892 passed 0 failed(이전 55 failed/30 errors). `python -m pytest src/site/fleet/test src/core/core_api_web/test -q` → 324 passed. CI의 루트·core 스텝 continue-on-error를 제거해 전면 게이팅을 복원했다
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: manifest 컨테이너 키(rosy_core/rosy_io)·서비스명(rosy-core 등)·ROS 노드명 문자열은 배포 계약과 런타임 정체로 유지한다. D-128의 "수정은 주인 세션" 규정은 소유자 지시로 본 세션이 흡수했다
+- 교훈: 수집 에러 4건이 140건의 실패를 가리고 있었다 — 중단된 수집은 스위트의 상태가 아니다. 경로를 옮기는 커밋에는 그 경로를 문자열로 고정하는 계약 테스트의 갱신이 반드시 함께 가야 한다
+
 ## 2026-09-20 · uncommitted · docs(adr): the fleet console repeats what swarm control says, in three phases (D-131)
 
 - 변경: ADR **D-131** 신규(색인 행 포함, Accepted — 방향). 실행 계획 `docs/plans/2026-09-20-fleet-console-ops-plan.md` 신설 — 백엔드–전단 불일치 장부와 T1–T7. `docs/progress.md`의 `adrs`에 D-131, `plans`에 실행 계획 추가

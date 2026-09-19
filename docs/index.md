@@ -92,5 +92,5 @@
 - 2026-09-20 · uncommitted · feat(fleet): the console map repeats swarm control — slots, relay evidence, mediation (D-131 phase 1)
 - 2026-09-20 · uncommitted · docs(acceptance): define per-module actual-operation criteria
 - 2026-09-20 · uncommitted · docs(adr): the fleet console repeats what swarm control says, in three phases (D-131)
+- 2026-09-20 · uncommitted · fix(test): absorb the D-128 stale-path backlog — root and core suites green
 - 2026-09-20 · uncommitted · chore(release): close the slice integration — PR #1/#2 both MERGED
-- 2026-09-20 · uncommitted · feat(ui): serve the single tokens file at /ui, delete the fleet copy, open the styleguide (D-129 Accepted)

@@ -5,7 +5,7 @@ import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BRINGUP = ROOT / "src" / "rosy_bringup"
+BRINGUP = ROOT / "src" / "hardware" / "bringup"
 
 
 def test_launch_exposes_all_motor_limits_to_the_node():
@@ -37,14 +37,14 @@ def test_launch_loads_the_pinky_profile_before_runtime_overrides():
 
 
 def test_bringup_validates_ros_values_through_the_board_adapter_before_sdk():
-    source = (BRINGUP / "rosy_bringup" / "bringup.py").read_text(encoding="utf-8")
+    source = (BRINGUP / "bringup" / "bringup.py").read_text(encoding="utf-8")
     assert "from .pinky_pro_adapter import PinkyProAdapter" in source
     assert "self.pinky_pro_adapter = PinkyProAdapter.from_mapping" in source
     assert source.index("PinkyProAdapter.from_mapping") < source.index("DynamixelDriver(")
 
 
 def test_node_uses_structured_controller_instead_of_inline_kinematics():
-    source = (BRINGUP / "rosy_bringup" / "bringup.py").read_text(encoding="utf-8")
+    source = (BRINGUP / "bringup" / "bringup.py").read_text(encoding="utf-8")
 
     assert "MotorController(" in source
     assert "DriveGeometry(" in source
@@ -57,7 +57,7 @@ def test_node_uses_structured_controller_instead_of_inline_kinematics():
 
 
 def test_node_stops_immediately_on_rejection_and_confirms_deadman_stop():
-    source = (BRINGUP / "rosy_bringup" / "bringup.py").read_text(encoding="utf-8")
+    source = (BRINGUP / "bringup" / "bringup.py").read_text(encoding="utf-8")
 
     assert "stop_outcome = self.motor_controller.stop()" in source
     assert "if stop_outcome.accepted:" in source
@@ -67,14 +67,14 @@ def test_node_stops_immediately_on_rejection_and_confirms_deadman_stop():
 
 
 def test_node_uses_rollover_safe_encoder_delta():
-    source = (BRINGUP / "rosy_bringup" / "bringup.py").read_text(encoding="utf-8")
+    source = (BRINGUP / "bringup" / "bringup.py").read_text(encoding="utf-8")
 
     assert "wrapped_encoder_delta(encoder_l, self.last_encoder_l)" in source
     assert "wrapped_encoder_delta(encoder_r, self.last_encoder_r)" in source
 
 
 def test_node_preserves_parameter_types_for_strict_driver_validation():
-    source = (BRINGUP / "rosy_bringup" / "bringup.py").read_text(encoding="utf-8")
+    source = (BRINGUP / "bringup" / "bringup.py").read_text(encoding="utf-8")
 
     assert "raw_motor_ids = list(self.get_parameter('motor_ids').value)" in source
     assert "self.motor_ids = list(validate_motor_ids(raw_motor_ids))" in source
@@ -92,7 +92,7 @@ def test_node_preserves_parameter_types_for_strict_driver_validation():
 
 
 def test_node_constructor_failure_always_terminates_motor_driver():
-    source = (BRINGUP / "rosy_bringup" / "bringup.py").read_text(encoding="utf-8")
+    source = (BRINGUP / "bringup" / "bringup.py").read_text(encoding="utf-8")
     normalized = " ".join(source.split())
 
     assert "try: self.get_logger().info('1. Opening serial port...')" in normalized
@@ -100,7 +100,7 @@ def test_node_constructor_failure_always_terminates_motor_driver():
 
 
 def test_bringup_publishes_a_latched_motor_readiness_lease():
-    source = (BRINGUP / "rosy_bringup" / "bringup.py").read_text(encoding="utf-8")
+    source = (BRINGUP / "bringup" / "bringup.py").read_text(encoding="utf-8")
 
     assert "MOTOR_READY_TOPIC = \"motor/ready\"" in source
     assert "TRANSIENT_LOCAL" in source

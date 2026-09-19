@@ -10,7 +10,7 @@
 from pathlib import Path
 import re
 
-WEB_ROOT = Path(__file__).parent.parent / "core" / "web"
+WEB_ROOT = Path(__file__).parent.parent.parent / "core_api_web" / "core_api_web" / "web"
 INDEX = WEB_ROOT / "index.html"
 DOM = WEB_ROOT / "dom.js"
 APP = WEB_ROOT / "app.js"

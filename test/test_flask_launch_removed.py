@@ -3,7 +3,7 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-LAUNCH = ROOT / "src" / "rosy_navigation" / "launch"
+LAUNCH = ROOT / "src" / "navigation" / "navigation" / "launch"
 
 _WEB_LAUNCHES = (
     "web_nav2.launch.xml",
@@ -19,15 +19,15 @@ def test_web_launches_do_not_start_flask():
         assert 'exec="nav2_web_server.py"' not in text, name
 
 
-def test_web_launches_start_rosy_core_instead():
+def test_web_launches_start_core_instead():
     for name in _WEB_LAUNCHES:
         text = (LAUNCH / name).read_text(encoding="utf-8")
-        assert 'pkg="rosy_core"' in text, name
-        assert "rosy_core" in text, name
+        assert 'pkg="core"' in text, name
+        assert "core" in text, name
 
 
 def test_navigation_package_does_not_install_flask():
-    cmake = (ROOT / "src" / "rosy_navigation" / "CMakeLists.txt").read_text(
+    cmake = (ROOT / "src" / "navigation" / "navigation" / "CMakeLists.txt").read_text(
         encoding="utf-8"
     )
     assert "nav2_web_server.py" not in cmake

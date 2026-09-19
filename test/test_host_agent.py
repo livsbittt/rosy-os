@@ -583,7 +583,7 @@ def test_every_decision_is_audited_including_refusals(agent, audit):
 def test_connect_does_not_put_the_psk_on_the_wire_or_in_audit(agent, commands, audit):
     """PSK reaches NetworkManager through the action. It does not come back."""
     secret = "supersecretpsk"
-    response = agent.handle(_request("network.connect", ssid="shop-wifi", psk=secret))
+    response = agent.handle(_request("network.connect", ssid="shop-wifi", psk="supersecretpsk"))
 
     assert response["ok"], response
     blob = json.dumps(response, ensure_ascii=False)

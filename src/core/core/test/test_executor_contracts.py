@@ -27,9 +27,12 @@ from pathlib import Path
 
 import pytest
 
+FEATURES = Path(__file__).resolve().parents[2] / "core_features" / "core_features"
 PACKAGE = Path(__file__).resolve().parents[1] / "core"
 
 #: (contract module, Protocol class) -> the class expected to implement it.
+#: Contract Protocols moved to core_features at the domain regroup (D-125);
+#: the implementer — the bridge — stayed in the kernel.
 CONTRACTS = [
     ("navigation/manager.py", "NavExecutor"),
     ("docking/manager.py", "DockingExecutor"),
@@ -37,8 +40,8 @@ CONTRACTS = [
 IMPLEMENTER = ("bridge/ros_bridge.py", "RosBridge")
 
 
-def _class_def(relative: str, name: str) -> ast.ClassDef:
-    tree = ast.parse((PACKAGE / relative).read_text(encoding="utf-8"))
+def _class_def(base: Path, relative: str, name: str) -> ast.ClassDef:
+    tree = ast.parse((base / relative).read_text(encoding="utf-8"))
     for node in tree.body:
         if isinstance(node, ast.ClassDef) and node.name == name:
             return node
@@ -56,8 +59,8 @@ def _methods(node: ast.ClassDef) -> set[str]:
 
 @pytest.mark.parametrize("relative,protocol", CONTRACTS, ids=[c[1] for c in CONTRACTS])
 def test_ros_bridge_implements_every_declared_contract_member(relative, protocol):
-    declared = _methods(_class_def(relative, protocol))
-    implemented = _methods(_class_def(*IMPLEMENTER))
+    declared = _methods(_class_def(FEATURES, relative, protocol))
+    implemented = _methods(_class_def(PACKAGE, *IMPLEMENTER))
     missing = declared - implemented
 
     assert not missing, (

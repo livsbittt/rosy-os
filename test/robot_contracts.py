@@ -7,8 +7,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 DEPLOY = ROOT / "deploy" / "robot"
-NAV_LAUNCH = ROOT / "src" / "rosy_navigation" / "launch"
-NAV_PARAMS = ROOT / "src" / "rosy_navigation" / "params" / "nav2_params.yaml"
+NAV_LAUNCH = ROOT / "src" / "navigation" / "navigation" / "launch"
+NAV_PARAMS = ROOT / "src" / "navigation" / "navigation" / "params" / "nav2_params.yaml"
 
 
 def compose() -> dict:
@@ -42,7 +42,7 @@ LAUNCH_REFERENCE = re.compile(r"([A-Za-z0-9_]+(?:\.launch|_launch)\.(?:xml|py))"
 
 def _launch_file(name: str) -> Path | None:
     """Resolve a launch file name to its in-tree path, whichever package owns it."""
-    return next(iter(sorted((ROOT / "src").glob(f"*/launch/{name}"))), None)
+    return next(iter(sorted((ROOT / "src").glob(f"*/*/launch/{name}"))), None)
 
 
 def runtime_launch_closure(mode: str | None = None) -> dict[str, Path]:

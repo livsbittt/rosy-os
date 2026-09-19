@@ -104,9 +104,9 @@ def _load_driver(
     sdk.GroupSyncWrite = SyncWrite
     sdk.GroupBulkRead = BulkRead
     monkeypatch.setitem(sys.modules, "dynamixel_sdk", sdk)
-    monkeypatch.syspath_prepend(str(ROOT / "src" / "rosy_bringup"))
-    sys.modules.pop("rosy_bringup.dynamixel_driver", None)
-    module = importlib.import_module("rosy_bringup.dynamixel_driver")
+    monkeypatch.syspath_prepend(str(ROOT / "src" / "hardware" / "bringup"))
+    sys.modules.pop("bringup.dynamixel_driver", None)
+    module = importlib.import_module("bringup.dynamixel_driver")
     monkeypatch.setattr(module.time, "sleep", lambda _seconds: None)
     return module.DynamixelDriver(
         "/dev/test",

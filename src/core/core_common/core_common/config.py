@@ -49,8 +49,11 @@ def _find_default_config() -> Path:
             return share / DEFAULT_CONFIG_NAME
     except Exception:
         pass
-    # 소스 트리 실행 (colcon install 미사용) 폴백
-    return Path(__file__).resolve().parent.parent / "config" / DEFAULT_CONFIG_NAME
+    # 소스 트리 실행 (colcon install 미사용) 폴백 — 기본 설정 파일은 core 패키지의
+    # config/ 에 산다 (설치 시에도 core share 로 들어간다). core_common/config.py 는
+    # src/core/core_common/ 에서 두 단계 위, src/ 가 기준이다.
+    return (Path(__file__).resolve().parents[3] / "core" / "core" / "config"
+            / DEFAULT_CONFIG_NAME)
 
 
 def load_config(explicit_path: Optional[str] = None) -> dict[str, Any]:

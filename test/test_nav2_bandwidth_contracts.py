@@ -24,7 +24,7 @@ import yaml
 
 from robot_contracts import NAV_PARAMS, ROOT
 
-_PKG = str(ROOT / "src" / "rosy_navigation")
+_PKG = str(ROOT / "src" / "navigation" / "navigation")
 if _PKG not in sys.path:
     sys.path.append(_PKG)
 
@@ -83,7 +83,7 @@ def test_the_rewritten_file_launch_actually_uses_keeps_the_rates(tmp_path):
     `params_rewrite` 는 safe_load → 변형 → safe_dump 라서 구조적으로는 키를
     보존하지만, 그것을 확인하는 테스트가 없었다.
     """
-    from rosy_navigation.params_rewrite import write_prefixed_nav2_params
+    from navigation.params_rewrite import write_prefixed_nav2_params
 
     written = write_prefixed_nav2_params(NAV_PARAMS, "rosy_02", directory=str(tmp_path))
     rewritten = _params(Path(written))

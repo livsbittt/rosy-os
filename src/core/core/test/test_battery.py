@@ -565,7 +565,7 @@ def _shipped_config(name="config/rosy_default.yaml"):
 def _pi5_config():
     import pathlib
     import yaml
-    root = pathlib.Path(__file__).resolve().parents[3]
+    root = pathlib.Path(__file__).resolve().parents[4]
     path = root / "deploy/robot/config/rosy.pi5.example.yaml"
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 

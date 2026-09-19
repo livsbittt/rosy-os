@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-NAV = Path(__file__).resolve().parents[1] / "core" / "navigation"
+NAV = Path(__file__).resolve().parents[2] / "core_features" / "core_features" / "navigation"
 
 
 def test_navigation_tree_has_no_swarm_module():

@@ -6,7 +6,7 @@ import pytest
 from core_api_web.api.app import create_app
 
 
-WEB_ROOT = Path(__file__).parent.parent / "core" / "web"
+WEB_ROOT = Path(__file__).parent.parent.parent / "core_api_web" / "core_api_web" / "web"
 
 
 def dashboard_js(*, without: tuple[str, ...] = ()) -> str:
@@ -325,8 +325,11 @@ def test_dashboard_exposes_local_field_settings_not_fleet():
     assert 'id="waypoint-save"' in html
     assert 'type="submit"' not in html.split('id="field-settings-panel"')[1]
     assert "FLEET_HOLD" in html
+    # Fleet 은 상태 카드(읽기 전용 FLEET_HOLD 칩)까지만 노린다 — 대시보드가 Fleet
+    # 조종 통로(swarm goal·fleet 명령 API)가 되지 않는다는 것이 이 파일의 계약이다.
+    # fleet-loss-policy 는 Fleet 단절 시 로봇이 스스로 취할 로컬 동작의 현장 설정이다.
     assert "/api/v1/swarm" not in html
-    assert "fleet" not in html
+    assert "/api/fleet" not in html
 
     assert "/api/v1/waypoints" in script
     assert "/api/v1/safety/limits" in script

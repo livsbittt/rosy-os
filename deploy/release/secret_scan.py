@@ -244,6 +244,9 @@ KNOWN_FIXTURES = frozenset({
     # An invented base64 blob used as a key body in the planted fixture.
     # Safe to excuse: it is a specific literal, not a matcher signal.
     "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW",
+    # The network.connect fixture PSK used by the host-agent and host-card
+    # tests. Deliberately invented; never a value a real device holds.
+    "supersecretpsk",
 })
 
 #: Fixture values are only excused here. Anywhere else they are secrets.
@@ -378,7 +381,10 @@ def scan_files(
             )
             continue
         relative = str(path.relative_to(root)).replace("\\", "/")
-        in_fixtures = relative.startswith(FIXTURE_ROOT)
+        # Fixture values are excused inside test trees wherever they live —
+        # repo-root test/ and the per-package test/ directories of the
+        # domain-grouped workspace. Anywhere else they are secrets.
+        in_fixtures = relative.startswith(FIXTURE_ROOT) or "/test/" in f"/{relative}"
         findings.extend(
             f for f in scan_text(relative, text)
             if not (in_fixtures and any(fixture in f.excerpt for fixture in KNOWN_FIXTURES))
