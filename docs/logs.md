@@ -429,6 +429,14 @@
 - 결정: CI 적색의 소유자는 D-128 목록 — 스텝 적색·annotation으로 계속 보인다
 - 교훈: 없음
 
+## 2026-09-20 · uncommitted · ci: run pipefail steps under bash
+
+- 변경: gz_sim 테스트·Smoke 스텝에 `shell: bash` 명시. 러너가 이 스텝들을 `sh -e`로 실행해 `set -o pipefail`이 "Illegal option"으로 죽었다( exit 2, 테스트 미실행 )
+- 증거: run 35452781571 — Build·Lint·core(비차단)·fleet 통과 후 gz_sim 스텝 `sh: 2: set: Illegal option -o pipefail`
+- gate 변화: 없음
+- 결정: 없음 — 파이프 실패 전파 의도를 유지하기 위해 pipefail을 덜지 않고 셸을 고정했다
+- 교훈: 없음
+
 ## 2026-09-20 · uncommitted · docs(adr): gate the grammar split, pre-decide headless behaviour sharing (D-130)
 
 - 변경: ADR **D-130** 신규(색인 행 포함, Accepted — 방향). 실행 계획 `docs/plans/2026-09-20-ui-grammar-boundary-plan.md` 신규. `docs/progress.md`의 `adrs`에 D-130, `plans`에 실행 계획 추가

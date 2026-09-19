@@ -69,6 +69,7 @@ jobs:
       # 없는 러너에서는 테스트가 스스로 skip 한다 — 조용히 통과하는 것이 아니라
       # skip 으로 드러난다.
       - name: Test (gz_sim multi-instance launch)
+        shell: bash
         run: |
           # ROS setup.sh 는 미정의 변수를 참조하므로 -u 를 쓰지 않는다.
           set -eo pipefail
@@ -93,6 +94,7 @@ jobs:
       # 임포트가 노드 생성자를 죽이는 결함을 잡지 못한다. 이 러너에는
       # slam_toolbox 가 없어 그 조건이 그대로 재현된다.
       - name: Smoke (node boots without optional ROS packages)
+        shell: bash
         run: |
           # ROS setup.sh 는 미정의 변수를 참조하므로 -u 를 쓰지 않는다.
           set -eo pipefail
