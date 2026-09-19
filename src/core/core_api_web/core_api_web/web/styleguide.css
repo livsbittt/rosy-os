@@ -1,0 +1,224 @@
+/* 스타일 갤러리 — D-92 어휘 표의 렌더링(D-129).
+ *
+ * 이 시트는 토큰을 선언하지 않는다(D-92 제4항). 색은 전부 단일 파일
+ * /ui/tokens.css 에서 오고, 간격은 --space-*, 글자 크기는 --text-* 뿐이다.
+ */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: var(--space-5) var(--space-4) var(--space-6);
+  background: var(--ground);
+  color: var(--paper);
+  font-family: var(--body);
+  font-size: var(--text-body);
+  line-height: 1.5;
+}
+
+.page-head {
+  max-width: 720px;
+  margin: 0 auto var(--space-5);
+}
+
+h1 {
+  font-size: var(--text-title);
+  margin: 0 0 var(--space-2);
+}
+
+.intro { color: var(--muted); margin: 0; }
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  display: grid;
+  gap: var(--space-5);
+}
+
+.entry {
+  border-top: 1px solid var(--line-14);
+  padding-top: var(--space-4);
+}
+
+h2 {
+  font-size: var(--text-value);
+  margin: 0 0 var(--space-1);
+}
+
+.rule {
+  color: var(--muted);
+  margin: 0 0 var(--space-3);
+}
+
+.demo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface-flat);
+  min-height: var(--target-secondary);
+}
+
+.demo-wide { display: flex; width: 100%; }
+.demo-row { flex-wrap: wrap; }
+
+.gate {
+  color: var(--nominal-quiet);
+  font-size: var(--text-micro);
+  letter-spacing: var(--track-label);
+  margin: var(--space-2) 0 0;
+}
+
+.gate code {
+  font-family: var(--mono);
+  color: var(--muted);
+}
+
+/* ---- 어휘 데모 ------------------------------------------------------- */
+
+.demo-label {
+  font-size: var(--text-micro);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--nominal-quiet);
+}
+
+.demo-value {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-value);
+  color: var(--nominal);
+}
+
+.demo-entry-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.demo-headrule {
+  flex: 1;
+  border-top: 1px solid var(--line-14);
+}
+
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--surface-line);
+  width: 100%;
+}
+
+.demo-grid > div {
+  background: var(--surface-flat);
+  padding: var(--space-2) var(--space-3);
+  display: grid;
+  gap: var(--space-1);
+}
+
+.demo-btn {
+  border: 0;
+  border-radius: var(--radius-button);
+  color: var(--paper);
+  font-family: var(--body);
+  font-size: var(--text-label);
+  padding: 0 var(--space-4);
+}
+
+.demo-btn.primary {
+  background: var(--button-primary-bg);
+  color: var(--button-primary-ink);
+  min-height: var(--target-primary);
+}
+
+.demo-btn.quiet {
+  background: transparent;
+  border: 1px solid var(--surface-line);
+  min-height: var(--target-secondary);
+}
+
+.demo-btn.irreversible {
+  background: var(--status-crit);
+  color: var(--paper);
+  min-height: var(--target-irreversible);
+}
+
+.demo-field {
+  width: 100%;
+  background: var(--field-bg);
+  border: 0;
+  border-bottom: 1px solid var(--field-line);
+  color: var(--paper);
+  font-family: var(--body);
+  font-size: var(--text-body);
+  padding: var(--space-2) var(--space-3);
+  min-height: var(--target-secondary);
+}
+
+.demo-field:focus {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.demo-tag {
+  border: 1px solid var(--line-30);
+  border-radius: var(--radius-flag);
+  color: var(--nominal);
+  font-size: var(--text-micro);
+  letter-spacing: var(--track-label);
+  padding: var(--space-1) var(--space-3);
+}
+
+.demo-tag.warn { border-color: var(--status-warn); color: var(--status-warn); }
+
+.demo-tag.crit {
+  background: var(--status-crit);
+  border-color: var(--status-crit);
+  color: var(--paper);
+}
+
+.demo-map {
+  background: var(--raster-unknown);
+  justify-content: center;
+  min-height: var(--space-6);
+}
+
+.demo-chip {
+  background: var(--scrim);
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-control);
+  color: var(--paper);
+  font-size: var(--text-micro);
+  letter-spacing: var(--track-label);
+  padding: var(--space-1) var(--space-3);
+}
+
+.demo-triage {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  width: 100%;
+}
+
+.demo-triage small { color: var(--muted); margin-left: auto; }
+
+.demo-dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-flag);
+  background: var(--muted-line);
+}
+
+.demo-dot.warn { background: var(--status-warn); }
+
+.demo-evidence { color: var(--nominal-quiet); font-size: var(--text-label); }
+
+.demo-evidence.delayed { color: var(--muted); }
+
+.demo-evidence.unavailable {
+  color: var(--muted);
+  border: 1px dashed var(--line-30);
+  padding: var(--space-1) var(--space-3);
+}

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -113,5 +115,55 @@ def create_app(config: dict[str, Any], services: CoreServicesLike) -> FastAPI:
             media_type=media_type,
             headers={"Cache-Control": "no-cache"},
         )
+
+    # D-129 — 토큰 파일은 트리 전체에서 하나다. 모든 웹 표면이 이 한 파일을
+    # /ui/tokens.css 로 링크하고 각자 사본을 두지 않는다. D-130.3 — 릴리스가
+    # 핀을 걸면 기동 때 어긋남을 경고한다(사이트 PC 서버가 로봇 이미지보다
+    # 낡은 토큰을 서빙하는 버전 스큐).
+    ui_tokens = web_root / "tokens.css"
+    ui_tokens_sha = hashlib.sha256(ui_tokens.read_bytes()).hexdigest()
+    pinned_sha = config.get("ui_tokens_sha256")
+    if pinned_sha and pinned_sha != ui_tokens_sha:
+        logging.warning(
+            "ui tokens sha mismatch: pinned %s, serving %s (%s)",
+            pinned_sha, ui_tokens_sha, ui_tokens,
+        )
+
+    @app.get("/ui/tokens.css", include_in_schema=False)
+    def ui_tokens_asset():
+        return FileResponse(
+            ui_tokens,
+            media_type="text/css",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-UI-Tokens-Sha256": ui_tokens_sha,
+            },
+        )
+
+    @app.get("/styleguide", include_in_schema=False)
+    def styleguide():
+        # D-129.3 — D-92 어휘 표의 유일한 렌더링. 제품 표면이 아니라 어휘 표의
+        # 실행 가능한 사본이며 어디에서도 import 되지 않는다.
+        return FileResponse(
+            web_root / "styleguide.html",
+            media_type="text/html",
+            headers={
+                "Cache-Control": "no-cache",
+                "Content-Security-Policy": (
+                    "default-src 'self'; img-src 'self' data:; style-src 'self'; "
+                    "script-src 'self'; frame-ancestors 'none'; base-uri 'self'"
+                ),
+            },
+        )
+
+    styleguide_assets = {"styleguide.css": "text/css"}
+
+    @app.get("/styleguide/assets/{asset_name:path}", include_in_schema=False)
+    def styleguide_asset(asset_name: str):
+        media_type = styleguide_assets.get(asset_name)
+        if media_type is None:
+            raise HTTPException(status_code=404, detail="styleguide asset not found")
+        return FileResponse(web_root / asset_name, media_type=media_type,
+                            headers={"Cache-Control": "no-cache"})
 
     return app

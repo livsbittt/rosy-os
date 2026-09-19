@@ -1,8 +1,13 @@
-"""concept 16 §6, §7.3 / D-72 L1 / D-82 — 관제 표면 팔레트의 수치 게이트.
+"""concept 16 §6, §7.3 / D-72 L1 / D-82 / D-129 — 관제 표면 팔레트의 수치 게이트.
 
-L1(토큰)은 네 표면이 공유하지만 컴포넌트는 공유하지 않는다. 이 모듈은 자기
-토큰 사본을 갖고 있으므로(D-73: 기능 시험은 그 모듈이 소유한 코드만 단언한다)
-같은 성질을 여기서 따로 지킨다.
+D-129 부터 L1 토큰은 트리 전체에서 하나다 — CORE 웹 자산의 tokens.css. 이
+모듈은 그 단일 파일을 읽는다. D-73이 "표면 간 토큰 단언의 거처가 없다"고 한
+자리가 이제 여기다: 그 파일이 공유 계약 자산이 된 이상(core_common 스키마
+선례, D-18) fleet 시험이 그 값을 읽는 것은 경계 침범이 아니라 계약 소비다.
+
+역할 분담(D-129·D-130): 값 게이트(아래 OKLCH·대비·사다리)는 단일 파일의 값을
+먹는 이 계층이, fleet 시트의 문법(원시 색 없음, 정상 참조 없음)은 이 파일의
+표면 게이트가 지킨다. 문법 분리 자체는 test_grammar_separation.py 가 잡는다.
 
 이 시험이 존재하는 이유: Fleet은 D-82 이전 팔레트를 복사해 갔었다. 적록 색약
 시야에서 주의 대 위험 대비가 1.07:1이었고, 계열 색 하나가 따뜻한 띠에 있었으며,
@@ -12,7 +17,6 @@ L1(토큰)은 네 표면이 공유하지만 컴포넌트는 공유하지 않는�
 표준 라이브러리만 쓴다.
 """
 
-from itertools import combinations
 from pathlib import Path
 import math
 import re
@@ -20,7 +24,9 @@ import re
 import pytest
 
 WEB = Path(__file__).resolve().parents[1] / "fleet" / "server" / "web"
-TOKENS = WEB / "tokens.css"
+#: D-129 — 단일 L1 파일. 사본은 없다.
+CANON = (Path(__file__).resolve().parents[3] / "core" / "core_api_web"
+         / "core_api_web" / "web" / "tokens.css")
 
 COLOR_LITERAL = re.compile(r"#[0-9a-fA-F]{3,8}\b|rgba?\(\s*\d|hsla?\(\s*\d")
 ROBOTS = ("robot-1", "robot-2", "robot-3")
@@ -44,12 +50,12 @@ def _rgb(hex_colour: str):
 
 def oklch(hex_colour: str):
     r, g, b = _rgb(hex_colour)
-    l = (0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b) ** (1 / 3)
-    m = (0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b) ** (1 / 3)
-    s = (0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b) ** (1 / 3)
-    lightness = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s
-    a = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s
-    bb = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s
+    lc = (0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b) ** (1 / 3)
+    mc = (0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b) ** (1 / 3)
+    sc = (0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b) ** (1 / 3)
+    lightness = 0.2104542553 * lc + 0.7936177850 * mc - 0.0040720468 * sc
+    a = 1.9779984951 * lc - 2.4285922050 * mc + 0.4505937099 * sc
+    bb = 0.0259040371 * lc + 0.7827717662 * mc - 0.8086757660 * sc
     return lightness, math.hypot(a, bb), math.degrees(math.atan2(bb, a)) % 360
 
 
@@ -73,9 +79,9 @@ def deuteranope(hex_colour: str) -> str:
 @pytest.fixture(scope="module")
 def palette() -> dict[str, str]:
     found = dict(
-        re.findall(r"--([a-z0-9-]+):\s*(#[0-9a-fA-F]{6})\s*;", TOKENS.read_text(encoding="utf-8"))
+        re.findall(r"--([a-z0-9-]+):\s*(#[0-9a-fA-F]{6})\s*;", CANON.read_text(encoding="utf-8"))
     )
-    assert found, "fleet tokens.css에서 hex 토큰을 읽지 못했다"
+    assert found, "단일 토큰 파일에서 hex 토큰을 읽지 못했다"
     return found
 
 
@@ -131,13 +137,18 @@ def test_robot_identity_is_a_lightness_ladder(palette):
         assert ratio >= 1.5, f"{a} 대 {b} 색약 대비 {ratio:.2f}:1"
 
 
-def test_nominal_carries_no_colour(palette):
-    """concept 16 §7.3 — 정상은 화면에 없다. 초록이 아니라 없음이다."""
-    text = TOKENS.read_text(encoding="utf-8")
-    assert "--status-good" not in text, "관제 팔레트에 '정상' 색이 남아 있다"
+def test_fleet_never_renders_the_nominal(palette):
+    """concept 16 §7.3 — 정상은 화면에 없다. 초록이 아니라 없음이다.
+
+    D-129 로 선언은 공유 파일에 옮겨 갔다(콘솔은 쓴다). 그래서 이 표면의
+    금지는 선언 부재가 아니라 **참조 부재**다 — fleet 시트와 스크립트가
+    정상 색 토큰을 읽는 순간 정상을 색으로 칠하는 것이다.
+    """
+    banned = ("--status-good", "--status-ok")
     for path in surfaces():
         body = path.read_text(encoding="utf-8")
-        assert "--status-good" not in body, f"{path.name}이 정상을 색으로 칠한다"
+        for token in banned:
+            assert token not in body, f"{path.name}이 정상을 색으로 칠한다({token})"
 
 
 def test_no_decoration_effects(palette):
@@ -157,14 +168,15 @@ def test_text_meets_wcag_on_the_ground(palette):
     assert contrast(palette["paper"], palette["status-crit"]) >= 4.5
 
 
-def test_every_referenced_token_is_declared(palette):
+def test_every_referenced_token_is_declared_in_the_single_file(palette):
     """토큰을 갈아끼울 때 관제 UI가 조용히 색을 잃지 않게 한다.
 
     `var(--x)`와 `css("--x")` 둘 다 본다 — 콘솔은 CSP 아래에서 캔버스 색을
-    런타임에 읽으므로, 선언이 사라지면 지도가 검게 칠해진다.
+    런타임에 읽으므로, 선언이 사라지면 지도가 검게 칠해진다. 선언의 출처는
+    이제 단일 파일이다(D-129).
     """
     declared = set(
-        re.findall(r"--([a-z0-9-]+)\s*:", TOKENS.read_text(encoding="utf-8"))
+        re.findall(r"--([a-z0-9-]+)\s*:", CANON.read_text(encoding="utf-8"))
     )
     missing: dict[str, list[str]] = {}
     for path in surfaces():
@@ -174,5 +186,4 @@ def test_every_referenced_token_is_declared(palette):
         gap = sorted(used - declared)
         if gap:
             missing[path.name] = gap
-    assert not missing, f"선언되지 않은 토큰 참조: {missing}"
-
+    assert not missing, f"단일 파일에 선언되지 않은 토큰 참조: {missing}"
