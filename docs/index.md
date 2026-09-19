@@ -84,8 +84,8 @@
 
 ## 최근 기록
 
+- 2026-09-19 · uncommitted · docs(adr): bundle Level-3 stale test paths as backlog (D-128)
 - 2026-09-19 · uncommitted · chore(release): open stacked slice PRs #1 (D-125) and #2 (D-126)
 - 2026-09-19 · uncommitted · chore(release): push local main to staging branch, origin/main untouched
 - 2026-09-19 · uncommitted · docs(adr): lock merge strategy as D-127, stage integration by slice
 - 2026-09-19 · uncommitted · docs(adr): accept D-126 after the five guards and affected suites go green
-- 2026-09-19 · uncommitted · docs(adr): propose full module separation (D-126)

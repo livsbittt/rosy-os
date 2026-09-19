@@ -356,3 +356,11 @@
 - gate 변화: 없음
 - 결정: 리뷰는 PR에서, 병합은 #1→#2 순. `origin/main` 직접 푸시는 계속 금지
 - 교훈: 없음
+
+## 2026-09-19 · uncommitted · docs(adr): bundle Level-3 stale test paths as backlog (D-128)
+
+- 변경: ADR D-128 색인·본문(Accepted). 구 경로 잔재 목록 고정(test/ 루트 4에러+1실패·runtime_slices·core dashboard/swarm/triage/palette 등·호출 규약). D-125/D-126 비차단, 수정은 주인 세션, 목록 밖 신규 실패는 회귀 취급
+- 증거: 2026-09-19 실측 — test/ 수집 에러 4건+실패 1건(구 rosy_* import), core 스위트 구 경로 실패군, control 환경성 2건(패키지 디렉터리 실행 시 PASS). 전부 D-126 미접촉 파일
+- gate 변화: 없음
+- 결정: D-128 Accepted
+- 교훈: 없음
