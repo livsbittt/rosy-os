@@ -85,8 +85,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · ci: source the ROS overlay in the colcon build step
 - 2026-09-20 · uncommitted · chore(release): push main directly to origin, superseding the D-127 slice-staged integration
 - 2026-09-20 · uncommitted · docs: realign the AGENTS.md network, ci.yml, and current-facing docs to the domain regroup
 - 2026-09-20 · uncommitted · docs(adr): record the L1 single-token-file and styleguide decision as D-129
 - 2026-09-19 · uncommitted · docs(adr): bundle Level-3 stale test paths as backlog (D-128)
-- 2026-09-19 · uncommitted · chore(release): open stacked slice PRs #1 (D-125) and #2 (D-126)

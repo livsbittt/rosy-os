@@ -36,6 +36,9 @@ jobs:
 
       - name: Build (colcon)
         run: |
+          # 러너 셸은 컨테이너 엔트리포인트를 우회하므로 ROS 환경을 직접 얹는다 —
+          # 아니면 CMake가 ament_cmake를 찾지 못해 빌드 자체가 시작되지 않는다.
+          . /opt/ros/jazzy/setup.sh
           cd src
           colcon build --symlink-install --event-handlers console_direct+
 

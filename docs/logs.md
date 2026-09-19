@@ -388,3 +388,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: D-127 재정의(소유자 직권, 이번 푸시에 한함). 이후 통합 방식은 미정 — 필요 시 D-127 슬라이스 절차로 복귀
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · ci: source the ROS overlay in the colcon build step
+
+- 변경: Build(colcon) 스텝에 `. /opt/ros/jazzy/setup.sh` 추가. 러너 셸은 컨테이너 엔트리포인트를 우회해 ament_cmake를 못 찾고, 슬라이스 PR 런(#1·#2)도 전부 이 자리에서 수십 초 만에 죽어 있었다 — 즉 메인 CI는 리얼라인 이전부터 빌드 시작도 못한 상태였다
+- 증거: run 35451970112 로그 — `CMake Error at CMakeLists.txt:9 (find_package): Could not find ament_cmake`. 같은 워크플로의 gz_sim·smoke 스텝은 각자 setup.sh를 source하는 대비가 이미 있었다
+- gate 변화: 없음
+- 결정: 이어지는 정리 푸시로 같은 직접 통합 창을 쓴다. 루트 test/ 스텝은 D-128 백로그(구 rosy_* import 4에러+1실패)로 규정된 적색 유지 — 목록 밖 신규 실패만 회귀로 본다
+- 교훈: 없음
