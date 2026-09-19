@@ -30,10 +30,12 @@ def generate_launch_description():
             'robot_description':
                 Command([
                     'xacro ',
+                    '"',
                     PathJoinSubstitution([
                         get_package_share_directory('description'),
                         'urdf/robot.urdf.xacro',
                     ]),
+                    '"',
                     ' namespace:=', namespace,
                     ' is_sim:=', LaunchConfiguration('is_sim'),
                     ' cam_tilt_deg:=', LaunchConfiguration('cam_tilt_deg')

@@ -250,7 +250,7 @@ def _launch_setup(context):
     world_path = os.path.join(rosy_gz_share, "worlds", world_name)
 
     # Gazebo 서버 (1회) — headless 여부로 GUI 분기
-    server_args = f"-r -s -v4 {world_path}"
+    server_args = f"-r -s -v4 \"{world_path}\""
     actions.append(
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
@@ -401,7 +401,7 @@ def _launch_setup(context):
             group_actions.append(
                 Node(
                     package="gz_sim",
-                    executable="seed_initialpose",
+                    executable="seed_initialpose.py",
                     name="seed_initialpose",
                     namespace=ns,
                     output="screen",
