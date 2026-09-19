@@ -64,6 +64,7 @@
 | D-123 | 웹은 Cyclone을 오버레이에 저장한 뒤 Host Agent 재부팅을 요청한다 |
 | D-124 | 대시보드는 AP on/off와 Wi-Fi 연결을 Host Agent로 확인하고 적용한다 |
 | D-129 | L1 토큰 파일은 하나이고 어휘 표는 보인다 — D-92 제1항을 대체한다 |
+| D-130 | L2 문법 분리는 게이트가 지키고, 로직 행위는 headless로 한 번 뽑는다 |
 
 ## 계획·결과 문서
 
@@ -73,6 +74,7 @@
 - [2026-09-17-remaining-gates-adr-plan.md](plans/2026-09-17-remaining-gates-adr-plan.md)
 - [2026-09-17-remaining-runtime-adr-plan.md](plans/2026-09-17-remaining-runtime-adr-plan.md)
 - [2026-09-18-rosy-games-remaining-adr-plan.md](plans/2026-09-18-rosy-games-remaining-adr-plan.md)
+- [2026-09-20-ui-grammar-boundary-plan.md](plans/2026-09-20-ui-grammar-boundary-plan.md)
 
 ## 교훈 (docs/solutions)
 
@@ -85,8 +87,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · ci: unblock the build runner — xacro, gz_sim exclusion, D-128 step tolerance
 - 2026-09-20 · uncommitted · ci: source the ROS overlay in the colcon build step
 - 2026-09-20 · uncommitted · chore(release): push main directly to origin, superseding the D-127 slice-staged integration
 - 2026-09-20 · uncommitted · docs: realign the AGENTS.md network, ci.yml, and current-facing docs to the domain regroup
-- 2026-09-20 · uncommitted · docs(adr): record the L1 single-token-file and styleguide decision as D-129
-- 2026-09-19 · uncommitted · docs(adr): bundle Level-3 stale test paths as backlog (D-128)
+- 2026-09-20 · uncommitted · docs(adr): gate the grammar split, pre-decide headless behaviour sharing (D-130)

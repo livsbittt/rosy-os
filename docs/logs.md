@@ -373,6 +373,14 @@
 - 결정: D-129 Proposed — L1 토큰 파일은 트리 전체에서 하나(`/ui/tokens.css` 링크)이고, D-92 어휘 표의 유일한 렌더링으로 CORE `/styleguide` 갤러리를 둔다. 컴포넌트·L2 공유 금지와 공용 컴포넌트 패키지 기각(`rosy_ui` 제안)은 유지. 구현(/ui 라우트·fleet 사본 삭제·게이트 이동·갤러리)이 착지해야 Accepted
 - 교훈: 없음
 
+## 2026-09-20 · uncommitted · docs(adr): gate the grammar split, pre-decide headless behaviour sharing (D-130)
+
+- 변경: ADR **D-130** 신규(색인 행 포함, Accepted — 방향). 실행 계획 `docs/plans/2026-09-20-ui-grammar-boundary-plan.md` 신규. `docs/progress.md`의 `adrs`에 D-130, `plans`에 실행 계획 추가
+- 증거: 실측 — fleet 웹 자산은 전체 32KB(styles.css 6.8KB)이고 fleet은 자체 팔레트 게이트 8건을 이미 갖는다. 반면 L2 문법 분리는 게이트가 없어 다중 에이전트 세션의 console CSS 복제( concept 16 §4 결함의 최단 경로)를 기계적으로 막는 장치가 없다. D-92 (a) 2단계 확인은 상태머신으로 로직 중복 비용이 선언 중복과 다르다
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: D-130 Accepted(방향) — (1) L2 문법 분리는 각 표면 모듈의 게이트가 지킨다(남의 표면 관용구 금지·스타일시트 참조는 자기 것과 `/ui/tokens.css`뿐·allowlist 이중 잠금) (2) 로직 행위는 둘 이상의 웹 표면이 필요할 때 스타일 없는 headless 커스텀 엘리먼트로 한 번 뽑고 시각 문법은 표면이 소유한다(D-92 제2항 유지, 처소는 CORE 웹 패키지) (3) D-129의 `/ui/tokens.css`는 릴리스에 해시 고정하고 불일치 시 기동 경고. 게이트 착지 전까지 L2 분리는 리뷰 의존인 간극을 본문에 명시
+- 교훈: 없음
+
 ## 2026-09-20 · uncommitted · docs: realign the AGENTS.md network, ci.yml, and current-facing docs to the domain regroup
 
 - 변경: AGENTS.md 56개를 regroup 후 경로로 재정렬(도메인 그룹 `src/{core,apps,hardware,navigation,sim,site}` 신설 6개 포함, `core` 커널 분해 구조 반영). ci.yml을 regroup 트리로 실정(flake8·pytest 경로, `ros2 run core core`, 부팅 로그 `core up`). README 구조 트리 갱신. env.sh·deployment runbook 3건·concept 3건의 현재형 경로를 새 패키지명으로 수정
@@ -395,4 +403,12 @@
 - 증거: run 35451970112 로그 — `CMake Error at CMakeLists.txt:9 (find_package): Could not find ament_cmake`. 같은 워크플로의 gz_sim·smoke 스텝은 각자 setup.sh를 source하는 대비가 이미 있었다
 - gate 변화: 없음
 - 결정: 이어지는 정리 푸시로 같은 직접 통합 창을 쓴다. 루트 test/ 스텝은 D-128 백로그(구 rosy_* import 4에러+1실패)로 규정된 적색 유지 — 목록 밖 신규 실패만 회귀로 본다
+- 교훈: 없음
+
+## 2026-09-20 · uncommitted · ci: unblock the build runner — xacro, gz_sim exclusion, D-128 step tolerance
+
+- 변경: ① apt에 `ros-jazzy-xacro` 추가(description configure 실패 제거) ② 빌드 전 `src/sim/gz_sim/COLCON_IGNORE` — 러너에 ros_gz·gz_ros2_control이 없고 x86에서는 aarch64 가드가 안 걸린다 ③ 루트 test/ 스텝에 `continue-on-error` — D-128이 규정한 백로그 실패(구 rosy_* import 4에러+1실패)를 비차단으로 두되 목록 밖 신규 실패는 스텝 적색으로 보인다. Smoke·Guard가 그 뒤에 처음으로 실행될 수 있게 된다
+- 증거: run 35452106894 — ament_cmake 소싱으로 빌드가 시작됐고 `description` CMakeLists.txt:10 xacro find_package 실패까지 진행. lamp_control·sensor_adc·imu_bno055는 x86 자체 스킵 가드 확인(CMakeLists if aarch64)
+- gate 변화: 없음
+- 결정: CI 적색의 소유자를 D-128 목록으로 고정한다 — 이제 적색이면 목록이느냐 아니냐만 보면 된다
 - 교훈: 없음
