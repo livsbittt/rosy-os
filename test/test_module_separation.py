@@ -50,6 +50,15 @@ TOP_TO_PACKAGE = {
 
 FINAL_CMD_VEL = re.compile(r"""['"]cmd_vel['"]""")
 
+#: The single pinned legacy exception to guard 2: the legacy comparison
+#: graph's final publisher default (see test_os_control_graph.py, which pins
+#: safety_node as the legacy final publisher). Everything else in control
+#: must not name the final topic.
+LEGACY_FINAL_PUBLISHER = (
+    "apps/control/control/safety/node.py",
+    "self.declare_parameter('cmd_out', 'cmd_vel')",
+)
+
 
 def _prod_py_files(tree: Path):
     return [
@@ -87,14 +96,18 @@ def test_control_has_no_final_cmd_vel():
     """Guard 2 (S2): control runtime never names the final topic.
 
     'cmd_vel_raw' and '/cmd_vel_raw' are allowed; only the exact final
-    topic string is forbidden.
+    topic string is forbidden. The one exception is the pinned legacy
+    comparison-graph publisher default (LEGACY_FINAL_PUBLISHER).
     """
     violations = []
     for path in _prod_py_files(CONTROL_PKG):
+        rel = path.relative_to(SRC).as_posix()
         text = path.read_text(encoding="utf-8")
         for i, line in enumerate(text.splitlines(), 1):
             if FINAL_CMD_VEL.search(line):
-                violations.append(f"{path.relative_to(SRC)}:{i}: {line.strip()[:100]}")
+                if rel == LEGACY_FINAL_PUBLISHER[0] and line.strip() == LEGACY_FINAL_PUBLISHER[1]:
+                    continue
+                violations.append(f"{rel}:{i}: {line.strip()[:100]}")
     assert violations == [], violations
 
 
