@@ -1,0 +1,237 @@
+"""HttpRobotClient — 로봇 REST 를 부르는 유일한 곳. 에러 본문은 ERR-101 형식이다."""
+
+import asyncio
+import json
+import logging
+
+import httpx
+import pytest
+
+from core_common.protocol.schemas import SwarmFollowParams
+from fleet.swarm.robots import RobotEndpoint
+from fleet.swarm.transport import (
+    HttpRobotClient,
+    RobotApiError,
+    RobotClient,
+    _as_event,
+    _as_text,
+    _rejection,
+)
+
+EP = RobotEndpoint("rosy_02", "http://robot:8080", "op-token")
+
+
+def run(coro):
+    return asyncio.run(coro)
+
+
+def _client(handler):
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url=EP.base_url)
+    return HttpRobotClient(EP, http=http)
+
+
+def test_it_satisfies_the_protocol():
+    assert isinstance(_client(lambda r: httpx.Response(200, json={})), RobotClient)
+
+
+def test_follow_posts_the_params_with_a_bearer_token():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["auth"] = request.headers.get("authorization")
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"role": "follower", "active": True})
+
+    params = SwarmFollowParams(target_robot_id="rosy_01", distance=0.6, lateral=-0.6,
+                               max_speed=0.15, stream_timeout_ms=1000)
+    got = run(_client(handler).follow(params))
+    assert got["active"] is True
+    assert seen["path"] == "/api/v1/swarm/follow"
+    assert seen["auth"] == "Bearer op-token"
+    assert seen["body"]["target_robot_id"] == "rosy_01"
+    assert seen["body"]["lateral"] == -0.6
+    assert seen["body"]["source"] == "fleet"
+
+
+def test_an_error_body_becomes_a_robot_api_error_with_the_robots_code():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(409, json={"error": {"code": "DOCKING_ACTIVE",
+                                                   "message": "a docking run owns navigation",
+                                                   "detail": None}})
+
+    with pytest.raises(RobotApiError) as exc:
+        run(_client(handler).follow(SwarmFollowParams(target_robot_id="rosy_01")))
+    assert exc.value.robot_id == "rosy_02"
+    assert exc.value.status == 409
+    assert exc.value.code == "DOCKING_ACTIVE"
+
+
+def test_a_non_json_error_still_raises_with_an_http_code():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(502, text="bad gateway")
+
+    with pytest.raises(RobotApiError) as exc:
+        run(_client(handler).state())
+    assert exc.value.code == "HTTP_502"
+
+
+@pytest.mark.parametrize("method, path", [
+    ("state", "/api/v1/robot/state"),
+    ("swarm_state", "/api/v1/swarm/state"),
+    ("swarm_cancel", "/api/v1/swarm/cancel"),
+    ("navigation_cancel", "/api/v1/navigation/cancel"),
+])
+def test_each_call_hits_its_route(method, path):
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["method"] = request.method
+        return httpx.Response(200, json={"ok": True})
+
+    assert run(getattr(_client(handler), method)()) == {"ok": True}
+    assert seen["path"] == path
+    assert seen["method"] == ("GET" if method.endswith("state") else "POST")
+
+
+def test_http_estop_posts_safety_stop():
+    import inspect
+    from fleet.swarm.transport import HttpRobotClient
+    src = inspect.getsource(HttpRobotClient.estop)
+    assert "/api/v1/safety/stop" in src
+
+
+def test_navigation_goal_posts_x_y_yaw():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content)
+        seen["path"] = request.url.path
+        return httpx.Response(200, json={"accepted": True})
+
+    run(_client(handler).navigation_goal(1.0, 2.0, 0.5))
+    assert seen["path"] == "/api/v1/navigation/goal"
+    assert seen["body"] == {"x": 1.0, "y": 2.0, "yaw": 0.5}
+
+
+def test_socket_urls_point_at_the_robot():
+    c = _client(lambda r: httpx.Response(200, json={}))
+    assert c.pose_url() == "ws://robot:8080/ws/swarm/pose?token=op-token"
+    assert c.reference_url() == "ws://robot:8080/ws/swarm/reference?token=op-token"
+    assert c.events_url(["nav.*", "swarm.*"]) == "ws://robot:8080/ws/events?token=op-token&types=nav.%2A%2Cswarm.%2A"
+
+
+def test_frame_text_conversion_passes_str_decodes_bytes_and_drops_garbage():
+    assert _as_text("x") == "x"
+    assert _as_text(b"\xea\xb0\x80") == "가"
+    assert _as_text(b"\xff\xfe") is None
+
+
+def test_event_conversion_keeps_only_json_objects():
+    assert _as_event('{"type": "nav.stuck"}') == {"type": "nav.stuck"}
+    assert _as_event("[1, 2]") is None
+    assert _as_event("not json") is None
+    assert _as_event(b"\xff") is None
+
+
+def test_a_200_that_is_not_a_json_object_is_a_bad_response_error():
+    for body_kwargs in ({"text": "<html>captive portal</html>"}, {"json": [1, 2]}):
+        def handler(request: httpx.Request, kw=body_kwargs) -> httpx.Response:
+            return httpx.Response(200, **kw)
+        with pytest.raises(RobotApiError) as exc:
+            run(_client(handler).state())
+        assert exc.value.code == "BAD_RESPONSE"
+
+
+def test_aclose_leaves_an_injected_client_alone():
+    http = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, json={})),
+                             base_url=EP.base_url)
+    c = HttpRobotClient(EP, http=http)
+    run(c.aclose())
+    assert not http.is_closed
+    run(http.aclose())
+
+
+def test_a_socket_closed_with_4403_raises_a_robot_api_error():
+    websockets = pytest.importorskip("websockets")
+
+    async def main():
+        async def handler(ws):
+            await ws.close(code=4403, reason="capability swarm.lead not declared")
+
+        async with websockets.serve(handler, "127.0.0.1", 0) as server:
+            port = server.sockets[0].getsockname()[1]
+            client = HttpRobotClient(RobotEndpoint("rosy_09", f"http://127.0.0.1:{port}", "t"))
+            try:
+                with pytest.raises(RobotApiError) as exc:
+                    async for _ in client.pose_stream():
+                        pass
+                assert exc.value.code == "WS_4403" and exc.value.status == 403
+                with pytest.raises(RobotApiError):
+                    async for _ in client.events(["nav.*"]):
+                        pass
+            finally:
+                await client.aclose()
+    run(main())
+
+
+def test_an_ordinary_close_ends_the_stream_quietly():
+    websockets = pytest.importorskip("websockets")
+
+    async def main():
+        async def handler(ws):
+            await ws.send('{"type": "pose"}')
+            await ws.close()
+
+        async with websockets.serve(handler, "127.0.0.1", 0) as server:
+            port = server.sockets[0].getsockname()[1]
+            client = HttpRobotClient(RobotEndpoint("rosy_09", f"http://127.0.0.1:{port}", "t"))
+            try:
+                frames = [f async for f in client.pose_stream()]
+                assert frames == ['{"type": "pose"}']
+            finally:
+                await client.aclose()
+    run(main())
+
+
+def test_a_handshake_rejected_with_403_raises_ws_403_on_every_socket():
+    websockets = pytest.importorskip("websockets")
+    import http
+
+    async def main():
+        async def reject(connection, request):
+            return connection.respond(http.HTTPStatus.FORBIDDEN, "forbidden\n")
+
+        async def handler(ws):
+            await ws.wait_closed()
+
+        async with websockets.serve(handler, "127.0.0.1", 0, process_request=reject) as server:
+            port = server.sockets[0].getsockname()[1]
+            client = HttpRobotClient(RobotEndpoint("rosy_09", f"http://127.0.0.1:{port}", "t"))
+            try:
+                with pytest.raises(RobotApiError) as exc:
+                    async for _ in client.pose_stream():
+                        pass
+                assert exc.value.code == "WS_403" and exc.value.status == 403
+                with pytest.raises(RobotApiError) as exc2:
+                    await client.open_reference_sink()
+                assert exc2.value.code == "WS_403"
+            finally:
+                await client.aclose()
+    run(main())
+
+
+def test_a_websockets_without_invalid_status_degrades_to_a_quiet_end(monkeypatch, caplog):
+    """package.xml 은 14 이상을 요구하지만 배포판이 더 오래된 것을 깔아 놓을 수 있다.
+    `ImportError` 가 예외 처리 한가운데서 새어 나가면 거절 하나가 스트림을 죽인다."""
+    ws_exc = pytest.importorskip("websockets.exceptions")
+    import fleet.swarm.transport as transport
+
+    monkeypatch.delattr(ws_exc, "InvalidStatus", raising=False)
+    monkeypatch.setattr(transport, "_missing_invalid_status_logged", False)
+    with caplog.at_level(logging.WARNING, logger="fleet.swarm.transport"):
+        assert _rejection("rosy_09", ws_exc.WebSocketException("handshake refused")) is None
+        assert _rejection("rosy_09", OSError("connection refused")) is None
+    # 경고는 처음 한 번뿐이다 — 소켓마다 찍으면 재연결 로그가 그것뿐이 된다.
+    assert caplog.text.count("InvalidStatus") == 1

@@ -24,7 +24,7 @@
 ## 시험
 
 - `test/test_dock_contract.py`
-- `src/rosy_core/test/test_docking.py`
+- `src/core/core/test/test_docking.py`
 
 ## 최근 기록
 

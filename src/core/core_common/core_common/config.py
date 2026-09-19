@@ -1,0 +1,135 @@
+"""core_common.config — YAML 설정 로드/검증 (P1-1, CFG-001/002).
+
+설정 계층:
+1. config/rosy_default.yaml (패키지 기본값)
+2. ~/.rosy/rosy.yaml (로봇 로컬 오버라이드) — 있으면 병합
+3. 환경변수 ROSY_CONFIG (명시적 경로) — 최우선
+"""
+
+from __future__ import annotations
+
+import os
+import re
+from pathlib import Path
+from typing import Any, Optional
+
+import yaml
+
+DEFAULT_CONFIG_NAME = "rosy_default.yaml"
+LOCAL_CONFIG_PATH = Path.home() / ".rosy" / "rosy.yaml"
+RUNTIME_MODES = frozenset({"core", "motor", "hardware"})
+
+
+class ConfigError(Exception):
+    """Local overlay could not be written."""
+
+
+def overlay_path() -> Path:
+    """Where dashboard/API writes persist: ROSY_CONFIG if set, else ~/.rosy/rosy.yaml."""
+    env = os.environ.get("ROSY_CONFIG", "").strip()
+    return Path(env) if env else LOCAL_CONFIG_PATH
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _find_default_config() -> Path:
+    try:
+        from ament_index_python.packages import get_package_share_directory
+
+        share = Path(get_package_share_directory("core")) / "config"
+        if (share / DEFAULT_CONFIG_NAME).exists():
+            return share / DEFAULT_CONFIG_NAME
+    except Exception:
+        pass
+    # 소스 트리 실행 (colcon install 미사용) 폴백
+    return Path(__file__).resolve().parent.parent / "config" / DEFAULT_CONFIG_NAME
+
+
+def load_config(explicit_path: Optional[str] = None) -> dict[str, Any]:
+    """기본값 → 로컬 오버라이드 → 명시적 경로 순으로 병합해 반환한다."""
+
+    base_path = Path(explicit_path) if explicit_path else _find_default_config()
+    config: dict[str, Any] = {}
+    with open(base_path, encoding="utf-8") as f:
+        config = yaml.safe_load(f) or {}
+
+    override_path = Path(os.environ.get("ROSY_CONFIG", "")) if os.environ.get("ROSY_CONFIG") else LOCAL_CONFIG_PATH
+    if override_path.exists():
+        with open(override_path, encoding="utf-8") as f:
+            config = _deep_merge(config, yaml.safe_load(f) or {})
+
+    namespace = os.environ.get("ROSY_NAMESPACE", "").strip().strip("/")
+    if namespace:
+        config.setdefault("robot", {})["frame_prefix"] = f"{namespace}/"
+
+    robot = config.setdefault("robot", {})
+    if namespace:
+        robot["id"] = namespace
+    number_env = os.environ.get("ROSY_ROBOT_NUMBER", "").strip()
+    if number_env:
+        if not re.fullmatch(r"0|[1-9][0-9]*", number_env):
+            raise ValueError(
+                f"ROSY_ROBOT_NUMBER must be a decimal integer with no leading zero, got {number_env!r}"
+            )
+        number = int(number_env)
+        expected = f"rosy_{number:02d}"
+        if namespace and namespace != expected:
+            raise ValueError(
+                f"ROSY_ROBOT_NUMBER={number} derives {expected}, not ROSY_NAMESPACE={namespace}"
+            )
+        robot["number"] = number
+        if not namespace:
+            robot["id"] = expected
+
+    mode = os.environ.get("ROSY_RUNTIME_MODE", "").strip()
+    if mode:
+        if mode not in RUNTIME_MODES:
+            raise ValueError(
+                f"ROSY_RUNTIME_MODE must be core, motor, or hardware, got {mode!r}"
+            )
+        config.setdefault("runtime", {})["mode"] = mode
+    else:
+        config.setdefault("runtime", {}).setdefault("mode", "core")
+
+    return config
+
+
+def patch_local_config(patch: dict[str, Any], path: Optional[Path] = None) -> Path:
+    """Deep-merge `patch` into the local overlay file. Never writes package defaults.
+
+    Only the overlay is updated, so unrelated keys (auth tokens, robot id) stay
+    as they were. Used by runtime settings such as SAF-004 manual speed limits.
+    """
+    target = Path(path) if path is not None else overlay_path()
+    default = _find_default_config()
+    if target.resolve() == default.resolve():
+        raise ConfigError("refusing to write package default config")
+
+    existing: dict[str, Any] = {}
+    if target.exists():
+        loaded = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
+        if not isinstance(loaded, dict):
+            raise ConfigError("local overlay is not a mapping")
+        existing = loaded
+
+    merged = _deep_merge(existing, patch)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_name(target.name + ".tmp")
+    try:
+        tmp.write_text(
+            yaml.safe_dump(merged, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+        os.replace(tmp, target)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+    return target

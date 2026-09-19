@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- P0-5 (A-6, ADR-D-6): 로봇 간 DDS 트래픽 차단 — localhost 전용 CycloneDDS 프로파일.
+     적용: export CYCLONEDDS_URI=file://$(ros2 pkg prefix bringup)/share/bringup/config/cyclonedds_localhost.xml
+     로봇 간 통신은 Fleet 경유만 허용 (ROSY-CORE-SRS-001 §6.2). -->
+<CycloneDDS xmlns="https://cdds.io/config">
+  <Domain>
+    <General>
+      <Interfaces>
+        <NetworkInterface name="lo"/>
+      </Interfaces>
+      <AllowMulticast>default</AllowMulticast>
+    </General>
+  </Domain>
+</CycloneDDS>

@@ -1,1 +1,0 @@
-# rosy_control

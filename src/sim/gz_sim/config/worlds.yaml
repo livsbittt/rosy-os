@@ -1,0 +1,57 @@
+# gz_multi 월드 카탈로그. 월드마다 다른 숫자는 여기만 적는다.
+# 런치 인자가 비면 이 값을 쓰고, 인자가 있으면 덮어쓴다.
+#
+# 아래 inflation_radius 들은 **정적 맵만 보이던 시절**에 맞춘 값이다. 코스트맵의 관측
+# 토픽이 잘못 풀려 장애물 레이어가 라이다를 한 번도 받지 못했고(2026-09-18 수정,
+# navigation/logs.md), 그래서 이 값들은 "벽에서 얼마나 떨어져 돌 것인가"만 정했지
+# 움직이는 것을 어떻게 피할지는 정한 적이 없다. 각 월드에 적힌 근거는 그 전제 위에 있다 -
+# 재측정 전까지는 벽 회피 근거로만 읽어야 한다.
+#
+# 교행 한계는 팽창으로 움직이지 않는다는 것이 실측이다(rosy_gauntlet 스윕, 0.15 와 0.08
+# 결과가 같았다). 좁은 통로에서 두 대를 지나가게 하는 일은 Fleet 양보가 맡는다.
+worlds:
+  rosy_factory.world:
+    map: rosy_factory.yaml
+    # 0.15 로 두면 선반 사이를 지날 때 라이다가 8 cm 까지 붙는다 - 풋프린트 반폭이
+    # 6 cm 라 여유가 2 cm 다. 0.25 면 같은 목표에 같은 정확도(오차 0.13 m)로 도착하면서
+    # 최소 여유가 0.20 m 로 벌어진다. 0.55 는 이 방에서 과하다 - 방 전체가 고비용이 되어
+    # 두 대 다 출발조차 못 했다.
+    inflation_radius: 0.25
+    # spawn 은 상단 통로다. 기본 (0,0)+1.5 를 쓰면 둘째 로봇이 (1.5,0) - 선반 둘과
+    # 로봇팔 박스 사이 막다른 주머니 - 에 놓여 목표를 받아도 나오지 못한다(실측).
+    spawn_x: -0.2
+    spawn_y: 1.05
+    spawn_spacing: 0.6
+  rosy_maze.world:
+    map: rosy_maze.yaml
+    # 통로 반폭(0.71)에 가깝게. 0.15 면 통로 가운데가 전부 cost 0 이라 경로가 최단으로
+    # 칸막이 끝을 스치고 pinky 가 벽면 4.7 cm 까지 붙어 끼었다(풋프린트 반폭 6 cm).
+    inflation_radius: 0.55
+    # 원점 (0,0) 은 칸막이 maze_v2 안이다. 첫 통로 아래 끝에서 출발한다.
+    spawn_x: -2.4
+    spawn_y: -2.4
+    spawn_spacing: 0.55
+  rosy_gauntlet.world:
+    map: rosy_gauntlet.yaml
+    # 교행 한계를 재는 월드다. 여기서 팽창 반경은 "통로 폭에 맞춘 값"이 아니라 **재는
+    # 대상**이다 - 벽 가까이가 비싸면 두 대가 서로를 비켜 갈 자리가 있어도 플래너가
+    # 그리로 가지 않는다. 기본값은 저장소 기본과 같은 0.15 로 두고, 스윕이 런치 인자로
+    # 덮어쓰며 비교한다.
+    inflation_radius: 0.15
+    # 아래 접근 구역(y -2.7~-1.5)의 가운데. 1.38 간격이면 둘째가 통로 2 앞에 선다.
+    spawn_x: -2.50
+    spawn_y: -2.10
+    spawn_spacing: 1.38
+  rosy_swarm_bench.world:
+    map: rosy_swarm_bench.yaml
+    inflation_radius: 0.15
+    spawn_x: 0.0
+    spawn_y: 0.0
+    spawn_spacing: 1.5
+  rosy_map.world:
+    map: rosy_demo_room.yaml
+    inflation_radius: 0.15
+    # 방이 2 x 1 m 다. 기본 (0,0)+1.5 를 쓰면 둘째 로봇이 x=1.5 - 벽 바깥 - 에 놓인다.
+    spawn_x: -0.5
+    spawn_y: 0.0
+    spawn_spacing: 1.0

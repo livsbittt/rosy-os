@@ -291,3 +291,26 @@
 - gate 변화: LOCAL GO 유지. DEVICE PARKED
 - 결정: AP on/off는 SITE_STA/RELAY_AP_STA. Wi-Fi 연결은 Host Agent network.connect
 - 교훈: 없음
+
+## 2026-09-19: Core 패키지 모듈화 (Level 3 Phase 1)
+
+- 배경: 모놀리식 core 패키지의 의존성 분리를 위해 논리적 라이브러리 단위(ament_python)로 분할 결정
+- 결정: ADR D-125 기록 (Option A - 단일 프로세스 유지 및 도메인 라이브러리 분할)
+- 실행: Phase 1으로 `core_common` 패키지 신규 생성 및 기초 모듈(identity, config, protocol 등) 이동 완료
+- 검증: `colcon build` 및 Python import 경로 전체 수정
+
+## 2026-09-19: Core 패키지 모듈화 (Level 3 Phase 2 & 3)
+
+- 실행: Phase 2로 `core_events` (이벤트 버스) 패키지를 분리하여 독립시킴
+- 실행: Phase 3로 `core_features` (안전, 배터리, 네비게이션, 군집, 도킹 등 도메인 로직) 패키지를 분리하여 독립시킴
+- 검증: 파이썬 import 경로 전체 재지정(core.events -> core_events.events, core.safety -> core_features.safety 등) 및 `package.xml` 의존성 주입 완료
+
+## 2026-09-19: Core 패키지 모듈화 완료 (Level 3 Phase 4 & 5)
+
+- 실행: Phase 4로 `core_api_web` (FastAPI 및 웹 대시보드) 패키지를 분리하여 독립시킴
+- 상태: Phase 5로 기존의 `core` 패키지에는 진입점 노드(`main.py`, `node.py`)와 `bridge/`, `system/` 모듈만 남겨 `core_node` 역할을 하도록 정비함
+- 결과: 단일 거대 모놀리식 구조(Option A 아키텍처)를 4개의 도메인 라이브러리(`core_common`, `core_events`, `core_features`, `core_api_web`)와 1개의 실행 노드(`core`)로 완전히 분리 완료
+
+## 2026-09-19: Fleet 도메인 폴더명 변경 (site)
+
+- 결정: 다중 로봇 관제를 담당하는 도메인 폴더명을 중복되는 `fleet/fleet` 구조에서 내부 용어와 일치하는 `site/fleet`으로 변경 (SiteHub, site-fabric 등)
