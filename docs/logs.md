@@ -500,3 +500,20 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: D-131 Accepted(방향) — 1단계 맵이 있는 말을 듣게 한다(슬롯 고스트·추적 오차·릴레이 증거·중재 시각화, 백엔드 무변경), 2단계 Robot Selection을 구현한다(FOR-001 파라미터 — 새 계약 아님, D-35/D-89는 열지 않음), 3단계 N 폴링 벤치로 상한을 수치로 고정한다. 측정 전 규모 주장 금지
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · docs(acceptance): define per-module actual-operation criteria
+
+- 변경: `docs/reference/ROSY Module Operational Acceptance Criteria.md` 신규. SOURCE/LOCAL/ROS-SIM/ARTIFACT/DEVICE/FIELD의 증명 범위, 공통 증거 레코드와 안전 불변식, 19개 ROS 패키지 및 deploy/dock/docs의 정상·장애·복구 판정 기준, 최소 의존 gate, M01–M14 추적표를 정의했다. 독자 검증 뒤 N/A·FIELD READY·판정 key/만료, config generation과 release-manifest 기반 이기종 artifact 호환, 의존 gate 상속, 사전 승인 수치 기준, M05 추론·M06 hand-eye·M14 재인수 책임을 보강했다. `docs/reference/AGENTS.md`에 기준 문서를 등록했다.
+- 증거: 현재 tree의 package.xml 19개, package entry point/launch/test 표면, D-61/D-73/D-78/D-79, `STATUS.md`와 각 `progress.md`, Device 검증·Pi 인수 문서를 교차 확인했다. 문서 추가 자체는 어떤 runtime gate도 승격하지 않는다.
+- gate 변화: 없음. 실제 gate 판정은 `STATUS.md`와 모듈 `progress.md`가 계속 소유한다.
+- 결정: 실행 패키지 기준을 본문으로 하고 M01–M14는 추적표로 연결한다. `accepted`와 완료, ROS-SIM과 Device, artifact와 설치, Device와 FIELD를 분리한다.
+- 교훈: 없음
+
+## 2026-09-20 · uncommitted · feat(fleet): the console map repeats swarm control — slots, relay evidence, mediation (D-131 phase 1)
+
+- 변경: console.js — 대형 활성 동안 맵에 슬롯 고스트(assignment 오프셋을 리더 yaw로 회전, geometry.slot_world_position 동일식)·로봇-슬롯 연결선·추적 오차(m, 임계 초과 시 주의 색)를 그리고, 릴레이 건강을 D-72 증거 태그로(끊김=crit·지연=warn·fresh 무표시, 명렬 행) 옮기고, 대기 미션은 blocked_by 점선+이유 칩·비켜서는 로봇은 bay 점선으로, HOLDING 이유를 리더 위 칩으로 표시. applyFormation 신설로 대형 갱신 시 명렬도 재렌더
+- 변경(시험): `test/test_fleet_console_browser.py` 신설 — 옵트인 Chromium(ROSY_RUN_BROWSER_TESTS=1), 가짜 API(활성 대형·중재 대기·단절 팔로워)로 렌더 단언. **mutation-proven**: drawFormationOverlay/drawMediation 호출 제거 시 적색, 복원 시 녹색 확인. 시험 정적 서버는 `/ui/tokens.css`를 CORE 단일 파일로 매핑(D-129) — fleet 사본 경로로 풀면 캔버스가 통째로 검정이 되는 것을 스크린샷이 실증
+- 증거: `ROSY_RUN_BROWSER_TESTS=1 python -m pytest test/test_fleet_console_browser.py -q` 1 passed, `python -m pytest src/site/fleet/test -q` 318 passed 5 skipped, flake8(변경 파일) 0. Playwright 스크린샷 1280×720 육안 확인 — 끊김 태그는 rosy_03에만, 정상 로봇 무색
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 추적 오차는 클라이언트 계산으로 백엔드 계약을 늘리지 않는다. 맵 칩은 D-92 오버레이 칩 규칙(scrim 바탕+surface-line 테두리). 임계값(STREAM_HZ_FLOOR 2 Hz·LEADER_AGE_MAX_S 1.0 s·TRACK_WARN_M 0.3 m)은 상수로 명시 — T7 벤치 전까지 보수적 값이다
+- 교훈: 스크린샷 육안 검증이 시험 코드의 경로 버그를 잡았다 — 단언이 녹색이어도 화면이 검정이면 무언가 틀리다

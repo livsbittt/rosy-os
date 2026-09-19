@@ -8,6 +8,10 @@ const GRID = { UNKNOWN: -1, FREE_MAX: 25, OCCUPIED_MIN: 65 };
 const STATE_MS = 1000;
 const MAP_MS = 5000;
 const LOG_MAX = 40;
+// 군집 제어 오버레이 상수(D-131 1단계). 임계는 T7 벤치 전까지 보수적으로 둔다.
+const STREAM_HZ_FLOOR = 2;    // FOR-003 은 ≥5 Hz 다. 이 아래면 지연으로 본다.
+const LEADER_AGE_MAX_S = 1.0; // 10 Hz 입력이면 1 초 연령은 이미 유실이다.
+const TRACK_WARN_M = 0.3;     // 기본 간격(0.6 m)의 절반을 넘으면 주의 색을 쓴다.
 
 const el = (id) => document.getElementById(id);
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -17,6 +21,7 @@ const view = {
   robots: [],
   selected: null, // 목표 지정을 기다리는 robot_id
   colors: [],
+  formation: null,
 };
 
 function log(text, kind) {
@@ -95,6 +100,182 @@ function cellToWorld(grid, col, row) {
   };
 }
 
+// --- 군집 제어 오버레이 (D-131 1단계) ---------------------------------------
+// 후단이 이미 주는 대형·릴레이·중재 상태를 맵에 되풀이한다. 대형이 비활성이면
+// 아무것도 그리지 않는다 — 오버레이는 장식이 아니라 운용자의 현재 작업 대상이다.
+
+function colorOf(robotId) {
+  const index = view.robots.findIndex((r) => r.robot_id === robotId);
+  return view.colors[(index >= 0 ? index : 0) % view.colors.length];
+}
+
+// fleet.formation.geometry.slot_world_position 과 같은 식이다 — distance 는
+// 리더 뒤(+), lateral 은 리더 왼쪽(+)이다.
+function slotWorld(offset, pose) {
+  const hx = Math.cos(pose.yaw);
+  const hy = Math.sin(pose.yaw);
+  const lx = -Math.sin(pose.yaw);
+  const ly = Math.cos(pose.yaw);
+  return {
+    x: pose.x - offset.distance * hx + offset.lateral * lx,
+    y: pose.y - offset.distance * hy + offset.lateral * ly,
+  };
+}
+
+// 릴레이 건강을 D-72 증거로 옮긴다. fresh 는 아무것도 붙이지 않는다(§7.3 정상은 안 보임).
+function streamEvidence(formation, robotId) {
+  const relay = formation && formation.relay;
+  if (!formation || !formation.active || !relay) return null;
+  if (robotId === formation.leader) {
+    if (relay.leader_last_error) return { text: "리더 오류", cls: "crit" };
+    if (typeof relay.leader_age_s === "number" && relay.leader_age_s > LEADER_AGE_MAX_S) {
+      return { text: "리더 지연", cls: "warn" };
+    }
+    return null;
+  }
+  const connected = relay.follower_connected || {};
+  if (!(robotId in connected)) return null;
+  if (connected[robotId] === false) return { text: "끊김", cls: "crit" };
+  const hz = relay.follower_tx_hz || {};
+  if (relay.paused !== true && typeof hz[robotId] === "number" && hz[robotId] < STREAM_HZ_FLOOR) {
+    return { text: "지연", cls: "warn" };
+  }
+  return null;
+}
+
+function drawChip(ctx, grid, cx, cy, text, tone) {
+  const fontSize = Math.max(9, Math.round(Math.min(grid.width, grid.height) * 0.035));
+  ctx.font = `${fontSize}px ${css("--mono") || "monospace"}`;
+  const padding = fontSize * 0.4;
+  const width = ctx.measureText(text).width + padding * 2;
+  const height = fontSize + padding * 2;
+  ctx.save();
+  ctx.globalAlpha = 0.92;
+  ctx.fillStyle = css("--scrim");
+  ctx.fillRect(cx - width / 2, cy - height / 2, width, height);
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = css("--surface-line");
+  ctx.lineWidth = 0.4;
+  ctx.strokeRect(cx - width / 2, cy - height / 2, width, height);
+  ctx.fillStyle = tone === "crit" ? css("--status-crit")
+    : tone === "warn" ? css("--status-warn") : css("--paper");
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, cx, cy);
+  ctx.restore();
+}
+
+function poseOf(robotId) {
+  const robot = view.robots.find((r) => r.robot_id === robotId);
+  return robot && robot.state ? robot.state.pose : null;
+}
+
+function cellOf(grid, x, y) {
+  const cell = worldToCell(grid, x, y);
+  return { cx: cell.col, cy: grid.height - cell.row };
+}
+
+function drawFormationOverlay(ctx, grid) {
+  const formation = view.formation;
+  if (!formation || !formation.active) return;
+  const leaderPose = poseOf(formation.leader);
+  if (!leaderPose) return;      // 리더 좌표가 없으면 슬롯을 놓을 수 없다
+  const leaderCell = cellOf(grid, leaderPose.x, leaderPose.y);
+  const size = Math.max(3, Math.min(grid.width, grid.height) * 0.045);
+  const entries = Object.entries(formation.assignment || {});
+  window.__swarmOverlay = { draws: (window.__swarmOverlay?.draws || 0) + 1, slots: entries.length };
+  ctx.save();
+  for (const [robotId, offset] of entries) {
+    const world = slotWorld(offset, leaderPose);
+    const { cx, cy } = cellOf(grid, world.x, world.y);
+    // 슬롯 고스트 — 배정된 자리. 로봇 색을 쓴다(누구 자리인지가 축이다).
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.7, 0, Math.PI * 2);
+    ctx.strokeStyle = colorOf(robotId);
+    ctx.stroke();
+    const pose = poseOf(robotId);
+    if (pose) {
+      // 로봇 → 슬롯 연결선 + 추적 오차. 오차가 임계를 넘을 때만 주의 색을 얻는다.
+      const robotCell = cellOf(grid, pose.x, pose.y);
+      const error = Math.hypot(pose.x - world.x, pose.y - world.y);
+      ctx.beginPath();
+      ctx.setLineDash([2, 2]);
+      ctx.moveTo(robotCell.cx, robotCell.cy);
+      ctx.lineTo(cx, cy);
+      ctx.strokeStyle = error > TRACK_WARN_M ? css("--status-warn") : css("--muted-line");
+      ctx.stroke();
+      ctx.setLineDash([]);
+      drawChip(ctx, grid, (robotCell.cx + cx) / 2, (robotCell.cy + cy) / 2,
+        `${error.toFixed(2)}m`, error > TRACK_WARN_M ? "warn" : undefined);
+    } else {
+      // 좌표를 못 받은 팔로워의 슬롯은 점선으로만 — 리더와의 연결이 끊긴 자리다.
+      ctx.beginPath();
+      ctx.setLineDash([1, 2]);
+      ctx.moveTo(leaderCell.cx, leaderCell.cy);
+      ctx.lineTo(cx, cy);
+      ctx.strokeStyle = css("--muted-line");
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+  // HOLD 중이면 왜 멈췄는지 맵 위에서 말한다 — 이유 없는 HOLD 는 고장으로 읽힌다.
+  if (formation.state === "HOLDING" && formation.reason && formation.reason.length) {
+    drawChip(ctx, grid, leaderCell.cx, leaderCell.cy - Math.min(grid.width, grid.height) * 0.08,
+      `HOLD · ${formation.reason.join(" / ")}`, "warn");
+  }
+  ctx.restore();
+}
+
+const MEDIATION_SHORT = {
+  ROUTE_CONFLICT: "경로 충돌",
+  YIELDING: "비켜서는 중",
+  YIELDED: "양보 대기",
+  NO_YIELD_SPACE: "자리 없음",
+};
+
+function drawMediation(ctx, grid) {
+  // 누가 누구 때문에 못 가는지는 관계다 — 목록에서 읽는 것과 맵에서 보는 것은 다르다(D-93).
+  let lines = 0;
+  for (const robot of view.robots) {
+    const pose = poseOf(robot.robot_id);
+    if (!pose) continue;
+    const from = cellOf(grid, pose.x, pose.y);
+    if (robot.queued && robot.queued.blocked_by) {
+      const blockerPose = poseOf(robot.queued.blocked_by);
+      if (blockerPose) {
+        lines += 1;
+        const to = cellOf(grid, blockerPose.x, blockerPose.y);
+        ctx.save();
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(from.cx, from.cy);
+        ctx.lineTo(to.cx, to.cy);
+        ctx.strokeStyle = css("--status-warn");
+        ctx.stroke();
+        ctx.restore();
+        const mid = cellOf(grid, (pose.x + blockerPose.x) / 2, (pose.y + blockerPose.y) / 2);
+        drawChip(ctx, grid, mid.cx, mid.cy,
+          MEDIATION_SHORT[robot.queued.reason] || robot.queued.reason || "대기", "warn");
+      }
+    }
+    if (robot.yielding && robot.yielding.bay) {
+      lines += 1;
+      const to = cellOf(grid, robot.yielding.bay.x, robot.yielding.bay.y);
+      ctx.save();
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.moveTo(from.cx, from.cy);
+      ctx.lineTo(to.cx, to.cy);
+      ctx.strokeStyle = css("--series-primary");
+      ctx.stroke();
+      ctx.restore();
+      drawChip(ctx, grid, to.cx, to.cy, "비켜설 자리");
+    }
+  }
+  window.__swarmOverlay = window.__swarmOverlay || {};
+  window.__swarmOverlay.mediation = lines;
+}
+
 function drawOverlay() {
   const grid = view.map;
   if (!grid) return;
@@ -136,6 +317,8 @@ function drawOverlay() {
       ctx.stroke();
     }
   });
+  drawFormationOverlay(ctx, grid);
+  drawMediation(ctx, grid);
 }
 
 async function refreshMap() {
@@ -202,6 +385,14 @@ function card(robot, index) {
   // 비켜서는 중인 로봇은 "주행 중"이 맞다 — 다만 제 미션을 가는 것이 아니라서 따로 적는다.
   navEl.textContent = robot.yielding ? "비켜서는 중" : robot.queued ? "대기" : nav.text;
   head.appendChild(navEl);
+  const evidence = streamEvidence(view.formation, robot.robot_id);
+  if (evidence) {
+    // 릴레이 건강은 증거다(D-72). fresh 는 아무것도 붙지 않는다 — 붙는 것은 문제뿐이다.
+    const evEl = document.createElement("span");
+    evEl.className = `tag ${evidence.cls}`;
+    evEl.textContent = evidence.text;
+    head.appendChild(evEl);
+  }
   node.appendChild(head);
 
   const facts = document.createElement("div");
@@ -396,9 +587,15 @@ function renderFormation(status) {
   detail.textContent = lines.join(" — ");
 }
 
+function applyFormation(status) {
+  view.formation = status;
+  renderFormation(status);
+  render();   // 명렬 카드의 증거 태그도 대형 상태를 따라 다시 그린다
+}
+
 async function refreshFormation() {
   try {
-    renderFormation(await call("/api/fleet/formation"));
+    applyFormation(await call("/api/fleet/formation"));
   } catch (err) {
     el("formation-detail").textContent = `대형 상태를 읽지 못했습니다 — ${err.message}`;
   }
@@ -411,7 +608,7 @@ async function formationCall(path, body, label) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     } : { method: "POST" });
-    renderFormation(status);
+    applyFormation(status);
     log(`대형 ${label} — ${status.state}`, "good");
   } catch (err) {
     log(`대형 ${label} 거절 — ${err.message}`, "bad");

@@ -58,7 +58,7 @@ done
 
 # 5. Start Fleet Server
 echo "[3/3] Starting Fleet Console..."
-export PYTHONPATH="$PYTHONPATH:$(pwd)/src/site/fleet"
+export PYTHONPATH="$PYTHONPATH:$(pwd)/src/site/fleet:$(pwd)/src/core/core_common:$(pwd)/src/core/core_features"
 
 echo ""
 echo "========================================================="
@@ -73,7 +73,8 @@ done
 echo "========================================================="
 echo "Press Ctrl+C to stop all processes."
 
-python3 src/site/fleet/fleet/cli.py console --robots "$ROBOTS_YAML"
+python3 src/site/fleet/fleet/cli.py console --robots "$ROBOTS_YAML" \
+    --ui-tokens "$PWD/src/core/core_api_web/core_api_web/web/tokens.css"
 
 # Cleanup on exit
 kill $(jobs -p) 2>/dev/null || true
