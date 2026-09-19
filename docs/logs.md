@@ -338,3 +338,13 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: D-127 Accepted. 다음 푸시는 슬라이스 PR 첫 건부터
 - 교훈: 없음
+
+## 2026-09-19 · uncommitted · chore(release): push local main to staging branch, origin/main untouched
+
+- 변경: `git push origin main:staging/main-20260919` (신규 원격 브랜치, FF·force 없음).
+  D-127의 첫 단계 통합 실행이다. `origin/main`은 그대로이며, 슬라이스 PR은 이 스테이징을
+  기준으로 자른다
+- 증거: push 출력 `* [new branch] main -> staging/main-20260919`. `git ls-remote` 사전 확인
+- gate 변화: 없음
+- 결정: D-127 이행 시작. 다음은 D-125/D-126 범위 슬라이스 PR
+- 교훈: 없음
