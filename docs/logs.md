@@ -484,3 +484,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: fleet 의 토큰 경로 해석은 launch·compose 가 `--ui-tokens`로 주입하고 fleet 의 ROS import 금지는 유지된다. 정상 색 금지는 선언 부재에서 참조 부재로 옮겨 갔다 — 콘솔은 status-good 을 쓰고 fleet 은 절대 쓰지 않는다
 - 교훈: append-only 로그를 여러 세션이 같이 쓰면 내 항목이 남의 커밋에 동봉될 수 있다 — 이번에 D-130 항목이 afefa86 에 끼어 들었고 move 시도가 append-only 위반으로 잡혔다. 항목 추가 전 파일 끝을 다시 읽는다
+
+## 2026-09-20 · uncommitted · chore(release): close the slice integration — PR #1/#2 both MERGED
+
+- 변경: PR #2(D-126)를 GitHub에서 머지 처리. 슬라이스 커밋은 이미 main 조상이라 머지 커밋 없이 상태만 MERGED로 정착 — D-125·D-126 슬라이스 PR이 모두 닫히며 도메인 재그룹 통합이 형식으로도 완료됐다. 작업 트리 클린, 로컬=origin 동기화
+- 증거: `gh pr view 2` → state MERGED; `git rev-list --left-right --count main...origin/main` → 0 0; 최신 CI run 35453611242 conclusion success(Build·Lint·fleet·gz_sim·Smoke·Guard GREEN, core·루트 test는 D-128 비차단)
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: D-127 슬라이스 절차는 재정의 푸시로 실질 통합이 먼저 끝났고, 이 표기로 절차도 종결했다
+- 교훈: 없음
