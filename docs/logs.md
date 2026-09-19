@@ -348,3 +348,11 @@
 - gate 변화: 없음
 - 결정: D-127 이행 시작. 다음은 D-125/D-126 범위 슬라이스 PR
 - 교훈: 없음
+
+## 2026-09-19 · uncommitted · chore(release): open stacked slice PRs #1 (D-125) and #2 (D-126)
+
+- 변경: 원격 슬라이스 브랜치 `slice/d125-restructure`(`9b77daa`), `slice/d126-separation`(`387cf89`, D-126 5커밋 연속) 푸시. PR #1 base=main, PR #2 base=slice/d125. 스택 순서대로 머지한다
+- 증거: `gh pr create` → PR #1·#2 URL 반환. D-126 5커밋이 9b77daa 직후 연속 배치 확인
+- gate 변화: 없음
+- 결정: 리뷰는 PR에서, 병합은 #1→#2 순. `origin/main` 직접 푸시는 계속 금지
+- 교훈: 없음
