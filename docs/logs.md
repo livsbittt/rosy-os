@@ -380,3 +380,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 역사 기록(docs/plans·logs·solutions)과 SRS 계약 문서는 개명하지 않았고, test/ 루트 구 경로는 D-128 백로그대로 두었다. 배포 서비스명(`rosy-core` 등)은 deploy 계약이라 유지
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · chore(release): push main directly to origin, superseding the D-127 slice-staged integration
+
+- 변경: 소유자 판단으로 D-127의 "origin/main 직접 푸시 금지"를 이번에 한해 재정의하고 로컬 main 287커밋을 `git push origin main`(FF)으로 올린다. 슬라이스 PR #1(D-125)·#2(D-126)는 내용이 이미 main에 포함되어 자동 종결된다
+- 증거: `git rev-list --left-right --count main...origin/main` → 287 ahead 0 behind(FF 가능, fetch로 origin/main 미이동 확인). 이 푸시로 GitHub CI가 리얼라인된 ci.yml(4285a7b) 기준으로 처음 돈다
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: D-127 재정의(소유자 직권, 이번 푸시에 한함). 이후 통합 방식은 미정 — 필요 시 D-127 슬라이스 절차로 복귀
+- 교훈: 없음
