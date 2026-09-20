@@ -4,10 +4,19 @@ on:
   push:
     branches: [main]
   pull_request:
+  # ubuntu-26.04-rehearsal.yml 이 같은 절차를 다른 러너에서 재실행한다 (D-134).
+  workflow_call:
+    inputs:
+      runs_on:
+        type: string
+        default: ubuntu-24.04
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # ubuntu-latest 는 2026-10-19 ~ 11-19 에 26.04 로 강제 이동한다 (GitHub
+    # changelog 2026-09-17). 게이팅 이미지는 고정하고, 이동 리허설은 별도
+    # 워크플로가 주간으로 수행한다 (ADR D-134).
+    runs-on: ${{ inputs.runs_on || 'ubuntu-24.04' }}
     container: ros:jazzy-ros-base
     steps:
       # 전체 이력: 모듈 logs.md 의 append-only 검사가 PR base / push 이전 커밋과 비교한다.

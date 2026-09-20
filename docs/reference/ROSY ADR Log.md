@@ -141,6 +141,8 @@
 | D-131 | Fleet 콘솔은 군집 제어의 말을 되풀이한다 — 세 단계로 | Accepted |
 | D-132 | 무장은 스트림이 연 뒤에 한다 | Accepted |
 | D-133 | CORE SIGSEGV 는 재현 경로로 쫓고, 흔들리는 환경에서의 반복은 폐기한다 | Accepted |
+| D-134 | ??? ?? ??? ???? ??? | Proposed |
+| D-135 | CI ??? Ubuntu ??? ????, ?? LTS ??? ?? ?? ????? | Accepted |
 
 ---
 
@@ -4272,3 +4274,82 @@ components.css 배포였지, 시각 없는 행위 공유가 아니었다. 마지
 
 **References:** concept 16 §7.1·§7.3·§6, FOR-001·002·003·004, D-31, D-59, D-60,
 D-72, D-79, D-81, D-88, D-89, D-91, D-93, D-129, D-130.
+
+---
+
+## D-134 릴레이 준비 신호는 실측으로 말한다
+
+**Status:** Proposed (2026-09-20, 리뷰 발견 — 미착지). D-132 작업 트리
+(`swarm/relay.py`, `swarm/session.py` 미커밋 변경) 리뷰에서 나온 3점. 코드는
+돌아가고 fleet 스위트 94 passed이나, 아래 셋은 진단 가치를 갉는다.
+
+**Context:** D-132는 "무장은 스트림이 연 뒤에"로 순서를 뒤집고
+`Relay.streams_ready()` — 리더 스트림 + 전 팔로워 sink 개방 — 를 기다린다.
+리뷰에서 신호 자체가 실측이 아닌 자리가 셋 나왔다.
+
+1. `relay.py:194` — `_read_leader`가 `pose_stream()` 시도 전에
+   `_leader_connected = True`를 먼저 세운다. 그런데 `pose_stream()`은 async
+   generator라 첫 `__anext__` 전까지 접속이 일어나지 않는다. 리더 down이어도
+   태스크 기동~실패 사이 찰나에 `streams_ready()`가 참 될 수 있고, 팔로워 sink가
+   빨리 열리면 검증 안 된 리더에 무장하는 꼴이다.
+2. `relay.py:131` `stop()` — lane은 `connected=False`로 내리는데 리더 flag는
+   그대로 둔다. stop 후 `streams_ready()`가 옛 값을 유지하고, Cancel로
+   `_read_leader`가 죽는 경로도 같다.
+3. `session.py:145` `_open_relay` — `self.relay = relay`를 `streams_ready()`
+   확인 전(155)에 대입한다. timeout 실패 시 stopped 릴레이가 `self.relay`에
+   남고 `_log_hold:515`의 `self.relay is None` 판단이 어긋난다. `except
+   SessionError:`에서 reason을 `"relay_failed:streams did not open"`으로
+   고정해 factory의 원원인(`SessionError("cannot build")` 등)을 지운다. polling
+   60회(3 s) 동안 `STOPPED`를 보지 않아 open 대기 중 운영자 `stop()`이 와도
+   3 s를 다 쓰고 `_arm`까지 갔다가 되돌아온다.
+
+**Decision:**
+
+1. **리더 connected는 첫 프레임 수신 때만 참이다.** loop-top 낙관 대입을
+   없애고 `_on_frame` 첫 호출(또는 첫 `got_frame=True`)에 세운다.
+   `streams_ready()`는 "리더 실측 + 전 팔로워 sink 개방"의 AND로 남는다.
+2. **`stop()`은 리더 flag를 거짓으로 내린다.** lane과 대칭. 취소 경로도 이 한
+   줄로 커버된다.
+3. **`_open_relay`는 확인 후 대입 + 원인 보존 + 중단 감시.** `self.relay`
+   대입은 `streams_ready()` 확인 뒤로, 실패 시 `None` 유지. `SessionError`
+   reason은 `f"relay_failed:{exc}"`로 원문 보존. polling loop 안에 `state is
+   STOPPED` 체크를 넣어 대기 중 stop이면 즉시 탈출한다.
+
+**Alternatives:** 현상 유지 — 찰나 참, stop 후 옛 값, 원인 마스킹을 안고 간다.
+진단 가치가 떨어지고 D-132가 약속한 "접촉 전 거절"의 증거력이 약해진다.
+타임아웃만 늘리는 안 — 순서·신호 결함을 못 고친다.
+
+**Consequences:** `streams_ready()`가 강해진다 — 소켓 열림이 아니라 데이터 흐름을
+증명한다. 무장 실패의 두 갈래(스트림 미개방/무장 거절) 중 전자의 거짓 양성이
+줄고, 실패 reason이 원인을 그대로 말한다. reform 경로는 그대로다 — 릴레이가
+살아 있으므로 대기가 없다.
+
+**Validation / Transition:** fleet 스위트 적색-녹색 4건 — (a) 프레임 없는 리더는
+`streams_ready()` 거짓, (b) stop 후 거짓, (c) factory `SessionError` 원문 보존,
+(d) open 대기 중 stop 즉시 탈출. 기존 94 passed 회귀 없음. ROS-SIM은 D-132
+계승 — 무장 직후 `follower_tx ≥ 1` 실측. 실행 계획:
+`docs/plans/2026-09-20-fleet-relay-readiness-plan.md`.
+
+**References:** D-31, D-59, D-89, D-131, D-132.
+
+---
+
+## D-135 CI 러너는 Ubuntu 버전을 고정하고, 다음 LTS 이동은 기한 전에 리허설한다
+
+**Status:** Accepted (2026-09-20).
+
+**Context:** GitHub 이 `ubuntu-latest` 를 2026-10-19~11-19 에 걸쳐 Ubuntu 24.04 에서 26.04 로 강제 이동한다(changelog 2026-09-17, runner-images #14748). 이 워크플로는 `ros:jazzy-ros-base` 컨테이너 안에서 ROS 전체를 빌드하지만, 호스트 이미지가 바뀌면 컨테이너 런타임·마운트·네트워크 동작이 함께 바뀐다. 이동이 시작되면 게이팅 CI 의 이미지가 통지 없이 바뀌고, 적색의 원인 규명이 이주 분석과 섞인다.
+
+**Decision:**
+
+1. **게이팅 잡의 러너는 고정한다.** `runs-on: ubuntu-24.04` — `latest` 태그가 이동해도 계약 시험의 실행 환경은 유지된다.
+2. **같은 절차를 26.04 에서 주간 리허설한다.** ci.yml 을 `workflow_call` 로 열어 러너를 입력으로 받고, `ubuntu-26.04-rehearsal.yml` 이 매주 월요일 + 수동 트리거로 26.04 에서 전 절차를 비게이팅 실행한다. 적색이 보이면 그때가 24.04 의존을 제거할 때다.
+3. **리허설이 연속 녹색이면 게이팅 러너를 26.04 로 전환한다.** 전환 커밋이 이 ADR 의 종결이다.
+
+**Alternatives:** 아무 것도 하지 않는다 — 10월 19일에 게이팅 이미지가 조용히 바뀌고, 적색 원인 규명이 이주 분석과 섞인다. 즉시 26.04 로 이동한다 — 리허설 없는 전환은 문화가 금지하는 "조용히 바뀌는" 패턴과 같다.
+
+**Consequences:** 게이팅 환경이 시간의 함수가 아니게 된다. 매주 이중 CI 비용(리허설 1회, 몇 분)이 든다. 26.04 리허설이 적색인 기간에는 러너 전환이 보류되고, 그 적색이 26.04 이주 준비의 할 일 목록이 된다.
+
+**Validation / Transition:** 리허설 워크플로가 26.04 에서 전 스텝 통과하면 게이팅 runs-on 을 26.04 로 바꾸고 이 항목에 전환 커밋을 적는다.
+
+**References:** GitHub changelog 2026-09-17 (Ubuntu 26 GA + latest migration), actions/runner-images #14748, D-127 (단계 통합의 선례).

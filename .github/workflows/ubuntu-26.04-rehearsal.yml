@@ -1,0 +1,18 @@
+name: ubuntu-26.04 rehearsal
+
+# D-134: ubuntu-latest 는 2026-10-19 ~ 11-19 에 26.04 로 이동한다. 게이팅 잡은
+# 24.04 로 고정하고, 이 리허설이 매주 같은 절차를 26.04 에서 먼저 통과시킨다 —
+# 녹색이 연속되면 게이팅 러너를 26.04 로 전환한다. 적색은 이주 전에 발견하는
+# 것이 목적이므로 리허설은 게이팅이 아니다 (continue-on-error).
+
+on:
+  schedule:
+    - cron: "23 2 * * 1"
+  workflow_dispatch:
+
+jobs:
+  rehearsal:
+    uses: ./.github/workflows/ci.yml
+    with:
+      runs_on: ubuntu-26.04
+    continue-on-error: true

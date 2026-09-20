@@ -692,3 +692,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 무장 실패가 두 갈래로 분리된다 — 스트림 미개방(로봇 무접촉, relay_failed:streams)과 무장 거절(접촉 후 롤백, arming_failed). stream_timeout_ms는 이제 스트림 단절 판정의 의미만 남는다
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · docs(adr): land D-134 relay readiness (console session) and add D-135 — pin the CI runner, rehearse ubuntu-26.04 weekly
+
+- 변경: ① 콘솔 세션이 작업 트리에 남긴 D-134(릴레이 준비 신호는 실측으로 말한다 — Proposed, 리뷰 발견 3점)의 본문과 인덱스 행을 착지 ② 본 세션의 CI 러너 결정은 번호 충돌로 D-135 로 재번호 — 게이팅 잡을 `ubuntu-24.04` 로 고정(GitHub 이 10/19~11/19 에 ubuntu-latest 를 26.04 로 강제 이동), ci.yml 을 workflow_call 로 열어 러너 입력화, `.github/workflows/ubuntu-26.04-rehearsal.yml` 이 주간 + 수동으로 26.04 에서 전 절차를 비게이팅 리허설
+- 증거: ADR 로그 본문/인덱스 각 1건(134·135), `rosy_harness.py lint` 0 errors, harness 계약 45 passed, 워크플로 YAML 파스 통과. 번호 충돌은 두 세션이 같은 번호를 동시에 append 하며 발생 — 파일 끝 재확인으로 해결
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: D-135 전환 조건 — 26.04 리허설 녹색이 연속되면 게이팅 runs-on 을 26.04 로 바꾸고 그 커밋으로 D-135 종결. 실패 리허설은 24.04 의존 제거 목록이 된다
+- 교훈: 번호도 경합 자원이다 — ADR 번호는 부여 직전 파일 끝과 인덱스를 다시 읽고, 충돌하면 먼저 착지한 쪽을 존중해 다음 번호로 간다
