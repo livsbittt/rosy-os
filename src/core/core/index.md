@@ -49,8 +49,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · feat(vision): D-136 T1 boundary contracts
 - 2026-09-20 · uncommitted · feat(core): known-model registry gates revisions (D-137 T3)
 - 2026-09-20 · uncommitted · feat(core): DetectionEvidence schema and person injection (D-137 T2)
 - 2026-09-20 · uncommitted · feat(core): person advisory caps linear speed (SAF-006)
 - 2026-09-18 · uncommitted · feat(core): dashboard AP toggle and Wi-Fi connect (D-124)
-- 2026-09-18 · uncommitted · feat(core): persist Cyclone then Host Agent reboot (D-123)
