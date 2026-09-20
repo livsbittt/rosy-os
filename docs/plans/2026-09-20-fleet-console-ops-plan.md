@@ -8,8 +8,8 @@
 
 | 후단이 주는 것 (출처) | 내용 | 전단 현황 | 소비 태스크 |
 |---|---|---|---|
-| `formation_status.assignment` (console.py:525) | 팔로워별 리더 기준 슬롯(distance·lateral) | 미소비 | T1 |
-| `formation_status.relay.*` (console.py:530) | leader_rx_hz·leader_age_s·follower_tx_hz·connected·paused | 미소비 | T2 |
+| `formation_status.assignment` (console.py:525) | 팔로워별 리더 기준 슬롯(distance·lateral) | 상세 패널 텍스트 요약만, 맵 ✗ | T1 |
+| `formation_status.relay.*` (console.py:530) | leader_rx_hz·leader_age_s·follower_tx_hz·connected·paused | leader Hz·paused 텍스트만 — follower_tx_hz·connected·leader_age_s 미소비 | T2 |
 | `formation_status.reason`·`pending_triggers` (console.py:528) | HOLD 이유와 대기 트리거 | 상태 태그만(HOLDING 글자), 이유 미소비 | T4 |
 | `robots[].queued` (snapshot) | blocked_by·waiting_on·reason | 명렬 텍스트만, 맵 ✗ | T3 |
 | `robots[].yielding` + bay (snapshot) | 비켜설 자리·누구 때문 | 명렬 텍스트만, 맵 ✗ | T3 |
