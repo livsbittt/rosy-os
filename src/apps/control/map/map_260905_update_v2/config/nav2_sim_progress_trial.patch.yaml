@@ -1,0 +1,8 @@
+# OPTIONAL PROGRESS-CHECKER CALIBRATION. This makes small motion count as progress.
+# Explicit reviewer approval is required; do not use localization jitter as progress.
+# This is NOT an emergency-stop or stale-LiDAR timeout configuration.
+# movement_time_allowance is deliberately omitted: existing value MUST be preserved.
+controller_server:
+  ros__parameters:
+    progress_checker:
+      required_movement_radius: 0.05

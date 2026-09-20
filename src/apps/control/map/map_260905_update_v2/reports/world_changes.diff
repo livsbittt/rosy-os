@@ -1,0 +1,67 @@
+--- original/map_260905.world
++++ worlds/map_260905.world
+@@ -1,26 +1,33 @@
+ <?xml version="1.0"?>
+-<!-- 260905 MAP FILE 실습 트랙.  실치수 2.710 x 1.260 m, 벽 높이 0.155 m, 두께 0.005 m.
+-     맵 중심이 원점. 위에서 내려다보면 왼쪽 아래 X자 대각벽, 그 위에 I자 벽.
+-     오른쪽·왼쪽 끝에 세로 통로(폭 0.28~0.30 m, 길이 약 0.9~1.25 m).
+-
+-     출처는 CAD STL(mm + Y-up 왼손 좌표계)이고 보관본은 meshes/map_260905*.stl 이지만,
+-     world 는 STL 을 참조하지 않는다 — 벽 16개를 박스로 직접 적어 파일 하나로 끝낸다.
+-     그렇게 한 이유 둘:
+-       1) dartsim 은 SDF 의 mesh collision 을 만들지 못한다("Mesh construction from an
+-          SDF has not been implemented yet for dartsim"). 조용히 실패해서 벽이 눈에는
+-          보이는데 로봇이 통과한다. convex hull 로 씌우는 방식은 오목한 미로를 통째로
+-          막아버려 못 쓴다. 결국 collision 은 어차피 박스로 깔아야 한다.
+-       2) mesh 를 쓰면 GZ_SIM_RESOURCE_PATH 나 절대경로에 묶여 다른 PC 에서 안 열린다.
+-          벤더 launch_sim.launch.xml 이 GZ_SIM_RESOURCE_PATH 를 set_env 로 덮어쓴다.
+-     박스 좌표는 STL 벽 상단면에서 뽑아 평면도와 대조 검증했다(상단면 삼각형 32개 전부 덮임).
+-
+-     띄우기 (world 인자에 이 파일 경로를 그대로 준다):
+-       ros2 launch pinky_gz_sim launch_sim.launch.xml
+-         world:=INSTALL/share/pinky_week1/config/worlds/map_260905.world
+-     또는 소스 트리 경로를 그대로 줘도 된다. -->
++<!-- MAP 260905 / v2 / 2026-09-20
++  Target: Gazebo Sim Harmonic (Sim 8), ROS 2 Jazzy integration candidate.
++  This file defines the environment only; it does not spawn a robot or start Nav2.
++
++  Source collision envelope: 2.715 x 1.265 m.
++  Bounds: X [-1.3575, 1.3575], Y [-0.6325, 0.6325] m.
++  All 16 wall boxes: thickness 0.010 m; height 0.155 m; Z [0, 0.155] m.
++  Original comment said 2.710 x 1.260 m and 0.005 m thickness.
++  The physical CAD/STL and as-built dimensions have NOT been independently checked.
++
++  All model names, poses, geometries, materials and friction settings are preserved.
++  The lower X pocket remains disconnected. No opening or safety inflation is added.
++  Positive X points right and positive Y up in the generated top view.
++  The floor is intentionally not treated as navigable space outside the track map.
++
++  DART is selected by the Physics system engine tag, not by the physics type alone.
++  Confirm the loaded engine in runtime logs. The ode friction subtree is retained;
++  a tag name does not prove how every property is handled by the active engine.
++  Legacy GUI camera data is retained; camera placement is not runtime-validated.
++
++  Use maps/map_260905.yaml with its PGM, not the annotated PNG/SVG plan.
++  Read README.md and docs/01_GAZEBO_NAV2_CAUTIONS.md before runtime use.
++  Static file checks only. Gazebo, ROS, Nav2 and hardware tests: NOT RUN.
++-->
+ <sdf version="1.6">
+   <world name="map_260905">
+-    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
++    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics">
++      <engine><filename>gz-physics-dartsim-plugin</filename></engine>
++    </plugin>
+     <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+     <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+     <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+@@ -293,7 +300,9 @@
+       </camera>
+     </gui>
+ 
+-    <physics type="ode">
++    <!-- The type is aligned with the explicitly requested engine above.
++         Step/rate values below are retained, not a measured performance guarantee. -->
++    <physics name="track_1ms" type="dart">
+       <real_time_update_rate>1000.0</real_time_update_rate>
+       <max_step_size>0.001</max_step_size>
+       <real_time_factor>1</real_time_factor>

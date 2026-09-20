@@ -206,13 +206,14 @@ class FakeRobot:
 class FakeRelay:
     """세션 테스트용. 실제 소켓 대신 호출 순서만 남긴다."""
 
-    def __init__(self, leader, followers, *, log: Optional[list] = None) -> None:
+    def __init__(self, leader, followers, *, log: Optional[list] = None, ready: bool = True) -> None:
         self.leader = leader
         self.followers = list(followers)
         self.log = log if log is not None else []
         self.paused = False
         self.started = False
         self.stopped = False
+        self.ready = ready
 
     def stats(self) -> RelayStats:
         return RelayStats(paused=self.paused)
@@ -235,3 +236,6 @@ class FakeRelay:
 
     def is_connected(self, robot_id: str) -> bool:
         return True
+
+    def streams_ready(self) -> bool:
+        return self.ready

@@ -66,6 +66,8 @@
 | D-129 | L1 토큰 파일은 하나이고 어휘 표는 보인다 — D-92 제1항을 대체한다 |
 | D-130 | L2 문법 분리는 게이트가 지키고, 로직 행위는 headless로 한 번 뽑는다 |
 | D-131 | Fleet 콘솔은 군집 제어의 말을 되풀이한다 — 세 단계로 |
+| D-132 | 무장은 스트림이 연 뒤에 한다 |
+| D-133 | CORE SIGSEGV 는 재현 경로로 쫓고, 흔들리는 환경에서의 반복은 폐기한다 |
 
 ## 계획·결과 문서
 
@@ -89,8 +91,8 @@
 
 ## 최근 기록
 
-- 2026-09-20 · uncommitted · feat(calibration): separate estimation from speed authority
-- 2026-09-20 · uncommitted · ci: split the two structural harness failures into a tolerated step
-- 2026-09-20 · uncommitted · fix(test): stub systemctl for the recovery gate tests
-- 2026-09-20 · uncommitted · feat(fleet): the console map repeats swarm control — slots, relay evidence, mediation (D-131 phase 1)
-- 2026-09-20 · uncommitted · docs(acceptance): define per-module actual-operation criteria
+- 2026-09-20 · uncommitted · docs(control): review the received camera-ground homography draft with verification math
+- 2026-09-20 · uncommitted · docs(fleet): my session's findings cross-validate the map bundle's result.md — the CORE API gate is closed by 6ff2cb8
+- 2026-09-20 · uncommitted · docs(fleet): the last blocker is named — leader Nav2 has no map TF; probe requirements recorded (D-83 handoff)
+- 2026-09-20 · uncommitted · ci: route the three frozen ADR-log violations through a tolerated step
+- 2026-09-20 · uncommitted · fix(fleet): defect (a) resolved in the live sim — relay delivers, no early HOLD (D-132 validated)

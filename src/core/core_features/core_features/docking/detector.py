@@ -17,9 +17,46 @@ import math
 import time
 from typing import Callable, Optional, Protocol, Sequence, runtime_checkable
 
+import logging
+
 from pydantic import BaseModel, Field
 
 from core_features.docking.database import DockInstance
+
+
+log = logging.getLogger(__name__)
+
+
+def select_detector(dock: DockInstance, dock_type, *,
+                    provider=None, frame_source=None,
+                    camera_matrix=None, dist_coeffs=None,
+                    clock: Callable[[], float] = time.monotonic):
+    """Choose the detector for one docking run (DNC-007, D-138).
+
+    The ArUco vision detector is selected only when the whole stack is
+    present: `detector="aruco"` naming it, a complete tag spec on the dock
+    type, a provider exposing `make_dock_detector` (resolved through the
+    `rosy.sensor_provider` port — never a static control import), and a frame
+    source plus camera geometry. Anything missing falls back to an empty
+    script, whose observations are always None: the state machine times out
+    into `DOCK_FAILED` instead of driving on a guess. A provider that raises
+    (no cv2 on this image) falls back the same way, with a warning.
+    """
+    if (dock_type.detector == "aruco"
+            and getattr(dock_type, "tag_id", None) is not None
+            and getattr(dock_type, "tag_size_m", None) is not None
+            and provider is not None
+            and callable(getattr(provider, "make_dock_detector", None))
+            and frame_source is not None
+            and camera_matrix is not None):
+        try:
+            return provider.make_dock_detector(
+                tag_id=dock_type.tag_id, tag_size_m=dock_type.tag_size_m,
+                frame_source=frame_source, camera_matrix=camera_matrix,
+                dist_coeffs=dist_coeffs, clock=clock)
+        except Exception as exc:
+            log.warning("aruco detector unavailable, staying simulated: %s", exc)
+    return SimulatedDetector(script=[])
 
 
 class DockObservation(BaseModel):

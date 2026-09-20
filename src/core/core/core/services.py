@@ -13,7 +13,7 @@ from core_features.command.arbitration import ModeMachine, SourceRegistry
 from core_features.command.manager import CommandManager
 from core_features.docking.agent import DockAgent
 from core_features.docking.database import DockDatabase
-from core_features.docking.detector import SimulatedDetector
+from core_features.docking.detector import select_detector
 from core_features.docking.manager import DockingConfig, DockingManager
 from core_common.domain.adapters import AdapterRegistry
 
@@ -215,9 +215,11 @@ class CoreServices:
             safety=safety,
             config=DockingConfig(),
             events=events,
-            # 검출기는 경계 뒤다 — 실물 선택은 카메라 스펙 뒤로 유보되어 있고,
-            # ros_bridge 가 기종에 맞는 것을 주입한다.
-            detector_factory=lambda dock, dock_type: SimulatedDetector(script=[]),
+            # 검출기는 경계 뒤다 — `select_detector` 가 기종·제원·provider·
+            # 프레임을 보고 고른다. 오늘은 provider도 프레임도 없어서 항상
+            # 시뮬레이션으로 떨어진다. 카메라가 오면 ros_bridge 가 같은 선택에
+            # provider와 프레임을 꽂는다 (D-138).
+            detector_factory=lambda dock, dock_type: select_detector(dock, dock_type),
             agent_factory=lambda dock: DockAgent(dock.agent_url),
             capability_provider=lambda: capability.supports("docking.supported"),
             map_id_provider=lambda: state.map_id,

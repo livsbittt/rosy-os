@@ -142,3 +142,75 @@ def test_the_leader_still_takes_goals_while_the_formation_runs():
     run(console.goal("rosy_01", 2.0, 0.0))
 
     assert [c for c in robots[0].calls if c[0] == "navigation_goal"]
+
+
+def test_robot_selection_picks_who_joins_the_formation():
+    """FOR-001 Robot Selection — N대 중 일부로 대형을 열 수 있다."""
+    robots = _fleet(3)
+    console = _console(*robots)
+    run(console.formation_start("rosy_01", "COLUMN", 0.6, members=["rosy_01", "rosy_02"]))
+
+    status = console.formation_status()
+    assert set(status["assignment"]) == {"rosy_02"}
+    # 미선택 로봇은 개별 미션을 계속 받는다 — 대형에 안 들었다고 막히면 안 된다.
+    run(console.goal("rosy_03", 2.0, 2.0))
+    assert [c for c in robots[2].calls if c[0] == "navigation_goal"]
+    # 선택된 팔로워는 여전히 거절한다.
+    with pytest.raises(HubError) as raised:
+        run(console.goal("rosy_02", 1.0, 1.0))
+    assert raised.value.code == "FORMATION_ACTIVE"
+
+
+def test_the_leader_must_be_among_the_selected_members():
+    console = _console(*_fleet(3))
+    with pytest.raises(HubError) as raised:
+        run(console.formation_start("rosy_01", members=["rosy_02", "rosy_03"]))
+    assert raised.value.code == "LEADER_NOT_IN_MEMBERS"
+
+
+def test_an_unknown_member_is_refused():
+    console = _console(*_fleet(2))
+    with pytest.raises(HubError) as raised:
+        run(console.formation_start("rosy_01", members=["rosy_01", "rosy_99"]))
+    assert raised.value.code == "UNKNOWN_ROBOT"
+
+
+def test_duplicated_members_are_refused():
+    console = _console(*_fleet(3))
+    with pytest.raises(HubError) as raised:
+        run(console.formation_start("rosy_01", members=["rosy_01", "rosy_02", "rosy_02"]))
+    assert raised.value.code == "MEMBER_DUPLICATED"
+
+
+def test_members_without_a_follower_is_refused():
+    console = _console(*_fleet(2))
+    with pytest.raises(HubError) as raised:
+        run(console.formation_start("rosy_01", members=["rosy_01"]))
+    assert raised.value.code == "NO_FOLLOWERS"
+
+
+def test_omitting_members_keeps_the_all_robots_behaviour():
+    """members 를 보내지 않으면 기존 동작(나머지 전원)이다 — 호환은 계약이다."""
+    robots = _fleet(3)
+    console = _console(*robots)
+    run(console.formation_start("rosy_01", "COLUMN", 0.6))
+    assert set(console.formation_status()["assignment"]) == {"rosy_02", "rosy_03"}
+
+
+class _StreamsNeverReadyRelay(FakeRelay):
+    def streams_ready(self) -> bool:
+        return False
+
+
+def test_start_does_not_touch_robots_until_the_streams_are_open():
+    """D-132 — 스트림이 안 열리면 무장하지 않는다. 로봇 무접촉 거절이다."""
+    robots = _fleet(2)
+    console = _console(*robots)
+    console._relay_factory = lambda leader, followers, **kw: _StreamsNeverReadyRelay(leader, followers)
+
+    with pytest.raises(HubError) as raised:
+        run(console.formation_start("rosy_01"))
+
+    assert raised.value.code == "ARMING_FAILED"
+    for robot in robots:
+        assert not [c for c in robot.calls if c[0] == "follow"]

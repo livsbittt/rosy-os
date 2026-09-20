@@ -30,6 +30,10 @@ _RATE_WINDOW = 20
 _RATE_STALE_S = 0.5
 #: 예외 없이, 프레임 하나 없이 끝난 리더 소켓. `leader_last_error` 에 이 문장이 들어간다.
 _QUIET_END = "leader pose stream ended without frames"
+#: 한 프레임 송신이 이 시간 안에 끝나지 않으면 그 레인은 죽은 것으로 본다. 수신 측이
+#: 읽지 않으면 send 는 영원히 리턴하지 않고, connected=true · tx=0 인 "살아 있는 것
+#: 같은 죽은 레인"을 남긴다 — 이 릴레이가 금지한 이름 없는 0 Hz 의 WS 판이다.
+_SEND_TIMEOUT_S = 2.0
 
 
 @dataclass
@@ -91,6 +95,7 @@ class Relay:
     def __init__(self, leader: RobotClient, followers: Sequence[RobotClient], *,
                  clock: Callable[[], float] = time.monotonic,
                  reconnect_max_s: float = 2.0,
+                 send_timeout_s: float = _SEND_TIMEOUT_S,
                  sleep: Callable[[float], Awaitable[None]] = asyncio.sleep) -> None:
         follower_ids = [f.robot_id for f in followers]
         if len(set(follower_ids)) != len(follower_ids):
@@ -101,6 +106,7 @@ class Relay:
         self._lanes = {f.robot_id: _Lane(f, clock) for f in followers}
         self._clock = clock
         self._reconnect_max = reconnect_max_s
+        self._send_timeout = send_timeout_s
         self._sleep = sleep
         self._paused = False
         self._tasks: list[asyncio.Task] = []
@@ -110,6 +116,7 @@ class Relay:
         self._last_seq: Optional[int] = None
         self._leader_last_error: Optional[str] = None
         self._running = False
+        self._leader_connected = False
 
     # --- 수명 --------------------------------------------------------------------
 
@@ -133,6 +140,8 @@ class Relay:
             except Exception as exc:
                 log.error("relay task died: %r", exc)
         self._tasks.clear()
+        # D-134 — lane과 대칭. Cancel로 _read_leader가 죽는 경로도 이 한 줄로 커버된다.
+        self._leader_connected = False
         for lane in self._lanes.values():
             if lane.sink is not None:
                 try:
@@ -160,6 +169,10 @@ class Relay:
         lane = self._lanes.get(robot_id)
         return bool(lane and lane.connected)
 
+    def streams_ready(self) -> bool:
+        """리더 스트림과 전 팔로워 sink 가 열려 있는가. 무장은 이 뒤에 한다 (D-132)."""
+        return bool(self._leader_connected) and all(lane.connected for lane in self._lanes.values())
+
     def stats(self) -> RelayStats:
         return RelayStats(
             leader_frames=self._leader_frames,
@@ -183,6 +196,11 @@ class Relay:
             try:
                 async for frame in self._leader.pose_stream():
                     got_frame = True
+                    # D-134 — 접속 시도가 아니라 첫 프레임 수신 때만 참이다.
+                    # pose_stream()은 async generator라 첫 __anext__ 전까지 접속이
+                    # 일어나지 않는다 — 시도 전에 세우면 리더 down이어도 찰나 참이 돼
+                    # 검증 안 된 리더에 무장한다.
+                    self._leader_connected = True
                     backoff = _BACKOFF_FIRST_S
                     self._leader_last_error = None
                     self._on_frame(frame)
@@ -191,14 +209,17 @@ class Relay:
             except RobotApiError as exc:
                 # 4401/4403: 토큰이나 capability 문제다. 재연결은 계속하되 이유를 남긴다 —
                 # 조용히 0 Hz 로 도는 것이 이 릴레이의 가장 나쁜 실패다.
+                self._leader_connected = False
                 self._leader_last_error = str(exc)
                 log.warning("%s: leader socket refused: %s", self._leader.robot_id, exc)
             except Exception as exc:
                 # 팔로워 레인과 같은 규칙이다: 이름 없는 0 Hz 는 없다. 리더는 더 나쁜 쪽이다 —
                 # 리더가 죽으면 팔로워 전원이 굶는다.
+                self._leader_connected = False
                 self._leader_last_error = str(exc)
                 log.warning("%s: leader socket failed: %s", self._leader.robot_id, exc)
             else:
+                self._leader_connected = False
                 if not got_frame:
                     # 예외 없이, 프레임 하나 없이 끝났다. 전송계층이 연결 거부(OSError)를
                     # 삼키면 이 모양이 된다 — 이유 없는 0 Hz 로 남기지 않는다.
@@ -266,7 +287,13 @@ class Relay:
                     frame, lane.latest = lane.latest, None
                     if frame is None:
                         continue
-                    await lane.sink.send(frame)
+                    try:
+                        await asyncio.wait_for(lane.sink.send(frame), self._send_timeout)
+                    except asyncio.TimeoutError:
+                        # 수신 측이 읽지 않는다. 끊고 다시 열어 이름을 붙인다 —
+                        # connected=true · tx=0 인 유령 레인을 남기지 않는다.
+                        raise TimeoutError(
+                            f"reference send timed out after {self._send_timeout}s")
                     lane.tx += 1
                     lane.rate.tick()
                     lane.last_error = None

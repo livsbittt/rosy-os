@@ -22,7 +22,7 @@ None.
 ### Working In This Directory
 
 - Update this report when P1 acceptance status changes. Do not put new automated tests here.
-- Distinguish from `docs/plan` (WBS) and `src/core/core/test` (code).
+- Distinguish from `docs/plans` (working trail; the historical WBS lives there too) and `src/core/core/test` (code).
 
 ### Testing Requirements
 

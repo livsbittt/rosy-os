@@ -1,0 +1,23 @@
+test_base_is_unchanged (test_prepare_sim_params.PrepareTests.test_base_is_unchanged) ... ok
+test_cli_acknowledgements_and_new_file_only (test_prepare_sim_params.PrepareTests.test_cli_acknowledgements_and_new_file_only) ... ok
+test_clock_scope_and_custom_guard_preservation (test_prepare_sim_params.PrepareTests.test_clock_scope_and_custom_guard_preservation) ... ok
+test_core_does_not_change_rpp_progress (test_prepare_sim_params.PrepareTests.test_core_does_not_change_rpp_progress) ... ok
+test_core_values (test_prepare_sim_params.PrepareTests.test_core_values) ... ok
+test_disabled_collision_detection_rejected (test_prepare_sim_params.PrepareTests.test_disabled_collision_detection_rejected) ... ok
+test_duplicate_yaml_rejected (test_prepare_sim_params.PrepareTests.test_duplicate_yaml_rejected) ... ok
+test_footprint_padding_inflation_and_watchdogs_preserved (test_prepare_sim_params.PrepareTests.test_footprint_padding_inflation_and_watchdogs_preserved) ... ok
+test_more_conservative_speed_limits_preserved (test_prepare_sim_params.PrepareTests.test_more_conservative_speed_limits_preserved) ... ok
+test_nonfinite_number_rejected (test_prepare_sim_params.PrepareTests.test_nonfinite_number_rejected) ... ok
+test_progress_timeout_not_overwritten (test_prepare_sim_params.PrepareTests.test_progress_timeout_not_overwritten) ... ok
+test_progress_write_requires_progress_ack (test_prepare_sim_params.PrepareTests.test_progress_write_requires_progress_ack) ... ok
+test_rpp_cost_consistency (test_prepare_sim_params.PrepareTests.test_rpp_cost_consistency) ... ok
+test_rpp_write_requires_lookahead_ack (test_prepare_sim_params.PrepareTests.test_rpp_write_requires_lookahead_ack) ... ok
+test_smaller_goal_and_resolution_are_preserved (test_prepare_sim_params.PrepareTests.test_smaller_goal_and_resolution_are_preserved) ... ok
+test_unexpected_patch_key_rejected (test_prepare_sim_params.PrepareTests.test_unexpected_patch_key_rejected) ... ok
+test_unsupported_controller_rejected (test_prepare_sim_params.PrepareTests.test_unsupported_controller_rejected) ... ok
+test_unsupported_namespaced_layout_rejected (test_prepare_sim_params.PrepareTests.test_unsupported_namespaced_layout_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 3.762s
+
+OK

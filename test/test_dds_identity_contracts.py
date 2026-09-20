@@ -203,22 +203,48 @@ def test_the_dev_script_also_exports_the_namespace():
 # --- 실제 동작 (bash 가 있을 때만) -----------------------------------------
 
 def _find_usable_bash():
-    candidate = shutil.which("bash")
-    if not candidate:
-        return None
-    try:
-        probe = subprocess.run(
-            [candidate, "-c", "true"],
-            capture_output=True,
-            timeout=2,
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return candidate if probe.returncode == 0 else None
+    # WSL(system32 bash.EXE)은 Windows 경로를 읽지 못한다 — Git Bash 를 선점한다
+    # ( test_runtime_slices 와 같은 순서 ). 그 뒤는 기존 대로 실제 실행으로 검증한다.
+    candidates = []
+    if os.name == "nt":
+        candidates.extend((
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files\Git\usr\bin\bash.exe",
+        ))
+    which = shutil.which("bash")
+    if which:
+        candidates.append(which)
+    for candidate in candidates:
+        if not candidate:
+            continue
+        try:
+            probe = subprocess.run(
+                [candidate, "-c", "true"],
+                capture_output=True,
+                timeout=2,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if probe.returncode == 0:
+            return candidate
+    return None
 
 
 BASH = _find_usable_bash()
+
+
+def _bash_view(path):
+    """임시 경로를 BASH 이 읽는 형태로 바꾼다.
+
+    Git Bash 는 드라이브 폼(X:/…)을 읽고, WSL(system32 bash.EXE)은
+    /mnt/<drive>/… 만 읽는다. 백슬래시는 bash 문자열에서 이스케이프로
+    읽히므로 슬래시로 통일한다.
+    """
+    s = str(path).replace("\\", "/")
+    if "system32" in BASH.lower().replace("/", "\\") and re.match(r"^[A-Za-z]:/", s):
+        return f"/mnt/{s[0].lower()}{s[2:]}"
+    return s
 
 
 def _drive_installer(robot_number, preset=None):
@@ -242,7 +268,8 @@ def _drive_installer(robot_number, preset=None):
             env["ROSY_ROBOT_NUMBER"] = str(robot_number)
 
         completed = subprocess.run(
-            [BASH, "-c", f'source "{script}"; set +e; require_robot_identity "{env_file}"'],
+            [BASH, "-c", f'source "{_bash_view(script)}"; set +e; '
+                          f'require_robot_identity "{_bash_view(env_file)}"'],
             capture_output=True, text=True, env=env,
             # 실패 메시지가 한국어다. Windows 기본 코드페이지로 읽으면 깨진다.
             encoding="utf-8", errors="replace",

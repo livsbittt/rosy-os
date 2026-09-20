@@ -2,7 +2,7 @@
 module: control
 logical_modules: [M05, M06, M07, M11]
 owner: CONTROL
-last_verified: { commit: "dc89264", date: 2026-09-17 }
+last_verified: { commit: "b98642f", date: 2026-09-20 }
 gates:
   SOURCE:
     state: GO
@@ -14,7 +14,7 @@ gates:
     cmd: "PYTHONPATH=src/control:src python3 -m pytest src/control/test -q"
   ROS-SIM:
     state: HOLD
-    blocker: "ROS 2 Jazzy 노드 그래프(sensing/camera/planning/safety-policy) 재실행 증거 없음. 레거시 전체 스택(launch/robot.launch.py)은 CORE와 병행 기동하지 않는다(AGENTS.md, D-38)"
+    blocker: "ROS 2 Jazzy 노드 그래프(sensing/camera/planning/safety-policy) 재실행 증거 없음. 레거시 전체 스택(launch/robot.launch.py)은 CORE와 병행 기동하지 않는다(AGENTS.md, D-38). 2026-09-20 Gazebo Harmonic end-to-end 시도 기록: 번들 무결성·월드 로드 PASS, 물리 충돌·센서 브리지 FAIL — docs/validation/map-260905-update-v2-2026-09-20/result.md. 재실행 전 물리 메시 충돌과 브리지 무출력을 먼저 해소해야 한다"
   ARTIFACT:
     state: HOLD
     blocker: "서명된 ARM64 manifest·immutable digest 발행 전. 흡수된 코드는 deploy가 소유하는 OS 이미지에 번들된다"

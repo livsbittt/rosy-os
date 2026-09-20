@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-14 | Updated: 2026-09-14 -->
+<!-- Generated: 2026-09-14 | Updated: 2026-09-20 -->
 
 # map
 
@@ -15,7 +15,9 @@ Gazebo world asset for the Pinky Pro desk maze used by Control sim rigs.
 
 ## Subdirectories
 
-None.
+| Directory | Purpose |
+|-----------|---------|
+| `map_260905_update_v2/` | Versioned MAP 260905 bundle (world + occupancy map + docs + scripts + MANIFEST); read its README first (see `map_260905_update_v2/AGENTS.md`) |
 
 ## For AI Agents
 
@@ -43,3 +45,4 @@ One world file at this level; generated maze SDF also exists under `../tools/gz/
 - Gazebo
 
 <!-- MANUAL: -->
+

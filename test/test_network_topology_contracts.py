@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ADR = ROOT / "docs" / "reference" / "ROSY ADR Log.md"
 SRS = ROOT / "docs" / "spec" / "ROSY CORE SRS.md"
 DESIGN = ROOT / "docs" / "plans" / "2026-09-01-rosy-os-v1-image-release-design.md"
-IMPLEMENTATION_PLAN = ROOT / "docs" / "plan" / "ROSY Implementation Plan.md"
+IMPLEMENTATION_PLAN = ROOT / "docs" / "plans" / "ROSY Implementation Plan.md"
 
 CONTRACT_DOCS = (ADR, SRS, DESIGN)
 

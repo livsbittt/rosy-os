@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-16 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-20 -->
 
 # plans
 
@@ -7,10 +7,16 @@
 
 Dated design and execute plans (2026-08-31 onward). These are the working trail for Pi runtime, motors, power, dashboard, docking, battery integrity, Wi-Fi, ROS graph observability, and OS image/release.
 
+`docs/plan/` 은 2026-09-20 에 폐쇄됐다 — 역사 WBS(`ROSY Implementation Plan.md`)와
+Flask parity checklist가 추적용으로 여기에 합류했다. 둘은 실행 근거가 아니라
+기록이다.
+
 ## Key Files
 
 | File | Description |
 |------|-------------|
+| `ROSY Implementation Plan.md` | 역사 WBS (ROSY-PLN-001 v2.0): phases P0–P6, Pn-xx tasks, AT/FAT/MAT matrix — 추적용 |
+| `ROSY Flask Parity Checklist.md` | 역사 D-3/P0-7: 구 Flask nav server 가 FastAPI 로 커버해야 했던 기능 목록 — 추적용 |
 | `2026-08-31-raspberry-pi-runtime.md` | Pi runtime split (core/motor/io) |
 | `2026-09-01-raspberry-pi-wifi-deployment.md` (+ `-design`) | Headless Wi-Fi/SSH image |
 | `2026-09-01-motor-control-contracts.md` (+ `-design`) | ROS-free MotorController contracts |

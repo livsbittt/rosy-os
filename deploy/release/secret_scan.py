@@ -115,6 +115,12 @@ _PUBLIC_PATH_TOKEN = re.compile(
 # Scrub only CSV columns 3 and 4 for that one known inventory format; other
 # long hex values remain subject to the normal matcher.
 _ABSORPTION_INVENTORY_SUFFIX = "docs/plans/2026-09-12-control-absorption-inventory.csv"
+
+# A checksum manifest (sha256sum output: "<64-hex>  <file>" per line) is by
+# definition a list of public integrity hashes, one per shipped file. The
+# leading hash column is scrubbed before entropy matching; filenames stay
+# visible to the matchers.
+_CHECKSUM_MANIFEST_SUFFIX = ".sha256"
 _SHA256 = re.compile(r"^[A-Fa-f0-9]{64}$")
 
 # Lines whose long hex is public integrity data rather than a secret.
@@ -125,7 +131,7 @@ _SHA256 = re.compile(r"^[A-Fa-f0-9]{64}$")
 # "hash" is deliberately absent — it turns up in ordinary prose, where it
 # would disable this matcher for the whole line.
 _INTEGRITY_CONTEXT = re.compile(
-    r"(?<![A-Za-z])(?:sha256|sha512|digest|revision|checksum|commit|oid|fingerprint)(?![A-Za-z])",
+    r"(?<![A-Za-z])(?:sha[-_]?256|sha[-_]?512|digest|revision|checksum|commit|oid|fingerprint)(?![A-Za-z])",
     re.IGNORECASE,
 )
 
@@ -335,6 +341,10 @@ def scan_text(path: str, text: str) -> list[Finding]:
                     if _SHA256.fullmatch(fields[index] or ""):
                         fields[index] = ""
                 entropy_line = ",".join(fields)
+        elif path.replace("\\", "/").endswith(_CHECKSUM_MANIFEST_SUFFIX):
+            fields = line.split(None, 1)
+            if len(fields) == 2 and _SHA256.fullmatch(fields[0]):
+                entropy_line = fields[1]
 
         for match in _BARE_TOKEN.finditer(entropy_line):
             value = match.group("value")

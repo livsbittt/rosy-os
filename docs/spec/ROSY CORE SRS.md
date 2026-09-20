@@ -461,6 +461,17 @@ CORE는 `${ROSY_DATA_PATH}/battery-shutdown-request.json`에 요청을 기록한
 (`STANDBY` 포함)에서도 유지된다 — 아무도 앞에 없는 상태가 이 표시가 필요한
 바로 그 상황이다.
 
+### SAF-006 사람 회피 (Vision Advisory)
+
+사람은 LiDAR/IR metric 정지의 **확대 사유**이며, vision 단독 정지 사유가 아니다.
+
+- YOLO `person` 분류는 advisory evidence로만 소비한다. 사람이 있으면 정책은
+  metric 정지 거리 여유를 넓히고(감속 개시점을 앞당김) 최고 속도를 낮춘다.
+- YOLO가 사람을 못 봐도 LiDAR/IR 정지는 그대로 동작한다. 거짓음성이 안전을
+  깎지 않는 방향으로만 결합한다 (D-137).
+- 사람 감속 후 재가속은 자동이다(사람 소멸 후 정상 속도 복귀). e-stop과는
+  다른 경로이며, 해금 조건(SAF-001)을 공유하지 않는다.
+
 ---
 
 # 10. Navigation 요구사항
@@ -530,6 +541,17 @@ Navigation 중 다음 조건이 지속되면 자동으로 Goal을 취소하고 �
 ```
 
 자동 재시도는 하지 않는다(재시도 판단은 상위 시스템 또는 운용자 책임).
+
+### NAV-007 차선 추종 (고전 CV)
+
+바닥 차선 추종은 YOLO가 아니라 고전 CV 영역이다. 카메라 전처리 worker 위에
+라인 횡오차 evidence를 얹고, 주행은 다음 규칙을 따른다.
+
+- 차선 evidence는 조향 보정 입력일 뿐 최종 명령이 아니다. 출력은 Command
+  Manager가 소유한다 (D-2).
+- 차선 상실이 설정 시간(기본 3초)을 넘기면 정지 + `nav.lane_lost` 이벤트 발행.
+  자동 재탐색 주행은 하지 않는다(재개는 운용자 또는 상위 목표 책임).
+- 차선 추종 중 최고 속도는 0.10 m/s로 고정한다(SAF-004 상한과 별도의 모드 캡).
 
 ## 10.1 Swarm 지원 (로봇측 군집 모드)
 
@@ -848,6 +870,22 @@ Docking 미지원 로봇은 Docking **명령**(`POST /api/v1/docking/dock|undock
 
 자동 복귀는 **Warning(20%)** 에서 발동한다. Critical(10%)은 2S 팩의 급락 구간이라 그 지점에서 출발하면 도크 도달을 보장할 수 없고, 전류 센서가 없어 경로 길이 기반 에너지 예산을 산출할 수단도 없다. 수동 조작 세션(우선순위 3)이 있으면 복귀는 보류되었다가 세션 종료 후 실행되며, 20% 위로 회복하면 취소된다. 도크가 없는 로봇에서는 SAF-005의 기존 `RETURN_HOME`/`STOP` 폴백이 그대로 남는다.
 
+### DNC-007 도크 태그 검출 (고전 CV)
+
+획득 이후 접근 단계의 도크 상대 포즈는 카메라 태그 검출이 공급한다. 태그는
+YOLO 대상이 아니다 — ArUco 고전 검출(`cv2.aruco`, 사전 `DICT_4X4_50`, 한 변
+100 mm)로 충분하며, 트리에 이미 실적이 있다(`games/host/overhead.py`).
+YOLO 첫 투입 과제는 사람 회피(SAF-006)로 미룬다 (D-137).
+
+- 태그 사전·크기는 도크 기종 항목(`dock_types`, DNC-005)에 기록한다. 크기가
+  없으면 상대 포즈를 풀지 않고 fail-closed.
+- 출력은 박스가 아니라 도크 상대 포즈다. 태그 검출 → solvePnP 상대 포즈 변환까지가
+  vision 책임이며, 이후 접근 제어는 도킹 SM이 소유한다.
+- 태그 상실이 설정 시간(기본 2초)을 넘기면 `DOCK_FAILED`로 종착한다.
+  스스로 재시도하지 않는다 (DNC-004).
+- 태그 evidence는 D-47 패턴의 generation 바인딩을 따른다. 카메라 보정·태그
+  제원이 바뀌면 revision이 바뀌고, 모르는 revision은 fail-closed (D-137).
+
 ---
 
 # 20. Diagnostics 요구사항
@@ -1038,3 +1076,4 @@ Timestamp / Robot ID / Source / Command·Event / Result / Error Code
 | 버전 | 일자 | 내용 |
 |---|---|---|
 | v1.0 | 2026-08-29 | PKY-CORE-SRS-001 v0.1의 로봇 책임 분을 승계. Rosy 전환, CAP/HWA/WPT/EVT/SAF-005/NAV-005·006/DNC/WEB/CMD-001/MAP/OBS-101 신설, Fleet 분 제외(→ ROSY-FLEET-SRS-001) |
+| v1.1 | 2026-09-20 | 제품 목적 등록: SAF-006 사람 회피, NAV-007 차선 추종(고전 CV), DNC-007 도크 태그 검출(ArUco 고전 CV — YOLO 첫 투입은 SAF-006으로). YOLO 서열은 D-137을 따른다 |

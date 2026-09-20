@@ -139,6 +139,10 @@
 | D-129 | L1 토큰 파일은 하나이고 어휘 표는 보인다 — D-92 제1항을 대체한다 | Accepted |
 | D-130 | L2 문법 분리는 게이트가 지키고, 로직 행위는 headless로 한 번 뽑는다 | Accepted |
 | D-131 | Fleet 콘솔은 군집 제어의 말을 되풀이한다 — 세 단계로 | Accepted |
+| D-132 | 무장은 스트림이 연 뒤에 한다 | Accepted |
+| D-133 | CORE SIGSEGV 는 재현 경로로 쫓고, 흔들리는 환경에서의 반복은 폐기한다 | Accepted |
+| D-134 | ??? ?? ??? ???? ??? | Proposed |
+| D-135 | CI ??? Ubuntu ??? ????, ?? LTS ??? ?? ?? ????? | Accepted |
 
 ---
 
@@ -4163,6 +4167,51 @@ components.css 배포였지, 시각 없는 행위 공유가 아니었다. 마지
 
 ---
 
+## D-132 무장은 스트림이 연 뒤에 한다
+
+**Status:** Accepted (2026-09-20, 방향). ROS-SIM LOCAL 실측에서 재현된 시간계 결함의 수정이며, fleet 스위트와 ROS-SIM 재실행이 착지를 증명한다.
+
+**Context:** ROS-SIM LOCAL 실측(2026-09-20): 무장 → RUNNING → 4초 안에 rosy_02 `nav.failed` → FOR-004 HOLD. 원인은 시간계다. FOR-003 의 follow 는 `stream_timeout_ms`(기본 1 s) 안에 첫 참조 프레임을 요구하는데, 그 시계는 **follow 명령 시점에 시작한다. 그런데 `session.start()` 는 무장이 끝난 뒤에 릴레이를 시작한다** — 리더 WS 접속, 팔로워 sink 접속, 첫 프레임 전달이 전부 그 1 초 안에 들어와야 한다. 낡은 설치 위의 첫 실측에서 이 경로는 어긋났고(무장 직후 `nav.failed` rosy_02), tx=0 은 HOLD 가 pause 하기 전 프레임을 못 보낸 하류 증상이었다. 릴레이의 관측 공백 — 팔로워 소켓의 마지막 오류가 API 에 없음 — 이 원인 추적을 가렸다.
+
+**Decision:**
+
+1. **무장은 스트림이 연 뒤에 한다.** `start()` 는 계획 → 릴레이 기동 → 스트림 개방 대기(상한 3 s) → 무장 순서로 바뀐다. 스트림이 안 열리면 로봇에게 아무것도 보내지 않은 채 거절한다 — 접촉 전 거절과 접촉 후 롤백이 순서로 분리된다.
+2. **무장 전에 흐르는 프레임은 안전하다.** follow 가 없으면 매니저가 참조 pose 를 버린다(`on_reference_pose` 의 params-None 드롭) — 먼저 흐르는 것은 로봇을 움직이지 않는다.
+3. **릴레이가 준비를 말한다.** `Relay.streams_ready()` — 리더 스트림 + 전 팔로워 sink 개방. 세션은 이것을 기다린다.
+4. 송신 정체의 이름 붙이기(1cf5c5b 의 send 타임아웃)는 유지한다 — 스트림이 열린 뒤의 정체도 이름을 얻는다.
+
+**Alternatives:** `stream_timeout_ms` 기본값을 늘리는 안 — 시계를 이기지 못하는 순서를 그대로 두고 임계만 키운다. 무장과 릴레이를 동시 기동하는 안 — 롤백 경로가 두 갈래로 갈라진다. 현상 유지 — ROS-SIM 재현 결함을 남긴다.
+
+**Consequences:** 무장 실패가 두 갈래로 분리된다 — 스트림 미개방(로봇 무접촉)과 무장 거절(접촉 후 롤백). reform 은 기존대로 `relay.pause()` 후 재무장한다 — 스트림이 살아 있으므로 대기가 없다. `stream_timeout_ms` 는 이제 "스트림 단절 판정"의 의미만 남는다.
+
+**Validation / Transition:** fleet 스위트 — 스트림 미개방 시 follow 무접촉 시험 신설. ROS-SIM 재실행에서 무장 직후 `follower_tx ≥ 1` 실측.
+
+**References:** FOR-001·003, D-31, D-59, D-89, D-131, 1cf5c5b.
+
+---
+
+## D-133 CORE SIGSEGV 는 재현 경로로 쫓고, 흔들리는 환경에서의 반복은 폐기한다
+
+**Status:** Accepted (2026-09-20).
+
+**Context:** ROS-SIM LOCAL 실측: 대형 RUNNING 중 리더(rosy_01) CORE 가 탐색+릴레이 가동 중 SIGSEGV(exit -11) 로 사망했다 — 릴레이 리더 스트림 종료, FOR-004 HOLD, 팔로워 `swarm.aborted`(SWM-004 자보 — 정책대로 작동). 같은 박스의 반복 시도에서는 Nav2 container SIGSEGV·-9 리핑이 확인됐다 — 2로봇 풀 스택이 이 공유 WSL 박스의 자원을 넘는다. 환경이 흔들릴 때의 실패는 결함 데이터와 구별이 안 된다.
+
+**Decision:**
+
+1. **재현 경로를 계약으로 남긴다** — 무장 → 리더 goal → 주행 중 관측(`Rosy/sim_verify.sh`). 누구나 같은 순서로 같은 크래시를 볼 수 있어야 추적이 시작된다.
+2. 네이티브 추적은 core 세션이 **안정 세션**(자원 튜닝된 WSL 또는 Pi)에서 수행한다. 공유 박스에서의 반복은 폐기한다 — 무효 숫자다(D-79 정신).
+3. (b) 가 닫히기 전까지 대형 주행의 FIELD 주장은 존재하지 않는다(D-91).
+
+**Alternatives:** 지금 상자에서의 반복 — 무효 숫자를 낳는다. 재현 없이 추적 포기 — D-83 을 영원히 막는다.
+
+**Consequences:** (b) 가 닫힐 때까지 D-131 의 대형 주행 증거는 LOCAL 진단 수준이다. 재현 경로가 문서화된 첫 사례로, 이후의 네이티브 크래시도 같은 모양으로 기록된다.
+
+**Validation / Transition:** SIGSEGV 재현(시뮬) → core 세션 추적 → D-83 재실행 통과가 이 ADR 을 닫는다.
+
+**References:** D-79, D-83, D-88, D-91, D-131.
+
+---
+
 ## D-131 Fleet 콘솔은 군집 제어의 말을 되풀이한다 — 세 단계로
 
 **Status:** Accepted (2026-09-20, 방향). 1단계는 백엔드 무변경이므로 착지 즉시
@@ -4225,3 +4274,243 @@ components.css 배포였지, 시각 없는 행위 공유가 아니었다. 마지
 
 **References:** concept 16 §7.1·§7.3·§6, FOR-001·002·003·004, D-31, D-59, D-60,
 D-72, D-79, D-81, D-88, D-89, D-91, D-93, D-129, D-130.
+
+---
+
+## D-134 릴레이 준비 신호는 실측으로 말한다
+
+**Status:** Accepted (2026-09-20). T1–T4 착지 — fleet 스위트 330 passed, 5 skipped, 신규 4건은 구 코드 적색 확인.
+
+**Context:** D-132는 "무장은 스트림이 연 뒤에"로 순서를 뒤집고
+`Relay.streams_ready()` — 리더 스트림 + 전 팔로워 sink 개방 — 를 기다린다.
+리뷰에서 신호 자체가 실측이 아닌 자리가 셋 나왔다.
+
+1. `relay.py:194` — `_read_leader`가 `pose_stream()` 시도 전에
+   `_leader_connected = True`를 먼저 세운다. 그런데 `pose_stream()`은 async
+   generator라 첫 `__anext__` 전까지 접속이 일어나지 않는다. 리더 down이어도
+   태스크 기동~실패 사이 찰나에 `streams_ready()`가 참 될 수 있고, 팔로워 sink가
+   빨리 열리면 검증 안 된 리더에 무장하는 꼴이다.
+2. `relay.py:131` `stop()` — lane은 `connected=False`로 내리는데 리더 flag는
+   그대로 둔다. stop 후 `streams_ready()`가 옛 값을 유지하고, Cancel로
+   `_read_leader`가 죽는 경로도 같다.
+3. `session.py:145` `_open_relay` — `self.relay = relay`를 `streams_ready()`
+   확인 전(155)에 대입한다. timeout 실패 시 stopped 릴레이가 `self.relay`에
+   남고 `_log_hold:515`의 `self.relay is None` 판단이 어긋난다. `except
+   SessionError:`에서 reason을 `"relay_failed:streams did not open"`으로
+   고정해 factory의 원원인(`SessionError("cannot build")` 등)을 지운다. polling
+   60회(3 s) 동안 `STOPPED`를 보지 않아 open 대기 중 운영자 `stop()`이 와도
+   3 s를 다 쓰고 `_arm`까지 갔다가 되돌아온다.
+
+**Decision:**
+
+1. **리더 connected는 첫 프레임 수신 때만 참이다.** loop-top 낙관 대입을
+   없애고 `_on_frame` 첫 호출(또는 첫 `got_frame=True`)에 세운다.
+   `streams_ready()`는 "리더 실측 + 전 팔로워 sink 개방"의 AND로 남는다.
+2. **`stop()`은 리더 flag를 거짓으로 내린다.** lane과 대칭. 취소 경로도 이 한
+   줄로 커버된다.
+3. **`_open_relay`는 확인 후 대입 + 원인 보존 + 중단 감시.** `self.relay`
+   대입은 `streams_ready()` 확인 뒤로, 실패 시 `None` 유지. `SessionError`
+   reason은 `f"relay_failed:{exc}"`로 원문 보존. polling loop 안에 `state is
+   STOPPED` 체크를 넣어 대기 중 stop이면 즉시 탈출한다.
+
+**Alternatives:** 현상 유지 — 찰나 참, stop 후 옛 값, 원인 마스킹을 안고 간다.
+진단 가치가 떨어지고 D-132가 약속한 "접촉 전 거절"의 증거력이 약해진다.
+타임아웃만 늘리는 안 — 순서·신호 결함을 못 고친다.
+
+**Consequences:** `streams_ready()`가 강해진다 — 소켓 열림이 아니라 데이터 흐름을
+증명한다. 무장 실패의 두 갈래(스트림 미개방/무장 거절) 중 전자의 거짓 양성이
+줄고, 실패 reason이 원인을 그대로 말한다. reform 경로는 그대로다 — 릴레이가
+살아 있으므로 대기가 없다.
+
+**Validation / Transition:** fleet 스위트 적색-녹색 4건 — (a) 프레임 없는 리더는
+`streams_ready()` 거짓, (b) stop 후 거짓, (c) factory `SessionError` 원문 보존,
+(d) open 대기 중 stop 즉시 탈출. 기존 94 passed 회귀 없음. ROS-SIM은 D-132
+계승 — 무장 직후 `follower_tx ≥ 1` 실측. 실행 계획:
+`docs/plans/2026-09-20-fleet-relay-readiness-plan.md`.
+
+**References:** D-31, D-59, D-89, D-131, D-132.
+
+---
+
+## D-135 CI 러너는 Ubuntu 버전을 고정하고, 다음 LTS 이동은 기한 전에 리허설한다
+
+**Status:** Accepted (2026-09-20).
+
+**Context:** GitHub 이 `ubuntu-latest` 를 2026-10-19~11-19 에 걸쳐 Ubuntu 24.04 에서 26.04 로 강제 이동한다(changelog 2026-09-17, runner-images #14748). 이 워크플로는 `ros:jazzy-ros-base` 컨테이너 안에서 ROS 전체를 빌드하지만, 호스트 이미지가 바뀌면 컨테이너 런타임·마운트·네트워크 동작이 함께 바뀐다. 이동이 시작되면 게이팅 CI 의 이미지가 통지 없이 바뀌고, 적색의 원인 규명이 이주 분석과 섞인다.
+
+**Decision:**
+
+1. **게이팅 잡의 러너는 고정한다.** `runs-on: ubuntu-24.04` — `latest` 태그가 이동해도 계약 시험의 실행 환경은 유지된다.
+2. **같은 절차를 26.04 에서 주간 리허설한다.** ci.yml 을 `workflow_call` 로 열어 러너를 입력으로 받고, `ubuntu-26.04-rehearsal.yml` 이 매주 월요일 + 수동 트리거로 26.04 에서 전 절차를 비게이팅 실행한다. 적색이 보이면 그때가 24.04 의존을 제거할 때다.
+3. **리허설이 연속 녹색이면 게이팅 러너를 26.04 로 전환한다.** 전환 커밋이 이 ADR 의 종결이다.
+
+**Alternatives:** 아무 것도 하지 않는다 — 10월 19일에 게이팅 이미지가 조용히 바뀌고, 적색 원인 규명이 이주 분석과 섞인다. 즉시 26.04 로 이동한다 — 리허설 없는 전환은 문화가 금지하는 "조용히 바뀌는" 패턴과 같다.
+
+**Consequences:** 게이팅 환경이 시간의 함수가 아니게 된다. 매주 이중 CI 비용(리허설 1회, 몇 분)이 든다. 26.04 리허설이 적색인 기간에는 러너 전환이 보류되고, 그 적색이 26.04 이주 준비의 할 일 목록이 된다.
+
+**Validation / Transition:** 리허설 워크플로가 26.04 에서 전 스텝 통과하면 게이팅 runs-on 을 26.04 로 바꾸고 이 항목에 전환 커밋을 적는다.
+
+**References:** GitHub changelog 2026-09-17 (Ubuntu 26 GA + latest migration), actions/runner-images #14748, D-127 (단계 통합의 선례).
+
+---
+
+## D-136 영상 대역폭은 예산으로 다룬다 — 경로 분리 + 상한 + 자동킬
+
+**Status:** Proposed (2026-09-20, 4자 토론 합의 — 미착지). CORE·비전·Fleet·안전
+4역할이 각자 수치로 토론했고 아래 4점에 만장일치했다. 충돌 2건(A. 평시 외부
+송출량, B. 추론 입력 규격)은 타협안으로 봉합하고 실측 과제를 남긴다.
+
+**Context:** 영상은 데이터가 아니라 예산이다. Pi 5에서 Nav2 + CORE 50Hz + 안전
+경로가 굶지 않는 선에서만 존재할 수 있다. 폭발 시나리오는 셋이다 —
+(S-1) MJPEG 폴링 스톰: 720p JPEG @15fps = 7~12Mbps/대, N=5 + 대시보드 2명이면
+35~60Mbps. (S-2) DDS Image 유출: RAW 720p RGB @15fps ≈ 317Mbps/대 1대로 전
+함대 마비. (S-3) 이벤트 동시 버스트 후 heartbeat 유실 → Fleet 오프라인 오판 →
+gather 스톰 2차 폭발. N=20에서 메타만이면 ~3.5Mbps로 사는데 영상 1개 섞이면
+~43Mbps로 스냅샷 p95가 붕괴한다.
+
+**Decision:**
+
+1. **CORE는 영상 바이트를 만지지 않는다.** 인코딩·프록시·중継 일체 금지.
+   `rosy-vision`이 별도 포트/서비스로 직접 서빙하고, CORE API는
+   `frame_id + timestamp + sha256 + 썸네일 포인터`(수백 바이트)만 반환한다.
+   FastAPI 워커 블로킹 → `cmd_vel` 지터의 원천 차단 (D-1, D-22 준수).
+2. **영상은 DDS cross-host 금지.** raw는 온보드 내부만(shm, BEST_EFFORT,
+   depth 1, multicast off). 외부는 유니캐스트 HTTP pull 또는 분리 토픽
+   (`detection_evidence` RELIABLE + `preview_h264` BEST_EFFORT)만. 대형 메시지
+   RELIABLE+multicast가 NACK/재전송 폭풍의 주범이다.
+3. **Fleet은 영상을 중계하지 않는다.** 메타데이터(추론 요약, 썸네일 digest,
+   증거 상태)까지만 gather. 풀영상은 dashboard→로봇 직결, Fleet은
+   `stream_endpoint + token` 시그널링만. gather/scatter 제어 경로에 이미지
+   바이트 혼입 금지 — 스냅샷 p95가 깨지면 군집 판단 자체가 무너진다.
+4. **예산 + 자동킬.** 안전계 ≤1Mbps 고정 예약. 영상+벌크 합산 캡 ≤8Mbps(N=20
+   기준: 스냅샷 ~3.5 + 썸네일 ~1.0 + on-demand 4.0). 평시 외부 송출은
+   160x120 썸네일 @1Hz + evidence + on-demand pull(token-bucket 대당
+   1req/5s). `cmd_vel`/heartbeat deadline miss 연속 N회 또는 점유율 임계
+   초과 시 vision/bulk 퍼블리시 자동 차단 → fail-closed(감속→정지). 영상
+   때문에 안전이 1프레임이라도 밀리면 결함이다.
+5. **품질 저하는 evidence 무효로만 결합한다.** 신선도 >300ms, 드롭율 >30%/1s,
+   강제 강등 상태면 해당 evidence INVALID → metric safety만으로 판단.
+   깨진 영상의 "clear"가 가장 위험한 거짓음성이다. YOLO "clear"로 e-stop
+   해금 금지 — fresh LiDAR/IR + 명시적 operator action만.
+6. **실시간과 녹화 분리.** 고화질 원본은 로컬 링버퍼(60s)에만. 업로드/재생은
+   e-stop·주행 중이 아닐 때, 2Mbps 제한 bulk 채널로만, 안전 트래픽 있으면
+   즉시 preempt. 영상 큐 늘리기로 해결 금지 — 전부 depth-1 + 최신 덮어쓰기,
+   버림은 카운터로 노출.
+
+**Alternatives:** 360p@1Hz 상시 송출안(CORE 제안) — N=20에서 과함, 160x120으로
+충분하다는 타협으로 기각. H265 인코딩안 — Pi 5에 HW 인코더가 없어 CPU를
+바쳐야 하므로 기각, 전송 코덱은 H264로 고정. Fleet 중계안 — N=10에서 서버가
+먼저 죽으므로 기각. "평상시 잘 됨" 무캡안 — 현장에서 터지는 패턴이므로 기각.
+
+**Consequences:** 동시 풀스트림 ≤2 운용 규칙이 console에 강제된다(3번째 요청
+큐잉/거절). YOLO 서열 ADR(다음)과 묶인다 — advisory-only + LiDAR/IR 우선.
+미결 3건: (a) `cmd_vel` deadline·miss N회 상수 확정, (b) Pi 5 실측 인코딩
+ms/frame + CPU% (Task 5 실기 비교에 포함), (c) 추론 입력 최소 640 규격은
+Hailo 장착을 전제로 하고 CPU-only면 추론 미기동.
+
+**Validation / Transition:** 계약 시험 — CORE 영상 바이트 취급 금지 경계,
+gather 경로 이미지 타입 혼입 금지, 캡 초과 시 강등 카운터. ROS-SIM/DEVICE에서
+N대 버스트 실측 후 N 상한 고정. 실행 계획:
+`docs/plans/2026-09-20-vision-bandwidth-budget-plan.md`.
+
+**References:** D-1, D-2, D-22, D-47, D-52, D-72, D-132, FOR-004,
+`docs/plans/2026-09-05-vision-accelerator-shield-design.md`,
+`docs/plans/2026-09-13-rosy-os-device-validation-implementation-plan.md`
+(Task 5).
+
+---
+
+## D-137 YOLO는 자문역이다 — LiDAR/IR가 결정하고 영상은 증거만 낸다
+
+**Status:** Proposed (2026-09-20, 미착지). D-136의 묶음 ADR. YOLO를 올리기 전에
+안전 논증을 먼저 못 박는다 — 순서 없이 올리면 "영상이 잘 보이는데 로봇은 멈추지
+않는" 상태가 된다.
+
+**Context:** 트리에 semantic detection이 없다 (HSV evidence, ArUco만). YOLO를
+`rosy-vision`에 올릴 자리는 그려져 있으나, 결정권 서열이 없으면 두 가지 파국이
+온다. (a) 거짓음성: 깨진 영상의 "clear"가 정지를 막는다. (b) 권한 상승:
+"사람을 봤다"는 박스 하나로 새 정지·회피를 만들면, 검증 안 된 모델이 사실상
+두 번째 Command Manager가 된다 (AIV-001 위반 — 온보드 추론은 인지이지 지휘가
+아니다).
+
+**Decision:**
+
+1. **서열 고정: LiDAR/IR metric > YOLO advisory.** YOLO가 "길이 비었다" 해도
+   LiDAR가 막았다면 정지. YOLO가 사람을 봐도 LiDAR 근거 없이 새 정지를 만들지
+   않는다. YOLO 출력은 CORE 정책 스냅샷의 advisory 입력일 뿐이다.
+2. **출력은 박스가 아니라 typed evidence.** `DetectionEvidence`
+   (class, bbox 정규화, conf, stamp, seq, model rev, 입력 규격/fps/지연 메타) —
+   control의 `TranslationEvidence`/`TrackedEvidence`와 같은 immutable 스냅샷
+   패턴. CORE는 후보별로 재평가하고 stale이면 폐기한다.
+3. **모델은 generation 바인딩.** 가중치 버전·digest·입력 규격을 D-47 패턴으로
+   관리. 모델이 바뀌면 evidence revision이 바뀌고, CORE가 모르는 revision은
+   fail-closed. "어떤 모델이 봤다"가 증거의 일부다.
+4. **트리거 게이트:** YOLO 단독으로는 영상 버스트 전송을 트리거할 수 없다.
+   전송 조건은 YOLO + LiDAR/IR corroboration 또는 operator 요청. 오탐 폭주율이
+   버스트를 만들지 못하게 한다.
+5. **해금은 metric + 사람만.** e-stop 해제는 fresh LiDAR/IR + 명시적 operator
+   action. YOLO "clear"는 필요조건도 충분조건도 아니다.
+
+**Alternatives:** YOLO 동등권안 — LiDAR와 동등한 정지 권한. 모델 미검증 상태에서
+권한을 주면 안전 논증이 모델 품질에 종속된다. YOLO 우선안 — 카메라는 가려짐·
+역광·야간에 깨지고 LiDAR는 안 깨진다. 물리 순서가 반대다. 현상 유지(YOLO 없음)
+— HSV/ArUco만으로는 사람·케이블 같은 비정형 장애물을 못 본다. 필요는 인정하되
+서열을 먼저 둔다.
+
+**Consequences:** `vision/detections` 토픽 단일 발행자(D-2 확장 규칙), 이중
+발행은 결함으로 테스트 고정. 모델 교체는 재배포가 아니라 generation 전이로
+다뤄진다 (rollback 포함). D-136의 evidence 무효 조건(신선도 >300ms, 드롭율
+>30%/1s)과 합쳐져 "못 본 것"과 "없는 것"이 시퀀스로 구분된다.
+
+**Validation / Transition:** 계약 시험 — vision 단독 정지 불가(정책 스냅샷에
+advisory로만 반영), unknown revision fail-closed, 단독 버스트 트리거 불가,
+해금 경로에 vision 없음. ROS-SIM에서 거짓음성 주입(깨진 영상 + LiDAR 장애물 →
+정지 유지). 실행 계획:
+`docs/plans/2026-09-20-yolo-advisory-sequence-plan.md`.
+
+**References:** D-2, D-38, D-47, D-136, AIV-001
+(`2026-09-05-vision-accelerator-shield-design.md`), FOR-004.
+
+---
+
+## D-138 도크 검출기는 센서 provider 포트를 탄다 — 새 정적 간선 없음
+
+**Status:** Accepted (2026-09-20). 착지 — provider 팩토리, `select_detector`,
+services 배선, 계약 15건.
+
+**Context:** DNC-007(ArUco 태그 검출)를 `DockDetector` 프로토콜에 붙이려면
+control의 검출기를 CORE 측 상태머신이 써야 한다. D-64는 "rosy_control
+import는 센서 어댑터만"으로 묶었고, D-126 S1은 정적 import 자체를 금지하고
+`rosy.sensor_provider` 진입점으로만 받는다. 새 진입점·새 정적 간선은 둘 다
+과잉이다 — 타는 길은 이미 있다.
+
+**Decision:**
+
+1. **도크 검출기는 같은 provider 포트를 탄다.** `control.sensor_provider`
+   에 `make_dock_detector` 팩토리를 추가한다. 새 진입점 없음, 새 정적
+   import 없음. D-64의 "센서 어댑터만"은 "provider 포트만"으로 읽는다.
+2. **선택은 `select_detector` 하나가 한다.** 기종 명명(`detector="aruco"`)
+   + 태그 제원 완비 + provider 팩토리 + 프레임 + 카메라 기하가 다 있어야
+   실검출기로 간다. 하나라도 없으면 빈 대본(무관측)으로 떨어지고 상태머신은
+   타임아웃 → `DOCK_FAILED`으로 간다. 고장난 provider도 경고 후 같은 길이다.
+3. **어댑터는 control 쪽에 산다.** `ArucoDockDetector`는 프로토콜에 구조적
+   적합일 뿐 docking 패키지를 import하지 않는다. 매니저가 읽는 것은 세
+   메서드와 `range_m`/`x`/`y`뿐이다.
+4. **services는 경로만 살린다.** `detector_factory`가 `select_detector`를
+   호출하고, 오늘은 provider도 프레임도 없어 항상 시뮬레이션으로 떨어진다
+   (동작 불변). 카메라가 오면 `ros_bridge`가 같은 선택에 provider와 프레임을
+   꽂는다 — 그때가 카메라 스펙 실측(Task 5) 이후다.
+
+**Alternatives:** bridge에 새 어댑터 + 정적 import — D-64를 다시 여는 것.
+core_features에 cv2 직접 import — CORE 이미지(D-66, OpenCV 제외)에서
+죽는다. 새 진입점 — 포트 하나로 충분한데 둘을 둔다.
+
+**Consequences:** 태그 제원이 `DockType`에 들어갔다(tag_family/tag_id/
+tag_size_m, all-or-nothing). 카메라 기하(내부행렬·왜곡)는 아직 공급자 없음 —
+`ros_bridge` 주입 시점에 calibration generation 바인딩(D-47)과 함께 온다.
+
+**Validation / Transition:** provider 3건 + selection 6건 + 기존 docking 회귀.
+core 전체 901 passed·10 skipped, control 도크 15건. ROS-SIM/DEVICE 실측은
+카메라 placement 뒤.
+
+**References:** D-64, D-126, D-66, D-47, D-137, DNC-004, DNC-005, DNC-007.
