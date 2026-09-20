@@ -79,3 +79,11 @@
 - gate 변화: SOURCE only. ARTIFACT remains HOLD until the native artifact completes and is signed and verified offline.
 - 결정: D-145.
 - 교훈: upload the immutable build handoff, not a mutable tag, and make `unsigned` impossible to overlook in both artifact and archive names.
+
+## 2026-09-21 · uncommitted · feat(release): verify unsigned ARM64 handoffs (D-146)
+
+- 변경: D-145 archive의 canonical identity와 외부 SHA-256을 먼저 확인하고, archive path/type/count/size, builder/manifest/provenance, 모든 payload hash, CORE/IO Docker config의 `linux/arm64`를 검증한 뒤에만 handoff를 원자적으로 노출하는 importer를 추가했다. private-key 인터페이스는 없다.
+- 증거: importer 단위/CLI/변조/cleanup 테스트 40개, 릴리스·커미셔닝 집중 `370 passed, 2 skipped`, 전체 `1093 passed, 13 skipped` 통과. 실제 `397bb25` artifact도 bounded streaming 경로에서 release/revision/key ID, 17개 payload hash, CORE/IO `linux/arm64`를 확인하고 `signed: false`로 import했다.
+- gate 변화: SOURCE/LOCAL만 갱신. importer 결과는 계속 `signed: false`; ARTIFACT와 G0는 승인된 offline 서명 및 publication 검증 전까지 HOLD다.
+- 결정: D-146.
+- 교훈: 외부 archive checksum 하나는 내부 identity, 경로 안전성, OCI architecture를 증명하지 않는다.

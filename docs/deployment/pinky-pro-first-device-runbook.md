@@ -49,12 +49,23 @@ gh workflow run build-arm64-payload.yml --ref main \
   -f ros_image="$ROS_IMAGE"
 # After that exact run succeeds, download its named unsigned artifact.
 gh run download RUN_ID --name "rosy-unsigned-${RELEASE_ID}-${REVISION}"
-sha256sum --check "rosy-unsigned-${RELEASE_ID}-${REVISION}.tar.zst.sha256"
+ARCHIVE="rosy-unsigned-${RELEASE_ID}-${REVISION}.tar.zst"
+CHECKSUM="${ARCHIVE}.sha256"
+HANDOFF="/trusted/rosy-unsigned-${RELEASE_ID}-${REVISION}"
+python3 deploy/release/import_unsigned_payload.py "$ARCHIVE" \
+  --checksum "$CHECKSUM" --output "$HANDOFF" \
+  --release-id "$RELEASE_ID" --git-revision "$REVISION" \
+  --signing-key-id "$SIGNING_KEY_ID" \
+  | tee "/trusted/${RELEASE_ID}-unsigned-import.json"
+PAYLOAD="$HANDOFF/rosy-unsigned-payload"
 ```
 
 Retain the run URL and job result with the builder JSON. The Actions artifact
 expires after seven days, so move the verified archive to the offline signing
-environment before then.
+environment before then. The importer verifies the outer checksum before
+decompression, rejects unsafe archive members, and binds builder, manifest,
+provenance, payload hashes, and both `linux/arm64` image configs to the expected
+release identity. Its `signed: false` result is a verified handoff, not G0.
 
 ```bash
 set -euo pipefail

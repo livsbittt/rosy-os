@@ -6,7 +6,7 @@
 | 모듈 | owner | last verified | SOURCE | LOCAL | ROS-SIM | ARTIFACT | DEVICE | FIELD |
 |---|---|---|---|---|---|---|---|---|
 | [core](src/core/core/progress.md) | CORE | ab8bf1b (2026-09-20) | GO | GO | HOLD | HOLD | HOLD | PARKED |
-| [deploy](deploy/progress.md) | 릴리스·플랫폼 | 6f6c515 (2026-09-21) | GO | GO | N/A | HOLD | HOLD | N/A |
+| [deploy](deploy/progress.md) | 릴리스·플랫폼 | uncommitted (2026-09-21) | GO | GO | N/A | HOLD | HOLD | N/A |
 | [control](src/apps/control/progress.md) | CONTROL | uncommitted (2026-09-21) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [fleet](src/site/fleet/progress.md) | FLEET | ab8bf1b (2026-09-20) | GO | GO | HOLD | PARKED | PARKED | PARKED |
 | [games](src/apps/games/progress.md) | GAMES | 411a303 (2026-09-18) | GO | GO | N/A | N/A | PARKED | PARKED |
@@ -28,7 +28,7 @@
 - core ROS-SIM: 2026-09-13 실제 ROS 출력 시험 이후 미재실행. ROS 2 Jazzy 환경에서 현재 트리로 재실행 필요. 2026-09-20 Gazebo 시도에서 부팅 AttributeError(self.core_common — D-126 개명 잔재)를 기록했고 6ff2cb8 에서 수정 — 재실행 증거는 아직 없음(docs/validation/map-260905-update-v2-2026-09-20/result.md)
 - core ARTIFACT: ARM64 개발 후보만 존재. 서명 manifest와 immutable digest 발행 전
 - core DEVICE: Pi bench Device 설치와 device-readback.sh --json 증거 없음. G4 viewport·보정 상태기계 미실행
-- deploy ARTIFACT: native ARM64 builder는 구현됐지만 아직 aarch64 host에서 실행·offline 서명·검증된 bundle 발행 전
+- deploy ARTIFACT: native ARM64 unsigned payload와 local import 검증은 완료; 승인된 offline Ed25519 서명·publication 검증 bundle 발행 전
 - deploy DEVICE: Pi OS Lite bench Device의 install-pi.sh 설치, verify-pi.sh, device-readback.sh --json 증거 없음
 - control ROS-SIM: 정확한 v2 mapping/CORE/Fleet 슬라이스는 2026-09-21 GO(52/52, 접근 가능 unknown 0%, 충돌 없음). 그러나 Control 전체 gate에는 sensing/camera/calibration/planning/safety-policy 노드 그래프 재실행과 물리 센서가 남아 있다. 레거시 전체 스택은 CORE와 병행 기동하지 않는다(D-38).
 - control ARTIFACT: 서명된 ARM64 manifest·immutable digest 발행 전. 흡수된 코드는 deploy가 소유하는 OS 이미지에 번들된다

@@ -69,6 +69,11 @@ The workflow runs `arm64_release_builder.py` on `ubuntu-24.04-arm`, packages
 the two OCI archives, runtime files, unsigned manifest, and builder JSON, then
 uploads an archive plus SHA-256 for seven days. Download and verify that
 checksum before importing the payload into the offline signing environment.
+Use `import_unsigned_payload.py` rather than extracting it manually. The
+importer checks the canonical archive identity, checksum, member paths and
+types, expanded-size limits, builder/manifest/provenance agreement, every
+declared payload hash, and both nested Docker configs as `linux/arm64` before
+atomically exposing the output directory.
 
 This artifact is deliberately named `unsigned`. It does not satisfy ARTIFACT
 or G0 by itself, and the workflow has no secret or release-write permission.

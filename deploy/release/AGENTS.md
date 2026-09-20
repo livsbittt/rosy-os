@@ -23,6 +23,7 @@ Release packaging and the privileged Host Agent. Modules are scripts (not an ins
 | `image_checks.py` | Image content checks used by the pipeline |
 | `secret_scan.py` | Secret scanning before ship |
 | `arm64_release_builder.py` | Native ARM64 `core`/`io` build and unsigned release-payload assembler; private keys are forbidden here |
+| `import_unsigned_payload.py` | Fail-closed checksum, archive, identity, payload, and nested ARM64 image verifier before offline signing; never accepts a private key |
 
 ## Subdirectories
 
