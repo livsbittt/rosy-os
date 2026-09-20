@@ -10,6 +10,7 @@
   <depend>core_common</depend>
   <depend>core_events</depend>
   <depend>core_features</depend>
+  <exec_depend>python3-fastapi</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
