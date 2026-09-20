@@ -10,6 +10,53 @@ own physical evidence exists. Do not copy Gazebo geometry, robot diameter,
 speed, stopping distance, or `map_260905_update_v2` results into a device
 certificate.
 
+## 0. Build and sign the G0 release
+
+Do this before powering the target robot. The image build host must be a native
+ARM64 Linux machine; an x86/QEMU build is development evidence only. Start from
+the exact clean commit that will be commissioned and retain the builder JSON:
+
+```bash
+set -euo pipefail
+test "$(uname -m)" = aarch64
+test -z "$(git status --porcelain)"
+RELEASE_ID=2026.09.21-001
+SIGNING_KEY_ID=rosy-release-2026-01
+REVISION="$(git rev-parse HEAD)"
+# Copy this digest from the approved registry-manifest evidence. A mutable tag
+# such as ros:jazzy-ros-base is refused.
+ROS_IMAGE='ros:jazzy-ros-base@sha256:<64-hex-registry-digest>'
+PAYLOAD="/var/tmp/rosy-${RELEASE_ID}-unsigned"
+python3 deploy/release/arm64_release_builder.py \
+  --repo-root "$PWD" --output "$PAYLOAD" --release-id "$RELEASE_ID" \
+  --signing-key-id "$SIGNING_KEY_ID" --ros-image "$ROS_IMAGE" \
+  | tee "/var/tmp/${RELEASE_ID}-unsigned-payload-build.json"
+```
+
+The builder creates two Docker-save archives and an unsigned manifest. It
+refuses non-ARM64 images and checks that both image labels match `$REVISION`.
+It never reads a private key. Transfer the complete payload and builder JSON to
+the offline signing environment, then sign and verify there. The private key
+must remain outside both the payload and the target robot:
+
+```bash
+set -euo pipefail
+PUBLIC_KEY="/secure/${SIGNING_KEY_ID}.pem"
+PRIVATE_KEY="/secure/${SIGNING_KEY_ID}.key"
+BUNDLE="/trusted/rosy-release-${RELEASE_ID}.tar.zst"
+python3 deploy/release/package_release.py "$PAYLOAD" "$BUNDLE" \
+  --public-key "$PUBLIC_KEY" --private-key "$PRIVATE_KEY"
+python3 deploy/release/publication.py verify-publication "$BUNDLE" \
+  --release-id "$RELEASE_ID" --git-revision "$REVISION" \
+  --public-key "$PUBLIC_KEY" --json \
+  | tee "/trusted/${RELEASE_ID}-signed-bundle-verification.json"
+```
+
+Copy the bundle, matching public key, unsigned builder JSON, and
+`signed-bundle-verification.json` to trusted removable media. Do not proceed to
+G0 if either JSON says `ok: false`, if the public-key filename stem differs
+from the manifest `signing_key_id`, or if the source revision differs.
+
 ## 1. Prepare before power-on
 
 - Two people for G4/G5: one operator and one person at the physical power cut.

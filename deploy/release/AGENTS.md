@@ -22,6 +22,7 @@ Release packaging and the privileged Host Agent. Modules are scripts (not an ins
 | `network.py` | Network profile provisioning helpers |
 | `image_checks.py` | Image content checks used by the pipeline |
 | `secret_scan.py` | Secret scanning before ship |
+| `arm64_release_builder.py` | Native ARM64 `core`/`io` build and unsigned release-payload assembler; private keys are forbidden here |
 
 ## Subdirectories
 
