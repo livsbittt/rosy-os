@@ -26,9 +26,11 @@ the default when the new options are omitted.
 ## Failure handling
 
 Unsafe parameters, missing SSH, route/address failures, invalid IPv4, and HTTP
-failures all stop the verifier. If an evidence path was requested, the failure
-is written before the non-zero exit. Existing evidence is never overwritten;
-the write uses a sibling temporary file and a no-replace move.
+failures all stop the verifier. Once a valid, unused evidence path is accepted,
+every operational failure is written before the non-zero exit. Parameter binding
+and evidence-path validation fail before a record exists. Existing evidence is
+never overwritten; the write uses a sibling temporary file and a no-replace
+move.
 
 ## Verification
 

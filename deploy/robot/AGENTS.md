@@ -18,7 +18,7 @@ On-device runtime: multi-stage Dockerfile (`core` / `io` targets), Compose `rosy
 | `install-pi.sh` | First-boot install on Pi. `--preset` (mode/alias) or `--slices` (must match a preset, include `core`); both map to `ROSY_RUNTIME_MODE`. vision/omx/ai: not installable yet |
 | `configure-uart-pi5.sh` | Pi 5 UART (`ttyAMA4` for Dynamixel) |
 | `deploy-from-windows.ps1` | Copy/deploy from a Windows host |
-| `verify-from-windows.ps1` | Remote verify |
+| `verify-from-windows.ps1` | Read-only remote peer verify; optional bounded batch SSH and atomic GO/HOLD JSON connection evidence |
 | `verify-pi.sh` / `verify-motors.sh` / `verify-power.sh` | On-device checks. `verify-motors.sh` refuses to probe the UART whenever it cannot establish that the motor runtime is down — a compose failure counts, so missing docker or an unset identity now stops it rather than opening the gate |
 | `device-readback.py` / `device-readback.sh` | Secret-free JSON evidence for OS identity, activation manifest, core health, and ROS graph |
 | `commission-pinky.py` / `commissioning_session.py` | Ordered G0-G5 evidence recorder; operator procedure is `docs/deployment/pinky-pro-first-device-runbook.md` |

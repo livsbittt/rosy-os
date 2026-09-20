@@ -746,6 +746,8 @@ def test_first_device_runbook_is_a_complete_fail_closed_handoff():
         'ROSY_RUNTIME_MODE=motor', 'ROSY_RUNTIME_MODE=hardware',
         '/api/v1/robot/state', '/api/v1/slam/start',
         '/api/v1/navigation/goal',
+        'G0-connection-evidence.json', '-BatchMode', '-EvidencePath',
+        'connectivity evidence only',
     ):
         assert phrase in runbook, phrase
 

@@ -101,8 +101,17 @@ sudo /opt/rosy/deploy/robot/verify-pi.sh --interface eth0
 From Windows, verify that the API and dashboard are reachable by another host:
 
 ```powershell
-./deploy/robot/verify-from-windows.ps1 -PiHost pinky-01.local -NetworkInterface eth0
+$ConnectionEvidence = Join-Path $PWD "G0-connection-evidence.json"
+./deploy/robot/verify-from-windows.ps1 `
+  -PiHost pinky-01.local -NetworkInterface eth0 `
+  -BatchMode -ConnectTimeoutSec 5 -EvidencePath $ConnectionEvidence
 ```
+
+This command does not change network settings or robot state. A JSON `GO` is
+connectivity evidence only: it proves bounded key-based SSH plus `/api/v1` and
+`/dashboard` reachability over the selected interface. It is not G0 artifact
+acceptance and does not advance DEVICE or FIELD. Preserve the file with the
+session evidence; the verifier refuses to replace an existing evidence file.
 
 ### Local console path
 
