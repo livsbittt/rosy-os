@@ -12,6 +12,7 @@ def test_line_observer_has_both_inputs_and_one_normalized_output():
     source = (ROOT / "control/line_observer_node.py").read_text(encoding="utf-8")
     assert "UInt16MultiArray, 'ir_sensor/range'" in source
     assert "Image, 'camera/front'" in source
+    assert "String, 'camera/controls'" in source
     assert "String, 'line/observation'" in source
     assert "create_publisher(Twist" not in source
 
@@ -32,3 +33,19 @@ def test_package_and_launch_expose_the_line_observer():
     assert "line_observer_node = control.line_observer_node:main" in setup
     assert "line_observer_node" in launch
     assert "line_follow.yaml" in launch
+    assert "ir_adc_node = control.ir_adc_node:main" in setup
+    assert "ir_adc_node" in launch
+
+
+def test_camera_capture_has_a_v4l2_fallback_for_the_device_image():
+    source = (ROOT / "control/camera_detect_node.py").read_text(encoding="utf-8")
+    assert "camera_backend" in source
+    assert "cv2.VideoCapture" in source
+    assert "freeze_controls" in source
+    assert "if self._line_controls_stable()" in source
+
+
+def test_camera_line_evidence_uses_the_original_image_header_stamp():
+    source = (ROOT / "control/line_observer_node.py").read_text(encoding="utf-8")
+    assert "msg.header.stamp" in source
+    assert "stamp=source_stamp" in source

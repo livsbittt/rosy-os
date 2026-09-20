@@ -30,6 +30,38 @@ from .sensing.camera_ground import ground_plane
 from .sensing.camera_homography import CalibrationThresholds, load_homography_profile
 from .sensing.camera_policy import CameraPolicy
 from .sensing.camera_worker import CameraFrame, CameraPreprocessProfile, CameraPreprocessWorker
+from .sensing.v4l2_controls import freeze_v4l2_controls, v4l2_lock_summary
+
+
+class _OpenCVCamera:
+    """Small Picamera2-compatible wrapper for a V4L2 camera device."""
+
+    def __init__(self, device, width, height, fps):
+        import cv2
+
+        self._cv2 = cv2
+        self._capture = cv2.VideoCapture(device)
+        self._capture.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+        self._capture.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+        self._capture.set(cv2.CAP_PROP_FPS, fps)
+        if not self._capture.isOpened():
+            self._capture.release()
+            raise RuntimeError(f'cannot open V4L2 camera {device}')
+
+    def capture_array(self, _stream='main'):
+        ok, frame = self._capture.read()
+        if not ok:
+            raise RuntimeError('V4L2 camera returned no frame')
+        return frame
+
+    def stop(self):
+        self._capture.release()
+
+    def close(self):
+        pass
+
+    def freeze_controls(self):
+        return freeze_v4l2_controls(self._capture, self._cv2)
 
 
 class CameraDetectNode(Node):
@@ -38,6 +70,8 @@ class CameraDetectNode(Node):
         self.declare_parameter('width', 320)
         self.declare_parameter('height', 240)
         self.declare_parameter('fps', 8.0)
+        self.declare_parameter('camera_backend', 'auto')
+        self.declare_parameter('camera_device', '/dev/video0')
         # Frame IDs are not ROS topic names: namespace does not prefix them.
         # The OS hardware profile supplies the actual mounted camera frame.
         self.declare_parameter('camera_frame', 'camera_link')
@@ -86,13 +120,13 @@ class CameraDetectNode(Node):
         self.dbg_pub = self.create_publisher(String, 'camera/debug', 10)
         self.img_pub = self.create_publisher(Image, 'camera/front', qos_profile_sensor_data)
         self.observation_pub = self.create_publisher(String, 'camera/observation', 10)
-        self.controls_pub = self.create_publisher(String, 'camera/controls', 10)
         self.telemetry_pub = self.create_publisher(String, 'camera/telemetry', 10)
         calibration_qos = QoSProfile(
             depth=1,
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
         )
+        self.controls_pub = self.create_publisher(String, 'camera/controls', calibration_qos)
         self.ground_status_pub = self.create_publisher(
             String, 'camera/calibration/status', calibration_qos)
         self.create_subscription(
@@ -217,10 +251,23 @@ class CameraDetectNode(Node):
                 f'camera homography active={status["active"]} (session only)')
 
     def _start_cam(self):
+        backend = str(self.get_parameter('camera_backend').value).strip().lower()
+        if backend not in ('auto', 'picamera2', 'opencv'):
+            self.get_logger().error(f'unsupported camera backend {backend!r}')
+            return
+        # Replace any transient-local lock from a previous camera process before
+        # the first new frame can be consumed by line following.
+        self.controls_pub.publish(String(data='settling'))
+        if backend == 'opencv':
+            self._start_opencv_cam()
+            return
         try:
             from picamera2 import Picamera2
         except ImportError:
-            self.get_logger().error('picamera2 missing — camera detection off')
+            if backend == 'auto':
+                self._start_opencv_cam()
+            else:
+                self.get_logger().error('picamera2 missing; camera detection off')
             return
         try:
             cam = Picamera2()
@@ -242,6 +289,23 @@ class CameraDetectNode(Node):
                 0.0, float(self.get_parameter('camera_settle_seconds').value))
         except Exception as exc:
             self.get_logger().error(f'camera start failed: {exc}')
+            self._cam = None
+            if backend == 'auto':
+                self._start_opencv_cam()
+
+    def _start_opencv_cam(self):
+        try:
+            device = str(self.get_parameter('camera_device').value)
+            self._cam = _OpenCVCamera(
+                device,
+                int(self.get_parameter('width').value),
+                int(self.get_parameter('height').value),
+                float(self.get_parameter('fps').value),
+            )
+            self._settle_deadline = time.monotonic() + max(
+                0.0, float(self.get_parameter('camera_settle_seconds').value))
+        except (ImportError, RuntimeError, ValueError) as exc:
+            self.get_logger().error(f'OpenCV camera start failed: {exc}')
             self._cam = None
 
     def _stop_cam(self):
@@ -282,6 +346,14 @@ class CameraDetectNode(Node):
                                 f'{self._lock_attempts} attempts)', froze=False)
             return
         settle = max(0.0, float(self.get_parameter('camera_settle_seconds').value))
+        if hasattr(self._cam, 'freeze_controls'):
+            controls = self._cam.freeze_controls()
+            if controls:
+                self._announce_lock(v4l2_lock_summary(controls))
+                return
+            self._lock_attempts += 1
+            self._settle_deadline = time.monotonic() + max(0.5, settle)
+            return
         try:
             controls = lock_controls(self._cam.capture_metadata())
         except Exception as exc:
@@ -332,7 +404,8 @@ class CameraDetectNode(Node):
             self.block_pub.publish(Bool(data=True))
             return
         bgr = processed.pixels
-        self._publish_front(bgr)
+        if self._line_controls_stable():
+            self._publish_front(bgr, capture_stamp)
         res = processed.result
         cliff, blocked = self._policy.update(res)
         self.cliff_pub.publish(Bool(data=cliff))
@@ -370,9 +443,17 @@ class CameraDetectNode(Node):
             ground=self._ground,
         )
 
-    def _publish_front(self, bgr):
+    def _line_controls_stable(self):
+        summary = str(self._locked or '')
+        return summary.startswith('exposure=') or summary.startswith('v4l2 exposure=')
+
+    def _publish_front(self, bgr, capture_stamp=None):
         msg = Image()
-        msg.header.stamp = self.get_clock().now().to_msg()
+        if capture_stamp is None:
+            capture_stamp = self.get_clock().now().nanoseconds * 1e-9
+        stamp_sec = int(capture_stamp)
+        msg.header.stamp.sec = stamp_sec
+        msg.header.stamp.nanosec = int((capture_stamp - stamp_sec) * 1_000_000_000)
         msg.header.frame_id = str(self.get_parameter('camera_frame').value)
         msg.height = int(bgr.shape[0])
         msg.width = int(bgr.shape[1])

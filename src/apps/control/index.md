@@ -20,6 +20,7 @@
 | D-77 | 운용자 콘솔은 CORE `/dashboard` 하나다 |
 | D-118 | 생 Image는 Fleet·보드·gz_multi 브리지에 타지 않는다 |
 | D-119 | 스캔·이미지·IMU는 sensor-data QoS다 |
+| D-143 | IR·카메라 차선 추종은 NAVIGATION 내부의 배타적 evidence 소스다 |
 
 ## 계획·결과 문서
 
@@ -30,6 +31,8 @@
 - [2026-09-13-rosy-os-device-validation-implementation-plan.md](../../../docs/plans/2026-09-13-rosy-os-device-validation-implementation-plan.md)
 - [2026-09-15-module-harness-design.md](../../../docs/plans/2026-09-15-module-harness-design.md)
 - [2026-09-17-interface-design-implementation-design.md](../../../docs/plans/2026-09-17-interface-design-implementation-design.md)
+- [2026-09-21-line-follow-modes-design.md](../../../docs/plans/2026-09-21-line-follow-modes-design.md)
+- [2026-09-21-line-follow-modes.md](../../../docs/plans/2026-09-21-line-follow-modes.md)
 
 ## 교훈 (docs/solutions)
 
@@ -42,8 +45,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · feat(control): selectable IR and camera line following (D-143)
 - 2026-09-21 · uncommitted · feat(mapping): complete the exact v2 Gazebo map
 - 2026-09-20 · uncommitted · feat(control): lane error and loss tracker (NAV-007)
 - 2026-09-20 · uncommitted · feat(dock): detector rides the sensor provider port (D-138)
 - 2026-09-20 · uncommitted · feat(control): ArUco detector lifecycle + DockType tag spec (DNC-007)
-- 2026-09-20 · uncommitted · feat(control): ArUco dock tag to relative pose (DNC-007)

@@ -325,11 +325,15 @@ write_install_runtime_selection() {
 }
 
 write_runtime_environment() {
-    local env_file run_group dialout_gid
+    local env_file run_group dialout_gid video_gid i2c_gid
     env_file="$INSTALL_ROOT/deploy/robot/.env"
     run_group="$(id -gn "$RUN_USER")"
     dialout_gid="$(getent group dialout | cut -d: -f3)"
     [[ -n "$dialout_gid" ]] || fail "the dialout group is unavailable"
+    video_gid="$(getent group video | cut -d: -f3)"
+    i2c_gid="$(getent group i2c | cut -d: -f3)"
+    [[ -n "$video_gid" ]] || video_gid=44
+    [[ -n "$i2c_gid" ]] || i2c_gid=998
     if [[ ! -f "$env_file" ]]; then
         install -o root -g "$run_group" -m 0640 \
             "$INSTALL_ROOT/deploy/robot/.env.example" "$env_file"
@@ -339,6 +343,8 @@ write_runtime_environment() {
     set_env_value "$env_file" ROSY_UID "$(id -u "$RUN_USER")"
     set_env_value "$env_file" ROSY_GID "$(id -g "$RUN_USER")"
     set_env_value "$env_file" ROSY_DIALOUT_GID "$dialout_gid"
+    set_env_value "$env_file" ROSY_VIDEO_GID "$video_gid"
+    set_env_value "$env_file" ROSY_I2C_GID "$i2c_gid"
     set_env_default "$env_file" ROSY_MOTOR_BAUDRATE 1000000
     set_env_default "$env_file" ROSY_MOTOR_IDS '[1,2]'
     set_env_default "$env_file" ROSY_MAX_LINEAR_MPS 0.20

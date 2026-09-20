@@ -33,9 +33,14 @@ IR 모드는 로봇 기준 left/center/right 세 값과 각 채널의 검정·�
 
 카메라 모드는 기존 NAV-007 하단 ROI 밝은 선 중심 검출을 사용하되 밝기 임계값,
 ROI 시작점, 과다 노출 면적, 최소 픽셀을 설정으로 노출한다. 카메라의 기존
-장애물 분류와 같은 프레임을 사용해 CSI 캡처를 중복하지 않는다. 카메라
+장애물 분류와 같은 프레임을 사용해 캡처를 중복하지 않는다. Pi의 Picamera2를
+우선 사용하고, 배포 컨테이너에서는 `/dev/video0` V4L2/OpenCV로 fallback한다. 카메라
 homography는 거리 보정용이며, 차선 중심 오차 자체의 필수 조건으로 오용하지
 않는다.
+V4L2 fallback도 settle 이후 auto exposure와 auto white balance를 끈 readback이
+확인되기 전에는 camera evidence를 유효하게 만들지 않는다. IR endpoint와 detector
+임계값은 배포 호스트의 외부 `line_follow.yaml`로 주입해 이미지 재빌드 없이 로봇별
+튜닝할 수 있다.
 
 ## 제어와 실패 처리
 
@@ -45,6 +50,11 @@ homography는 거리 보정용이며, 차선 중심 오차 자체의 필수 조�
 보이지 않거나 관측이 stale/저신뢰이면 즉시 0 속도다. 소실 3초 이후
 `nav.lane_lost`를 한 번 발행하며 자동 탐색 주행은 하지 않는다. 재개에는 fresh
 관측과 명시적 모드 재선택이 필요하다.
+영상 신선도는 브리지 도착 시각이 아니라 `Image.header.stamp`의 원본 캡처
+시각부터 계산한다. API와 ROS executor가 같은 manager를 만지는 구간은 잠금으로
+직렬화해 전환 직전 소스가 전환 후 명령을 만들지 못하게 한다.
+계산된 decision에도 mode generation을 붙여 CORE CommandManager에 기록하는 순간
+다시 검사한다. 따라서 tick 뒤 API 전환이 끼어도 이전 소스의 pulse가 남지 않는다.
 
 ## 관제와 시뮬레이션
 

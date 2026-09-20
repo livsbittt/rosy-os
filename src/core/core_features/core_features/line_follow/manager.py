@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import enum
 import math
+import threading
 import time
 from dataclasses import dataclass
 from typing import Callable, Optional
@@ -69,6 +70,9 @@ class LineFollowConfig:
 class LineFollowDecision:
     linear: float = 0.0
     angular: float = 0.0
+    generation: int = 0
+    evidence_revision: int = 0
+    mode: LineFollowMode = LineFollowMode.OFF
 
 
 def _finite(value) -> bool:
@@ -80,9 +84,12 @@ class LineFollowManager:
     def __init__(self, events, *, config: Optional[LineFollowConfig] = None,
                  clock: Callable[[], float] = time.monotonic) -> None:
         self._events = events
+        self._lock = threading.RLock()
         self._config = config or LineFollowConfig()
         self._clock = clock
         self._mode = LineFollowMode.OFF
+        self._generation = 0
+        self._evidence_revision = 0
         self._observation: Optional[LineObservation] = None
         self._received_at: Optional[float] = None
         self._loss_started_at: Optional[float] = None
@@ -92,121 +99,165 @@ class LineFollowManager:
 
     @property
     def mode(self) -> LineFollowMode:
-        return self._mode
+        with self._lock:
+            return self._mode
 
     @property
     def active(self) -> bool:
-        return self._mode is not LineFollowMode.OFF
+        with self._lock:
+            return self._mode is not LineFollowMode.OFF
 
     def set_mode(self, mode: LineFollowMode | str) -> LineFollowStatus:
         selected = mode if isinstance(mode, LineFollowMode) else LineFollowMode(mode)
-        previous = self._mode
-        self._mode = selected
-        self._observation = None
-        self._received_at = None
-        self._lost_latched = False
-        self._invalid_observation = False
-        self._loss_started_at = None if selected is LineFollowMode.OFF else self._clock()
-        self._status = LineFollowStatus(
-            mode=selected.value,
-            state="OFF" if selected is LineFollowMode.OFF else "WAITING",
-            source=None if selected is LineFollowMode.OFF else selected.value,
-            reason="mode_off" if selected is LineFollowMode.OFF else "no_observation",
-        )
-        if previous is not selected:
-            self._events.publish(
-                "nav.line_mode_changed", source="line_follow_manager",
-                data={"from": previous.value, "to": selected.value},
+        with self._lock:
+            previous = self._mode
+            self._generation += 1
+            self._mode = selected
+            self._observation = None
+            self._received_at = None
+            self._lost_latched = False
+            self._invalid_observation = False
+            self._loss_started_at = None if selected is LineFollowMode.OFF else self._clock()
+            self._status = LineFollowStatus(
+                mode=selected.value,
+                state="OFF" if selected is LineFollowMode.OFF else "WAITING",
+                source=None if selected is LineFollowMode.OFF else selected.value,
+                reason="mode_off" if selected is LineFollowMode.OFF else "no_observation",
             )
-        return self._status
+            if previous is not selected:
+                self._events.publish(
+                    "nav.line_mode_changed", source="line_follow_manager",
+                    data={"from": previous.value, "to": selected.value},
+                )
+            return self._status.model_copy()
 
     def stop(self) -> LineFollowStatus:
         return self.set_mode(LineFollowMode.OFF)
 
-    def observe(self, observation: LineObservation, received_at: Optional[float] = None) -> bool:
+    def observe(self, observation: LineObservation, received_at: Optional[float] = None,
+                source_now: Optional[float] = None) -> bool:
         now = self._clock() if received_at is None else received_at
         if not _finite(now):
             raise ValueError("received_at must be finite")
-        if observation.source is not self._mode:
-            return False
-        self._invalid_observation = False
-        self._observation = observation
-        self._received_at = float(now)
-        if observation.visible and observation.confidence >= self._config.min_confidence:
-            if not self._lost_latched:
-                self._loss_started_at = None
-        elif self._loss_started_at is None:
-            self._loss_started_at = float(now)
-        return True
+        effective_received_at = float(now)
+        if source_now is not None:
+            if not _finite(source_now):
+                raise ValueError("source_now must be finite")
+            source_age = float(source_now) - observation.stamp
+            if source_age < -0.1:
+                raise ValueError("observation timestamp is in the future")
+            effective_received_at -= max(0.0, source_age)
+        with self._lock:
+            if observation.source is not self._mode:
+                return False
+            self._invalid_observation = False
+            self._observation = observation
+            self._received_at = effective_received_at
+            self._evidence_revision += 1
+            if observation.visible and observation.confidence >= self._config.min_confidence:
+                if not self._lost_latched:
+                    self._loss_started_at = None
+            elif self._loss_started_at is None:
+                self._loss_started_at = float(now)
+            return True
 
     def invalidate(self, received_at: Optional[float] = None) -> bool:
         """Replace an active command candidate with explicit invalid evidence."""
-        if self._mode is LineFollowMode.OFF:
-            return False
         now = self._clock() if received_at is None else received_at
         if not _finite(now):
             raise ValueError("received_at must be finite")
-        self._observation = LineObservation(
-            source=self._mode, stamp=float(now), visible=False,
-            error=None, confidence=0.0)
-        self._received_at = float(now)
-        self._invalid_observation = True
-        if self._loss_started_at is None:
-            self._loss_started_at = float(now)
-        return True
+        with self._lock:
+            if self._mode is LineFollowMode.OFF:
+                return False
+            self._observation = LineObservation(
+                source=self._mode, stamp=float(now), visible=False,
+                error=None, confidence=0.0)
+            self._received_at = float(now)
+            self._invalid_observation = True
+            self._evidence_revision += 1
+            if self._loss_started_at is None:
+                self._loss_started_at = float(now)
+            return True
 
     def status(self) -> LineFollowStatus:
-        return self._status
+        with self._lock:
+            return self._status.model_copy()
+
+    def apply_if_current(self, decision: LineFollowDecision,
+                         apply: Callable[[LineFollowDecision], None]) -> bool:
+        """Apply a decision only while its mode and sensor evidence stay current.
+
+        The callback runs inside the same lock as ``set_mode``. Therefore either
+        the old command is written before a transition (whose caller then clears
+        it), or the transition wins and this write is rejected. Observations and
+        invalidations also advance an evidence revision so fail-closed evidence
+        cannot be overtaken by a command computed from an older frame.
+        """
+        with self._lock:
+            if (decision.generation != self._generation
+                    or decision.evidence_revision != self._evidence_revision
+                    or decision.mode is not self._mode
+                    or self._mode is LineFollowMode.OFF):
+                return False
+            apply(decision)
+            return True
 
     def tick(self, now: Optional[float] = None) -> LineFollowDecision:
         current = self._clock() if now is None else now
         if not _finite(current):
             raise ValueError("line-follow clock must be finite")
         current = float(current)
-        if self._mode is LineFollowMode.OFF:
-            return self._stop_decision("OFF", "mode_off")
-        if self._lost_latched:
-            return self._stop_decision("LOST", "reselection_required")
+        with self._lock:
+            if self._mode is LineFollowMode.OFF:
+                return self._stop_decision("OFF", "mode_off")
+            if self._lost_latched:
+                return self._stop_decision("LOST", "reselection_required")
 
-        observation = self._observation
-        age = None if self._received_at is None else current - self._received_at
-        if observation is None or self._received_at is None:
-            return self._loss_or_stop(current, "WAITING", "no_observation", age)
-        if age < 0.0 or age > self._config.stale_after_s:
-            if self._loss_started_at is None:
-                self._loss_started_at = min(current, self._received_at + self._config.stale_after_s)
-            return self._loss_or_stop(current, "HOLD", "observation_stale", age)
-        if not observation.visible:
-            reason = "invalid_observation" if self._invalid_observation else "line_not_visible"
-            return self._loss_or_stop(current, "HOLD", reason, age)
-        if observation.confidence < self._config.min_confidence:
-            return self._loss_or_stop(current, "HOLD", "low_confidence", age)
+            observation = self._observation
+            age = None if self._received_at is None else current - self._received_at
+            if observation is None or self._received_at is None:
+                return self._loss_or_stop(current, "WAITING", "no_observation", age)
+            if observation.source is not self._mode:
+                return self._loss_or_stop(current, "HOLD", "source_mismatch", age)
+            if age < 0.0 or age > self._config.stale_after_s:
+                if self._loss_started_at is None:
+                    self._loss_started_at = min(current, self._received_at + self._config.stale_after_s)
+                return self._loss_or_stop(current, "HOLD", "observation_stale", age)
+            if not observation.visible:
+                reason = "invalid_observation" if self._invalid_observation else "line_not_visible"
+                return self._loss_or_stop(current, "HOLD", reason, age)
+            if observation.confidence < self._config.min_confidence:
+                return self._loss_or_stop(current, "HOLD", "low_confidence", age)
 
-        self._loss_started_at = None
-        error = float(observation.error)
-        confidence_span = 1.0 - self._config.min_confidence
-        confidence_scale = (1.0 if confidence_span == 0.0 else
-                            (observation.confidence - self._config.min_confidence)
-                            / confidence_span)
-        confidence_scale = max(0.0, min(1.0, confidence_scale))
-        curve_scale = max(0.2, 1.0 - 0.65 * abs(error))
-        linear = min(self._config.cruise_speed, self._config.max_linear)
-        linear *= confidence_scale * curve_scale
-        angular = max(-self._config.max_angular,
-                      min(self._config.max_angular, -self._config.steering_gain * error))
-        decision = LineFollowDecision(linear=linear, angular=angular)
-        self._status = LineFollowStatus(
-            mode=self._mode.value,
-            state="TRACKING",
-            source=observation.source.value,
-            error=error,
-            confidence=observation.confidence,
-            age_s=round(age, 3),
-            linear=linear,
-            angular=angular,
-            reason="tracking",
-        )
-        return decision
+            self._loss_started_at = None
+            error = float(observation.error)
+            confidence_span = 1.0 - self._config.min_confidence
+            confidence_scale = (1.0 if confidence_span == 0.0 else
+                                (observation.confidence - self._config.min_confidence)
+                                / confidence_span)
+            confidence_scale = max(0.0, min(1.0, confidence_scale))
+            curve_scale = max(0.2, 1.0 - 0.65 * abs(error))
+            linear = min(self._config.cruise_speed, self._config.max_linear)
+            linear *= confidence_scale * curve_scale
+            angular = max(-self._config.max_angular,
+                          min(self._config.max_angular, -self._config.steering_gain * error))
+            decision = LineFollowDecision(
+                linear=linear, angular=angular,
+                generation=self._generation,
+                evidence_revision=self._evidence_revision,
+                mode=self._mode)
+            self._status = LineFollowStatus(
+                mode=self._mode.value,
+                state="TRACKING",
+                source=observation.source.value,
+                error=error,
+                confidence=observation.confidence,
+                age_s=round(age, 3),
+                linear=linear,
+                angular=angular,
+                reason="tracking",
+            )
+            return decision
 
     def _loss_or_stop(self, now: float, state: str, reason: str,
                       age: Optional[float]) -> LineFollowDecision:
@@ -234,4 +285,8 @@ class LineFollowManager:
             age_s=None if age is None else round(max(0.0, age), 3),
             reason=reason,
         )
-        return LineFollowDecision()
+        return LineFollowDecision(
+            generation=self._generation,
+            evidence_revision=self._evidence_revision,
+            mode=self._mode,
+        )

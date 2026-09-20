@@ -15,6 +15,7 @@ from launch.actions import (
     IncludeLaunchDescription,
     OpaqueFunction,
 )
+from launch.conditions import IfCondition
 from launch.launch_description_sources import (
     AnyLaunchDescriptionSource,
     PythonLaunchDescriptionSource,
@@ -101,6 +102,7 @@ def _include_nav2(context, *args, **kwargs):
 def generate_launch_description():
     bringup_share = get_package_share_directory("bringup")
     nav_share = get_package_share_directory("navigation")
+    control_share = get_package_share_directory("control")
     default_params = os.path.join(nav_share, "params", "nav2_params.yaml")
 
     namespace = LaunchConfiguration("namespace")
@@ -128,6 +130,14 @@ def generate_launch_description():
         DeclareLaunchArgument("use_sim_time", default_value="false"),
         DeclareLaunchArgument("enable_battery", default_value="false"),
         DeclareLaunchArgument("enable_lidar", default_value="true"),
+        DeclareLaunchArgument("enable_line_follow", default_value="false"),
+        DeclareLaunchArgument("line_camera_enabled", default_value="true"),
+        DeclareLaunchArgument("line_ir_enabled", default_value="true"),
+        DeclareLaunchArgument("camera_backend", default_value="auto"),
+        DeclareLaunchArgument("camera_device", default_value="/dev/video0"),
+        DeclareLaunchArgument("ir_interface", default_value="/dev/i2c-1"),
+        DeclareLaunchArgument(
+            "line_follow_config", default_value="/etc/rosy/line_follow.yaml"),
         DeclareLaunchArgument("cmd_vel_timeout_s", default_value="0.5"),
         DeclareLaunchArgument("motor_device", default_value="/dev/ttyAMA4"),
         DeclareLaunchArgument("motor_baudrate", default_value="1000000"),
@@ -163,6 +173,21 @@ def generate_launch_description():
                 os.path.join(bringup_share, "launch", "bringup_robot.launch.py")
             ),
             launch_arguments=robot_args.items(),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(control_share, "launch", "line_follow.launch.py")
+            ),
+            condition=IfCondition(LaunchConfiguration("enable_line_follow")),
+            launch_arguments={
+                "namespace": namespace,
+                "start_camera": LaunchConfiguration("line_camera_enabled"),
+                "start_ir_adc": LaunchConfiguration("line_ir_enabled"),
+                "camera_backend": LaunchConfiguration("camera_backend"),
+                "camera_device": LaunchConfiguration("camera_device"),
+                "ir_interface": LaunchConfiguration("ir_interface"),
+                "line_follow_config": LaunchConfiguration("line_follow_config"),
+            }.items(),
         ),
         OpaqueFunction(function=_include_nav2),
     ])

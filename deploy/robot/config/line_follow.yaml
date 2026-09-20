@@ -6,15 +6,14 @@
 
 /**/line_observer_node:
   ros__parameters:
-    # Fail closed until each robot's black/white surfaces have been measured.
+    # Measure these six endpoints on each robot, then enable. The external file
+    # is mounted read-only into rosy-io, so tuning never rebuilds the image.
     ir_calibration_enabled: false
     ir_black: [0.0, 0.0, 0.0]
     ir_white: [0.0, 0.0, 0.0]
     ir_min_span: 100.0
     ir_min_white: 0.55
     ir_min_contrast: 0.15
-
-    # White-line segmentation in the lower camera band.
     camera_bright_threshold: 180
     camera_roi_top_fraction: 0.40
     camera_washed_fraction: 0.40

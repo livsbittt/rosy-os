@@ -10,7 +10,7 @@ import json
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from std_msgs.msg import String, UInt16MultiArray
 
@@ -37,6 +37,7 @@ class LineObserverNode(Node):
         self.declare_parameter('camera_min_pixels', 80)
 
         self._ir_calibration = None
+        self._camera_controls_stable = False
         if bool(self.get_parameter('ir_calibration_enabled').value):
             self._ir_calibration = IRLineCalibration(
                 black=tuple(self.get_parameter('ir_black').value),
@@ -49,6 +50,11 @@ class LineObserverNode(Node):
             UInt16MultiArray, 'ir_sensor/range', self._on_ir, qos_profile_sensor_data)
         self.create_subscription(
             Image, 'camera/front', self._on_camera, qos_profile_sensor_data)
+        controls_qos = QoSProfile(
+            depth=1, reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.create_subscription(
+            String, 'camera/controls', self._on_camera_controls, controls_qos)
         if self._ir_calibration is None:
             self.get_logger().warning(
                 'IR line calibration disabled; IR_LINE will remain fail-closed')
@@ -56,8 +62,9 @@ class LineObserverNode(Node):
     def _stamp(self) -> float:
         return self.get_clock().now().nanoseconds * 1e-9
 
-    def _publish(self, source, observation) -> None:
-        payload = line_observation_payload(source, self._stamp(), observation)
+    def _publish(self, source, observation, *, stamp=None) -> None:
+        payload = line_observation_payload(
+            source, self._stamp() if stamp is None else stamp, observation)
         self.observation_pub.publish(String(data=json.dumps(payload, sort_keys=True)))
 
     def _on_ir(self, msg: UInt16MultiArray) -> None:
@@ -75,6 +82,10 @@ class LineObserverNode(Node):
 
     def _on_camera(self, msg: Image) -> None:
         observation = None
+        if not self._camera_controls_stable:
+            self._publish('CAMERA_LINE', None, stamp=(
+                float(msg.header.stamp.sec) + float(msg.header.stamp.nanosec) * 1e-9))
+            return
         try:
             channels = 1 if msg.encoding == 'mono8' else 3
             if msg.encoding not in ('mono8', 'bgr8', 'rgb8'):
@@ -97,7 +108,14 @@ class LineObserverNode(Node):
             )
         except ValueError as exc:
             self.get_logger().warning(f'invalid camera line frame: {exc}')
-        self._publish('CAMERA_LINE', observation)
+        source_stamp = (float(msg.header.stamp.sec)
+                        + float(msg.header.stamp.nanosec) * 1e-9)
+        self._publish('CAMERA_LINE', observation, stamp=source_stamp)
+
+    def _on_camera_controls(self, msg: String) -> None:
+        summary = str(msg.data)
+        self._camera_controls_stable = (
+            summary.startswith('exposure=') or summary.startswith('v4l2 exposure='))
 
 
 def main():

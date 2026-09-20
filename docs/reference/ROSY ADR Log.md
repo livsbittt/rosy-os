@@ -4668,6 +4668,16 @@ complete.
 6. 관제는 CORE API로만 모드를 선택하고 상태·오차·신뢰도·명령·정지 사유를
    표시한다. 호스트 시뮬레이션은 실제 detector와 manager를 사용하되 물리
    반사율·조명·CSI·모터 검증을 대신하지 않는다.
+7. 센싱 노드는 `rosy-io` 이미지와 hardware launch에 포함한다. 카메라는
+   Picamera2 우선·V4L2/OpenCV fallback이며, IR는 기존 0x08 I²C ADC의 12-bit
+   wire contract를 읽는다. 둘 다 명령을 발행하지 않는다. 영상 관측의 stale은
+   수신 시각이 아니라 원본 `Image.header.stamp`부터 계산하고, API·ROS executor가
+   공유하는 manager 상태는 하나의 재진입 잠금으로 직렬화한다.
+8. V4L2 fallback도 settle 뒤 auto exposure와 auto white balance를 실제로 끄고
+   readback이 manual임을 확인해야만 카메라 차선 evidence를 허용한다. IR endpoint와
+   detector 임계값은 `/etc/rosy/line_follow.yaml` 외부 read-only mount로 주입해
+   immutable 이미지를 다시 만들지 않고 로봇별로 교정한다. 제어 decision에는 mode
+   generation을 넣어 계산과 CommandManager handoff 사이에 모드가 바뀐 경우 폐기한다.
 
 **Alternatives:** 두 센서를 자동 융합하는 방식은 한 센서의 오교정이 다른 센서의
 정상 관측을 덮을 수 있고 책임 소재가 흐려져 보류했다. 각 센서 노드가 직접
@@ -4679,7 +4689,8 @@ ROS 토픽을 직접 발행하는 방식도 외부 API 경계를 우회하므로
 조명 변화, 좌우 부호, 정지 거리, 최대 속도를 별도로 검증해야 한다.
 
 **Validation / Transition:** detector/manager/API/UI 계약 테스트, bridge 단일 발행자
-구조 검사, IR·카메라 결정론적 시뮬레이션 JSON. 이후 Pinky Pro에서 교정값,
+구조 검사, IR·카메라 폐루프 운동학 시뮬레이션 JSON, hardware compose의
+카메라·I²C device 전달 검사. 이후 Pinky Pro에서 교정값,
 10 Hz 이상 관측, stale zero, 좌우 복귀, E-stop을 측정한다.
 
 **References:** NAV-007, SAF-001, SAF-004, D-2, D-38, D-47, D-136, D-142.

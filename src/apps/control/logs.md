@@ -91,3 +91,11 @@
 - gate 변화: Control 전체 ROS-SIM은 HOLD 유지. 정확한 v2 월드의 mapping/CORE/Fleet 슬라이스는 GO지만, camera/calibration/safety-policy 전체 노드 그래프와 실기기는 이 실행이 증명하지 않는다.
 - 결정: 전체 이미지 unknown 비율 대신 실제 본체가 도달 가능한 구성공간을 합격 기준으로 삼고, 밀폐 포켓 비율은 별도 공개한다.
 - 교훈: 반복되는 얇은 벽에서는 scan matcher가 정확한 simulation odom을 잘못 굽힐 수 있다. 시뮬레이션에서는 live scan을 Gazebo model-pose odom에 직접 래스터화해야 재현 가능한 정답 비교가 된다.
+
+## 2026-09-21 · uncommitted · feat(control): selectable IR and camera line following (D-143)
+
+- 변경: CORE dashboard/API에서 `OFF`, `IR_LINE`, `CAMERA_LINE`을 배타적으로 선택한다. Control은 IR/영상 evidence만 발행하며 CORE manager가 adaptive speed와 조향을 만들고 기존 단일 `cmd_vel` 경로가 최종 중재한다. `rosy-io` 이미지와 hardware launch에 V4L2 camera fallback 및 Pinky 0x08 I²C ADC publisher를 연결했다.
+- 안전: 원본 영상 header stamp 기반 stale, malformed/저신뢰/미검출 즉시 zero, 3초 loss latch, 모드 전환 상태 잠금, 0.10 m/s 별도 상한을 적용했다.
+- 증거: 폐루프 운동학 simulation에서 3.5 cm 횡오차가 IR -0.03 cm, camera 0.006 cm로 수렴하며 stale/loss 정지 통과. 외부 IR calibration YAML, V4L2 exposure/white-balance 잠금 readback, mode/evidence revision 원자적 handoff를 추가했다. Control `1084 passed, 26 skipped`; CORE `955 passed, 11 skipped`; root `1008 passed, 13 skipped`; Fleet `332 passed, 5 skipped`; OMX `10 passed`; Games `101 passed`. `rosy-io:dev` 빌드와 이미지 내부 3개 line-follow executable, OpenCV 4.6.0, launch argument readback도 통과했다.
+- gate 변화: SOURCE/LOCAL GO. ROS-SIM은 detector/manager 폐루프 증거만 추가되었고 전체 graph gate는 HOLD. ARM64 artifact, Pi camera/I²C readback, 물리 교정과 실제 차선 주행은 ARTIFACT/DEVICE/FIELD HOLD.
+- 결정: D-143. 센서는 motion authority가 아니며 관제는 CORE API만 사용한다.

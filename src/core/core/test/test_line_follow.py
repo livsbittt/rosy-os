@@ -1,6 +1,7 @@
 """NAV-007 / D-143 line-follow policy is ROS-free and fail-closed."""
 
 import math
+import threading
 
 import pytest
 
@@ -181,3 +182,105 @@ def test_full_confidence_threshold_has_no_division_by_zero():
     manager.observe(observation("CAMERA_LINE", confidence=1.0), now[0])
 
     assert manager.tick().linear > 0.0
+
+
+def test_source_timestamp_age_can_make_a_just_received_sample_stale(rig):
+    now, _events, manager = rig
+    manager.set_mode(LineFollowMode.CAMERA_LINE)
+
+    manager.observe(
+        observation("CAMERA_LINE", stamp=10.0),
+        received_at=now[0], source_now=10.31,
+    )
+
+    assert manager.tick(now[0]).linear == 0.0
+    assert manager.status().reason == "observation_stale"
+
+
+def test_future_source_timestamp_is_rejected(rig):
+    now, _events, manager = rig
+    manager.set_mode(LineFollowMode.CAMERA_LINE)
+
+    with pytest.raises(ValueError, match="future"):
+        manager.observe(
+            observation("CAMERA_LINE", stamp=10.0),
+            received_at=now[0], source_now=9.0,
+        )
+
+
+def test_mode_switch_and_observation_are_thread_safe(rig):
+    now, _events, manager = rig
+    errors = []
+
+    def switch_modes():
+        try:
+            for _ in range(500):
+                manager.set_mode(LineFollowMode.IR_LINE)
+                manager.set_mode(LineFollowMode.CAMERA_LINE)
+        except Exception as exc:  # pragma: no cover
+            errors.append(exc)
+
+    def feed_both_sources():
+        try:
+            for _ in range(500):
+                manager.observe(observation("IR_LINE"), now[0])
+                manager.observe(observation("CAMERA_LINE"), now[0])
+                manager.tick(now[0])
+                status = manager.status()
+                if status.state == "TRACKING" and status.source != status.mode:
+                    errors.append(AssertionError("tracking source differs from selected mode"))
+        except Exception as exc:  # pragma: no cover
+            errors.append(exc)
+
+    threads = [threading.Thread(target=switch_modes), threading.Thread(target=feed_both_sources)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
+
+
+def test_decision_cannot_be_applied_after_mode_generation_changes(rig):
+    now, _events, manager = rig
+    manager.set_mode(LineFollowMode.IR_LINE)
+    manager.observe(observation("IR_LINE"), now[0])
+    old_decision = manager.tick(now[0])
+
+    manager.set_mode(LineFollowMode.CAMERA_LINE)
+    applied = []
+
+    assert manager.apply_if_current(old_decision, applied.append) is False
+    assert applied == []
+
+
+def test_decision_cannot_be_applied_after_new_fail_closed_evidence(rig):
+    now, _events, manager = rig
+    manager.set_mode(LineFollowMode.IR_LINE)
+    manager.observe(observation("IR_LINE"), now[0])
+    old_decision = manager.tick(now[0])
+
+    manager.observe(LineObservation(
+        source=LineFollowMode.IR_LINE,
+        stamp=now[0],
+        visible=False,
+        error=None,
+        confidence=0.0,
+    ), now[0])
+    applied = []
+
+    assert manager.apply_if_current(old_decision, applied.append) is False
+    assert applied == []
+
+
+def test_decision_cannot_be_applied_after_invalidation(rig):
+    now, _events, manager = rig
+    manager.set_mode(LineFollowMode.IR_LINE)
+    manager.observe(observation("IR_LINE"), now[0])
+    old_decision = manager.tick(now[0])
+
+    manager.invalidate(now[0])
+    applied = []
+
+    assert manager.apply_if_current(old_decision, applied.append) is False
+    assert applied == []

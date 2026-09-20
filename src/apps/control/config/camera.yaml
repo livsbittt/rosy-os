@@ -3,6 +3,9 @@
     width: 320
     height: 240
     fps: 8.0
+    # ``auto`` prefers Picamera2 and falls back to V4L2/OpenCV.
+    camera_backend: auto
+    camera_device: /dev/video0
     rotate_deg: 180
     # Captured frames must match this profile; the worker reports a mismatch
     # as unavailable evidence instead of silently classifying a wrong stream.

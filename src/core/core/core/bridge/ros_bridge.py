@@ -215,8 +215,9 @@ class RosBridge:
                 error=(float(data["error"]) if visible else None),
                 confidence=float(data["confidence"]),
             )
+            source_now = self._node.get_clock().now().nanoseconds * 1e-9
             accepted = self._svc.line_follow.observe(
-                observation, received_at=time.monotonic())
+                observation, received_at=time.monotonic(), source_now=source_now)
             self._svc.state.set_sensor("line_follow", {
                 "valid": True,
                 "accepted": accepted,
@@ -239,8 +240,11 @@ class RosBridge:
             return
         now = time.monotonic()
         decision = self._svc.line_follow.tick(now)
-        self._svc.command.set_nav_twist(
-            CoreTwist(linear=decision.linear, angular=decision.angular), now=now)
+        self._svc.line_follow.apply_if_current(
+            decision,
+            lambda current: self._svc.command.set_nav_twist(
+                CoreTwist(linear=current.linear, angular=current.angular), now=now),
+        )
         status = self._svc.line_follow.status()
         self._svc.state.set_line_follow(status)
         self._svc.state.set_sensor("line_follow", status.model_dump())

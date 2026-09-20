@@ -140,6 +140,8 @@ services:
     user: "${ROSY_UID:-1000}:${ROSY_GID:-1000}"
     group_add:
       - "${ROSY_DIALOUT_GID:-20}"
+      - "${ROSY_VIDEO_GID:-44}"
+      - "${ROSY_I2C_GID:-998}"
     environment:
       <<: *ros-environment
       HOME: /var/lib/rosy
@@ -148,9 +150,12 @@ services:
       - "${ROSY_DATA_PATH:-/var/lib/rosy}/maps:/var/lib/rosy/maps:ro"
       - "./config/profile.${ROSY_RUNTIME_MODE:-core}.yaml:/etc/rosy/profile.yaml:ro"
       - "./config/motion_profiles.yaml:/etc/rosy/motion_profiles.yaml:ro"
+      - "${ROSY_LINE_FOLLOW_CONFIG_PATH:-./config/line_follow.yaml}:/etc/rosy/line_follow.yaml:ro"
     devices:
       - "${ROSY_MOTOR_DEVICE:-/dev/ttyAMA4}:/dev/rosy-motor"
       - "${ROSY_LIDAR_DEVICE:-/dev/ttyAMA0}:/dev/ttyAMA0"
+      - "${ROSY_CAMERA_DEVICE:-/dev/video0}:/dev/video0"
+      - "${ROSY_I2C_DEVICE:-/dev/i2c-1}:/dev/i2c-1"
     tmpfs:
       - /tmp:size=256m,mode=1777
     healthcheck:
@@ -177,3 +182,7 @@ services:
       - "motor_profile_acceleration:=${ROSY_MOTOR_PROFILE_ACCELERATION:-200}"
       - "enable_lidar:=true"
       - "enable_battery:=false"
+      - "enable_line_follow:=true"
+      - "camera_device:=/dev/video0"
+      - "ir_interface:=/dev/i2c-1"
+      - "line_follow_config:=/etc/rosy/line_follow.yaml"

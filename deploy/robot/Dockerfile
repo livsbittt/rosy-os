@@ -78,6 +78,8 @@ COPY deploy/robot/requirements-io.txt /tmp/requirements-io.txt
 RUN apt-get -o Acquire::Retries=5 update \
     && apt-get install -y --no-install-recommends \
         python3-pip \
+        python3-numpy \
+        python3-opencv \
         python3-yaml \
         ros-jazzy-joint-state-publisher \
         ros-jazzy-robot-state-publisher \
@@ -109,11 +111,12 @@ COPY src/sim/description ./src/sim/description
 COPY src/hardware/bringup ./src/hardware/bringup
 COPY src/navigation/navigation ./src/navigation/navigation
 COPY src/apps/omx_adapter ./src/apps/omx_adapter
+COPY src/apps/control ./src/apps/control
 RUN mkdir -p src/sim/description/meshes
 RUN set -eo pipefail \
     && source /opt/ros/jazzy/setup.bash \
     && colcon build --merge-install \
-        --packages-select sllidar_ros2 interfaces description bringup navigation omx_adapter \
+        --packages-select sllidar_ros2 interfaces description bringup navigation omx_adapter control \
     && test -d /opt/rosy_ws/install
 
 FROM io-runtime AS io

@@ -36,6 +36,8 @@ def test_runtime_separates_core_from_hardware_devices():
     assert services["rosy-io"]["devices"] == [
         "${ROSY_MOTOR_DEVICE:-/dev/ttyAMA4}:/dev/rosy-motor",
         "${ROSY_LIDAR_DEVICE:-/dev/ttyAMA0}:/dev/ttyAMA0",
+        "${ROSY_CAMERA_DEVICE:-/dev/video0}:/dev/video0",
+        "${ROSY_I2C_DEVICE:-/dev/i2c-1}:/dev/i2c-1",
     ]
 
 

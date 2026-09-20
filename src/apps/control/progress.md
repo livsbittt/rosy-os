@@ -10,7 +10,7 @@ gates:
     cmd: "python3 -m pytest test/test_control_absorption_package.py -q"
   LOCAL:
     state: GO
-    evidence: "1064 passed, 26 skipped (2026-09-21 Windows, 패키지 cwd). 본체 반경 기반 map audit와 exact-map 회귀 포함"
+    evidence: "1084 passed, 26 skipped (2026-09-21 Windows, 패키지 cwd). D-143 IR/camera detector와 폐루프 운동학 수렴, 본체 반경 기반 map audit 포함"
     cmd: "cd src/apps/control && python -m pytest test -q"
   ROS-SIM:
     state: HOLD
@@ -23,7 +23,7 @@ gates:
     blocker: "Pi bench Device 설치와 device-readback.sh --json 증거 없음. Control sensor adapter 활성화는 Device 보정 generation에 묶인다(D-47)"
   FIELD:
     state: PARKED
-adrs: [D-37, D-38, D-40, D-42, D-47, D-50, D-57, D-58, D-77, D-118, D-119]
+adrs: [D-37, D-38, D-40, D-42, D-47, D-50, D-57, D-58, D-77, D-118, D-119, D-143]
 plans:
   - docs/plans/2026-09-06-module-split-criteria.md
   - docs/plans/2026-09-12-rosy-control-absorption-plan.md
@@ -32,6 +32,8 @@ plans:
   - docs/plans/2026-09-13-rosy-os-device-validation-implementation-plan.md
   - docs/plans/2026-09-15-module-harness-design.md
   - docs/plans/2026-09-17-interface-design-implementation-design.md
+  - docs/plans/2026-09-21-line-follow-modes-design.md
+  - docs/plans/2026-09-21-line-follow-modes.md
 ---
 ## 지금 상태
 
@@ -41,11 +43,23 @@ plans:
 - `web_node`+`dashboard.html`은 레거시 런치 진단 화면이다. 운용자 콘솔이 아니며 compose에 없다(D-77).
 - LOCAL 증거는 `8fdd8d2` 기준이다. Windows에서는 `PYTHONPATH`를 `;`로 구분한다.
 - `map_260905_update_v2` 단일 로봇 mapping 슬라이스는 Gazebo Harmonic에서 완주했다. 접근 가능한 본체 구성공간의 unknown/occupied는 모두 0%이고 CORE가 최종 `cmd_vel`을 단독 발행했다.
+- D-143 차선 추종은 IR 또는 카메라 한 소스만 관제에서 선택하며, Control은 evidence만 내고 CORE가 제한된 Navigation 후보 명령을 만든다. hardware mode의 IO 이미지에는 V4L2 카메라와 Pinky I²C ADC 센싱 경로가 포함된다.
 
 ## 다음 gate
 
 1. ROS Jazzy container에서 mapping 외 control 노드 그래프를 재실행해 모듈 전체 ROS-SIM HOLD를 해소한다.
 2. 서명된 ARM64 artifact 발행 후 Pi readback으로 Control sensor adapter 활성화 경로를 확인한다(ARTIFACT → DEVICE).
+3. Pinky에서 IR 검정/흰색 끝점, 카메라 방향·노출, 좌우 조향 부호, stale zero와 E-stop을 측정한다(D-143 DEVICE/FIELD).
+
+## 2026-09-21 IR·camera line-follow status
+
+- Dashboard에서 `OFF`, `IR_LINE`, `CAMERA_LINE`을 배타적으로 선택하고 오차·신뢰도·명령·정지 사유를 읽는다.
+- `rosy-io`가 sensing-only observer, V4L2/OpenCV camera fallback, 0x08 I²C 12-bit IR ADC publisher를 실행한다. 최종 `cmd_vel` publisher는 CORE 하나뿐이다.
+- 원본 영상 header 시각부터 0.3초 stale을 계산하며 malformed/저신뢰/미검출은 즉시 zero, 3초 손실은 재선택 전까지 latch다. manager의 API/ROS 공유 상태는 잠금으로 직렬화된다.
+- 폐루프 host simulation에서 초기 횡오차 3.5 cm가 IR -0.03 cm, camera 0.006 cm로 수렴했고 두 모드 모두 stale zero와 loss latch를 통과했다.
+- 외부 read-only YAML로 IR 끝점과 detector 임계값을 이미지 재빌드 없이 조정하며, 카메라 영상은 exposure/white-balance 수동 잠금 readback 전까지 전달하지 않는다.
+- mode generation과 sensor evidence revision을 한 잠금에서 확인해 mode 전환이나 더 최신의 차선 상실 evidence 뒤에 이전 주행 명령이 적용되지 않는다.
+- LOCAL Control `1084 passed, 26 skipped`, CORE `955 passed, 11 skipped`, root `1008 passed, 13 skipped`. Pi 카메라·I²C readback과 물리 차선 주행은 DEVICE/FIELD HOLD다.
 
 ## 현재 유효한 금지사항
 
