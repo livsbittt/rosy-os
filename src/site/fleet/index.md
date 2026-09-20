@@ -44,8 +44,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · feat(fleet): no video relay boundary (D-136 T1)
 - 2026-09-20 · uncommitted · fix(fleet): relay readiness is measured, not attempted (D-134)
 - 2026-09-18 · uncommitted · feat(fleet): coincident poses are not a blocked corridor (D-116)
 - 2026-09-18 · uncommitted · test(fleet): never import games (D-106)
 - 2026-09-18 · uncommitted · feat(server): 폭 면제를 걷어낸다 (D-93)
-- 2026-09-18 · uncommitted · fix(server): 잘린 계획 경로가 목표 점유를 가렸다

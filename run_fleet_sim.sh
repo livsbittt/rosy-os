@@ -11,24 +11,35 @@ echo "Starting $ROBOTS-robot fleet simulation..."
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 
+# D-117 — 시스템 전체는 CycloneDDS 만 쓴다. 비대화형 셸은 env.sh 를 거치지
+# 않으므로 여기서 명시한다. 빠뜨리면 ros_gz_bridge 만 FastDDS 로 떠서
+# clock/scan/odom 이 ROS 로 전혀 흐르지 않는다(센서 브리지 FAIL 의 원인).
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
 # 재기동 사이클마다 SIGKILL 된 프로세스의 DDS 참가자 잔재가 도메인 0 인덱스를
 # 고갈시킨다("Failed to find a free participant index"). 실행마다 새 도메인으로
 # 격리한다 — fleet 콘솔은 HTTP 여서 영향이 없고, 시뮬 내부는 이 도메인을 공유한다.
 export ROS_DOMAIN_ID=$(( (RANDOM % 100) + 20 ))
+
+# Nav2 의 정적 점유 맵(map_server) — mode:=nav 는 map:= 인자를 요구한다.
+MAP_YAML="$PWD/src/apps/control/map/map_260905_update_v2/maps/map_260905.yaml"
 
 # 2. Cleanup previous processes
 killall -9 ruby gz python3 parameter_bridge create 2>/dev/null || true
 
 # 3. Start gz_multi.launch.py in the background
 echo "[1/3] Starting Gazebo Multi-Robot Environment (core+nav2)..."
-ros2 launch src/sim/gz_sim/launch/gz_multi.launch.py robots:=$ROBOTS world_name:=/tmp/map_260905.world mode:=nav core:=true headless:=true spawn_x:=-0.5 spawn_spacing:=1.0 > /tmp/rosy_gz.log 2>&1 &
+ros2 launch src/sim/gz_sim/launch/gz_multi.launch.py robots:=$ROBOTS world_name:=/tmp/map_260905.world map:="$MAP_YAML" mode:=nav core:=true headless:=true spawn_x:=-0.5 spawn_spacing:=1.0 > /tmp/rosy_gz.log 2>&1 &
 GZ_PID=$!
 
 echo "Waiting for robots.yaml to be generated..."
 ROBOTS_YAML=""
-for i in {1..30}; do
-    # Find the newest robots.yaml in /tmp/rosy_gz_multi_*/
-    YAML_PATH=$(ls -t /tmp/rosy_gz_multi_*/robots.yaml 2>/dev/null | head -n 1)
+SIM_START=$(date +%s)
+for i in {1..240}; do
+    # 이번 실행이 시작된 뒤에 생성된 yaml 만 받는다 — 죽은 이전 세대의 stale
+    # yaml 을 집으면 죽은 포트의 매니페스트로 콘솔이 떠서 영구 ConnectError 다.
+    YAML_PATH=$(find /tmp -maxdepth 2 -path '*rosy_gz_multi*/robots.yaml' \
+        -newermt "@$SIM_START" 2>/dev/null | head -n 1)
     if [ -n "$YAML_PATH" ] && [ -f "$YAML_PATH" ]; then
         ROBOTS_YAML=$YAML_PATH
         break

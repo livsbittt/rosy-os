@@ -143,10 +143,13 @@
 | D-133 | CORE SIGSEGV 는 재현 경로로 쫓고, 흔들리는 환경에서의 반복은 폐기한다 | Accepted |
 | D-134 | 릴레이 준비 신호는 실측으로 말한다 | Accepted |
 | D-135 | CI 러너는 Ubuntu 버전을 고정하고, 다음 LTS 이동은 기한 전에 리허설한다 | Accepted |
+| D-140 | ARM64 ?? ??? ?? arm64 ??? ?? ????? ? ARTIFACT ? ?? ?? ??? | Accepted |
 | D-136 | 영상 대역폭은 예산으로 다룬다 — 경로 분리 + 상한 + 자동킬 | Proposed |
 | D-137 | YOLO는 자문역이다 — LiDAR/IR가 결정하고 영상은 증거만 낸다 | Proposed |
 | D-138 | 도크 검출기는 센서 provider 포트를 탄다 — 새 정적 간선 없음 | Accepted |
 | D-139 | OS는 자리만 내고, 무엇을 볼지는 제품이 정한다 | Accepted |
+| D-141 | 대형 주행 실측은 네 게이트를 순서대로 통과한다 — 단일 세션 묶음 | Accepted |
+| D-142 | 실물 전에 소프트웨어 계약을 닫는다 — 잔여 3건 | Accepted |
 
 ---
 
@@ -4553,3 +4556,82 @@ placement 실측(Task 5) 뒤. 그 전까지 D-136/D-137은 계약 문서로 잠�
 거절한다.
 
 **References:** D-23, D-62, D-64, D-136, D-137, D-138, SRS v1.1.
+
+---
+
+## D-142 실물 전에 소프트웨어 계약을 닫는다 — 잔여 3건
+
+**Status:** Accepted (2026-09-20). 실행 계획:
+`docs/plans/2026-09-20-remaining-software-contracts-plan.md`.
+
+**Context:** D-139가 "ID 없는 vision 작업은 PARKED"로 못 박았지만, 실물 없이
+닫히는 계약이 셋 남았다. 이것들은 측정·자재를 기다리지 않는다 — 호스트
+pytest로 적색→녹색이 today 된다. 미루면 실측 때 계약 없이 달리게 된다.
+
+**Decision:**
+
+1. **P1 — D-136 T1 계약 3건.** CORE 영상 바이트 금지, gather 이미지 혼입
+   금지, Fleet 릴레이 금지. 전부 import/스키마/라우트 단언이다.
+2. **P2 — 차선 조향 소비.** `error → 각속도` pure 함수 + 0.10 캡 +
+   `nav.lane_lost` 방출점. 노드 배선은 카메라 온 뒤.
+3. **P3 — D-137 T4 반쪽.** stale INVALID 전이까지만. LiDAR 쪽 person 입력은
+   YOLO 파이프까지 대기.
+4. **범위 밖 확정:** D-136/D-137 Accepted 전환, placement, Pi 게이트, 실물
+   도크, Gazebo 브리지(D-83), 하네스 re-stamp(타 세션).
+
+**Alternatives:** 실측 때까지 전부 대기 — 계약 없이 실측하면 실패의 원인을
+자를 수 없다. 실물 설계 계속 — 설계는 4건 착지했고 더 그리면 서랍만 는다.
+
+**Consequences:** P1→P2→P3 순서, 각 적색→녹색 + 회귀 후 커밋. 끝나면 본 계획
+complete.
+
+**Validation / Transition:** 신규 계약 + 기존 스위트 회귀.
+
+**References:** D-136, D-137, D-139, NAV-007, SAF-006.
+
+---
+
+## D-141 대형 주행 실측은 네 게이트를 순서대로 통과한다 — 단일 세션 묶음
+
+**Status:** Accepted (2026-09-20). 단일 대화형 세션 원칙이 지켜지는 실행 묶음이며, 게이트 실측이 logs 에 기록될 때마다 진행이 갱신된다.
+
+**Context:** D-131 (콘솔 군집 렌더링) 과 D-132 (무장은 스트림이 연 뒤에) 의 코드와 계약 시험은 착지됐고, LOCAL 실측도 부분 도달했다 — 코어 2/2 부팅, 릴레이 22,791 프레임 전달, T6 선택 편성 무장, FOR-004 HOLD 작동. 남은 것은 네 개이고 순서가 있다: 센서 브리지 게이트, 맵/TF 게이트, 무장 직후 follower_tx ≥ 1 (D-132 계약), 리더 주행 → 팔로워 추종 → 추적 오차 표본. 그리고 환경: 공유 박스에서의 네 번의 실패 양상(참가자 인덱스 고갈·고아 스택 누적·discovery 불능·백그라운드 재피해)이 기록됐다. 같은 날 두 세션이 D-140 번호를 이중 사용하는 충돌도 있었다 — 번호 배정은 이제 직전에 확인한다.
+
+**Decision:**
+
+1. **단일 대화형 세션 원칙.** 시뮬 실측은 백그라운드 기동이 아니라 대화형 터미널 하나에서 수행한다. 시작 전 점유 확인: 8090·18080/18081 청취 없음, /tmp/rosy_gz_multi_* 잔재 없음, gz·코어·launch 프로세스 0.
+2. **게이트 A — 센서 브리지.** 기동 후 /rosy_XX/scan·/clock 이 ROS 쪽에서 흐르는지 실측(주기 포함). RMW 는 스크립트가 Cyclone 으로 통일한다(D-117). 흐르지 않으면 ros_gz_bridge 구성 추적 — gz_sim 도메인 과제다.
+3. **게이트 B — 맵/TF.** map:= 로 전달된 점유 맵이 map_server 에서 /map 으로 게시되고, AMCL 이 scan+초기 pose 로 map→odom 을 내는지 실측. TF 가 서면 Nav2 는 PLANNING 을 벗어난다.
+4. **무장 실측 (D-132 계약).** 스트림 개방 후 무장 — 무장 직후 follower_tx ≥ 1. 미달이면 follower_last_error 가 이유를 말한다.
+5. **주행·추종 표본.** 리더 1.2 m 주행 중 추적 오차를 표본 수집한다 — 0.3 m 임계 검토의 첫 실데이터다. 임계 변경은 이 데이터 없이 하지 않는다.
+6. 각 게이트 결과를 logs 에 기록하고, 전부 통과하면 D-132/D-133 의 Validation 을 채워 D-131 의 LOCAL 증거를 완성한다.
+
+**Alternatives:** 환경 정비 없이 반복 — 무효 숫자(D-133 네 번 확인). Pi 우선 — 센서 브리지 게이트는 호스트 시뮬에서도 판정 가능하나 Pi 는 자원 여유가 없다. 실측 포기 — D-131 의 미완 문장이 남는다.
+
+**Consequences:** 이 묶음이 닫히면 D-131 의 LOCAL 증거가 완성되고 0.3 m 임계가 실데이터로 검토된다. 결함 (b) SIGSEGV 가 재현되면 core 세션 귀속이며, 이 묶음은 중단된 시점까지의 관측만 기록한다. logs 항목의 불릿은 괄호 메타데이터 없이 표준 이름을 쓴다 — 면제 목록이 늘어나는 것은 프로세스 결함이다.
+
+**Validation / Transition:** 절차는 `Rosy/sim_verify.sh`(정리·RMW·도메인·map:= 전부 반영). 각 게이트의 수치를 logs 에 기록한다. 전 게이트 통과 시 D-132 의 "ROS-SIM 재실행에서 무장 직후 follower_tx ≥ 1 실측" 문장이 채워진다.
+
+**References:** FOR-001·003, D-31, D-59, D-83, D-88, D-91, D-131, D-132, D-133, D-134, result.md(map-260905-update-v2), 1cf5c5b, 196be0d, 6ff2cb8.
+
+---
+
+## D-140 ARM64 소스 검증은 공개 arm64 러너로 매주 리허설한다 — ARTIFACT gate 의 코드 수준 선검증
+
+**Status:** Accepted (2026-09-20).
+
+**Context:** ARTIFACT gate 가 HOLD 인 이유 중 하나는 "ARM64 개발 후보만 존재" — 네이티브 arm64 에서의 코드 검증이 Pi 없이는 불가능했다(D-66/D-78 은 이미지 빌드 단계). 이 저장소는 public 이므로 GitHub 의 arm64 호스티드 러너(ubuntu-24.04-arm)가 무료이고, ROS 2 Jazzy apt 패키지는 arm64 를 지원한다.
+
+**Decision:**
+
+1. **매주 목요일 + 수동 트리거로 arm64 리허설을 실행한다.** ubuntu-24.04-arm 에서 ROS Jazzy base 설치 → `colcon build src` → core ROS-free 스위트. 비게이팅(continue-on-error) — 실패는 ARTIFACT 진입 전에 발견하는 것이 목적이다.
+2. **이미지 빌드 자체는 D-66 대로 네이티브 Pi 에서 한다.** 이 리허설은 코드 수준 선검증이며 deploy/image 파이프라인을 대체하지 않는다.
+3. **리허설 적색은 ARTIFACT 준비의 할 일 목록이다.** 녹색이 연속되어도 ARTIFACT gate 승격은 D-78 절차를 따른다.
+
+**Alternatives:** QEMU 에뮬레이션 — 느리고 D-66 이 금지한다. Pi 상시 연결 — 하드웨어 비용과 대기 시간. 무시 — 이주 후 적색 발견은 늦다.
+
+**Consequences:** 주간 arm64 CI 실행(공개 저장소 무료). ROS Jazzy arm64 apt 의존(apt.ros.org arm64 지원). 리허설 적색이 ARTIFACT 준비의 가시적 신호가 된다.
+
+**Validation / Transition:** 최초 실행에서 빌드·스위트 통과를 확인한다. 연속 녹색이면 ARTIFACT gate 진입 시 "코드 수준 네이티브 검증" 증거로 인용한다.
+
+**References:** D-66, D-78, actions/runner-images(Ubuntu 26.04/24.04 arm64), changelog 2026-09-17.

@@ -5,10 +5,10 @@
 
 | 모듈 | owner | last verified | SOURCE | LOCAL | ROS-SIM | ARTIFACT | DEVICE | FIELD |
 |---|---|---|---|---|---|---|---|---|
-| [core](src/core/core/progress.md) | CORE | b98642f (2026-09-20) | GO | GO | HOLD | HOLD | HOLD | PARKED |
-| [deploy](deploy/progress.md) | 릴리스·플랫폼 | b98642f (2026-09-20) | GO | GO | N/A | HOLD | HOLD | N/A |
+| [core](src/core/core/progress.md) | CORE | ab8bf1b (2026-09-20) | GO | GO | HOLD | HOLD | HOLD | PARKED |
+| [deploy](deploy/progress.md) | 릴리스·플랫폼 | ab8bf1b (2026-09-20) | GO | GO | N/A | HOLD | HOLD | N/A |
 | [control](src/apps/control/progress.md) | CONTROL | uncommitted (2026-09-21) | GO | GO | HOLD | HOLD | HOLD | PARKED |
-| [fleet](src/site/fleet/progress.md) | FLEET | b98642f (2026-09-20) | GO | GO | HOLD | PARKED | PARKED | PARKED |
+| [fleet](src/site/fleet/progress.md) | FLEET | ab8bf1b (2026-09-20) | GO | GO | HOLD | PARKED | PARKED | PARKED |
 | [games](src/apps/games/progress.md) | GAMES | 411a303 (2026-09-18) | GO | GO | N/A | N/A | PARKED | PARKED |
 | [gz_sim](src/sim/gz_sim/progress.md) | SIM | uncommitted (2026-09-21) | GO | GO | GO | N/A | N/A | N/A |
 | [navigation](src/navigation/navigation/progress.md) | NAV | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
@@ -21,7 +21,7 @@
 | [interfaces](src/core/interfaces/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | N/A | HOLD | HOLD | PARKED |
 | [description](src/sim/description/progress.md) | 로봇 통합 | uncommitted (2026-09-21) | GO | GO | GO | HOLD | HOLD | PARKED |
 | [dock](dock/progress.md) | 도킹 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
-| [docs](docs/progress.md) | 거버넌스 | b98642f (2026-09-20) | GO | GO | N/A | N/A | N/A | N/A |
+| [docs](docs/progress.md) | 거버넌스 | ab8bf1b (2026-09-20) | GO | GO | N/A | N/A | N/A | N/A |
 
 ## HOLD blockers
 

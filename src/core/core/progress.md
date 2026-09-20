@@ -2,7 +2,7 @@
 module: core
 logical_modules: [M03, M04, M06, M07, M11, M12, M13]
 owner: CORE
-last_verified: { commit: "b98642f", date: 2026-09-20 }
+last_verified: { commit: "ab8bf1b", date: 2026-09-20 }
 gates:
   SOURCE:
     state: GO

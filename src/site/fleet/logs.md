@@ -99,3 +99,9 @@
 - gate 변화: 없음. SOURCE/LOCAL GO, ROS-SIM HOLD — ROS-SIM 실측(`follower_tx ≥ 1`)은 D-132 계승으로 미실행
 - 결정: D-134 Proposed → Accepted
 - 교훈: `pose_stream()`은 async generator라 첫 `__anext__` 전까지 접속이 일어나지 않는다 — 시도 전에 세운 connected flag는 거짓 양성이다
+
+## 2026-09-20 · uncommitted · feat(fleet): no video relay boundary (D-136 T1)
+
+- 변경: `test_no_video_relay.py` 2건 — fleet 생산 코드 영상 import 없음 + 서버 라우트에 video/stream/camera/preview/proxy/relay 없음 (라우트 열거 비어있음 방지 포함)
+- 증거: 2 passed. fleet 전체 332 passed·5 skipped
+- gate 변화: 없음

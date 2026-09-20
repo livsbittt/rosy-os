@@ -796,3 +796,67 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 실측 완주(무장 직후 follower_tx ≥ 1 → 팔로워 추종 → 오버레이 검증)는 대화형 세션에서만 가능함이 세 번째로 확인됐다 — D-83 세션의 절차는 유효하며(Rosy/sim_verify.sh, 정리 절차 강제·RMW 통일·도메인 격리·map:= 주입 모두 반영됨), 인계를 이대로 종결한다
 - 교훈: 세 번의 다른 실패 뒤에는 같은 결론이 있었다 — 환경이 허락할 때까지 기다리는 것과, 환경을 바꾸는 것, 그리고 환경 밖에서 할 수 있는 것을 다 하고 멈추는 것. 이번은 세 번째다
+
+## 2026-09-20 · uncommitted · docs(harness): re-stamp last_verified at ab8bf1b — all suites green on the new runner
+
+- 변경: core·control·fleet·docs·deploy 다섯 모듈의 progress.md last_verified 를 ab8bf1b(2026-09-20)로 갱신 — ubuntu-26.04 전환 러너에서의 재검증 스탬프다
+- 증거: 이 호스트 실측 — core 927 passed 11 skipped, control 1063 passed 26 skipped(기존 환경성 startup 2실패 소멸), fleet 330 passed 5 skipped(+6), 루트 계약 966 passed 13 skipped(network_topology 실패 소멸 — docs/plan 이동 착지분)
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: control 의 환경성 2건이 소멸한 것은 콘솔 세션의 최근 커밋(web_port 런치 정리)과 무관하지 않아 보이나 원인 규명은 하지 않았다 — 다음 스탬프 때 재현 여부 확인
+- 교훈: 없음
+
+## 2026-09-20 · uncommitted · fix(sim): run_fleet_sim pins CycloneDDS — the D-117 bridge FAIL cause
+
+- 변경: 콘솔 세션이 작업 트리에 남긴 수정을 소유자 지시로 착지 — run_fleet_sim.sh 에 `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` 명시 export 추가. 비대화형 실행은 env.sh 를 거치지 않아 누락 시 ros_gz_bridge 가 FastDDS 로 올라 clock/scan/odom 이 ROS 로 넘어가지 않는다(브리지 FAIL 원인)
+- 증거: 맵 검증 result.md 의 센서 브리지 FAIL 항목과 동일 증상(브리지 무출력). 스크립트 내 주석에 원인 기록. D-117 의 Cyclone 고정 계약과 일치
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 시뮬 런처도 D-117 의 Cyclone 고정을 따른다
+- 교훈: 없음
+
+## 2026-09-20 · uncommitted · docs(plans): land three design drafts — camera placement, dock build, Pi bench commissioning
+
+- 변경: 콘솔 세션이 작성한 설계 초안 3건을 착지하고 plans 인덱스에 등록했다 — ① 카메라 배치(Task 5, D-52: Picamera2/CSI 캡처를 host service + least-privilege 컨테이너로 분리, 제품 아닌 인프라) ② 도크 벤치 빌드(DNC: 1단 벤치 마킹, DNC-007 태그 검증, teach-by-docking) ③ Pi 벤치 커미셔닝(D-66: artifact 설치→readback 단계 게이트). run_fleet_sim.sh 는 맵 번들 world·yaml 을 gz_multi 에 연결하는 수정과 함께 별도 커밋
+- 증거: 문서 3건 각 39~48 줄 완결형 Draft — ADR/계약 참조 명시(D-52·D-47·D-136·D-138 / D-28·DNC-001~007 / D-33·D-46·D-66), 상위 계획 문서 연결
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 세 문서 모두 Draft 상태 유지 — 실행 착지 시 각자의 게이트로 판정
+- 교훈: 없음
+
+## 2026-09-20 · uncommitted · ci(adr): add D-140 — weekly native arm64 rehearsal (ARTIFACT 코드 수준 선검증)
+
+- 변경: `.github/workflows/arm64-rehearsal.yml` 신설 — 매주 목요일 + 수동 트리거, ubuntu-24.04-arm(공개 저장소 무료) 에서 ROS Jazzy base 설치 → colcon build src → core ROS-free 스위트 실행. 비게이팅(continue-on-error). ADR 로그에 D-140 본문·인덱스 행 착지
+- 증거: 저장소 public 확인(`gh repo view` → PUBLIC) — arm64 호스티드 러너 무료. 워크플로 YAML 파스 통과. ARTIFACT gate blocker "ARM64 개발 후보만 존재"의 코드 수준 선검증 경로
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 이미지 빌드 자체는 D-66 대로 네이티브 Pi — 이 리허설은 코드 수준 선검증이다. 실패 리허설은 ARTIFACT 준비 목록이 된다
+- 교훈: 없음
+
+## 2026-09-20 · uncommitted · ci(adr): first full native arm64 rehearsal — build green, 11 platform findings recorded
+
+- 변경: arm64 리허설 2차 — 1차 빌드 실패 원인을 해소(description 의 xacro apt 추가, Pi 전용 드라이버 lamp_control·sensor_adc·imu_bno055 와 gz_sim 을 packages-skip) 하여 네이티브 arm64 빌드 최초 GREEN. core 스위트 결과를 플랫폼 발견으로 기록
+- 증거: run 35516761718 — Install ROS ✓, Build(colcon, native arm64) ✓, core 스위트 11 failed 926 passed 1 skipped. 실패 내역: test_absorption_output_graph 10건(SimpleNamespace 에 _readiness 부재 — rclpy import 가능 환경에서의 분기 차이)·test_control_sensor_adapter 1건(rclpy.init 미호출 상태로 노드 생성). x86 게이팅 run 35511334843 success 와 병행 확인
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 11건은 arm64 리허설 비게이팅 스텝에 기록된 ARTIFACT 준비 목록이다 — x86 게이팅과 분리하며, 소유 세션이 다음 스탬프 때 흡수한다
+- 교훈: "ROS-free 스위트"도 rclpy 가 설치된 플랫폼에서는 실행 경로가 달라진다 — ROS-free 는 import 금지가 아니라 경로 문제이며, 아키텍처 리허설이 그 차이를 드러낸다
+
+## 2026-09-20 · uncommitted · fix(sim): double the robots.yaml wait window in run_fleet_sim
+
+- 변경: run_fleet_sim.sh 의 robots.yaml 대기 루프를 120회 → 240회로 연장 — 느린 호스트에서 yaml 생성이 대기창을 넘기면 콘솔이 죽은 포트의 stale 매니페스트를 집는 문제의 여유를 넓혔다
+- 증거: `git diff run_fleet_sim.sh` — for 루프 상한만 수정, 나머지 무변경. map_260905 world·yaml 연결(c5db281)과 결합해 시뮬 기동이 안정화
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 없음
+- 교훈: 없음
+
+## 2026-09-20 · uncommitted · docs(fleet): fourth confirmation - background sim stacks cannot survive this box; the handoff stands as final
+
+- 변경: 없음(확인과 기록만). 배경 기반 시뮬 검증 재시도 1회 — 콘솔 D-state 임포트 중 스택 전멸(콘솔·코어 프로세스 소멸, 8090 무청취), 관측 8회 전부 무응답
+- 증거: 네 번의 세대 교체마다 동일한 종말 — (1) 참가자 인덱스 고갈 (2) 고아 스택 누적·SIGSEGV/-9 (3) discovery 불능(도메인·RMW 일치에도) (4) 백그라운드 스택 재피해. 각각에 대한 우회(도메인 격리·pkill 목록·세션 생존)는 1·2·3 번에 유효했으나 네 번째 조합은 새 원인을 낳는다 — 공유 박스의 동시 세션 활동이 원인이라 통제 밖이다
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 이 환경에서의 시뮬 실측 시도를 종료한다. D-131·D-132 의 미완 실측(무장 직후 tx ≥ 1, 팔로워 추종, 0.3 m 임계)은 D-83 세션이 안정 환경(단독 세션·자원 튜닝)에서 Rosy/sim_verify.sh 로 완주한다 — 인계물은 전부 자리했다(스크립트·진단 필드·재현 경로·계약 시험)
+- 교훈: 게이트가 적색을 유지하는 것은 실패가 아니라 정보다 — 네 번의 적색이 네 가지 환경 결함을 밝혔다. 환경 한계를 코드 결함과 구별해 기록하는 것이 다음 세션의 가장 빠른 시작점이다
+
+## 2026-09-20 · uncommitted · docs(adr): the formation-driving measurement bundle is locked as four ordered gates (D-141)
+
+- 변경: ADR **D-141** 신규(색인 행 포함, Accepted — 실행 묶음). `docs/progress.md`의 `adrs`에 D-141 추가
+- 증거: 번호 배정 직전 확인 — 같은 날 두 세션이 D-140 을 이중 사용(본문 2개·색인 1행)하는 충돌이 있었고, 본 ADR은 그 다음 빈 번호 D-141 로 배정했다. 충돌 자체의 해결은 관련 세션 간 조정 사항으로 보고한다
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: D-141 — 대형 주행 실측은 네 게이트를 순서대로 통과한다. (A) 센서 브리지(RMW 통일 상태에서 scan/clock 흐름) → (B) 맵/TF(map:= → map_server → /map → map→odom) → 무장 직후 follower_tx ≥ 1(D-132 계약) → 리더 1.2 m 주행·팔로워 추종·추적 오차 표본(0.3 m 임계의 첫 실데이터). 단일 대화형 세션 원칙 + 시작 전 점유 확인(8090·18080·yaml·프로세스). 게이트 실패 시 gz_sim·core 도메인 귀속
+- 교훈: 없음
