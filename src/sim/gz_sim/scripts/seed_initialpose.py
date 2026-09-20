@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish map-frame initialpose at gz_multi spawn (D-115).
+"""Publish a map-frame initial pose at the gz_multi spawn (D-115).
 
 rclpy lives here, not in world_profiles. Host pytest must not import this file.
 """
