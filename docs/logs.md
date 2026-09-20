@@ -828,3 +828,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 이미지 빌드 자체는 D-66 대로 네이티브 Pi — 이 리허설은 코드 수준 선검증이다. 실패 리허설은 ARTIFACT 준비 목록이 된다
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · ci(adr): first full native arm64 rehearsal — build green, 11 platform findings recorded
+
+- 변경: arm64 리허설 2차 — 1차 빌드 실패 원인을 해소(description 의 xacro apt 추가, Pi 전용 드라이버 lamp_control·sensor_adc·imu_bno055 와 gz_sim 을 packages-skip) 하여 네이티브 arm64 빌드 최초 GREEN. core 스위트 결과를 플랫폼 발견으로 기록
+- 증거: run 35516761718 — Install ROS ✓, Build(colcon, native arm64) ✓, core 스위트 11 failed 926 passed 1 skipped. 실패 내역: test_absorption_output_graph 10건(SimpleNamespace 에 _readiness 부재 — rclpy import 가능 환경에서의 분기 차이)·test_control_sensor_adapter 1건(rclpy.init 미호출 상태로 노드 생성). x86 게이팅 run 35511334843 success 와 병행 확인
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 11건은 arm64 리허설 비게이팅 스텝에 기록된 ARTIFACT 준비 목록이다 — x86 게이팅과 분리하며, 소유 세션이 다음 스탬프 때 흡수한다
+- 교훈: "ROS-free 스위트"도 rclpy 가 설치된 플랫폼에서는 실행 경로가 달라진다 — ROS-free 는 import 금지가 아니라 경로 문제이며, 아키텍처 리허설이 그 차이를 드러낸다
