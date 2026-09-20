@@ -764,3 +764,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 수용 보류 — ① 포맷 래핑(encode_record) ② img2 후반 데이터 수령 ③ 융합 근거 문서화를 공급자에게 요구. 물리 체크박스에는 ArUco dock tag pose(bf0ed54)와의 교차검증을 포함했다
 - 교훈: 검증 도구의 출력도 의심한다 — "1.75cm 열화"는 내 스크립트가 잘린 데이터를 잘못 짝지은 오판이었다. 잘린 입력 위의 정밀 숫자는 정확한 착각이다
+
+## 2026-09-20 · uncommitted · docs(fleet): DDS discovery itself is dead on this box — the D-83 stable session is mandatory, proven three ways
+
+- 변경: 없음(진단과 기록만)
+- 증거: 세 가지 독립 실측이 같은 결론 — (1) 재기동 사이클의 CycloneDDS 참가자 인덱스 고갈("Failed to find a free participant index", 도메인 격리로 우회) (2) 누적 고아 스택의 Nav2 SIGSEGV·-9 리핑(pkill 목록 정리로 우회) (3) 도메인 56·Cyclone 일치 프로브에서도 그래프 텅 빔(토픽·TF 0 — /proc/PID/environ 에서 도메인 자동 일치 확인). 즉 이 공유 WSL2 박스는 지금 DDS 발견 자체가 불안정하고, 시뮬 스택 검증은 여기서 무효다
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: D-132·D-134 의 최종 실측("무장 직후 follower_tx ≥ 1", 팔로워 실제 추종)은 D-83 세션의 절차(안정 세션에서 sim_verify.sh 실행)로 확정 인계 — 인계물 전부 자리했다(Rosy/sim_verify.sh·run_fleet_sim.sh 수정·진단 필드·재현 경로)
+- 교훈: 세 번의 다른 실패 양상 뒤에 같은 환경 원인이 있었다. 같은 환경에서 세 번 다른 그림이 나오면, 그것은 코드 결함이 아니라 환경 한계의 세 얼굴이다 — 갈아타라
