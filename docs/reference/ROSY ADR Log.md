@@ -4279,9 +4279,7 @@ D-72, D-79, D-81, D-88, D-89, D-91, D-93, D-129, D-130.
 
 ## D-134 릴레이 준비 신호는 실측으로 말한다
 
-**Status:** Proposed (2026-09-20, 리뷰 발견 — 미착지). D-132 작업 트리
-(`swarm/relay.py`, `swarm/session.py` 미커밋 변경) 리뷰에서 나온 3점. 코드는
-돌아가고 fleet 스위트 94 passed이나, 아래 셋은 진단 가치를 갉는다.
+**Status:** Accepted (2026-09-20). T1–T4 착지 — fleet 스위트 330 passed, 5 skipped, 신규 4건은 구 코드 적색 확인.
 
 **Context:** D-132는 "무장은 스트림이 연 뒤에"로 순서를 뒤집고
 `Relay.streams_ready()` — 리더 스트림 + 전 팔로워 sink 개방 — 를 기다린다.

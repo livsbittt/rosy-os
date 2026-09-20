@@ -140,6 +140,8 @@ class Relay:
             except Exception as exc:
                 log.error("relay task died: %r", exc)
         self._tasks.clear()
+        # D-134 — lane과 대칭. Cancel로 _read_leader가 죽는 경로도 이 한 줄로 커버된다.
+        self._leader_connected = False
         for lane in self._lanes.values():
             if lane.sink is not None:
                 try:
@@ -191,10 +193,14 @@ class Relay:
         backoff = _BACKOFF_FIRST_S
         while self._running:
             got_frame = False
-            self._leader_connected = True
             try:
                 async for frame in self._leader.pose_stream():
                     got_frame = True
+                    # D-134 — 접속 시도가 아니라 첫 프레임 수신 때만 참이다.
+                    # pose_stream()은 async generator라 첫 __anext__ 전까지 접속이
+                    # 일어나지 않는다 — 시도 전에 세우면 리더 down이어도 찰나 참이 돼
+                    # 검증 안 된 리더에 무장한다.
+                    self._leader_connected = True
                     backoff = _BACKOFF_FIRST_S
                     self._leader_last_error = None
                     self._on_frame(frame)

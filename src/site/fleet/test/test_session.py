@@ -453,6 +453,59 @@ def test_a_relay_that_cannot_be_built_is_refused_before_any_robot_is_touched():
     run(main())
 
 
+def test_a_relay_session_error_keeps_its_original_reason():
+    """D-134 — 고정 문자열로 덮어쓰지 않는다. 원인이 지워지면 "접촉 전 거절"이
+    왜 일어났는지 아무도 모른다."""
+    async def main():
+        leader, followers, _ = _robots(2)
+
+        def broken(_leader, _followers, **_kw):
+            raise SessionError("cannot build: boom-134")
+
+        s = FormationSession(leader, followers, FormationSpec(Formation.COLUMN, spacing=0.6),
+                             relay_factory=broken, sleep=_no_sleep)
+        with pytest.raises(SessionError):
+            await s.start()
+        assert s.state is SessionState.STOPPED
+        assert "boom-134" in s.reason[0]
+        assert not any(_follows(f) for f in followers)
+    run(main())
+
+
+def test_stop_during_open_wait_aborts_immediately_without_touching_robots():
+    """D-134 — 개방 대기 3 s 중 운영자 stop이면 즉시 탈출한다. 3 s를 다 쓰고
+    _arm까지 갔다가 되돌아오지 않고, 운영자의 종료 사유를 덮어쓰지 않는다."""
+    async def main():
+        leader, followers, log = _robots(2)
+        holder = {}
+
+        def factory(ld, f, **_kw):
+            relay = FakeRelay(ld, f, log=log, ready=False)
+            holder["relay"] = relay
+            return relay
+
+        box = {}
+
+        async def sleep(_s):
+            box["n"] = box.get("n", 0) + 1
+            if box["n"] == 2:
+                await box["s"].stop()       # 대기 중에 운영자가 끝낸다
+            else:
+                await asyncio.sleep(0)
+
+        s = FormationSession(leader, followers, FormationSpec(Formation.COLUMN, spacing=0.6),
+                             relay_factory=factory, sleep=sleep)
+        box["s"] = s
+        with pytest.raises(SessionError):
+            await s.start()
+        assert s.state is SessionState.STOPPED
+        assert s.reason == ("stopped", None)      # 구 코드는 relay_failed로 덮어쓴다
+        assert box["n"] < 60                       # 3 s 상한을 다 쓰지 않았다
+        assert not any(_follows(f) for f in followers)
+        assert holder["relay"].stopped
+    run(main())
+
+
 def test_the_session_refuses_duplicate_or_self_following_robots():
     spec = FormationSpec(Formation.COLUMN, spacing=0.6)
     with pytest.raises(ValueError):

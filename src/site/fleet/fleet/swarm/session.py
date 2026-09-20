@@ -143,29 +143,34 @@ class FormationSession:
         self.reason = None
 
     async def _open_relay(self) -> None:
-        """릴레이를 켜고 스트림이 열리기를 기다린다 (D-132).
+        """릴레이를 켜고 스트림이 열리기를 기다린다 (D-132, D-134).
 
         실패 시 로봇을 만지기 전이므로 relay.stop() 만으로 끝난다 — 무장된 팔로워를
-        되돌릴 필요가 없는 것이 이 순서의 이득이다.
+        되돌릴 필요가 없는 것이 이 순서의 이득이다. D-134: self.relay 대입은
+        streams_ready() 확인 뒤로, SessionError 원문은 보존하고, 대기 중 stop이면
+        즉시 탈출해 운영자의 종료 사유를 덮어쓰지 않는다.
         """
         relay = None
         try:
             relay = self._relay_factory(self._leader, self._followers)
             await relay.start()
-            self.relay = relay
             for _ in range(60):                      # 3 s — 개방 상한
+                if self.state is SessionState.STOPPED:
+                    raise SessionError("session stopped while waiting for relay streams")
                 if relay.streams_ready():
+                    self.relay = relay
                     return
                 await self._sleep(0.05)
             raise SessionError("relay streams did not open within 3s")
-        except SessionError:
+        except SessionError as exc:
             if relay is not None:
                 try:
                     await relay.stop()
-                except Exception as exc:
-                    log.warning("relay stop failed after a failed start: %s", exc)
-            self.state = SessionState.STOPPED
-            self.reason = ("relay_failed:streams did not open", None)
+                except Exception as stop_exc:
+                    log.warning("relay stop failed after a failed start: %s", stop_exc)
+            if self.state is not SessionState.STOPPED:
+                self.state = SessionState.STOPPED
+                self.reason = (f"relay_failed:{exc}", None)
             raise
         except Exception as exc:
             if relay is not None:
@@ -173,8 +178,9 @@ class FormationSession:
                     await relay.stop()
                 except Exception as stop_exc:
                     log.warning("relay stop failed after a failed start: %s", stop_exc)
-            self.state = SessionState.STOPPED
-            self.reason = (f"relay_failed:{exc}", None)
+            if self.state is not SessionState.STOPPED:
+                self.state = SessionState.STOPPED
+                self.reason = (f"relay_failed:{exc}", None)
             raise SessionError(f"relay could not be started: {exc}") from exc
 
     async def reform(self, spec: FormationSpec) -> None:

@@ -234,6 +234,38 @@ def test_stop_closes_the_sinks():
     run(main())
 
 
+def test_streams_ready_is_false_until_the_first_leader_frame_arrives():
+    """D-134 — 접속 시도가 아니라 첫 프레임 수신이 준비다. pose_stream()은 async
+    generator라 첫 __anext__ 전까지 접속이 일어나지 않는다 — 시도 전에 세우면
+    리더 down이어도 찰나 참이 돼 검증 안 된 리더에 무장한다."""
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        leader.pose_error = RobotApiError("rosy_01", 403, "WS_4403", "capability swarm.lead not declared")
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await asyncio.sleep(0)          # 리더 태스크가 첫 접속 시도까지 돌게 한다
+        assert relay.is_connected("rosy_02")      # 팔로워 sink는 열렸다
+        assert not relay.streams_ready()          # 리더 실측 없음 — 구 코드는 여기서 참이었다
+        await relay.stop()
+    run(main())
+
+
+def test_streams_ready_tracks_data_flow_and_stop_clears_it():
+    """D-134 — 준비는 데이터 흐름이다. 프레임 1개에 참, stop 뒤에는 거짓으로 돌아간다."""
+    async def main():
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        relay = Relay(leader, [f1], sleep=_no_sleep())
+        await relay.start()
+        await settle()
+        assert not relay.streams_ready()          # 소켓만 열리고 프레임은 없다
+        leader.pose_frames.put_nowait(frame(1))
+        await settle()
+        assert relay.streams_ready()
+        await relay.stop()
+        assert not relay.streams_ready()          # lane과 리더 flag 둘 다 내린다
+    run(main())
+
+
 def test_a_rate_falls_to_zero_when_the_stream_stops():
     async def main():
         clock = FakeClock()
