@@ -2,7 +2,7 @@
 module: control
 logical_modules: [M05, M06, M07, M11]
 owner: CONTROL
-last_verified: { commit: "b98642f", date: 2026-09-20 }
+last_verified: { commit: "ab8bf1b", date: 2026-09-20 }
 gates:
   SOURCE:
     state: GO

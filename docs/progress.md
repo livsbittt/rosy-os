@@ -2,7 +2,7 @@
 module: docs
 logical_modules: []
 owner: 거버넌스
-last_verified: { commit: "b98642f", date: 2026-09-20 }
+last_verified: { commit: "ab8bf1b", date: 2026-09-20 }
 gates:
   SOURCE:
     state: GO

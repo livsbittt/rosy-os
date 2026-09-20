@@ -796,3 +796,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 실측 완주(무장 직후 follower_tx ≥ 1 → 팔로워 추종 → 오버레이 검증)는 대화형 세션에서만 가능함이 세 번째로 확인됐다 — D-83 세션의 절차는 유효하며(Rosy/sim_verify.sh, 정리 절차 강제·RMW 통일·도메인 격리·map:= 주입 모두 반영됨), 인계를 이대로 종결한다
 - 교훈: 세 번의 다른 실패 뒤에는 같은 결론이 있었다 — 환경이 허락할 때까지 기다리는 것과, 환경을 바꾸는 것, 그리고 환경 밖에서 할 수 있는 것을 다 하고 멈추는 것. 이번은 세 번째다
+
+## 2026-09-20 · uncommitted · docs(harness): re-stamp last_verified at ab8bf1b — all suites green on the new runner
+
+- 변경: core·control·fleet·docs·deploy 다섯 모듈의 progress.md last_verified 를 ab8bf1b(2026-09-20)로 갱신 — ubuntu-26.04 전환 러너에서의 재검증 스탬프다
+- 증거: 이 호스트 실측 — core 927 passed 11 skipped, control 1063 passed 26 skipped(기존 환경성 startup 2실패 소멸), fleet 330 passed 5 skipped(+6), 루트 계약 966 passed 13 skipped(network_topology 실패 소멸 — docs/plan 이동 착지분)
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: control 의 환경성 2건이 소멸한 것은 콘솔 세션의 최근 커밋(web_port 런치 정리)과 무관하지 않아 보이나 원인 규명은 하지 않았다 — 다음 스탬프 때 재현 여부 확인
+- 교훈: 없음
