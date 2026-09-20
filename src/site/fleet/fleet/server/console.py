@@ -552,18 +552,35 @@ class FleetConsole:
         )
 
     async def formation_start(self, leader_id: str, formation: str = "COLUMN",
-                              spacing=None, max_speed=None) -> dict:
-        """리더 하나와 나머지 전원으로 대형을 연다.
+                              spacing=None, max_speed=None, members=None) -> dict:
+        """리더와 선택된 팔로워로 대형을 연다(FOR-001 Robot Selection).
 
         이미 열려 있으면 거절한다. 조용히 갈아치우면 앞 세션의 팔로워가 무장된 채로
         남고, 그 로봇은 아무도 보내지 않는 참조를 기다리며 서 있게 된다.
+
+        `members` 가 None 이면 등록된 나머지 전원이 팔로워다(기존 동작). 리스트면
+        리더를 반드시 포함해야 하고, 그 안의 로봇만 대형에 들어가며 미선택 로봇은
+        개별 미션을 계속 받는다.
         """
         if self._formation_members():
             raise HubError("FORMATION_ACTIVE", "a formation is already running; stop it first")
-        leader = self._client(leader_id)
-        followers = [self._clients[rid] for rid in self._order if rid != leader_id]
-        if not followers:
+        if members is None:
+            follower_ids = [rid for rid in self._order if rid != leader_id]
+        else:
+            member_ids = list(members)
+            if len(set(member_ids)) != len(member_ids):
+                raise HubError("MEMBER_DUPLICATED", "a formation lists a robot twice")
+            if leader_id not in member_ids:
+                raise HubError("LEADER_NOT_IN_MEMBERS",
+                               f"leader {leader_id} must be among the selected members")
+            unknown = [rid for rid in member_ids if rid not in self._clients]
+            if unknown:
+                raise HubError("UNKNOWN_ROBOT", f"unknown members: {', '.join(unknown)}")
+            follower_ids = [rid for rid in member_ids if rid != leader_id]
+        if not follower_ids:
             raise HubError("NO_FOLLOWERS", "a formation needs at least one follower")
+        leader = self._client(leader_id)
+        followers = [self._clients[rid] for rid in follower_ids]
         kwargs = {} if self._relay_factory is None else {"relay_factory": self._relay_factory}
         session = FormationSession(leader, followers,
                                    self._spec(formation, spacing, max_speed), **kwargs)

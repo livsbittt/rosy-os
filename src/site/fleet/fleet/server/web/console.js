@@ -552,6 +552,17 @@ function fillLeaders() {
     return option;
   }));
   if (ids.includes(current)) select.value = current;
+  // FOR-001 Robot Selection — 기본은 전원 체크다. 하나라도 풀면 선택 편성이 된다.
+  const box = el("formation-members");
+  box.replaceChildren(...ids.map((id) => {
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = id;
+    input.checked = true;
+    label.append(input, document.createTextNode(id));
+    return label;
+  }));
 }
 
 function renderFormation(status) {
@@ -564,10 +575,12 @@ function renderFormation(status) {
   // 재개는 HOLDING 에서만 뜻이 있다. RUNNING 에서 눌러 봐야 세션이 조용히 무시한다.
   el("formation-resume").disabled = status.state !== "HOLDING";
   el("formation-stop").disabled = !status.active;
+  // 대형이 열려 있는 동안에는 멤버를 바꿀 수 없다 — 해제하고 다시 연다.
+  el("formation-members").querySelectorAll("input").forEach((i) => { i.disabled = status.active; });
 
   const detail = el("formation-detail");
   if (!status.active) {
-    detail.textContent = "리더를 고르고 무장하면 나머지가 슬롯으로 따라붙습니다.";
+    detail.textContent = "리더와 포함 로봇을 고르고 무장하면 선택된 로봇이 슬롯으로 따라붙습니다.";
     return;
   }
   const slots = Object.entries(status.assignment || {})
@@ -616,14 +629,21 @@ async function formationCall(path, body, label) {
   }
 }
 
-el("formation-start").addEventListener("click", () => formationCall(
-  "/api/fleet/formation/start",
-  {
-    leader: el("formation-leader").value,
+el("formation-start").addEventListener("click", () => {
+  const leader = el("formation-leader").value;
+  const body = {
+    leader,
     formation: el("formation-shape").value,
     spacing: Number(el("formation-spacing").value),
-  },
-  "무장"));
+  };
+  // FOR-001 Robot Selection — 하나라도 풀면 선택 편성이다. 전원 체크는 전원 대형이다.
+  const boxes = [...el("formation-members").querySelectorAll("input")];
+  if (boxes.length && boxes.some((b) => !b.checked)) {
+    body.members = [leader, ...boxes.filter((b) => b.checked).map((b) => b.value)
+      .filter((id) => id !== leader)];
+  }
+  formationCall("/api/fleet/formation/start", body, "무장");
+});
 
 el("formation-reform").addEventListener("click", () => formationCall(
   "/api/fleet/formation/reform",

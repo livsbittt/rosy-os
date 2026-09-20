@@ -48,6 +48,7 @@ class FormationRequest(BaseModel):
     formation: str = "COLUMN"
     spacing: Optional[float] = None
     max_speed: Optional[float] = None
+    members: Optional[list[str]] = None  # FOR-001 Robot Selection — None 은 전원이다
 
 
 class ReformRequest(BaseModel):
@@ -125,7 +126,8 @@ def create_app(console: FleetConsole, *, console_token: Optional[str] = None,
     async def formation_start(body: FormationRequest) -> dict:
         try:
             return await console.formation_start(body.leader, body.formation,
-                                                 body.spacing, body.max_speed)
+                                                 body.spacing, body.max_speed,
+                                                 members=body.members)
         except (HubError, RobotApiError, OSError) as exc:
             raise _http_error(exc) from exc
 
