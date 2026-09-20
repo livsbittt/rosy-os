@@ -604,3 +604,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: openssl 이 이미 PATH 에 있으면 아무 것도 건드리지 않는다. bash 후보 순위는 runtime_slices 가 밟은 패턴을 따른다
 - 교훈: 로컬에서만 깨지는 스위트는 "환경 문제"로 묻혀 있다가 이동 대규모 변경 때 한꺼번에 터진다 — CI 그린과 로컬 그린은 별개의 계약이다
+
+## 2026-09-20 · uncommitted · docs: retire docs/plan — the WBS and parity checklist join the plans trail
+
+- 변경: docs/plan/ 폐쇄 완료 — ROSY Implementation Plan.md·ROSY Flask Parity Checklist.md·plan/AGENTS.md 를 docs/plans/ 로 옮기고(이동은 콘솔 세션이 시작했으나 plans/AGENTS.md 를 덮어써서 실패한 상태였다 — 본 세션이 HEAD 표 복원 후 역사 문서 2건을 정식 등록해 마무리), docs/AGENTS.md·docs/test/AGENTS.md·test_network_topology_contracts 의 경로를 갱신. docs/reference 에는 콘솔 세션이 만든 운영 인수 기준 문서와 콘솔 ops plan 정밀화를 착지
+- 증거: `python -m pytest test/test_network_topology_contracts.py test/test_harness_contracts.py -q` → 69 passed. `python tools/harness/rosy_harness.py lint` 0 errors. `git grep docs/plan/` 잔여는 reference/(frozen upstream)뿐
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: control 의 map 검증 덤프(map_260905_update_v2/)는 untracked 로 남긴다 — 기기 검증 자산의 귀속은 소유자 확인 후
+- 교훈: PowerShell Get-Content/Set-Content 는 UTF-8 한국어 파일을 cp949 로 재해석해 유실시킨다 — 문서 편집은 read/edit 도구나 UTF-8 명시 파이썬으로만

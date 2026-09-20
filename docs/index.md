@@ -89,8 +89,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · docs: retire docs/plan — the WBS and parity checklist join the plans trail
 - 2026-09-20 · uncommitted · fix(test): make the host contract suite green on the Windows dev host
 - 2026-09-20 · uncommitted · perf(fleet): the WSL addendum bench kills the dev-box temptation (D-131 phase 3 addendum)
 - 2026-09-20 · uncommitted · ci: restore single-step root gating — the harness waiver cleared the structural reds
 - 2026-09-20 · uncommitted · ci: route the two frozen harness contracts through a tolerated step
-- 2026-09-20 · uncommitted · feat(fleet): Robot Selection lands (FOR-001) and the gather bench puts a number on N (D-131 phases 2-3)
