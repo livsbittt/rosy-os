@@ -844,3 +844,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 없음
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · docs(fleet): fourth confirmation - background sim stacks cannot survive this box; the handoff stands as final
+
+- 변경: 없음(확인과 기록만). 배경 기반 시뮬 검증 재시도 1회 — 콘솔 D-state 임포트 중 스택 전멸(콘솔·코어 프로세스 소멸, 8090 무청취), 관측 8회 전부 무응답
+- 증거: 네 번의 세대 교체마다 동일한 종말 — (1) 참가자 인덱스 고갈 (2) 고아 스택 누적·SIGSEGV/-9 (3) discovery 불능(도메인·RMW 일치에도) (4) 백그라운드 스택 재피해. 각각에 대한 우회(도메인 격리·pkill 목록·세션 생존)는 1·2·3 번에 유효했으나 네 번째 조합은 새 원인을 낳는다 — 공유 박스의 동시 세션 활동이 원인이라 통제 밖이다
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 이 환경에서의 시뮬 실측 시도를 종료한다. D-131·D-132 의 미완 실측(무장 직후 tx ≥ 1, 팔로워 추종, 0.3 m 임계)은 D-83 세션이 안정 환경(단독 세션·자원 튜닝)에서 Rosy/sim_verify.sh 로 완주한다 — 인계물은 전부 자리했다(스크립트·진단 필드·재현 경로·계약 시험)
+- 교훈: 게이트가 적색을 유지하는 것은 실패가 아니라 정보다 — 네 번의 적색이 네 가지 환경 결함을 밝혔다. 환경 한계를 코드 결함과 구별해 기록하는 것이 다음 세션의 가장 빠른 시작점이다

@@ -91,8 +91,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · docs(fleet): fourth confirmation - background sim stacks cannot survive this box; the handoff stands as final
 - 2026-09-20 · uncommitted · fix(sim): double the robots.yaml wait window in run_fleet_sim
 - 2026-09-20 · uncommitted · ci(adr): first full native arm64 rehearsal — build green, 11 platform findings recorded
 - 2026-09-20 · uncommitted · ci(adr): add D-140 — weekly native arm64 rehearsal (ARTIFACT 코드 수준 선검증)
 - 2026-09-20 · uncommitted · docs(plans): land three design drafts — camera placement, dock build, Pi bench commissioning
-- 2026-09-20 · uncommitted · fix(sim): run_fleet_sim pins CycloneDDS — the D-117 bridge FAIL cause
