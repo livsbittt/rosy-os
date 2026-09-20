@@ -740,3 +740,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 적색 목록은 콘솔 세션 소유다. 해동은 ADR — is_append_only 의 "정형화 예외" 계약 변경을 소유자가 승인해야 한다
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · docs(fleet): the last blocker is named — leader Nav2 has no map TF; probe requirements recorded (D-83 handoff)
+
+- 변경: 없음(진단과 기록만). 결함 (a) 이후의 잔여 블로커를 특정해 D-83 세션 인계물로 기록
+- 증거: LOCAL 실측 — 리더(rosy_01)가 goal 수납 후 `navigation: PLANNING` 에 정체(포즈 불변), gz 로그에 costmap "map frame does not exist" 반복, `/map`·map→odom TF 부재. 팔로워 추종 실측의 선결 조건은 리더의 실제 주행이므로, 블로커는 fleet 이 아니라 로봇 스택의 로컬라이제이션/맵 슬라이스다. 프로브 요건도 기록: 실행 중인 시뮬의 ROS_DOMAIN_ID(실행마다 랜덤, 65 관측)·RMW_IMPLEMENTATION=rmw_cyclonedds_cpp 일치 필요 — 불일치 프로브는 빈 그래프를 반환한다(실측: 도메인 65 지정 시에도 토픽 0 — RMW 불일치 추가 확인 필요)
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 리더 Nav2 의 맵/TF 브링업( sensing 프로필에 map_server·SLAM 슬라이스가 있는지) 확인과 프로브 요건 일치는 D-83 세션 인계물이다 — fleet 측 결함 (a) 는 22,791 프레임 전달로 해소됐다
+- 교훈: 진단 스크립트는 대상 프로세스의 environ(/proc/PID/environ)에서 도메인·RMW를 읽고 일치시켜야 한다 — 불일치 프로브는 "시스템이 죽었다"는 거짓 결론을 낳는다
