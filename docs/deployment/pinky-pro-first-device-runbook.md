@@ -92,17 +92,10 @@ python3 "$COMMISSION" status --session "$SESSION"
 ```
 
 G3-G5 use an exact body file from
-[the body templates](pinky-pro-commissioning-body-templates.md):
-
-```bash
-python3 "$COMMISSION" prepare \
-  --session "$SESSION" --body "$EVIDENCE/G3-stationary.json" \
-  --record "$EVIDENCE/G3-record.json"
-python3 "$COMMISSION" record \
-  --session "$SESSION" --record "$EVIDENCE/G3-record.json" \
-  --evidence-file "$EVIDENCE/G3-stationary.json" \
-  --evidence-file "$EVIDENCE/G3-state-samples.jsonl"
-```
+[the body templates](pinky-pro-commissioning-body-templates.md). Use each gate's
+exact command below: G3 requires the G2 readback plus ten individual state JSON
+files, G4 requires eight distinct trial digests, and G5 requires four distinct
+role-bound digests. A body file by itself is always refused.
 
 For G3-G5, the exact body is an explicit operator attestation backed by raw
 telemetry. It is not a cryptographic sensor signature. G0 is instead derived
@@ -216,8 +209,19 @@ done
 ```
 
 Fill `$EVIDENCE/G3-stationary.json` from those ten states and the G2 publisher
-count, then run the G3 `prepare`/`record` commands in section 3. Preserve all ten
-state files as additional `--evidence-file` arguments.
+count. G3 refuses the body alone; attach the G2 readback and all ten raw states:
+
+```bash
+python3 "$COMMISSION" prepare \
+  --session "$SESSION" --body "$EVIDENCE/G3-stationary.json" \
+  --record "$EVIDENCE/G3-record.json"
+G3_ARGS=()
+for path in "$EVIDENCE"/G3-state-*.json; do G3_ARGS+=(--evidence-file "$path"); done
+python3 "$COMMISSION" record \
+  --session "$SESSION" --record "$EVIDENCE/G3-record.json" \
+  --evidence-file "$EVIDENCE/G3-stationary.json" \
+  --evidence-file "$EVIDENCE/G2-device-readback.json" "${G3_ARGS[@]}"
+```
 
 If a sample moves, E-stop clears, the mode changes, or publisher count differs
 from one: stop, preserve the raw output, and do not create a GO record.
@@ -269,15 +273,21 @@ After the trials:
 
 ```bash
 sudo /opt/rosy/deploy/robot/runtime-mode.sh down
+sha256sum "$EVIDENCE"/G4-*-odom.csv >"$EVIDENCE/G4-odom-SHA256SUMS"
+# Fill G4-evidence-manifest.json with all eight matching trial values and digests.
 python3 "$COMMISSION" prepare \
   --session "$SESSION" --body "$EVIDENCE/G4-motor.json" \
   --record "$EVIDENCE/G4-record.json"
+G4_ARGS=()
+for path in "$EVIDENCE"/G4-*-odom.csv; do G4_ARGS+=(--evidence-file "$path"); done
+[[ $((${#G4_ARGS[@]} / 2)) -eq 8 ]] || { echo 'need 8 G4 odom files' >&2; exit 1; }
 python3 "$COMMISSION" record \
   --session "$SESSION" --record "$EVIDENCE/G4-record.json" \
   --evidence-file "$EVIDENCE/G4-motor.json" \
+  --evidence-file "$EVIDENCE/G4-evidence-manifest.json" \
   --evidence-file "$EVIDENCE/G4-motor-preflight.txt" \
   --evidence-file "$EVIDENCE/G4-deadman-events.txt" \
-  --evidence-file "$EVIDENCE/G4-forward-1-odom.csv"
+  "${G4_ARGS[@]}"
 ```
 
 ### G5 - controlled hardware mapping/navigation
@@ -292,6 +302,10 @@ Create a separate mode-0600 operator curl config as in G3, then run:
 ```bash
 sudo /opt/rosy/deploy/robot/runtime-mode.sh down
 sudo ROSY_RUNTIME_MODE=hardware /opt/rosy/deploy/robot/runtime-mode.sh up
+timeout 10 docker compose --env-file /opt/rosy/deploy/robot/.env \
+  -f /opt/rosy/deploy/robot/compose.yaml exec -T rosy-io \
+  ros2 topic hz --window 50 /rosy_01/scan \
+  | tee "$EVIDENCE/G5-lidar-rate.txt"
 curl --config "$HOME/.config/rosy/operator.curl" --fail-with-body --silent --show-error \
   -X POST http://127.0.0.1:8080/api/v1/slam/start \
   | tee "$EVIDENCE/G5-slam-start.json"
@@ -323,12 +337,18 @@ curl --config "$HOME/.config/rosy/viewer.curl" --fail-with-body --silent --show-
   http://127.0.0.1:8080/api/v1/robot/state >"$EVIDENCE/G5-final-state.json"
 curl --config "$HOME/.config/rosy/viewer.curl" --fail-with-body --silent --show-error \
   http://127.0.0.1:8080/api/v1/navigation/state >"$EVIDENCE/G5-navigation-state.json"
+sha256sum "$EVIDENCE/G5-lidar-rate.txt" "$EVIDENCE/G5-map-save.json" \
+  "$EVIDENCE/G5-navigation-state.json" "$EVIDENCE/G5-final-state.json" \
+  >"$EVIDENCE/G5-role-SHA256SUMS"
+# Fill G5-evidence-manifest.json with these four digests and exact body role values.
 python3 "$COMMISSION" prepare \
   --session "$SESSION" --body "$EVIDENCE/G5-hardware.json" \
   --record "$EVIDENCE/G5-record.json"
 python3 "$COMMISSION" record \
   --session "$SESSION" --record "$EVIDENCE/G5-record.json" \
   --evidence-file "$EVIDENCE/G5-hardware.json" \
+  --evidence-file "$EVIDENCE/G5-evidence-manifest.json" \
+  --evidence-file "$EVIDENCE/G5-lidar-rate.txt" \
   --evidence-file "$EVIDENCE/G5-final-state.json" \
   --evidence-file "$EVIDENCE/G5-navigation-state.json" \
   --evidence-file "$EVIDENCE/G5-map-save.json" \

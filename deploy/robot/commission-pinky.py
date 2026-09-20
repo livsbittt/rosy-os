@@ -67,7 +67,7 @@ def _bind_evidence(record, paths):
         raise ValueError('record has no recognized gate body')
     expected = record[body_key]
     documents, digests = _load_evidence(paths)
-    if not _evidence_supports(gate, expected, documents):
+    if not _evidence_supports(gate, expected, documents, digests):
         raise ValueError(f'{gate} structured evidence does not support its claims')
     return digests
 
@@ -92,13 +92,91 @@ def _load_evidence(paths):
     return documents, digests
 
 
-def _evidence_supports(gate, expected, documents):
+def _evidence_supports(gate, expected, documents, digests):
     if gate in ('G0', 'G1', 'G2'):
         return any(item == expected for item in _derive_bodies(gate, documents))
-    # G3-G5 include measurements and direct physical observations. They are
-    # explicitly operator-attested, but the persisted JSON must still be the
-    # exact validated body rather than an unrelated attachment.
-    return any(item == expected for item in documents)
+    if not any(item == expected for item in documents):
+        return False
+    if gate == 'G3':
+        readback_ok = any(
+            isinstance(item, dict) and
+            isinstance(item.get('ros_graph'), dict) and
+            item['ros_graph'].get('cmd_vel_publishers') ==
+            expected.get('cmd_vel_publishers')
+            for item in documents
+        )
+        raw_samples = []
+        for item in documents:
+            if not isinstance(item, dict):
+                continue
+            if all(key in item for key in ('seq', 'mode', 'velocity', 'safety')):
+                raw_samples.append({
+                    'sequence': item['seq'],
+                    'mode': item['mode'],
+                    'velocity': item['velocity'],
+                    'safety': item['safety'],
+                })
+        return readback_ok and all(
+            sample in raw_samples for sample in expected.get('samples', [])
+        )
+    manifest_gate = gate
+    manifests = [
+        item for item in documents
+        if isinstance(item, dict) and item.get('schema_version') == 1 and
+        item.get('gate') == manifest_gate
+    ]
+    digest_set = set(digests)
+    if gate == 'G4':
+        expected_trials = expected.get('deadman_trials', [])
+        for manifest in manifests:
+            trials = manifest.get('trials')
+            if not isinstance(trials, list) or len(trials) != 8:
+                continue
+            referenced = []
+            supported = []
+            for trial in trials:
+                if not isinstance(trial, dict):
+                    continue
+                digest = trial.get('evidence_sha256')
+                if not isinstance(digest, str) or digest not in digest_set:
+                    continue
+                referenced.append(digest)
+                supported.append({
+                    key: trial.get(key)
+                    for key in ('direction', 'trial', 'stop_latency_s',
+                                'final_velocity', 'passed')
+                })
+            if (len(set(referenced)) == 8 and
+                    all(trial in supported for trial in expected_trials)):
+                return True
+        return False
+    if gate == 'G5':
+        for manifest in manifests:
+            roles = manifest.get('roles')
+            if not isinstance(roles, dict) or set(roles) != {
+                    'lidar', 'map', 'navigation', 'final_state'}:
+                continue
+            referenced = []
+            valid = True
+            for role, expected_value in (
+                    ('lidar', expected.get('lidar')),
+                    ('map', expected.get('map')),
+                    ('navigation', expected.get('navigation')),
+                    ('final_state', expected.get('final_state'))):
+                item = roles.get(role)
+                if not isinstance(item, dict):
+                    valid = False
+                    break
+                digest = item.get('evidence_sha256')
+                value = item.get('value')
+                if digest not in digest_set or value != expected_value:
+                    valid = False
+                    break
+                referenced.append(digest)
+            if valid and len(set(referenced)) == 4:
+                return True
+        return False
+    return False
 
 
 def _derive_bodies(gate, documents):

@@ -48,6 +48,22 @@ software gate rejects anything above 0.65 s; the site may impose a lower limit.
 }
 ```
 
+Create `G4-evidence-manifest.json` after hashing the eight distinct odometry
+captures. Each entry repeats the matching `deadman_trials` value:
+
+```json
+{
+  "schema_version": 1,
+  "gate": "G4",
+  "trials": [
+    {"direction": "forward", "trial": 1, "stop_latency_s": null, "final_velocity": {"linear": null, "angular": null}, "passed": false, "evidence_sha256": "REPLACE_WITH_64_HEX"}
+  ]
+}
+```
+
+The final manifest must contain all eight direction/trial entries and eight
+different digests that match eight supplied raw evidence files.
+
 ## G5 `hardware`
 
 The map ID must identify this run's fresh physical map, not a Gazebo asset.
@@ -73,3 +89,19 @@ The map ID must identify this run's fresh physical map, not a Gazebo asset.
 
 The example G5 `scan_hz` value `0.0` is intentionally invalid, so an unmeasured
 template cannot pass. Replace it with the fresh measured positive rate.
+
+Create `G5-evidence-manifest.json` with four distinct raw-file digests. Each
+`value` must exactly equal the corresponding object in `G5-hardware.json`:
+
+```json
+{
+  "schema_version": 1,
+  "gate": "G5",
+  "roles": {
+    "lidar": {"value": {"fresh": true, "scan_hz": 0.0}, "evidence_sha256": "REPLACE_WITH_64_HEX"},
+    "map": {"value": {"fresh": true, "map_id": "PHYSICAL_MAP_ID"}, "evidence_sha256": "REPLACE_WITH_64_HEX"},
+    "navigation": {"value": {"goal_id": "PHYSICAL_GOAL_ID", "status": "SUCCEEDED", "collision_observed": false}, "evidence_sha256": "REPLACE_WITH_64_HEX"},
+    "final_state": {"value": {"velocity": {"linear": 0.0, "angular": 0.0}, "estop": true}, "evidence_sha256": "REPLACE_WITH_64_HEX"}
+  }
+}
+```

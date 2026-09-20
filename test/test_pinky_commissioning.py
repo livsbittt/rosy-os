@@ -585,6 +585,115 @@ def test_cli_g1_derives_claims_from_install_result_and_device_readback(tmp_path)
     assert json.loads(result.stdout)['next_gate'] == 'G2'
 
 
+@pytest.mark.parametrize(
+    ('prior_gate', 'record_factory', 'body_key'),
+    [('G2', _g3, 'stationary'), ('G3', _g4, 'motor'),
+     ('G4', _g5, 'hardware')],
+)
+def test_cli_physical_gate_body_alone_cannot_replace_raw_evidence(
+        tmp_path, prior_gate, record_factory, body_key):
+    session_path = tmp_path / 'session.json'
+    session_path.write_text(json.dumps(_through(prior_gate)), encoding='utf-8')
+    record = record_factory()
+    record.pop('evidence_files')
+    record_path = tmp_path / 'record.json'
+    record_path.write_text(json.dumps(record), encoding='utf-8')
+    body_path = tmp_path / 'body.json'
+    body_path.write_text(json.dumps(record[body_key]), encoding='utf-8')
+
+    result = _run_cli(
+        'record', '--session', session_path, '--record', record_path,
+        '--evidence-file', body_path,
+    )
+
+    assert result.returncode != 0
+    assert 'does not support' in result.stderr
+    assert json.loads(session_path.read_text(encoding='utf-8')) == _through(prior_gate)
+
+
+def test_cli_g3_requires_and_accepts_all_raw_states_plus_readback(tmp_path):
+    session_path = tmp_path / 'session.json'
+    session_path.write_text(json.dumps(_through('G2')), encoding='utf-8')
+    record = _g3()
+    record.pop('evidence_files')
+    record_path = tmp_path / 'record.json'
+    record_path.write_text(json.dumps(record), encoding='utf-8')
+    body_path = tmp_path / 'body.json'
+    body_path.write_text(json.dumps(record['stationary']), encoding='utf-8')
+    readback_path = tmp_path / 'readback.json'
+    readback_path.write_text(json.dumps(_readback()), encoding='utf-8')
+    evidence_args = ['--evidence-file', body_path,
+                     '--evidence-file', readback_path]
+    for sample in record['stationary']['samples']:
+        state = dict(sample)
+        state['seq'] = state.pop('sequence')
+        path = tmp_path / f"state-{state['seq']}.json"
+        path.write_text(json.dumps(state), encoding='utf-8')
+        evidence_args.extend(['--evidence-file', path])
+
+    result = _run_cli(
+        'record', '--session', session_path, '--record', record_path,
+        *evidence_args,
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_cli_g4_and_g5_require_role_bound_distinct_raw_digests(tmp_path):
+    for prior_gate, record_factory, body_key in (
+            ('G3', _g4, 'motor'), ('G4', _g5, 'hardware')):
+        session_path = tmp_path / f'{prior_gate}.json'
+        session_path.write_text(json.dumps(_through(prior_gate)), encoding='utf-8')
+        record = record_factory()
+        record.pop('evidence_files')
+        record_path = tmp_path / f'{prior_gate}-record.json'
+        record_path.write_text(json.dumps(record), encoding='utf-8')
+        body_path = tmp_path / f'{prior_gate}-body.json'
+        body_path.write_text(json.dumps(record[body_key]), encoding='utf-8')
+        raw_paths = []
+        count = 8 if body_key == 'motor' else 4
+        for index in range(count):
+            path = tmp_path / f'{prior_gate}-raw-{index}.txt'
+            path.write_text(f'raw physical evidence {index}', encoding='utf-8')
+            raw_paths.append(path)
+        digests = [hashlib.sha256(path.read_bytes()).hexdigest()
+                   for path in raw_paths]
+        if body_key == 'motor':
+            manifest = {
+                'schema_version': 1,
+                'gate': 'G4',
+                'trials': [dict(trial, evidence_sha256=digest)
+                           for trial, digest in zip(
+                               record['motor']['deadman_trials'], digests)],
+            }
+        else:
+            manifest = {
+                'schema_version': 1,
+                'gate': 'G5',
+                'roles': {
+                    role: {
+                        'value': record['hardware'][role],
+                        'evidence_sha256': digest,
+                    }
+                    for role, digest in zip(
+                        ('lidar', 'map', 'navigation', 'final_state'), digests)
+                },
+            }
+        manifest_path = tmp_path / f'{prior_gate}-manifest.json'
+        manifest_path.write_text(json.dumps(manifest), encoding='utf-8')
+        evidence_args = ['--evidence-file', body_path,
+                         '--evidence-file', manifest_path]
+        for path in raw_paths:
+            evidence_args.extend(['--evidence-file', path])
+
+        result = _run_cli(
+            'record', '--session', session_path, '--record', record_path,
+            *evidence_args,
+        )
+
+        assert result.returncode == 0, result.stderr
+
+
 def test_cli_failure_does_not_mutate_session_or_accept_secrets(tmp_path):
     session_path = tmp_path / 'session.json'
     assert _run_cli(
