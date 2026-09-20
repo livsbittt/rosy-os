@@ -49,3 +49,9 @@
 - 증거: control `test_dock_detector.py` 7건 + `test_dock_tag.py` 5건 = 12 passed (적색→녹색). core `test_docking.py` 103 passed, core 전체 895 passed·10 skipped
 - gate 변화: 없음. 배선(factory 주입)은 vision 컨테이너 결정 후 — 미연결 상태의 어댑터는 죽은 코드가 아니라 계약이다
 
+## 2026-09-20 · uncommitted · feat(dock): detector rides the sensor provider port (D-138)
+
+- 변경: `control/sensor_provider.py`에 `make_dock_detector` (cv2 지연 import). `core_features` `select_detector` — aruco 명명+제원 완비+provider+프레임+기하가 다 있어야 실검출기, 아니면 빈 대본. `services.py` detector_factory가 `select_detector` 호출 (오늘은 항상 시뮬레이션, 동작 불변)
+- 증거: provider 3건 + selection 6건 신규. core 전체 901 passed·10 skipped, control 도크 15건. flake8 신규 파일 무경고 (services.py E306 기존 건 제외)
+- gate 변화: 없음. 카메라 프레임·기하 주입은 Task 5 실측 뒤 ros_bridge 몫
+

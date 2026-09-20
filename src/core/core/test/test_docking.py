@@ -336,6 +336,78 @@ class TestSimulatedDetector:
         assert isinstance(self._detector(clock, script=[]), DockDetector)
 
 
+class TestSelectDetector:
+    """DNC-007/D-138: `detector="aruco"` + 태그 제원 + provider + 프레임이 다
+    있어야 실검출기로 간다. 하나라도 없으면 시뮬레이션(무관측)으로 떨어진다."""
+
+    def _select(self, dock_type=None, **kwargs):
+        from core_features.docking.detector import (
+            SimulatedDetector,
+            select_detector,
+        )
+        dock_type = dock_type or DockType(name="rosy_v1", detector="aruco",
+                                          tag_id=7, tag_size_m=0.10)
+        detector = select_detector(a_dock(), dock_type, **kwargs)
+        return detector, SimulatedDetector
+
+    def test_simulated_by_default(self):
+        detector, SimulatedDetector = self._select()
+        assert isinstance(detector, SimulatedDetector)
+
+    def test_named_detector_without_tag_spec_stays_simulated(self):
+        from control.sensor_provider import PROVIDER
+        dock_type = DockType(name="rosy_v1", detector="aruco")
+        detector, SimulatedDetector = self._select(
+            dock_type, provider=PROVIDER, frame_source=lambda: None)
+        assert isinstance(detector, SimulatedDetector)
+
+    def test_simulated_name_ignores_a_full_aruco_stack(self):
+        from control.sensor_provider import PROVIDER
+        dock_type = DockType(name="rosy_v1", detector="simulated",
+                             tag_id=7, tag_size_m=0.10)
+        detector, SimulatedDetector = self._select(
+            dock_type, provider=PROVIDER, frame_source=lambda: None)
+        assert isinstance(detector, SimulatedDetector)
+
+    def test_no_frames_means_no_vision_detector(self):
+        from control.sensor_provider import PROVIDER
+        detector, SimulatedDetector = self._select(provider=PROVIDER)
+        assert isinstance(detector, SimulatedDetector)
+
+    def test_a_broken_provider_falls_back_without_raising(self):
+        from types import SimpleNamespace
+
+        def broken(**kwargs):
+            raise ImportError("no cv2 on this image")
+
+        provider = SimpleNamespace(make_dock_detector=broken)
+        detector, SimulatedDetector = self._select(
+            provider=provider, frame_source=lambda: None)
+        assert isinstance(detector, SimulatedDetector)
+
+    def test_full_stack_selects_the_aruco_detector(self):
+        cv2 = pytest.importorskip("cv2")
+        import numpy as np
+        from control.sensor_provider import PROVIDER
+
+        dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+        marker = cv2.aruco.generateImageMarker(dictionary, 7, 200)
+        frame = np.full((480, 640, 3), 255, dtype=np.uint8)
+        frame[140:340, 220:420] = cv2.cvtColor(marker, cv2.COLOR_GRAY2BGR)
+        camera = np.array([[600.0, 0.0, 320.0],
+                           [0.0, 600.0, 240.0],
+                           [0.0, 0.0, 1.0]])
+        detector, SimulatedDetector = self._select(
+            provider=PROVIDER, frame_source=lambda: frame,
+            camera_matrix=camera, dist_coeffs=np.zeros(5))
+        assert not isinstance(detector, SimulatedDetector)
+        detector.start(a_dock())
+        obs = detector.relative_pose()
+        assert obs is not None
+        assert obs.range_m == pytest.approx(0.30, abs=0.02)
+        detector.stop()
+
+
 # --- 도크 에이전트 클라이언트 --------------------------------------------------
 #
 # 도크가 밀어넣지 않고 로봇이 폴링한다. 도크는 어느 로봇이 오는지 모르고,

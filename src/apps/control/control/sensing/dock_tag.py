@@ -69,9 +69,9 @@ def detect_dock_tag(bgr: np.ndarray, spec: DockTagSpec,
     # Tag frame: x right, y down, z out of the tag toward the camera.
     obj = np.array([[-half, half, 0.0], [half, half, 0.0],
                     [half, -half, 0.0], [-half, -half, 0.0]])
-    ok, rvec, tvec = cv2.solvePnP(obj, match.reshape(4, 2).astype(np.float64),
-                                   camera_matrix, dist_coeffs,
-                                   flags=cv2.SOLVEPNP_IPPE_SQUARE)
+    ok, rvec, tvec = cv2.solvePnP(
+        obj, match.reshape(4, 2).astype(np.float64),
+        camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_IPPE_SQUARE)
     if not ok:
         return None
     tx, _, tz = (float(v) for v in tvec.flatten())
