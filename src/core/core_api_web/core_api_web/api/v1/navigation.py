@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core_api_web.api.v1.common import enter_navigation_mode, operator, viewer
 from core_api_web.api.deps import AuthContext, get_services, CoreServicesLike
@@ -96,7 +96,10 @@ slam_router = APIRouter(prefix="/api/v1/slam", tags=["slam"])
 
 
 class SlamSaveRequest(BaseModel):
-    name: str = "rosy_map"
+    name: str = Field(
+        default="rosy_map",
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+    )
 
 
 @slam_router.post("/start")

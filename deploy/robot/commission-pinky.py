@@ -154,12 +154,13 @@ def _evidence_supports(gate, expected, documents, digests):
         for manifest in manifests:
             roles = manifest.get('roles')
             if not isinstance(roles, dict) or set(roles) != {
-                    'lidar', 'map', 'navigation', 'final_state'}:
+                    'lidar', 'telemetry', 'map', 'navigation', 'final_state'}:
                 continue
             referenced = []
             valid = True
             for role, expected_value in (
                     ('lidar', expected.get('lidar')),
+                    ('telemetry', expected.get('telemetry')),
                     ('map', expected.get('map')),
                     ('navigation', expected.get('navigation')),
                     ('final_state', expected.get('final_state'))):
@@ -173,7 +174,7 @@ def _evidence_supports(gate, expected, documents, digests):
                     valid = False
                     break
                 referenced.append(digest)
-            if valid and len(set(referenced)) == 4:
+            if valid and len(set(referenced)) == 5:
                 return True
         return False
     return False

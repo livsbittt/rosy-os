@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-15 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-21 -->
 
 # navigation
 
@@ -25,6 +25,7 @@ None.
 ### Working In This Directory
 
 - `save_map` returns `map_id` (filename + checksum, D-13). Bridge computes the hash.
+- Mapping start is readiness-gated just like goals; the active backend decides whether AMCL/map-server or SLAM Toolbox must be active.
 - Stuck timeout is SAF/NAV-006 — honor `stuck_timeout_s` from config.
 - **Recorded exception (C7):** `NavigationManager` also carries NAV-005 mapping-session state (`mapping_active`,
   `start/stop/save/reset_mapping`) although this package claims NAV-001~004/006. Accepted — there is no `mapping`

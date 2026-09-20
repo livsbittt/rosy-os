@@ -50,6 +50,42 @@ def test_unknown_runtime_mode_env_is_rejected(tmp_path, monkeypatch):
         raise AssertionError("unknown ROSY_RUNTIME_MODE must not boot")
 
 
+def test_slam_backend_requires_hardware_and_is_recorded_in_runtime(tmp_path, monkeypatch):
+    config_path = tmp_path / "rosy.yaml"
+    config_path.write_text("runtime:\n  mode: core\n", encoding="utf-8")
+    monkeypatch.setattr(config_module, "LOCAL_CONFIG_PATH", tmp_path / "missing.yaml")
+    monkeypatch.delenv("ROSY_CONFIG", raising=False)
+    monkeypatch.setenv("ROSY_RUNTIME_MODE", "hardware")
+    monkeypatch.setenv("ROSY_NAVIGATION_BACKEND", "slam")
+
+    config = config_module.load_config(str(config_path))
+    assert config["runtime"]["navigation_backend"] == "slam"
+
+    monkeypatch.setenv("ROSY_RUNTIME_MODE", "core")
+    try:
+        config_module.load_config(str(config_path))
+    except ValueError as exc:
+        assert "requires hardware" in str(exc)
+    else:
+        raise AssertionError("slam backend must not boot outside hardware mode")
+
+
+def test_unknown_navigation_backend_is_rejected(tmp_path, monkeypatch):
+    config_path = tmp_path / "rosy.yaml"
+    config_path.write_text("runtime:\n  mode: core\n", encoding="utf-8")
+    monkeypatch.setattr(config_module, "LOCAL_CONFIG_PATH", tmp_path / "missing.yaml")
+    monkeypatch.delenv("ROSY_CONFIG", raising=False)
+    monkeypatch.setenv("ROSY_RUNTIME_MODE", "hardware")
+    monkeypatch.setenv("ROSY_NAVIGATION_BACKEND", "both")
+
+    try:
+        config_module.load_config(str(config_path))
+    except ValueError as exc:
+        assert "localization or slam" in str(exc)
+    else:
+        raise AssertionError("unknown navigation backend must not boot")
+
+
 def test_ros_namespace_derives_core_frame_prefix(tmp_path, monkeypatch):
     config_path = tmp_path / "rosy.yaml"
     config_path.write_text("robot:\n  frame_prefix: ''\n", encoding="utf-8")

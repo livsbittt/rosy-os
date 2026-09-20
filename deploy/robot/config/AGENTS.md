@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-16 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-21 -->
 
 # config
 
@@ -13,7 +13,8 @@ Pinky Pro board overlays mounted into `rosy-core`. `ROSY_RUNTIME_MODE` selects `
 |------|-------------|
 | `profile.core.yaml` / `capabilities.core.yaml` | Dashboard only: no teleop, no lidar |
 | `profile.motor.yaml` / `capabilities.motor.yaml` | Dynamixel teleop, encoder only |
-| `profile.hardware.yaml` / `capabilities.hardware.yaml` | Motor + RPLidar + Nav2 goal/return-home; slam still false |
+| `profile.hardware.yaml` / `capabilities.hardware.yaml` | Motor + RPLidar + localized Nav2 goal/return-home; slam false |
+| `capabilities.hardware-mapping.yaml` | Hardware SLAM overlay selected only by `ROSY_NAVIGATION_BACKEND=slam`; slam true, navigation false |
 | `motion_profiles.yaml` | Measured base/arm/payload states; defaults to unmeasured `unknown` |
 | `board.yaml` | Modes, aliases (`pi5-lite` → `hardware`), `slices` (`required: [core]`; available motor/io/nav/vision/omx/ai), and `presets` (`core` / `motor` / `hardware`) |
 | `resolve-mode.sh` | Maps aliases and `--slices` sets onto catalog modes; overlay YAML exists only for catalog modes |
@@ -30,7 +31,7 @@ None.
 - Compose bind-mounts profile/capabilities over `/etc/rosy/`. Keep keys aligned with `src/core/core/config/` schemas.
 - Overlay YAML exists only for `core` / `motor` / `hardware`. Do not copy YAML for aliases.
 - Presets: `core` → `[core]`; `motor` → `[core, motor]`; `hardware` → `[core, motor, io, nav]`. vision/omx/ai are catalog-only (`enabled: false`); do not add overlay YAML or compose services for them.
-- Do not enable slam/swarm here unless the hardware image actually launches those stacks. `hardware` may advertise Nav2 only because `hardware.launch.py` starts it.
+- Do not enable slam/swarm unless the hardware image actually launches those stacks. D-144 permits slam only through the dedicated hardware-mapping overlay; the normal hardware overlay remains localization-only.
 
 ### Testing Requirements
 

@@ -74,7 +74,19 @@ The map ID must identify this run's fresh physical map, not a Gazebo asset.
   "runtime_mode": "hardware",
   "cmd_vel_publishers": 1,
   "lidar": {"fresh": true, "scan_hz": 0.0},
-  "map": {"fresh": true, "map_id": "PHYSICAL_MAP_ID"},
+  "telemetry": {
+    "format": "mcap",
+    "duration_s": 0.0,
+    "topics": ["/rosy_01/scan", "/rosy_01/odom", "/rosy_01/cmd_vel", "/rosy_01/map", "/tf", "/tf_static"],
+    "mcap_sha256": "REPLACE_WITH_64_HEX",
+    "metadata_sha256": "REPLACE_WITH_64_HEX"
+  },
+  "map": {
+    "fresh": true,
+    "map_id": "PHYSICAL_MAP_ID",
+    "yaml_sha256": "REPLACE_WITH_64_HEX",
+    "image_sha256": "REPLACE_WITH_64_HEX"
+  },
   "navigation": {
     "goal_id": "PHYSICAL_GOAL_ID",
     "status": "SUCCEEDED",
@@ -87,10 +99,12 @@ The map ID must identify this run's fresh physical map, not a Gazebo asset.
 }
 ```
 
-The example G5 `scan_hz` value `0.0` is intentionally invalid, so an unmeasured
-template cannot pass. Replace it with the fresh measured positive rate.
+The example G5 `scan_hz` and `duration_s` values are intentionally invalid, so
+an unmeasured template cannot pass. The MCAP must cover at least 30 seconds and
+at most 30 minutes. Its two digests and the saved YAML/PGM digests must also be
+present in the record's actual evidence-file digest set.
 
-Create `G5-evidence-manifest.json` with four distinct raw-file digests. Each
+Create `G5-evidence-manifest.json` with five distinct role digests. Each
 `value` must exactly equal the corresponding object in `G5-hardware.json`:
 
 ```json
@@ -99,7 +113,8 @@ Create `G5-evidence-manifest.json` with four distinct raw-file digests. Each
   "gate": "G5",
   "roles": {
     "lidar": {"value": {"fresh": true, "scan_hz": 0.0}, "evidence_sha256": "REPLACE_WITH_64_HEX"},
-    "map": {"value": {"fresh": true, "map_id": "PHYSICAL_MAP_ID"}, "evidence_sha256": "REPLACE_WITH_64_HEX"},
+    "telemetry": {"value": {"format": "mcap", "duration_s": 0.0, "topics": ["/rosy_01/scan", "/rosy_01/odom", "/rosy_01/cmd_vel", "/rosy_01/map", "/tf", "/tf_static"], "mcap_sha256": "REPLACE_WITH_64_HEX", "metadata_sha256": "REPLACE_WITH_64_HEX"}, "evidence_sha256": "REPLACE_WITH_64_HEX"},
+    "map": {"value": {"fresh": true, "map_id": "PHYSICAL_MAP_ID", "yaml_sha256": "REPLACE_WITH_64_HEX", "image_sha256": "REPLACE_WITH_64_HEX"}, "evidence_sha256": "REPLACE_WITH_64_HEX"},
     "navigation": {"value": {"goal_id": "PHYSICAL_GOAL_ID", "status": "SUCCEEDED", "collision_observed": false}, "evidence_sha256": "REPLACE_WITH_64_HEX"},
     "final_state": {"value": {"velocity": {"linear": 0.0, "angular": 0.0}, "estop": true}, "evidence_sha256": "REPLACE_WITH_64_HEX"}
   }

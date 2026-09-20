@@ -18,6 +18,7 @@ from typing import Iterable, Optional
 COMPONENTS = (
     "amcl",
     "map_server",
+    "slam_toolbox",
     "controller_server",
     "local_costmap",
     "global_costmap",

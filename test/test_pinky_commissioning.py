@@ -25,6 +25,10 @@ SPEC.loader.exec_module(commissioning)
 NOW = '2026-09-21T12:00:00+00:00'
 REVISION = 'a' * 40
 DIGEST = 'b' * 64
+MCAP_DIGEST = 'c' * 64
+METADATA_DIGEST = 'd' * 64
+MAP_YAML_DIGEST = 'e' * 64
+MAP_IMAGE_DIGEST = 'f' * 64
 
 
 def _release_manifest():
@@ -208,14 +212,29 @@ def _g4():
 
 
 def _g5():
-    return {
+    record = {
         **_common('G5'),
         'hardware': {
             'operator': 'tester',
             'runtime_mode': 'hardware',
             'cmd_vel_publishers': 1,
             'lidar': {'fresh': True, 'scan_hz': 10.2},
-            'map': {'fresh': True, 'map_id': 'occupancy:abc123'},
+            'telemetry': {
+                'format': 'mcap',
+                'duration_s': 120.0,
+                'topics': [
+                    '/rosy_01/scan', '/rosy_01/odom', '/rosy_01/cmd_vel',
+                    '/rosy_01/map', '/tf', '/tf_static',
+                ],
+                'mcap_sha256': MCAP_DIGEST,
+                'metadata_sha256': METADATA_DIGEST,
+            },
+            'map': {
+                'fresh': True,
+                'map_id': 'occupancy:abc123',
+                'yaml_sha256': MAP_YAML_DIGEST,
+                'image_sha256': MAP_IMAGE_DIGEST,
+            },
             'navigation': {
                 'goal_id': 'device-smoke-001',
                 'status': 'SUCCEEDED',
@@ -227,6 +246,10 @@ def _g5():
             },
         },
     }
+    record['evidence_files'].extend([
+        MCAP_DIGEST, METADATA_DIGEST, MAP_YAML_DIGEST, MAP_IMAGE_DIGEST,
+    ])
+    return record
 
 
 def _through(gate):
@@ -424,6 +447,24 @@ def test_g5_requires_fresh_lidar_map_success_and_final_stop():
     collision['hardware']['navigation']['collision_observed'] = True
     with pytest.raises(ValueError, match='collision'):
         commissioning.record_gate(session, collision)
+
+
+def test_g5_requires_bounded_raw_telemetry_and_real_map_artifacts():
+    session = _through('G4')
+    missing_topic = _g5()
+    missing_topic['hardware']['telemetry']['topics'].remove('/rosy_01/map')
+    with pytest.raises(ValueError, match='telemetry topics'):
+        commissioning.record_gate(session, missing_topic)
+
+    unbound_map = _g5()
+    unbound_map['evidence_files'].remove(MAP_IMAGE_DIGEST)
+    with pytest.raises(ValueError, match='map artifact'):
+        commissioning.record_gate(session, unbound_map)
+
+    too_short = _g5()
+    too_short['hardware']['telemetry']['duration_s'] = 2.0
+    with pytest.raises(ValueError, match='duration'):
+        commissioning.record_gate(session, too_short)
 
 
 def _run_cli(*args):
@@ -651,7 +692,7 @@ def test_cli_g4_and_g5_require_role_bound_distinct_raw_digests(tmp_path):
         body_path = tmp_path / f'{prior_gate}-body.json'
         body_path.write_text(json.dumps(record[body_key]), encoding='utf-8')
         raw_paths = []
-        count = 8 if body_key == 'motor' else 4
+        count = 8 if body_key == 'motor' else 9
         for index in range(count):
             path = tmp_path / f'{prior_gate}-raw-{index}.txt'
             path.write_text(f'raw physical evidence {index}', encoding='utf-8')
@@ -667,6 +708,12 @@ def test_cli_g4_and_g5_require_role_bound_distinct_raw_digests(tmp_path):
                                record['motor']['deadman_trials'], digests)],
             }
         else:
+            record['hardware']['telemetry']['mcap_sha256'] = digests[5]
+            record['hardware']['telemetry']['metadata_sha256'] = digests[6]
+            record['hardware']['map']['yaml_sha256'] = digests[7]
+            record['hardware']['map']['image_sha256'] = digests[8]
+            record_path.write_text(json.dumps(record), encoding='utf-8')
+            body_path.write_text(json.dumps(record[body_key]), encoding='utf-8')
             manifest = {
                 'schema_version': 1,
                 'gate': 'G5',
@@ -676,7 +723,9 @@ def test_cli_g4_and_g5_require_role_bound_distinct_raw_digests(tmp_path):
                         'evidence_sha256': digest,
                     }
                     for role, digest in zip(
-                        ('lidar', 'map', 'navigation', 'final_state'), digests)
+                        ('lidar', 'telemetry', 'map', 'navigation', 'final_state'),
+                        digests,
+                    )
                 },
             }
         manifest_path = tmp_path / f'{prior_gate}-manifest.json'
@@ -744,10 +793,13 @@ def test_first_device_runbook_is_a_complete_fail_closed_handoff():
         'Do not copy Gazebo', 'HOLD', 'map_260905_update_v2',
         '/var/cache/rosy/releases/${RELEASE_ID}/manifest.json',
         'ROSY_RUNTIME_MODE=motor', 'ROSY_RUNTIME_MODE=hardware',
-        '/api/v1/robot/state', '/api/v1/slam/start',
+            '/api/v1/robot/state', '/api/v1/slam/start',
+            '/api/v1/safety/release', '/api/v1/safety/stop',
         '/api/v1/navigation/goal',
         'G0-connection-evidence.json', '-BatchMode', '-EvidencePath',
         'connectivity evidence only',
+        'ROSY_NAVIGATION_BACKEND=slam', 'ros2 bag record', '--storage mcap',
+        'G5-map.yaml', 'G5-map.pgm', 'G5-telemetry',
     ):
         assert phrase in runbook, phrase
 
@@ -775,4 +827,7 @@ def test_physical_body_templates_are_invalid_until_measured():
     assert '"mode": "UNMEASURED"' in templates
     assert '"stop_latency_s": null' in templates
     assert '"scan_hz": 0.0' in templates
+    assert '"format": "mcap"' in templates
+    assert '"mcap_sha256": "REPLACE_WITH_64_HEX"' in templates
+    assert '"yaml_sha256": "REPLACE_WITH_64_HEX"' in templates
     assert 'intentionally invalid' in templates

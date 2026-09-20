@@ -11,11 +11,24 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+import re
 from typing import Optional
 
 
 class SaveMapFailed(RuntimeError):
     """slam_toolbox refused or could not complete the save."""
+
+
+_SAFE_MAP_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+
+
+def resolve_output_stem(name: str, output_dir: str | Path) -> str:
+    """Resolve an operator map name beneath the shared map directory."""
+    if not isinstance(name, str) or not _SAFE_MAP_NAME.fullmatch(name):
+        raise ValueError("map name must be a safe basename")
+    if name in {".", ".."}:
+        raise ValueError("map name must be a safe basename")
+    return str(Path(output_dir) / name)
 
 
 def check_result(code: int) -> None:

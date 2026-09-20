@@ -287,6 +287,10 @@ from one: stop, preserve the raw output, and do not create a GO record.
 Hazardous gate: it is never auto-executed by `commission-pinky.py`.
 
 ```bash
+install -m 0600 /dev/null "$HOME/.config/rosy/operator.curl"
+install -m 0600 /dev/null "$HOME/.config/rosy/admin.curl"
+${EDITOR:-vi} "$HOME/.config/rosy/operator.curl" # operator Authorization header
+${EDITOR:-vi} "$HOME/.config/rosy/admin.curl"    # administrator Authorization header
 sudo /opt/rosy/deploy/robot/runtime-mode.sh down
 sudo /opt/rosy/deploy/robot/verify-motors.sh \
   | tee "$EVIDENCE/G4-motor-preflight.txt"
@@ -353,23 +357,45 @@ hardware mode, then verify one `cmd_vel` publisher and fresh LiDAR before the
 operator explicitly releases E-stop. Start with the lowest accepted physical
 motion envelope; simulator speeds are not evidence.
 
-Create a separate mode-0600 operator curl config as in G3, then run:
+Create separate mode-0600 operator and administrator curl configs as in G3.
+The administrator credential is required only to release the software E-stop;
+keep the physical power cut reachable. Then run:
 
 ```bash
 sudo /opt/rosy/deploy/robot/runtime-mode.sh down
-sudo ROSY_RUNTIME_MODE=hardware /opt/rosy/deploy/robot/runtime-mode.sh up
+sudo ROSY_RUNTIME_MODE=hardware ROSY_NAVIGATION_BACKEND=slam \
+  /opt/rosy/deploy/robot/runtime-mode.sh up
 timeout 10 docker compose --env-file /opt/rosy/deploy/robot/.env \
   -f /opt/rosy/deploy/robot/compose.yaml exec -T rosy-io \
   ros2 topic hz --window 50 /rosy_01/scan \
   | tee "$EVIDENCE/G5-lidar-rate.txt"
+curl --config "$HOME/.config/rosy/admin.curl" --fail-with-body --silent --show-error \
+  -X POST http://127.0.0.1:8080/api/v1/safety/release \
+  | tee "$EVIDENCE/G5-estop-release.json"
 curl --config "$HOME/.config/rosy/operator.curl" --fail-with-body --silent --show-error \
   -X POST http://127.0.0.1:8080/api/v1/slam/start \
   | tee "$EVIDENCE/G5-slam-start.json"
-# Drive only through the supervised dashboard while mapping.
+# In terminal A, record at most 15 minutes of raw physical telemetry. The
+# commissioning directory is the only evidence write mount in rosy-io.
+sudo timeout --signal=INT --kill-after=10s 900s \
+  docker compose --env-file /opt/rosy/deploy/robot/.env \
+  -f /opt/rosy/deploy/robot/compose.yaml exec -T rosy-io \
+  ros2 bag record --storage mcap \
+  --output "$EVIDENCE/G5-telemetry" \
+  /rosy_01/scan /rosy_01/odom /rosy_01/cmd_vel /rosy_01/map /tf /tf_static
+# In terminal B, drive only through the supervised dashboard while mapping.
+# Stop terminal A with Ctrl-C after the route is covered; timeout remains the
+# hard upper bound and allows rosbag2 to close metadata cleanly.
 curl --config "$HOME/.config/rosy/operator.curl" --fail-with-body --silent --show-error \
   -H 'Content-Type: application/json' -d '{"name":"pinky_01_physical_001"}' \
   http://127.0.0.1:8080/api/v1/slam/save \
   | tee "$EVIDENCE/G5-map-save.json"
+test -s /var/lib/rosy/maps/pinky_01_physical_001.yaml
+test -s /var/lib/rosy/maps/pinky_01_physical_001.pgm
+cp --no-clobber /var/lib/rosy/maps/pinky_01_physical_001.yaml \
+  "$EVIDENCE/G5-map.yaml"
+cp --no-clobber /var/lib/rosy/maps/pinky_01_physical_001.pgm \
+  "$EVIDENCE/G5-map.pgm"
 curl --config "$HOME/.config/rosy/operator.curl" --fail-with-body --silent --show-error \
   -X POST http://127.0.0.1:8080/api/v1/slam/stop \
   | tee "$EVIDENCE/G5-slam-stop.json"
@@ -385,18 +411,39 @@ velocity with E-stop asserted. `map_260905_update_v2` may be used as a route
 reference only after coordinate/frame and clearance checks; the first physical
 map gets a new evidence-bound ID.
 
-Capture final state, fill the invalid-until-measured G5 body template, record,
-then take hardware down:
+Assert E-stop again before final capture. Fill the invalid-until-measured G5
+body template, record, then take hardware down:
 
 ```bash
+curl --config "$HOME/.config/rosy/viewer.curl" --fail-with-body --silent --show-error \
+  -X POST http://127.0.0.1:8080/api/v1/safety/stop \
+  | tee "$EVIDENCE/G5-estop-stop.json"
 curl --config "$HOME/.config/rosy/viewer.curl" --fail-with-body --silent --show-error \
   http://127.0.0.1:8080/api/v1/robot/state >"$EVIDENCE/G5-final-state.json"
 curl --config "$HOME/.config/rosy/viewer.curl" --fail-with-body --silent --show-error \
   http://127.0.0.1:8080/api/v1/navigation/state >"$EVIDENCE/G5-navigation-state.json"
-sha256sum "$EVIDENCE/G5-lidar-rate.txt" "$EVIDENCE/G5-map-save.json" \
+MCAP_FILE="$(find "$EVIDENCE/G5-telemetry" -maxdepth 1 -type f -name '*.mcap' -print -quit)"
+test -n "$MCAP_FILE" && test -s "$MCAP_FILE"
+test -s "$EVIDENCE/G5-telemetry/metadata.yaml"
+docker compose --env-file /opt/rosy/deploy/robot/.env \
+  -f /opt/rosy/deploy/robot/compose.yaml exec -T rosy-io \
+  ros2 bag info "$EVIDENCE/G5-telemetry" \
+  | tee "$EVIDENCE/G5-telemetry-info.txt"
+{
+  cat "$EVIDENCE/G5-map-save.json"
+  sha256sum "$EVIDENCE/G5-map.yaml" "$EVIDENCE/G5-map.pgm"
+} >"$EVIDENCE/G5-map-artifacts.txt"
+sha256sum "$MCAP_FILE" "$EVIDENCE/G5-telemetry/metadata.yaml" \
+  "$EVIDENCE/G5-map.yaml" "$EVIDENCE/G5-map.pgm" \
+  >"$EVIDENCE/G5-artifact-SHA256SUMS"
+sha256sum "$EVIDENCE/G5-lidar-rate.txt" "$EVIDENCE/G5-telemetry-info.txt" \
+  "$EVIDENCE/G5-map-artifacts.txt" \
   "$EVIDENCE/G5-navigation-state.json" "$EVIDENCE/G5-final-state.json" \
   >"$EVIDENCE/G5-role-SHA256SUMS"
-# Fill G5-evidence-manifest.json with these four digests and exact body role values.
+# Fill G5-hardware.json with the measured duration/topics and the four artifact
+# digests. Fill G5-evidence-manifest.json with five role digests and exact body
+# role values. G5-telemetry-info.txt comes from `ros2 bag info G5-telemetry`;
+# G5-map-artifacts.txt contains the map-save response and YAML/PGM sha256 lines.
 python3 "$COMMISSION" prepare \
   --session "$SESSION" --body "$EVIDENCE/G5-hardware.json" \
   --record "$EVIDENCE/G5-record.json"
@@ -408,7 +455,13 @@ python3 "$COMMISSION" record \
   --evidence-file "$EVIDENCE/G5-final-state.json" \
   --evidence-file "$EVIDENCE/G5-navigation-state.json" \
   --evidence-file "$EVIDENCE/G5-map-save.json" \
-  --evidence-file "$EVIDENCE/G5-goal.json"
+  --evidence-file "$EVIDENCE/G5-goal.json" \
+  --evidence-file "$MCAP_FILE" \
+  --evidence-file "$EVIDENCE/G5-telemetry/metadata.yaml" \
+  --evidence-file "$EVIDENCE/G5-map.yaml" \
+  --evidence-file "$EVIDENCE/G5-map.pgm" \
+  --evidence-file "$EVIDENCE/G5-telemetry-info.txt" \
+  --evidence-file "$EVIDENCE/G5-map-artifacts.txt"
 sudo /opt/rosy/deploy/robot/runtime-mode.sh down
 ```
 

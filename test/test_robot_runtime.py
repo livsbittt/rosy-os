@@ -216,7 +216,7 @@ def test_core_data_is_a_host_owned_bind_and_capabilities_match_the_slice():
         in core["volumes"]
     )
     assert (
-        "./config/capabilities.${ROSY_RUNTIME_MODE:-core}.yaml"
+        "./config/${ROSY_CAPABILITIES_FILE:-capabilities.core.yaml}"
         ":/etc/rosy/capabilities.yaml:ro"
         in core["volumes"]
     )

@@ -36,6 +36,9 @@ def _include_nav2(context, *args, **kwargs):
     nav_share = get_package_share_directory("navigation")
     namespace = LaunchConfiguration("namespace").perform(context)
     source = LaunchConfiguration("params_file").perform(context)
+    backend = LaunchConfiguration("navigation_backend").perform(context).strip().lower()
+    if backend not in {"localization", "slam"}:
+        raise ValueError("navigation backend must be localization or slam")
     profile_path = LaunchConfiguration("profile_file").perform(context)
     limits = load_motion_limits(profile_path)
     footprint_file = LaunchConfiguration("footprint_profile_file").perform(context).strip()
@@ -72,29 +75,45 @@ def _include_nav2(context, *args, **kwargs):
         max_angular_rps=LaunchConfiguration("max_angular_rps").perform(context),
     )
     validate_nav2_parameters(source, limits)
-    fallback_map = os.path.join(nav_share, "map", "my_map.yaml")
-    allow_demo_map = LaunchConfiguration("allow_demo_map").perform(context).lower()
-    if allow_demo_map not in {"true", "false"}:
-        raise ValueError("allow_demo_map must be true or false")
-    map_yaml = resolve_occupancy_map(
-        LaunchConfiguration("map").perform(context),
-        fallback_map,
-        allow_fallback=allow_demo_map == "true",
+    rewritten_nav = write_prefixed_nav2_params(
+        source, namespace, footprint_points=footprint_points
     )
+    if backend == "localization":
+        fallback_map = os.path.join(nav_share, "map", "my_map.yaml")
+        allow_demo_map = LaunchConfiguration("allow_demo_map").perform(context).lower()
+        if allow_demo_map not in {"true", "false"}:
+            raise ValueError("allow_demo_map must be true or false")
+        map_yaml = resolve_occupancy_map(
+            LaunchConfiguration("map").perform(context),
+            fallback_map,
+            allow_fallback=allow_demo_map == "true",
+        )
+        launch_file = "bringup_launch.xml"
+        launch_arguments = {
+            "namespace": namespace,
+            "use_sim_time": LaunchConfiguration("use_sim_time").perform(context),
+            "map": map_yaml,
+            "params_file": rewritten_nav,
+            "use_composition": "True",
+        }
+    else:
+        mapper_source = LaunchConfiguration("mapper_params_file").perform(context)
+        launch_file = "mapping_bringup_launch.xml"
+        launch_arguments = {
+            "namespace": namespace,
+            "use_sim_time": LaunchConfiguration("use_sim_time").perform(context),
+            "params_file": rewritten_nav,
+            "slam_params_file": write_prefixed_nav2_params(
+                mapper_source, namespace
+            ),
+            "use_composition": "True",
+        }
     return [
         IncludeLaunchDescription(
             AnyLaunchDescriptionSource(
-                os.path.join(nav_share, "launch", "bringup_launch.xml")
+                os.path.join(nav_share, "launch", launch_file)
             ),
-            launch_arguments={
-                "namespace": namespace,
-                "use_sim_time": LaunchConfiguration("use_sim_time").perform(context),
-                "map": map_yaml,
-                "params_file": write_prefixed_nav2_params(
-                    source, namespace, footprint_points=footprint_points
-                ),
-                "use_composition": "True",
-            }.items(),
+            launch_arguments=launch_arguments.items(),
         )
     ]
 
@@ -104,6 +123,7 @@ def generate_launch_description():
     nav_share = get_package_share_directory("navigation")
     control_share = get_package_share_directory("control")
     default_params = os.path.join(nav_share, "params", "nav2_params.yaml")
+    default_mapper_params = os.path.join(nav_share, "params", "mapper_params.yaml")
 
     namespace = LaunchConfiguration("namespace")
     use_sim_time = LaunchConfiguration("use_sim_time")
@@ -128,6 +148,10 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("namespace", default_value=""),
         DeclareLaunchArgument("use_sim_time", default_value="false"),
+        DeclareLaunchArgument(
+            "navigation_backend",
+            default_value=os.environ.get("ROSY_NAVIGATION_BACKEND", "localization"),
+        ),
         DeclareLaunchArgument("enable_battery", default_value="false"),
         DeclareLaunchArgument("enable_lidar", default_value="true"),
         DeclareLaunchArgument("enable_line_follow", default_value="false"),
@@ -151,6 +175,7 @@ def generate_launch_description():
             default_value=os.environ.get("ROSY_MAP", "/var/lib/rosy/maps/site.yaml"),
         ),
         DeclareLaunchArgument("params_file", default_value=default_params),
+        DeclareLaunchArgument("mapper_params_file", default_value=default_mapper_params),
         DeclareLaunchArgument("allow_demo_map", default_value="false"),
         DeclareLaunchArgument(
             "footprint_profile_file",

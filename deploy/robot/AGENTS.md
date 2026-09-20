@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-16 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-21 -->
 
 # robot
 
@@ -13,7 +13,7 @@ On-device runtime: multi-stage Dockerfile (`core` / `io` targets), Compose `rosy
 |------|-------------|
 | `Dockerfile` | Multi-stage: `core` image vs `rosy-io` |
 | `compose.yaml` | `rosy-core` (always), `rosy-motor` (profile `motor`), hardware/LiDAR/Nav2 (profile `hardware`); host network, read-only, cap_drop ALL |
-| `runtime-mode.sh` | Modes: `core` \| `motor` \| `hardware` (not `io`) |
+| `runtime-mode.sh` | Modes: `core` \| `motor` \| `hardware` (not `io`); hardware selects `ROSY_NAVIGATION_BACKEND=localization|slam` |
 | `entrypoint.sh` | Container entry |
 | `install-pi.sh` | First-boot install on Pi. `--preset` (mode/alias) or `--slices` (must match a preset, include `core`); both map to `ROSY_RUNTIME_MODE`. vision/omx/ai: not installable yet |
 | `configure-uart-pi5.sh` | Pi 5 UART (`ttyAMA4` for Dynamixel) |
@@ -21,7 +21,7 @@ On-device runtime: multi-stage Dockerfile (`core` / `io` targets), Compose `rosy
 | `verify-from-windows.ps1` | Read-only remote peer verify; optional bounded batch SSH and atomic GO/HOLD JSON connection evidence |
 | `verify-pi.sh` / `verify-motors.sh` / `verify-power.sh` | On-device checks. `verify-motors.sh` refuses to probe the UART whenever it cannot establish that the motor runtime is down — a compose failure counts, so missing docker or an unset identity now stops it rather than opening the gate |
 | `device-readback.py` / `device-readback.sh` | Secret-free JSON evidence for OS identity, activation manifest, core health, and ROS graph |
-| `commission-pinky.py` / `commissioning_session.py` | Ordered G0-G5 evidence recorder; operator procedure is `docs/deployment/pinky-pro-first-device-runbook.md` |
+| `commission-pinky.py` / `commissioning_session.py` | Ordered G0-G5 evidence recorder; G5 binds MCAP telemetry and generated map hashes; operator procedure is `docs/deployment/pinky-pro-first-device-runbook.md` |
 | `measure-dds-baseline.sh` | Phase 0 DDS baseline (D-34). Requires `hardware` mode; records each topic's pre-attach subscriber count because attaching `ros2 topic bw` creates the traffic it measures |
 | `rosy-runtime.service` | systemd unit for compose runtime |
 | `rosy-lowbatt-shutdown.service` / `.path` / `.sh` | D-27: host watches CORE sentinel file and halts |
@@ -51,6 +51,10 @@ On-device runtime: multi-stage Dockerfile (`core` / `io` targets), Compose `rosy
   what shipped every unit as 42/`rosy_01`. CycloneDDS URI `file:///etc/rosy/cyclonedds.xml`.
 
 ### Testing Requirements
+
+D-144 keeps mapping orthogonal to the runtime slice: `slam` is valid only in
+`hardware`, selects the mapping capability overlay and SLAM readiness, and makes
+the maps mount writable. Localization keeps the maps mount read-only.
 
 ```bash
 python3 -m pytest test/test_robot_runtime.py test/test_release_boundary_guards.py -v

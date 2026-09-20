@@ -204,6 +204,7 @@ class NavigationManager:
     # --- NAV-005 Mapping 세션 -------------------------------------------------
 
     def start_mapping(self, source: str = "api") -> None:
+        self.require_ready()
         if self._safety.estop:
             raise NavigationError("EMERGENCY_ACTIVE", "e-stop is active")
         with self._lock:

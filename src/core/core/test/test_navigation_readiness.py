@@ -102,6 +102,31 @@ def test_core_services_turns_the_gate_on_for_hardware_even_without_an_overlay(tm
     assert services.readiness.required is True
 
 
+def test_mapping_backend_uses_slam_readiness_instead_of_amcl(tmp_path):
+    from core_common.profile import RobotProfile
+    from core.services import CoreServices
+
+    config_dir = Path(__file__).parent.parent / "config"
+    config = yaml.safe_load((config_dir / "rosy_default.yaml").read_text(encoding="utf-8"))
+    config["runtime"] = {"mode": "hardware", "navigation_backend": "slam"}
+    config["navigation"]["readiness"] = {
+        "required": True,
+        "profiles": {
+            "localization": ["amcl", "map_server", "controller_server", "local_costmap", "global_costmap", "motor_adapter"],
+            "slam": ["slam_toolbox", "controller_server", "local_costmap", "global_costmap", "motor_adapter"],
+        },
+    }
+    profile = RobotProfile.load(config_dir / "profile.pinky_pro.yaml")
+    capabilities = yaml.safe_load((config_dir / "capabilities.yaml").read_text(encoding="utf-8"))
+
+    services = CoreServices.build(config, profile, capabilities, tmp_path / "waypoints.json")
+
+    assert services.readiness.required_components == (
+        "slam_toolbox", "controller_server", "local_costmap",
+        "global_costmap", "motor_adapter",
+    )
+
+
 def test_navigation_state_exposes_readiness_reason_to_the_device_ui(core_client):
     client, _services = core_client()
 

@@ -90,7 +90,7 @@ def test_motor_profile_does_not_launch_nav2():
     assert "hardware.launch.py" not in command
 
 
-def test_io_image_packages_nav2_without_slam_or_aux_drivers():
+def test_io_image_packages_nav2_and_slam_without_aux_drivers():
     dockerfile = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
     dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
 
@@ -99,7 +99,7 @@ def test_io_image_packages_nav2_without_slam_or_aux_drivers():
     assert "ros-jazzy-navigation2" in dockerfile
     assert "ros-jazzy-nav2-bringup" in dockerfile
     assert "python3-yaml" in dockerfile
-    assert "ros-jazzy-slam-toolbox" not in dockerfile
+    assert "ros-jazzy-slam-toolbox" in dockerfile
     for package in hardware_packages():
         assert package not in dockerfile, package
     assert "!src/navigation/navigation/" in dockerignore
@@ -120,8 +120,7 @@ def test_hardware_launch_composes_bringup_and_imports_nav_policy():
     assert "state_unknown" in launch
     assert "from navigation.site_map import resolve_occupancy_map" in launch
     assert "sys.path.insert" not in launch
-    assert "map_building" not in launch
-    assert "slam_toolbox" not in launch
+    assert "mapping_bringup_launch.xml" in launch
     assert "nav2_web_server" not in launch
 
 
@@ -130,7 +129,10 @@ def test_hardware_io_mounts_a_host_site_map_directory():
     motor = compose()["services"]["rosy-motor"]
 
     assert io["environment"]["ROSY_MAP"] == "${ROSY_MAP:-/var/lib/rosy/maps/site.yaml}"
-    assert "${ROSY_DATA_PATH:-/var/lib/rosy}/maps:/var/lib/rosy/maps:ro" in io["volumes"]
+    assert (
+        "${ROSY_DATA_PATH:-/var/lib/rosy}/maps:/var/lib/rosy/maps:"
+        "${ROSY_MAPS_MOUNT_MODE:-ro}"
+    ) in io["volumes"]
     assert "./config/profile.${ROSY_RUNTIME_MODE:-core}.yaml:/etc/rosy/profile.yaml:ro" in motor[
         "volumes"
     ]

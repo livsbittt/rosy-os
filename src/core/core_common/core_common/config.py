@@ -18,6 +18,7 @@ import yaml
 DEFAULT_CONFIG_NAME = "rosy_default.yaml"
 LOCAL_CONFIG_PATH = Path.home() / ".rosy" / "rosy.yaml"
 RUNTIME_MODES = frozenset({"core", "motor", "hardware"})
+NAVIGATION_BACKENDS = frozenset({"localization", "slam"})
 
 
 class ConfigError(Exception):
@@ -101,6 +102,19 @@ def load_config(explicit_path: Optional[str] = None) -> dict[str, Any]:
         config.setdefault("runtime", {})["mode"] = mode
     else:
         config.setdefault("runtime", {}).setdefault("mode", "core")
+
+    backend = os.environ.get("ROSY_NAVIGATION_BACKEND", "").strip()
+    if backend:
+        if backend not in NAVIGATION_BACKENDS:
+            raise ValueError(
+                "ROSY_NAVIGATION_BACKEND must be localization or slam, "
+                f"got {backend!r}"
+            )
+        if backend == "slam" and config["runtime"]["mode"] != "hardware":
+            raise ValueError("slam navigation backend requires hardware runtime mode")
+        config["runtime"]["navigation_backend"] = backend
+    else:
+        config["runtime"].setdefault("navigation_backend", "localization")
 
     return config
 

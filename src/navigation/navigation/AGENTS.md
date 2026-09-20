@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-21 -->
 
 # navigation
 
@@ -11,7 +11,7 @@ Nav2 and SLAM Toolbox launch/config/maps for real robot and Gazebo. ament_cmake.
 
 | File | Description |
 |------|-------------|
-| `package.xml` | Depends on navigation2, nav2_bringup |
+| `package.xml` | Depends on navigation2, nav2_bringup, and slam_toolbox |
 | `CMakeLists.txt` | Installs the Python policy package, launch, params, maps, rviz. |
 | `progress.md` | Current gate snapshot (SOURCE…FIELD). Overwrite; state of record over this file |
 | `logs.md` | Append-only work journal, one entry per change |
@@ -39,6 +39,7 @@ Nav2 and SLAM Toolbox launch/config/maps for real robot and Gazebo. ament_cmake.
   bypass it with a higher hardware launch override.
 - `gz_bringup_launch.xml` includes `bringup_launch.xml`; do not fork the robot Nav2 XML.
 - Watch absolute vs namespaced `scan_topic` in mapper params (noted in `gz_multi.launch.py`).
+- D-144 selects localization or SLAM through `ROSY_NAVIGATION_BACKEND` while retaining `ROSY_RUNTIME_MODE=hardware`; mapping must not require a pre-existing map.
 
 ### Testing Requirements
 

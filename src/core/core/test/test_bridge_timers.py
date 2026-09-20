@@ -199,6 +199,7 @@ EXPECTED_SUBSCRIPTIONS = [
     ("line/observation", "_on_line_observation", 10),
     ("amcl/transition_event", "_on_amcl_transition", 10),
     ("map_server/transition_event", "_on_map_server_transition", 10),
+    ("slam_toolbox/transition_event", "_on_slam_transition", 10),
     ("controller_server/transition_event", "_on_controller_transition", 10),
     ("local_costmap/local_costmap/transition_event", "_on_local_costmap_transition", 10),
     ("global_costmap/global_costmap/transition_event", "_on_global_costmap_transition", 10),

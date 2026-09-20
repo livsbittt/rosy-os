@@ -87,6 +87,9 @@ RUN apt-get -o Acquire::Retries=5 update \
         ros-jazzy-xacro \
         ros-jazzy-navigation2 \
         ros-jazzy-nav2-bringup \
+        ros-jazzy-slam-toolbox \
+        ros-jazzy-ros2bag \
+        ros-jazzy-rosbag2-storage-mcap \
     && python3 -m pip install --break-system-packages --no-cache-dir \
         -r /tmp/requirements-io.txt \
     && rm -rf /var/lib/apt/lists/* /tmp/requirements-io.txt

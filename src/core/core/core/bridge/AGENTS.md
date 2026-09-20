@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-21 -->
 
 # bridge
 
@@ -19,7 +19,7 @@ ROS-101: the only module allowed to import rclpy message types and talk to the R
 | `reconcile.py` | ROS-free change-detection latch. LED latches on a skipped call, LiDAR does not |
 | `odometry.py` | ROS-free `travelled_m` — the only measure undocking has |
 | `battery_policy.py` | ROS-free SAF-005/DNC-006 chain: what one voltage reading sets in motion, in order |
-| `save_map.py` | ROS-free SaveMap reply handling: `RESULT_SUCCESS = 0` (truthiness inverts it) and the D-13 map id |
+| `save_map.py` | ROS-free SaveMap reply handling: safe basenames under the configured map directory, `RESULT_SUCCESS = 0`, and the D-13 map id |
 
 ## Subdirectories
 
@@ -69,6 +69,8 @@ transient-local adapter lease. They feed the ROS-free
 `navigation.readiness.NavigationReadinessGate` and do not create another
 velocity path. Hardware mode remains HOLD until all required components report
 active and the motor lease is refreshed.
+The SLAM backend substitutes `slam_toolbox` lifecycle readiness for AMCL and
+map-server readiness; the selected profile must never require both graphs.
 
 ## Dependencies
 

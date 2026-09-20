@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-20 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-21 -->
 
 # plans
 
@@ -57,6 +57,7 @@ Flask parity checklist가 추적용으로 여기에 합류했다. 둘은 실행 
 | `2026-09-20-dock-build-design.md` | ?? ?? ?? ?? ? 1? ?? ??, DNC-007 ?? ??, teach-by-docking ??? (DNC) |
 | `2026-09-20-pi-bench-commissioning-design.md` | Pi ?? ???? ? artifact ???readback ?? ??? (D-66) |
 | `2026-09-21-pinky-device-commissioning-design.md` (+ implementation plan) | Fail-closed G0-G5 first physical Pinky Pro session and evidence workflow |
+| `2026-09-21-hardware-mapping-g5-design.md` (+ implementation plan) | D-144 hardware SLAM backend, writable map output, and MCAP/hash-bound G5 evidence |
 | D-73 | `tools/harness/harness.yaml` `functional` + `test/test_module_functional_surface.py` |
 
 ## Subdirectories

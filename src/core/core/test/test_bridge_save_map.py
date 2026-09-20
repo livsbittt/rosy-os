@@ -42,7 +42,19 @@ def test_any_unknown_code_is_a_failure_not_a_success(code):
 
 # --- D-13 map id ------------------------------------------------------------
 
-from core.bridge.save_map import map_id, saved_bytes  # noqa: E402
+from core.bridge.save_map import map_id, resolve_output_stem, saved_bytes  # noqa: E402
+
+
+def test_map_output_stem_is_confined_to_the_shared_map_directory(tmp_path):
+    assert resolve_output_stem("survey_01", tmp_path) == str(tmp_path / "survey_01")
+
+
+@pytest.mark.parametrize(
+    "name", ["", ".", "..", "../escape", "nested/map", r"nested\\map", "/tmp/map"]
+)
+def test_map_output_stem_rejects_empty_or_path_like_names(tmp_path, name):
+    with pytest.raises(ValueError, match="map name"):
+        resolve_output_stem(name, tmp_path)
 
 
 def test_map_id_is_the_name_plus_a_short_content_checksum():

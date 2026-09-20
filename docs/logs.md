@@ -860,3 +860,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: D-141 — 대형 주행 실측은 네 게이트를 순서대로 통과한다. (A) 센서 브리지(RMW 통일 상태에서 scan/clock 흐름) → (B) 맵/TF(map:= → map_server → /map → map→odom) → 무장 직후 follower_tx ≥ 1(D-132 계약) → 리더 1.2 m 주행·팔로워 추종·추적 오차 표본(0.3 m 임계의 첫 실데이터). 단일 대화형 세션 원칙 + 시작 전 점유 확인(8090·18080·yaml·프로세스). 게이트 실패 시 gz_sim·core 도메인 귀속
 - 교훈: 없음
+
+## 2026-09-21 · uncommitted · docs(adr): define physical hardware mapping as D-144
+
+- 변경: recorded the localization/SLAM backend split and the G5 evidence contract. The operator runbook now captures bounded MCAP telemetry, generated YAML/PGM hashes, navigation evidence, and final stopped/E-stop state.
+- 증거: documentation contracts are exercised by the hardware-mapping and Pinky commissioning tests; harness lint/generation is run before integration.
+- gate 변화: none. Documentation and host simulation do not upgrade ARTIFACT or DEVICE.
+- 결정: D-144 Accepted at source-contract level; physical acceptance remains evidence-gated.
+- 교훈: a saved map screenshot is presentation evidence, not proof of the sensor/TF/cmd_vel path that generated it.

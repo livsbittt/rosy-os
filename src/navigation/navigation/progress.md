@@ -23,10 +23,12 @@ gates:
     blocker: "Pi bench Device 설치와 device-readback.sh --json 증거 없음"
   FIELD:
     state: PARKED
-adrs: [D-2, D-3, D-4, D-40, D-54, D-58]
+adrs: [D-2, D-3, D-4, D-40, D-54, D-58, D-144]
 plans:
   - docs/plans/2026-09-13-rosy-os-device-validation-implementation-plan.md
   - docs/plans/2026-09-15-module-harness-design.md
+  - docs/plans/2026-09-21-hardware-mapping-g5-design.md
+  - docs/plans/2026-09-21-hardware-mapping-g5.md
 ---
 ## 지금 상태
 

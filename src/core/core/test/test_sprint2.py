@@ -160,6 +160,18 @@ class TestNewApi:
         assert svc.state.map_id == "wh:deadbeef"
         assert tc.post("/api/v1/slam/stop", headers=OPERATOR).json()["mapping"] is False
 
+    @pytest.mark.parametrize("name", ["../escape", "nested/map", r"nested\\map"])
+    def test_slam_save_rejects_path_like_names(self, client, name):
+        tc, _svc = client
+        assert tc.post("/api/v1/slam/start", headers=OPERATOR).status_code == 200
+
+        response = tc.post(
+            "/api/v1/slam/save", json={"name": name}, headers=OPERATOR
+        )
+
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
     def test_metrics_prometheus(self, client):
         tc, _ = client
         r = tc.get("/metrics")

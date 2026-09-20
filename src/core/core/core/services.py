@@ -192,7 +192,22 @@ class CoreServices:
         if type(raw_readiness_required) is not bool:
             raise ValueError("navigation.readiness.required must be a boolean")
         readiness_required = raw_readiness_required
+        navigation_backend = str(
+            (config.get("runtime") or {}).get("navigation_backend", "localization")
+        ).strip().lower()
+        if navigation_backend not in {"localization", "slam"}:
+            raise ValueError("runtime.navigation_backend must be localization or slam")
+        readiness_profiles = readiness_cfg.get("profiles")
+        if readiness_profiles is not None and not isinstance(readiness_profiles, dict):
+            raise ValueError("navigation.readiness.profiles must be a mapping")
         readiness_components = readiness_cfg.get("required_components")
+        if readiness_profiles is not None:
+            readiness_components = readiness_profiles.get(navigation_backend)
+            if readiness_components is None:
+                raise ValueError(
+                    "navigation readiness profile is missing for "
+                    f"{navigation_backend}"
+                )
         readiness = NavigationReadinessGate(
             required=readiness_required,
             stale_after_s=readiness_cfg.get("stale_after_s", 2.0),

@@ -47,3 +47,11 @@
 - 증거: isolated exact-map runtime showed map server, AMCL, planner, controller and behavior server active under `/codex_01`; the initial-pose seed completed. Contract coverage is in `test_gz_package_contract.py`.
 - gate 변화: none. Stack startup is proven, but the exact-map unattended route and device execution remain HOLD.
 - 교훈: switching composition modes changes which launch scope owns the namespace; the child cannot inherit and push the same namespace again.
+
+## 2026-09-21 · uncommitted · feat(nav): add a real-hardware SLAM backend (D-144)
+
+- 변경: `hardware.launch.py` now selects localization or mapping without requiring an existing map in SLAM mode. The mapping bringup composes Nav2 navigation with SLAM Toolbox while preserving CORE ownership of final `cmd_vel`; mapper frame/topic parameters remain robot-namespaced.
+- 증거: hardware launch contracts, frame-prefix rewrites, readiness selection, safe map paths, and G5 evidence binding pass in the Windows test suite. Container package and launch inspection also passed.
+- gate 변화: SOURCE/LOCAL refreshed only. ROS-SIM and DEVICE remain HOLD until their actual runtimes are exercised.
+- 결정: D-144.
+- 교훈: mapping is a navigation backend, not a new runtime mode; this keeps motor/LiDAR ownership unchanged while making persistence and readiness backend-specific.

@@ -69,6 +69,7 @@
 | D-132 | 무장은 스트림이 연 뒤에 한다 |
 | D-133 | CORE SIGSEGV 는 재현 경로로 쫓고, 흔들리는 환경에서의 반복은 폐기한다 |
 | D-141 | 대형 주행 실측은 네 게이트를 순서대로 통과한다 — 단일 세션 묶음 |
+| D-144 | 하드웨어 맵 생성은 runtime mode가 아니라 검증된 navigation backend다 |
 
 ## 계획·결과 문서
 
@@ -80,6 +81,8 @@
 - [2026-09-18-rosy-games-remaining-adr-plan.md](plans/2026-09-18-rosy-games-remaining-adr-plan.md)
 - [2026-09-20-fleet-console-ops-plan.md](plans/2026-09-20-fleet-console-ops-plan.md)
 - [2026-09-20-ui-grammar-boundary-plan.md](plans/2026-09-20-ui-grammar-boundary-plan.md)
+- [2026-09-21-hardware-mapping-g5-design.md](plans/2026-09-21-hardware-mapping-g5-design.md)
+- [2026-09-21-hardware-mapping-g5.md](plans/2026-09-21-hardware-mapping-g5.md)
 
 ## 교훈 (docs/solutions)
 
@@ -92,8 +95,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · docs(adr): define physical hardware mapping as D-144
 - 2026-09-20 · uncommitted · docs(adr): the formation-driving measurement bundle is locked as four ordered gates (D-141)
 - 2026-09-20 · uncommitted · docs(fleet): fourth confirmation - background sim stacks cannot survive this box; the handoff stands as final
 - 2026-09-20 · uncommitted · fix(sim): double the robots.yaml wait window in run_fleet_sim
 - 2026-09-20 · uncommitted · ci(adr): first full native arm64 rehearsal — build green, 11 platform findings recorded
-- 2026-09-20 · uncommitted · ci(adr): add D-140 — weekly native arm64 rehearsal (ARTIFACT 코드 수준 선검증)

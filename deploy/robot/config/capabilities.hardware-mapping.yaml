@@ -1,0 +1,26 @@
+# Pinky Pro board support - hardware runtime with the SLAM backend selected.
+# This overlay is mounted only after runtime-mode.sh validates
+# ROSY_RUNTIME_MODE=hardware and ROSY_NAVIGATION_BACKEND=slam.
+capability_version: 1
+navigation:
+  goal_navigation: true
+  return_home: true
+  max_linear_velocity: 0.20
+  max_angular_velocity: 0.80
+teleop: true
+slam: true
+swarm:
+  follow: false
+  lead: false
+vision:
+  enabled: false
+omx:
+  enabled: false
+ai:
+  enabled: false
+docking:
+  supported: false
+sensors: [lidar, encoder]
+events: ["safety.*", "mode.*", "waypoint.*", "system.*", "command.*"]
+api_versions: [v1]
+protocol_version: "1.0"

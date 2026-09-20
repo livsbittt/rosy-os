@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${ROSY_ENV_FILE:-$SCRIPT_DIR/.env}"
 ACTION="${1:-}"
 MODE="${ROSY_RUNTIME_MODE:-core}"
+BACKEND="${ROSY_NAVIGATION_BACKEND:-}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
     echo "error: Rosy environment file not found: $ENV_FILE" >&2
@@ -17,6 +18,12 @@ if [[ -z "${ROSY_RUNTIME_MODE+x}" ]]; then
     MODE="${configured_mode:-core}"
 fi
 
+if [[ -z "$BACKEND" ]]; then
+    configured_backend="$(sed -n 's/^ROSY_NAVIGATION_BACKEND=//p' "$ENV_FILE" | tail -n 1)"
+    configured_backend="${configured_backend%$'\r'}"
+    BACKEND="${configured_backend:-localization}"
+fi
+
 cd "$SCRIPT_DIR"
 
 # shellcheck source=config/resolve-mode.sh
@@ -24,11 +31,34 @@ source "$SCRIPT_DIR/config/resolve-mode.sh"
 MODE="$(resolve_runtime_mode "$MODE" "$SCRIPT_DIR/config/board.yaml")" || exit 2
 export ROSY_RUNTIME_MODE="$MODE"
 
+case "$BACKEND" in
+    localization|slam)
+        ;;
+    *)
+        echo "error: ROSY_NAVIGATION_BACKEND must be localization|slam, got '$BACKEND'" >&2
+        exit 2
+        ;;
+esac
+if [[ "$BACKEND" == "slam" && "$MODE" != "hardware" ]]; then
+    echo "error: slam backend requires hardware runtime mode" >&2
+    exit 2
+fi
+export ROSY_NAVIGATION_BACKEND="$BACKEND"
+
 compose() {
     docker compose --env-file "$ENV_FILE" "$@"
 }
 
-CAP_FILE="$SCRIPT_DIR/config/capabilities.${MODE}.yaml"
+if [[ "$BACKEND" == "slam" ]]; then
+    ROSY_CAPABILITIES_FILE="capabilities.hardware-mapping.yaml"
+    ROSY_MAPS_MOUNT_MODE=rw
+else
+    ROSY_CAPABILITIES_FILE="capabilities.${MODE}.yaml"
+    ROSY_MAPS_MOUNT_MODE=ro
+fi
+export ROSY_CAPABILITIES_FILE ROSY_MAPS_MOUNT_MODE
+
+CAP_FILE="$SCRIPT_DIR/config/$ROSY_CAPABILITIES_FILE"
 PROF_FILE="$SCRIPT_DIR/config/profile.${MODE}.yaml"
 if [[ ! -f "$CAP_FILE" || ! -f "$PROF_FILE" ]]; then
     echo "error: missing board overlay for mode '$MODE' ($CAP_FILE / $PROF_FILE)" >&2

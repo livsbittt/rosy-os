@@ -306,7 +306,8 @@ def _validate_g5(record, session):
         raise ValueError('G5 evidence fields are incomplete or unknown')
     hardware = record['hardware']
     if not isinstance(hardware, dict) or set(hardware) != {
-            'operator', 'runtime_mode', 'cmd_vel_publishers', 'lidar', 'map',
+            'operator', 'runtime_mode', 'cmd_vel_publishers', 'lidar',
+            'telemetry', 'map',
             'navigation', 'final_state'}:
         raise ValueError('G5 hardware evidence is incomplete')
     _text(hardware['operator'], 'G5 operator')
@@ -322,12 +323,51 @@ def _validate_g5(record, session):
         raise ValueError('G5 requires fresh LiDAR evidence')
     _number(lidar['scan_hz'], 'G5 LiDAR scan_hz', minimum=0.001)
 
+    telemetry = hardware['telemetry']
+    if not isinstance(telemetry, dict) or set(telemetry) != {
+            'format', 'duration_s', 'topics', 'mcap_sha256',
+            'metadata_sha256'}:
+        raise ValueError('G5 telemetry evidence is incomplete')
+    if telemetry['format'] != 'mcap':
+        raise ValueError('G5 telemetry format must be mcap')
+    _number(
+        telemetry['duration_s'], 'G5 telemetry duration',
+        minimum=30.0, maximum=1800.0,
+    )
+    topics = telemetry['topics']
+    if (not isinstance(topics, list) or not topics or
+            not all(isinstance(topic, str) and topic.startswith('/')
+                    for topic in topics) or len(set(topics)) != len(topics)):
+        raise ValueError('G5 telemetry topics are invalid')
+    required_topics = ('/scan', '/odom', '/cmd_vel', '/map', '/tf', '/tf_static')
+    if any(not any(topic == required or topic.endswith(required)
+                   for topic in topics) for required in required_topics):
+        raise ValueError('G5 telemetry topics are incomplete')
+    evidence_digests = set(record['evidence_files'])
+    telemetry_digests = {
+        telemetry['mcap_sha256'], telemetry['metadata_sha256']
+    }
+    if (not all(isinstance(digest, str) and _SHA256.fullmatch(digest)
+                for digest in telemetry_digests) or
+            not telemetry_digests <= evidence_digests):
+        raise ValueError('G5 telemetry artifacts must be evidence-bound')
+
     map_evidence = hardware['map']
+    expected_map_keys = {
+        'fresh', 'map_id', 'yaml_sha256', 'image_sha256'
+    }
     if (not isinstance(map_evidence, dict) or
-            set(map_evidence) != {'fresh', 'map_id'} or
+            set(map_evidence) != expected_map_keys or
             map_evidence['fresh'] is not True):
         raise ValueError('G5 requires a fresh map')
     _text(map_evidence['map_id'], 'G5 map_id')
+    map_digests = {
+        map_evidence['yaml_sha256'], map_evidence['image_sha256']
+    }
+    if (not all(isinstance(digest, str) and _SHA256.fullmatch(digest)
+                for digest in map_digests) or
+            not map_digests <= evidence_digests):
+        raise ValueError('G5 map artifacts must be evidence-bound')
 
     navigation = hardware['navigation']
     if not isinstance(navigation, dict) or set(navigation) != {

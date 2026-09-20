@@ -63,3 +63,11 @@
 - gate 변화: SOURCE/LOCAL만 갱신. 연결 GO도 G0 artifact, DEVICE, FIELD를 대신하지 않는다.
 - 교훈: 장치 미연결을 콘솔 timeout으로만 남기지 말고 재실행 가능한 구조화 evidence로
   남기되, 자동 subnet scan이나 host-key 우회로 장치 identity 경계를 약화하지 않는다.
+
+## 2026-09-21 · uncommitted · feat(deploy): make physical G5 mapping evidence-bound (D-144)
+
+- 변경: added an orthogonal `ROSY_NAVIGATION_BACKEND=localization|slam` selector for hardware runtime. SLAM selects its own capability/readiness profile, writable maps mount, and image packages for SLAM Toolbox plus MCAP recording; localization remains read-only and AMCL-based.
+- 증거: focused hardware-mapping, commissioning, runtime, navigation, and CORE tests pass on Windows; the development image was built and its packages and launch arguments inspected.
+- gate 변화: SOURCE/LOCAL evidence is refreshed. ARTIFACT and DEVICE remain HOLD until a signed native ARM64 bundle is installed and the physical Pinky G0-G5 session produces the required files.
+- 결정: D-144.
+- 교훈: a mapping API and a SLAM package are insufficient unless the runtime backend, writable persistence, readiness, raw telemetry, generated map pair, and final safe state are all bound into one commissioning session.

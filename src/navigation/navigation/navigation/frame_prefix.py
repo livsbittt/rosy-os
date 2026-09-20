@@ -22,8 +22,11 @@ from typing import Any
 
 PREFIXABLE_FRAMES = {"odom", "base_footprint", "base_link"}
 FRAME_KEYS = {
+    "base_frame",
     "base_frame_id",
+    "odom_frame",
     "odom_frame_id",
+    "map_frame",
     "robot_base_frame",
     "global_frame",
     "local_frame",
@@ -33,7 +36,7 @@ FRAME_KEYS = {
 #: Sensor topics that live under the robot. `/map` is deliberately absent — it is
 #: shared, like the `map` frame.
 PREFIXABLE_TOPICS = {"scan", "/scan"}
-TOPIC_KEYS = {"topic"}
+TOPIC_KEYS = {"topic", "scan_topic"}
 
 
 def apply_nav2_frame_prefix(params: dict, prefix: str) -> dict:

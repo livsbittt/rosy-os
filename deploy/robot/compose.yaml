@@ -43,6 +43,8 @@ services:
       ROSY_CONFIG: /etc/rosy/rosy.yaml
       ROSY_HOST_ROOT: "${ROSY_HOST_ROOT:-/host}"
       ROSY_RUNTIME_MODE: "${ROSY_RUNTIME_MODE:-core}"
+      ROSY_NAVIGATION_BACKEND: "${ROSY_NAVIGATION_BACKEND:-localization}"
+      ROSY_MAP_OUTPUT_DIR: /var/lib/rosy/maps
       ROSY_DATA_PATH: /var/lib/rosy
       ROSY_DATA_GENERATION: "${ROSY_DATA_GENERATION:-}"
     command:
@@ -56,7 +58,7 @@ services:
     volumes:
       - "${ROSY_CONFIG_PATH:-/etc/rosy/rosy.yaml}:/etc/rosy/rosy.yaml:ro"
       - "./config/profile.${ROSY_RUNTIME_MODE:-core}.yaml:/etc/rosy/profile.yaml:ro"
-      - "./config/capabilities.${ROSY_RUNTIME_MODE:-core}.yaml:/etc/rosy/capabilities.yaml:ro"
+      - "./config/${ROSY_CAPABILITIES_FILE:-capabilities.core.yaml}:/etc/rosy/capabilities.yaml:ro"
       - "./config/motion_profiles.yaml:/etc/rosy/motion_profiles.yaml:ro"
       - "${ROSY_DATA_PATH:-/var/lib/rosy}:/var/lib/rosy"
       - "/proc/uptime:/host/proc/uptime:ro"
@@ -146,8 +148,10 @@ services:
       <<: *ros-environment
       HOME: /var/lib/rosy
       ROSY_MAP: "${ROSY_MAP:-/var/lib/rosy/maps/site.yaml}"
+      ROSY_NAVIGATION_BACKEND: "${ROSY_NAVIGATION_BACKEND:-localization}"
     volumes:
-      - "${ROSY_DATA_PATH:-/var/lib/rosy}/maps:/var/lib/rosy/maps:ro"
+      - "${ROSY_DATA_PATH:-/var/lib/rosy}/maps:/var/lib/rosy/maps:${ROSY_MAPS_MOUNT_MODE:-ro}"
+      - "${ROSY_DATA_PATH:-/var/lib/rosy}/commissioning:/var/lib/rosy/commissioning:rw"
       - "./config/profile.${ROSY_RUNTIME_MODE:-core}.yaml:/etc/rosy/profile.yaml:ro"
       - "./config/motion_profiles.yaml:/etc/rosy/motion_profiles.yaml:ro"
       - "${ROSY_LINE_FOLLOW_CONFIG_PATH:-./config/line_follow.yaml}:/etc/rosy/line_follow.yaml:ro"
@@ -161,7 +165,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "nodes=$$(ros2 node list 2>/dev/null); echo \"$$nodes\" | grep -Fxq '/${ROSY_NAMESPACE}/bringup' && echo \"$$nodes\" | grep -Fxq '/${ROSY_NAMESPACE}/lifecycle_manager_navigation'"
+        - "nodes=$$(ros2 node list 2>/dev/null); echo \"$$nodes\" | grep -Fxq '/${ROSY_NAMESPACE}/bringup' && echo \"$$nodes\" | grep -Fxq '/${ROSY_NAMESPACE}/lifecycle_manager_navigation' && if [ '${ROSY_NAVIGATION_BACKEND:-localization}' = slam ]; then echo \"$$nodes\" | grep -Fxq '/${ROSY_NAMESPACE}/slam_toolbox'; else echo \"$$nodes\" | grep -Fxq '/${ROSY_NAMESPACE}/amcl' && echo \"$$nodes\" | grep -Fxq '/${ROSY_NAMESPACE}/map_server'; fi"
       interval: 10s
       timeout: 10s
       retries: 3
@@ -172,6 +176,7 @@ services:
       - navigation
       - hardware.launch.py
       - "namespace:=${ROSY_NAMESPACE}"
+      - "navigation_backend:=${ROSY_NAVIGATION_BACKEND:-localization}"
       - "cmd_vel_timeout_s:=${ROSY_CMD_VEL_TIMEOUT_S:-0.5}"
       - "motor_device:=/dev/rosy-motor"
       - "motor_baudrate:=${ROSY_MOTOR_BAUDRATE:-1000000}"

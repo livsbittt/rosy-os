@@ -15,6 +15,7 @@ capabilities: /etc/rosy/capabilities.yaml
 
 runtime:
   mode: core
+  navigation_backend: localization
 
 auth:
   tokens:
@@ -66,6 +67,9 @@ navigation:
     required: true
     stale_after_s: 2.0
     required_components: [amcl, map_server, controller_server, local_costmap, global_costmap, motor_adapter]
+    profiles:
+      localization: [amcl, map_server, controller_server, local_costmap, global_costmap, motor_adapter]
+      slam: [slam_toolbox, controller_server, local_costmap, global_costmap, motor_adapter]
 
 events:
   ring_buffer_size: 1000

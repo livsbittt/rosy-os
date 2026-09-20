@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-21 -->
 
 # v1
 
@@ -45,6 +45,7 @@ None.
   different packages is a finding: split, or record why not. `control.py`, `safety.py` are recorded accepts; see
   `docs/plans/2026-09-06-module-split-criteria.md`. Router count is not the test — `robot.py` has three routers and one owner.
 - `slam_router` lives in `navigation.py` because there is no `mapping` service to own it, not because `nav` is its owner.
+- SLAM save names are safe basenames only; do not allow callers to choose an arbitrary filesystem path.
 - Tests that patch a route helper must name the domain module (`core.api.v1.host._agent`); patching the aggregator re-export has no effect.
 
 ### Testing Requirements

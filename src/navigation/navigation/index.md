@@ -15,11 +15,14 @@
 | D-40 | Nav2 기본 유지와 단일 주행 backend 소유권 |
 | D-54 | Nav2 profile limits and field maps fail closed |
 | D-58 | Hardware motion requires an authoritative readiness gate |
+| D-144 | 하드웨어 맵 생성은 runtime mode가 아니라 검증된 navigation backend다 |
 
 ## 계획·결과 문서
 
 - [2026-09-13-rosy-os-device-validation-implementation-plan.md](../../../docs/plans/2026-09-13-rosy-os-device-validation-implementation-plan.md)
 - [2026-09-15-module-harness-design.md](../../../docs/plans/2026-09-15-module-harness-design.md)
+- [2026-09-21-hardware-mapping-g5-design.md](../../../docs/plans/2026-09-21-hardware-mapping-g5-design.md)
+- [2026-09-21-hardware-mapping-g5.md](../../../docs/plans/2026-09-21-hardware-mapping-g5.md)
 
 ## 교훈 (docs/solutions)
 
@@ -35,8 +38,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · feat(nav): add a real-hardware SLAM backend (D-144)
 - 2026-09-20 · uncommitted · fix(nav2): keep non-composed nodes in one robot namespace
 - 2026-09-18 · uncommitted · test(nav2): 교행 한계는 팽창으로 움직이지 않는다
 - 2026-09-18 · uncommitted · fix(nav2): 코스트맵이 라이다를 한 번도 듣지 않고 있었다
 - 2026-09-18 · uncommitted · fix(nav): 기동 경쟁과 좁은 방 여유를 실측으로 잡는다
-- 2026-09-17 · uncommitted · fix(nav): 좁은 통로에서 실제로 완주하게 만든 네 가지

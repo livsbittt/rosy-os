@@ -29,6 +29,7 @@
 | D-122 | 잘못된 RMW는 다음 CORE 기동에서 Cyclone으로 고친다. OS reboot가 아니다 |
 | D-123 | 웹은 Cyclone을 오버레이에 저장한 뒤 Host Agent 재부팅을 요청한다 |
 | D-124 | 대시보드는 AP on/off와 Wi-Fi 연결을 Host Agent로 확인하고 적용한다 |
+| D-144 | 하드웨어 맵 생성은 runtime mode가 아니라 검증된 navigation backend다 |
 
 ## 계획·결과 문서
 
@@ -38,6 +39,8 @@
 - [2026-09-15-module-harness-design.md](../../../docs/plans/2026-09-15-module-harness-design.md)
 - [2026-09-15-navigation-swarm-split-design.md](../../../docs/plans/2026-09-15-navigation-swarm-split-design.md)
 - [2026-09-17-interface-design-implementation-design.md](../../../docs/plans/2026-09-17-interface-design-implementation-design.md)
+- [2026-09-21-hardware-mapping-g5-design.md](../../../docs/plans/2026-09-21-hardware-mapping-g5-design.md)
+- [2026-09-21-hardware-mapping-g5.md](../../../docs/plans/2026-09-21-hardware-mapping-g5.md)
 
 ## 교훈 (docs/solutions)
 
@@ -49,8 +52,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · feat(core): gate SLAM mapping and persist maps safely (D-144)
 - 2026-09-20 · uncommitted · feat(vision): D-136 T1 boundary contracts
 - 2026-09-20 · uncommitted · feat(core): known-model registry gates revisions (D-137 T3)
 - 2026-09-20 · uncommitted · feat(core): DetectionEvidence schema and person injection (D-137 T2)
 - 2026-09-20 · uncommitted · feat(core): person advisory caps linear speed (SAF-006)
-- 2026-09-18 · uncommitted · feat(core): dashboard AP toggle and Wi-Fi connect (D-124)

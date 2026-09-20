@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import threading
 import time
 from typing import Optional
@@ -100,6 +101,8 @@ class RosBridge:
                                  self._on_amcl_transition, 10)
         node.create_subscription(TransitionEvent, "map_server/transition_event",
                                  self._on_map_server_transition, 10)
+        node.create_subscription(TransitionEvent, "slam_toolbox/transition_event",
+                                 self._on_slam_transition, 10)
         node.create_subscription(TransitionEvent, "controller_server/transition_event",
                                  self._on_controller_transition, 10)
         node.create_subscription(TransitionEvent, "local_costmap/local_costmap/transition_event",
@@ -267,6 +270,10 @@ class RosBridge:
     def _on_map_server_transition(self, msg: TransitionEvent) -> None:
         if self._readiness is not None:
             self._readiness.observe("map_server", self._lifecycle_active(msg))
+
+    def _on_slam_transition(self, msg: TransitionEvent) -> None:
+        if self._readiness is not None:
+            self._readiness.observe("slam_toolbox", self._lifecycle_active(msg))
 
     def _on_controller_transition(self, msg: TransitionEvent) -> None:
         if self._readiness is not None:
@@ -605,9 +612,12 @@ class RosBridge:
                 "slam_toolbox is not installed in this runtime; map saving is unavailable")
         if not self._slam_client.wait_for_service(timeout_sec=1.0):
             raise RuntimeError("slam_toolbox save_map service unavailable")
+        output_stem = save_map.resolve_output_stem(
+            name, os.environ.get("ROSY_MAP_OUTPUT_DIR", "/var/lib/rosy/maps")
+        )
         request = self._slam_client.srv_type.Request()
         # SaveMap.srv 의 name 은 string 이 아니라 std_msgs/String 이다.
-        request.name = String(data=name)
+        request.name = String(data=output_stem)
         future = self._slam_client.call_async(request)
         done = threading.Event()
 
@@ -622,7 +632,9 @@ class RosBridge:
             raise RuntimeError("save_map service failed")
         save_map.check_result(response.result)
 
-        return save_map.map_id(name, save_map.saved_bytes(name), time.time())
+        return save_map.map_id(
+            name, save_map.saved_bytes(output_stem), time.time()
+        )
 
     def reset_mapping(self) -> None:
         """NAV-005 세션 초기화 — 아직 실기가 없다.
