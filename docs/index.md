@@ -91,8 +91,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · docs(plans): land three design drafts — camera placement, dock build, Pi bench commissioning
 - 2026-09-20 · uncommitted · fix(sim): run_fleet_sim pins CycloneDDS — the D-117 bridge FAIL cause
 - 2026-09-20 · uncommitted · docs(harness): re-stamp last_verified at ab8bf1b — all suites green on the new runner
 - 2026-09-20 · uncommitted · docs(fleet): background-launched sims are reaped - live full-chain verification requires the interactive D-83 session (final)
 - 2026-09-20 · uncommitted · docs(fleet): DDS discovery itself is dead on this box — the D-83 stable session is mandatory, proven three ways
-- 2026-09-20 · uncommitted · docs(control): review the received camera-ground homography draft with verification math

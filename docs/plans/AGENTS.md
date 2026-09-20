@@ -53,6 +53,9 @@ Flask parity checklist가 추적용으로 여기에 합류했다. 둘은 실행 
 | `2026-09-18-rosy-games-local-host.md` | rosy_games LOCAL 실행 계획: 스켈레톤 → gate·MatchHost·teleop 클라이언트. Isaac/overhead 제외 |
 | `2026-09-18-rosy-games-overhead-plan.md` | 천장 카메라 관측 어댑터. OpenCV는 overhead만. 합성 시험 ≠ DEVICE (D-94, D-95) |
 | `2026-09-18-rosy-games-remaining-adr-plan.md` | 남은 games 트랙 → D-95–D-100; 골은 ArUco 20/21+영역, 온보드/Isaac은 FIELD 뒤 |
+| `2026-09-20-camera-placement-design.md` | ??? ?? ?? ? Picamera2/CSI ??? host service + least-privilege ????? ?? (Task 5, D-52) |
+| `2026-09-20-dock-build-design.md` | ?? ?? ?? ?? ? 1? ?? ??, DNC-007 ?? ??, teach-by-docking ??? (DNC) |
+| `2026-09-20-pi-bench-commissioning-design.md` | Pi ?? ???? ? artifact ???readback ?? ??? (D-66) |
 | D-73 | `tools/harness/harness.yaml` `functional` + `test/test_module_functional_surface.py` |
 
 ## Subdirectories

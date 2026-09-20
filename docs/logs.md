@@ -812,3 +812,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 시뮬 런처도 D-117 의 Cyclone 고정을 따른다
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · docs(plans): land three design drafts — camera placement, dock build, Pi bench commissioning
+
+- 변경: 콘솔 세션이 작성한 설계 초안 3건을 착지하고 plans 인덱스에 등록했다 — ① 카메라 배치(Task 5, D-52: Picamera2/CSI 캡처를 host service + least-privilege 컨테이너로 분리, 제품 아닌 인프라) ② 도크 벤치 빌드(DNC: 1단 벤치 마킹, DNC-007 태그 검증, teach-by-docking) ③ Pi 벤치 커미셔닝(D-66: artifact 설치→readback 단계 게이트). run_fleet_sim.sh 는 맵 번들 world·yaml 을 gz_multi 에 연결하는 수정과 함께 별도 커밋
+- 증거: 문서 3건 각 39~48 줄 완결형 Draft — ADR/계약 참조 명시(D-52·D-47·D-136·D-138 / D-28·DNC-001~007 / D-33·D-46·D-66), 상위 계획 문서 연결
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 세 문서 모두 Draft 상태 유지 — 실행 착지 시 각자의 게이트로 판정
+- 교훈: 없음
