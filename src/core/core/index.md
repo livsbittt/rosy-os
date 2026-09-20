@@ -49,8 +49,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · feat(core): DetectionEvidence schema and person injection (D-137 T2)
+- 2026-09-20 · uncommitted · feat(core): person advisory caps linear speed (SAF-006)
 - 2026-09-18 · uncommitted · feat(core): dashboard AP toggle and Wi-Fi connect (D-124)
 - 2026-09-18 · uncommitted · feat(core): persist Cyclone then Host Agent reboot (D-123)
 - 2026-09-18 · uncommitted · feat(core): correct foreign RMW on next CORE start (D-122)
-- 2026-09-18 · uncommitted · feat(core): apply Cyclone before rclpy.init (D-121)
-- 2026-09-18 · uncommitted · feat(core): scan/imu/range use sensor-data QoS (D-119)

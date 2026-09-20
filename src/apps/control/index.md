@@ -42,8 +42,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · feat(control): lane error and loss tracker (NAV-007)
+- 2026-09-20 · uncommitted · feat(dock): detector rides the sensor provider port (D-138)
 - 2026-09-20 · uncommitted · feat(control): ArUco detector lifecycle + DockType tag spec (DNC-007)
 - 2026-09-20 · uncommitted · feat(control): ArUco dock tag to relative pose (DNC-007)
 - 2026-09-18 · uncommitted · feat(control): camera/front publishes sensor-data QoS (D-119)
-- 2026-09-17 · 8fdd8d2 · docs(control): D-77 diagnostic surface, CSS/JS token mirror
-- 2026-09-17 · uncommitted · fix(sensing): stop writing RGB tuples into the BGR map raster
