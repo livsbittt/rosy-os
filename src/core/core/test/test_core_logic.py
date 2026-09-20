@@ -151,6 +151,68 @@ class TestSafety:
         assert "battery.low" in types and "battery.critical" in types
 
 
+class TestPersonAdvisory:
+    """SAF-006: 사람은 metric 정지의 확대 사유다. YOLO advisory는 속도 상한만
+    낮추고, 못 보면 기존 정지가 그대로이며, 사라지면 프로필로 복귀한다."""
+
+    def _advisory(self, safety, now, **kwargs):
+        from core_features.safety.manager import PersonAdvisory
+        options = dict(present=True, confidence=0.9, observed_at=now, max_age_s=1.0)
+        options.update(kwargs)
+        advisory = PersonAdvisory(**options)
+        safety.set_person_advisory(advisory)
+        return advisory
+
+    def test_no_advisory_leaves_clip_unchanged(self, safety):
+        assert safety.clip(0.20, 0.50) == (pytest.approx(0.20), pytest.approx(0.50))
+
+    def test_fresh_person_caps_linear_only(self, safety):
+        now = time.monotonic()
+        self._advisory(safety, now)
+        linear, angular = safety.clip(0.20, 0.50, now=now)
+        assert linear == pytest.approx(0.05)
+        assert angular == pytest.approx(0.50)   # 선회율은 손대지 않는다
+
+    def test_below_cap_passes_through(self, safety):
+        now = time.monotonic()
+        self._advisory(safety, now)
+        assert safety.clip(0.03, 0.10, now=now)[0] == pytest.approx(0.03)
+
+    def test_stale_advisory_is_ignored(self, safety):
+        now = time.monotonic()
+        self._advisory(safety, now - 2.0)       # max_age 1.0 s 초과
+        assert safety.clip(0.20, 0.50, now=now)[0] == pytest.approx(0.20)
+
+    def test_absent_person_is_ignored(self, safety):
+        now = time.monotonic()
+        self._advisory(safety, now, present=False)
+        assert safety.clip(0.20, 0.50, now=now)[0] == pytest.approx(0.20)
+
+    def test_cleared_advisory_restores_profile(self, safety):
+        now = time.monotonic()
+        self._advisory(safety, now)
+        assert safety.clip(0.20, 0.50, now=now)[0] == pytest.approx(0.05)
+        safety.set_person_advisory(None)        # 사람 소멸 → 자동 복귀
+        assert safety.clip(0.20, 0.50, now=now)[0] == pytest.approx(0.20)
+
+    def test_advisory_never_raises_the_cap(self, safety):
+        """낮추기만 한다 — session cap과 같은 규칙. min() 구조라 위로 못 간다."""
+        now = time.monotonic()
+        self._advisory(safety, now)
+        assert safety.clip(0.20, 0.50, now=now)[0] <= 0.20
+
+    def test_bad_advisory_is_rejected(self, safety):
+        from core_features.safety.manager import PersonAdvisory
+        with pytest.raises(ValueError):
+            safety.set_person_advisory(PersonAdvisory(
+                present=True, confidence=1.5, observed_at=0.0, max_age_s=1.0))
+        with pytest.raises(ValueError):
+            safety.set_person_advisory(PersonAdvisory(
+                present=True, confidence=0.9, observed_at=0.0, max_age_s=0.0))
+        with pytest.raises(ValueError):
+            safety.set_person_advisory("person!")
+
+
 class TestEventBus:
     def test_seq_monotone_and_history(self, bus):
         bus.publish("nav.completed")

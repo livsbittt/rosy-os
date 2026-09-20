@@ -85,6 +85,39 @@ class SafetyDecision:
     reason: str = ''
 
 
+@dataclass(frozen=True)
+class PersonAdvisory:
+    """SAF-006: YOLO `person` 분류 자문. metric 정지의 확대 사유이며 단독
+    정지 사유가 아니다 — 못 보면 기존 정지가 그대로고, 사라지면 해제된다."""
+
+    present: bool
+    confidence: float
+    observed_at: float
+    max_age_s: float = 1.0
+
+    def __post_init__(self) -> None:
+        if type(self.present) is not bool:
+            raise ValueError("person present must be a boolean")
+        if (not isinstance(self.confidence, (int, float))
+                or isinstance(self.confidence, bool)
+                or not 0.0 <= self.confidence <= 1.0):
+            raise ValueError("person confidence must be in [0, 1]")
+        if not isinstance(self.observed_at, (int, float)) or not math.isfinite(self.observed_at):
+            raise ValueError("person observed_at must be finite")
+        if (not isinstance(self.max_age_s, (int, float))
+                or isinstance(self.max_age_s, bool)
+                or not math.isfinite(self.max_age_s) or not self.max_age_s > 0):
+            raise ValueError("person max_age_s must be positive")
+
+    def fresh(self, now: float) -> bool:
+        return bool(self.present) and self.observed_at <= now <= self.observed_at + self.max_age_s
+
+
+#: SAF-006 사람 감속 상한. 사람이 있으면 전진 속도를 기어가기로 묶는다.
+#: 선회율은 손대지 않는다 — 위험은 접근 속도지 제자리 회전이 아니다.
+PERSON_LINEAR_CAP_M_S = 0.05
+
+
 class SafetyManager:
     """E-Stop(SAF-001)·속도 제한(SAF-004)·배터리 정책(SAF-005)·Fleet 단절 정책(SAF-003)."""
 
@@ -110,6 +143,11 @@ class SafetyManager:
         #: 한 활동이 자기 구간 동안만 더 낮춰 쓰는 상한 (SWM-002 max_speed).
         #: 프로필 상한을 넘겨 올릴 수는 없다 — clip 이 둘 중 작은 값을 쓴다.
         self._session_linear: Optional[float] = None
+        #: SAF-006 사람 자문. None 이면 사람이 없다는 뜻이 아니라 자문이 없다는
+        #: 뜻이다 — metric 정지는 그대로고 상한만 프로필로 돌아간다.
+        self._person: Optional[PersonAdvisory] = None
+        #: 사람 감속 상한. 낮추기만 하는 값이라 올리는 세터는 없다.
+        self.person_linear_cap: float = PERSON_LINEAR_CAP_M_S
         #: E-Stop 이 실제로 걸릴 때 한 번 불린다. API·배터리·어느 경로로
         #: 들어오든 같은 자리를 지나므로, 중단해야 할 활동은 여기에 붙는다.
         self.estop_listeners: list = []
@@ -277,7 +315,15 @@ class SafetyManager:
     def session_linear(self) -> Optional[float]:
         return self._session_linear
 
-    def clip(self, linear: float, angular: float, scope: str = "nav") -> tuple[float, float]:
+    def set_person_advisory(self, advisory: Optional[PersonAdvisory]) -> None:
+        """SAF-006: 사람 자문을 건다/뗀다. 뗀다고 정지가 풀리는 게 아니라
+        상한이 프로필로 돌아갈 뿐이다 — metric 정지는 이 함수가 모른다."""
+        if advisory is not None and not isinstance(advisory, PersonAdvisory):
+            raise ValueError("person advisory must be a PersonAdvisory or None")
+        self._person = advisory
+
+    def clip(self, linear: float, angular: float, scope: str = "nav",
+             now: Optional[float] = None) -> tuple[float, float]:
         if not finite_velocity(linear, angular):
             return 0.0, 0.0
         if scope == "manual":
@@ -295,6 +341,13 @@ class SafetyManager:
         if self._session_linear is not None:
             # 낮추기만 한다. 활동이 프로필 상한을 넘겨 달릴 수는 없다.
             max_l = min(max_l, self._session_linear)
+        person = self._person
+        if person is not None:
+            current = now if now is not None else time.monotonic()
+            if person.fresh(current):
+                # SAF-006: 사람이 있으면 기어가기. 못 보면 이 줄이 없고,
+                # 사라지면 자문이 떼어져서 프로필로 돌아간다.
+                max_l = min(max_l, self.person_linear_cap)
         l = max(-max_l, min(max_l, linear))
         a = max(-max_a, min(max_a, angular))
         return l, a
