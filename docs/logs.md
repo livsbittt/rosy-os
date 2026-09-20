@@ -724,3 +724,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: workflow_call 입력(runs_on)은 유지한다 — 러너 후퇴도 한 줄이다
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · fix(fleet): defect (a) resolved in the live sim — relay delivers, no early HOLD (D-132 validated)
+
+- 변경: run_fleet_sim.sh — 실행마다 새 ROS_DOMAIN_ID 부여(재기동 사이클의 SIGKILL 잔재가 도메인 0 참가자 인덱스를 고갈: "Failed to find a free participant index" — gz_multi 가 코어 기동 전 사망하던 원인). logs 에 실측 기록
+- 증거(LOCAL): 정리 절차 강화(pkill 패턴 목록 — killall 이 못 거두는 C++ 고아 스택이 누적 원인이었다) 후 시뮬 재실행 → 로봇 2/2 online → 무장 즉시 **RUNNING 6 샘플 연속**(조기 HOLD 소멸) → **follower_tx_hz 3.59~5.71 Hz**(이전: 영구 0.0) → leader_hz 11.6~18.2·age ≤ 0.06s. D-132 의 무장-스트림 순서가 경합을 제거한 것이 실측으로 확인됐다
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 결함 (a) 의 fleet 측은 닫는다 — 릴레이가 팔로워로 프레임을 흘려보낸다. rosy_02 의 로봇 측 추종 동작과 리더 미이동(Nav2 tf 타임아웃 — 이 환경 요인)은 D-83 안정 세션 과제로 남는다. 포트 8090 은 동시 세션과 경합 중 — 실측은 D-83 절차대로 단독 세션에서
+- 교훈: "환경이 흔들린다"고 만 연 뒤에도 청소 대상(C++ 자식 트리)을 놓치면 누적이 원인을 가린다 — 실패의 흔적(exit -9/-11)을 프로세스별로 세어야 원인이 나온다

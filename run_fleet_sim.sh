@@ -11,6 +11,11 @@ echo "Starting $ROBOTS-robot fleet simulation..."
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 
+# 재기동 사이클마다 SIGKILL 된 프로세스의 DDS 참가자 잔재가 도메인 0 인덱스를
+# 고갈시킨다("Failed to find a free participant index"). 실행마다 새 도메인으로
+# 격리한다 — fleet 콘솔은 HTTP 여서 영향이 없고, 시뮬 내부는 이 도메인을 공유한다.
+export ROS_DOMAIN_ID=$(( (RANDOM % 100) + 20 ))
+
 # 2. Cleanup previous processes
 killall -9 ruby gz python3 parameter_bridge create 2>/dev/null || true
 
