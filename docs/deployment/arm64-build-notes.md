@@ -58,6 +58,23 @@ The old upstream clone-and-delete instructions are retained in
 `legacy-arm64-guide.md` for provenance only and must not be used for a Rosy OS
 deployment.
 
+## Native unsigned payload workflow (D-145)
+
+Use the manual `Build native ARM64 unsigned payload` GitHub workflow when a
+separate native ARM64 build host is unavailable. Supply a release ID and the
+ID of the offline key that will later sign the bundle. The default ROS base is
+the digest-pinned multi-platform manifest already recorded below.
+
+The workflow runs `arm64_release_builder.py` on `ubuntu-24.04-arm`, packages
+the two OCI archives, runtime files, unsigned manifest, and builder JSON, then
+uploads an archive plus SHA-256 for seven days. Download and verify that
+checksum before importing the payload into the offline signing environment.
+
+This artifact is deliberately named `unsigned`. It does not satisfy ARTIFACT
+or G0 by itself, and the workflow has no secret or release-write permission.
+Only the separate offline signing and publication verification path may turn
+it into a release bundle.
+
 ## 2026-09-13 builder verification
 
 Docker Desktop `desktop-linux` reports `linux/arm64`. The first real execution

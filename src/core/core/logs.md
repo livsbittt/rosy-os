@@ -143,3 +143,10 @@
 - gate 변화: SOURCE/LOCAL evidence refreshed. ROS-SIM/ARTIFACT/DEVICE remain HOLD pending their actual environments.
 - 결정: D-144.
 - 교훈: capability advertisement, lifecycle readiness, filesystem scope, and commissioning hashes must describe the same selected backend.
+
+## 2026-09-21 · uncommitted · test(core): make ROS-installed native ARM64 tests deterministic
+
+- 변경: the output-graph fixture now supplies the bridge readiness field explicitly, and the missing-provider test patches entry-point discovery instead of relying on the control package being absent from the environment.
+- 증거: native arm64 run 35539577735 reproduced 10 `_readiness` fixture failures and one installed-provider failure after the source build succeeded. Corrected focused tests pass locally; combined root+CORE suite is `2021 passed, 24 skipped` and the native run is repeated after integration.
+- gate 변화: none until the repeated native job is green.
+- 교훈: a missing-optional-package contract must isolate discovery; installing the optional package must not invert the test's premise.

@@ -77,6 +77,7 @@ class OutputGraphTests(unittest.TestCase):
         observed = []
         node.create_subscription(Twist, 'cmd_vel', lambda msg: observed.append(msg), 10)
         bridge = SimpleNamespace(_svc=SimpleNamespace(command=command, power=Mock()),
+                                 _readiness=None,
                                  cmd_vel_pub=node.create_publisher(Twist, 'cmd_vel', 10))
         try:
             if control_obstacle or control_geometry or control_tracking or control_actuation:

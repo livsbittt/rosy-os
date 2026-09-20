@@ -71,3 +71,11 @@
 - gate 변화: SOURCE/LOCAL evidence is refreshed. ARTIFACT and DEVICE remain HOLD until a signed native ARM64 bundle is installed and the physical Pinky G0-G5 session produces the required files.
 - 결정: D-144.
 - 교훈: a mapping API and a SLAM package are insufficient unless the runtime backend, writable persistence, readiness, raw telemetry, generated map pair, and final safe state are all bound into one commissioning session.
+
+## 2026-09-21 · uncommitted · feat(release): export native ARM64 unsigned payloads (D-145)
+
+- 변경: added a manual `ubuntu-24.04-arm` workflow that invokes the existing fail-closed builder, frees ephemeral image layers, archives the unsigned payload and builder JSON, and uploads the archive with SHA-256 for seven days.
+- 증거: ARM64 builder plus workflow contracts and the combined root+CORE suite pass locally (`2021 passed, 24 skipped`). Native rehearsal run 35539577735 built on arm64 and exposed 11 environment-sensitive test failures; the two fixtures were made overlay-independent and are rerun after integration.
+- gate 변화: SOURCE only. ARTIFACT remains HOLD until the native artifact completes and is signed and verified offline.
+- 결정: D-145.
+- 교훈: upload the immutable build handoff, not a mutable tag, and make `unsigned` impossible to overlook in both artifact and archive names.

@@ -35,6 +35,7 @@ None.
 - UART on Pi 5 is documented in `deploy/robot/configure-uart-pi5.sh` (default motor device `/dev/ttyAMA4`).
 - Do not enable `lidar.standby_stop` until `power-bench-verification.md` passes. `pi5-acceptance-checklist.md` gates are HOLD until field sign-off.
 - A simulated or host-built map never satisfies G5. The device session must retain bounded MCAP telemetry, the generated YAML/PGM pair, their hashes, navigation evidence, and the final stopped/E-stop state.
+- D-145's native GitHub workflow produces an unsigned payload only. Offline Ed25519 signing and publication verification remain separate mandatory gates.
 
 ### Testing Requirements
 

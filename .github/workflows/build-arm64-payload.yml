@@ -1,0 +1,105 @@
+name: Build native ARM64 unsigned payload
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: Release ID (YYYY.MM.DD-NNN)
+        required: true
+        type: string
+      signing_key_id:
+        description: Offline signing key ID to bind into the unsigned manifest
+        required: true
+        type: string
+      ros_image:
+        description: Digest-pinned ROS Jazzy base image
+        required: true
+        default: ros:jazzy-ros-base@sha256:c3706ef0a0aa45413c07803cf433602f543b22e45b4855f6fca955c2d8ecc4e8
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rosy-arm64-payload-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-unsigned-payload:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    env:
+      RELEASE_ID: ${{ inputs.release_id }}
+      SIGNING_KEY_ID: ${{ inputs.signing_key_id }}
+      ROS_IMAGE: ${{ inputs.ros_image }}
+      PAYLOAD_DIR: /tmp/rosy-unsigned-payload
+      BUILDER_JSON: /tmp/arm64-builder.json
+      UPLOAD_DIR: /tmp/rosy-upload
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify native clean source and pinned base
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          test "$(docker info --format '{{.Architecture}}')" = aarch64
+          test -z "$(git status --porcelain)"
+          [[ "$ROS_IMAGE" =~ @sha256:[0-9a-f]{64}$ ]]
+          docker buildx imagetools inspect "$ROS_IMAGE" >/dev/null
+
+      - name: Build and assemble unsigned ARM64 payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 deploy/release/arm64_release_builder.py \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --output "$PAYLOAD_DIR" \
+            --release-id "$RELEASE_ID" \
+            --signing-key-id "$SIGNING_KEY_ID" \
+            --ros-image "$ROS_IMAGE" \
+            | tee "$BUILDER_JSON"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path(os.environ["BUILDER_JSON"]).read_text())
+          assert report == {
+              "ok": True,
+              "output": os.environ["PAYLOAD_DIR"],
+              "release_id": os.environ["RELEASE_ID"],
+              "git_revision": os.environ["GITHUB_SHA"],
+              "signed": False,
+          }
+          PY
+
+      - name: Package unsigned payload with checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The hosted runner is ephemeral. Free image layers before creating a
+          # compressed copy of the already exported OCI archives.
+          docker system prune --all --force
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd
+          mkdir -p "$UPLOAD_DIR"
+          archive="rosy-unsigned-${RELEASE_ID}-${GITHUB_SHA}.tar.zst"
+          tar --zstd -cf "$UPLOAD_DIR/$archive" \
+            -C /tmp rosy-unsigned-payload arm64-builder.json
+          (
+            cd "$UPLOAD_DIR"
+            sha256sum "$archive" >"$archive.sha256"
+          )
+
+      - name: Upload unsigned payload
+        uses: actions/upload-artifact@v4
+        with:
+          name: rosy-unsigned-${{ inputs.release_id }}-${{ github.sha }}
+          path: /tmp/rosy-upload/*
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

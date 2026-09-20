@@ -52,8 +52,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · test(core): make ROS-installed native ARM64 tests deterministic
 - 2026-09-21 · uncommitted · feat(core): gate SLAM mapping and persist maps safely (D-144)
 - 2026-09-20 · uncommitted · feat(vision): D-136 T1 boundary contracts
 - 2026-09-20 · uncommitted · feat(core): known-model registry gates revisions (D-137 T3)
 - 2026-09-20 · uncommitted · feat(core): DetectionEvidence schema and person injection (D-137 T2)
-- 2026-09-20 · uncommitted · feat(core): person advisory caps linear speed (SAF-006)

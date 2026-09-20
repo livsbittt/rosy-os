@@ -39,6 +39,23 @@ It never reads a private key. Transfer the complete payload and builder JSON to
 the offline signing environment, then sign and verify there. The private key
 must remain outside both the payload and the target robot:
 
+When no separate native build host is available, D-145 provides the same
+unsigned handoff on GitHub's native ARM64 runner. It still does not sign:
+
+```bash
+gh workflow run build-arm64-payload.yml --ref main \
+  -f release_id="$RELEASE_ID" \
+  -f signing_key_id="$SIGNING_KEY_ID" \
+  -f ros_image="$ROS_IMAGE"
+# After that exact run succeeds, download its named unsigned artifact.
+gh run download RUN_ID --name "rosy-unsigned-${RELEASE_ID}-${REVISION}"
+sha256sum --check "rosy-unsigned-${RELEASE_ID}-${REVISION}.tar.zst.sha256"
+```
+
+Retain the run URL and job result with the builder JSON. The Actions artifact
+expires after seven days, so move the verified archive to the offline signing
+environment before then.
+
 ```bash
 set -euo pipefail
 PUBLIC_KEY="/secure/${SIGNING_KEY_ID}.pem"

@@ -3,6 +3,7 @@
 import ast
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -352,5 +353,8 @@ def test_sensor_provider_surface_is_host_importable():
 
 
 def test_enabled_adapter_without_provider_fails_closed_with_install_hint():
-    with pytest.raises(ValueError, match="control slice"):
-        ControlSensorAdapter({"enabled": True})
+    # Isolate the missing-provider contract even when the full ROS overlay has
+    # installed the control entry point (for example on the native ARM runner).
+    with patch("importlib.metadata.entry_points", return_value=()):
+        with pytest.raises(ValueError, match="control slice"):
+            ControlSensorAdapter({"enabled": True})

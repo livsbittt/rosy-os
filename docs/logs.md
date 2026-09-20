@@ -868,3 +868,11 @@
 - gate 변화: none. Documentation and host simulation do not upgrade ARTIFACT or DEVICE.
 - 결정: D-144 Accepted at source-contract level; physical acceptance remains evidence-gated.
 - 교훈: a saved map screenshot is presentation evidence, not proof of the sensor/TF/cmd_vel path that generated it.
+
+## 2026-09-21 · uncommitted · docs(adr): keep native artifact building separate from offline signing (D-145)
+
+- 변경: D-145 records a manual native arm64 workflow that exports only checksum-bound unsigned payloads with seven-day retention and read-only repository permission.
+- 증거: workflow contract tests cover the native runner, manual trigger, digest pin, existing builder invocation, unsigned naming, checksum, and retention; the runner mutation was observed red before restoration. Combined root+CORE suite: `2021 passed, 24 skipped`.
+- gate 변화: none. A successful workflow artifact will advance build evidence but ARTIFACT remains HOLD until offline Ed25519 signing and verification.
+- 결정: D-145.
+- 교훈: making the native build reproducible must not silently move the private signing key into an online runner.

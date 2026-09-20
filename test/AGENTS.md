@@ -29,6 +29,7 @@ Host-side pytest for deploy/release/motor/network contracts. These tests do **no
 | `test_release_layout.py` | On-disk release layout |
 | `test_release_manifest.py` | Manifest schema |
 | `test_release_signing.py` | Ed25519 signing |
+| `test_arm64_payload_workflow.py` | Manual native ARM64 workflow, digest pin, unsigned artifact and retention contracts |
 | `test_release_storage.py` | Release store / retention |
 | `test_release_updater.py` | Activate/rollback updater |
 | `robot_contracts.py` | Shared ROOT/DEPLOY/compose helpers |

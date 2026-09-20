@@ -18,6 +18,7 @@
 | D-53 | Device signature/readback trust evidence |
 | D-124 | 대시보드는 AP on/off와 Wi-Fi 연결을 Host Agent로 확인하고 적용한다 |
 | D-144 | 하드웨어 맵 생성은 runtime mode가 아니라 검증된 navigation backend다 |
+| D-145 | 네이티브 ARM64 빌드는 unsigned artifact까지만 자동화한다 |
 
 ## 계획·결과 문서
 
@@ -43,8 +44,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · feat(release): export native ARM64 unsigned payloads (D-145)
 - 2026-09-21 · uncommitted · feat(deploy): make physical G5 mapping evidence-bound (D-144)
 - 2026-09-21 · 6f6c515 · feat(deploy): capture Pinky connection evidence
 - 2026-09-21 · c2bb799 · feat(release): native ARM64 unsigned payload builder
 - 2026-09-21 · 1acb41a · feat(deploy): fail-closed Pinky commissioning
-- 2026-09-18 · uncommitted · feat(host-agent): structured network status, set_mode, connect (D-124)

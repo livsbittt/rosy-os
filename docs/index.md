@@ -70,6 +70,7 @@
 | D-133 | CORE SIGSEGV 는 재현 경로로 쫓고, 흔들리는 환경에서의 반복은 폐기한다 |
 | D-141 | 대형 주행 실측은 네 게이트를 순서대로 통과한다 — 단일 세션 묶음 |
 | D-144 | 하드웨어 맵 생성은 runtime mode가 아니라 검증된 navigation backend다 |
+| D-145 | 네이티브 ARM64 빌드는 unsigned artifact까지만 자동화한다 |
 
 ## 계획·결과 문서
 
@@ -95,8 +96,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · docs(adr): keep native artifact building separate from offline signing (D-145)
 - 2026-09-21 · uncommitted · docs(adr): define physical hardware mapping as D-144
 - 2026-09-20 · uncommitted · docs(adr): the formation-driving measurement bundle is locked as four ordered gates (D-141)
 - 2026-09-20 · uncommitted · docs(fleet): fourth confirmation - background sim stacks cannot survive this box; the handoff stands as final
 - 2026-09-20 · uncommitted · fix(sim): double the robots.yaml wait window in run_fleet_sim
-- 2026-09-20 · uncommitted · ci(adr): first full native arm64 rehearsal — build green, 11 platform findings recorded
