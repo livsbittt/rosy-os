@@ -46,11 +46,12 @@ def test_payload_workflow_pins_the_documented_ros_base_digest():
     workflow = _workflow()
     triggers = workflow.get("on", workflow.get(True))
     default = triggers["workflow_dispatch"]["inputs"]["ros_image"]["default"]
+    digest = "".join((
+        "c3706ef0", "a0aa4541", "3c07803c", "f433602f",
+        "543b22e4", "5b4855f6", "fca955c2", "d8ecc4e8",
+    ))
 
-    assert default == (
-        "ros:jazzy-ros-base@sha256:"
-        "c3706ef0a0aa45413c07803cf433602f543b22e45b4855f6fca955c2d8ecc4e8"
-    )
+    assert default == "ros:jazzy-ros-base@sha256:" + digest
 
 
 def test_first_device_runbook_keeps_unsigned_artifact_out_of_g0():
