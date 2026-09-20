@@ -628,3 +628,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: deploy 는 Windows 호스트에서 identity·openssl 계약까지 전부 통과해 처음으로 스탬프했다(이전에는 WSL 경로·openssl 부재로 불가 — Git Bash 선점과 conftest PATH 부트스트랩으로 해소)
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · test(fleet): the sim runs end-to-end and the console exposes two real defects (D-131 phase 1 LOCAL evidence)
+
+- 변경: 없음(실측만). 검증 절차 `Rosy/sim_verify.sh`(저장소 외 — D-83 세션이 tools/로 승격 검토). 시뮬 기동 → 2/2 online → T6 선택 편성 무장 → 리더 주행 → 표본 6회 수집
+- 증거(LOCAL, D-91 — FIELD 아님): ① 코어 부팅 수정 효과 — 로봇 2/2 online ② T6 — members [rosy_01, rosy_02] 무장 → RUNNING, assignment {rosy_02: 0.6m} ③ 릴레이 리더 스트림 9.95 Hz(FOR-003 ≥10Hz 부합), age 0.009~0.07s ④ 리더 목표 수납(NAVIGATION) ⑤ FOR-004 — 코어 사망 시 세션 HOLDING 전환(정책 작동) ⑥ **결함 2건**: (a) follower_tx_hz == 0.0 지속(connected=true, FOR-003 ≥5Hz 위반 — 릴레이 송신 또는 팔로워 구독 결함, swarm 도메인) (b) rosy_01 CORE SIGSEGV(exit -11) 탐색+릴레이 가동 중(core 도메인, D-83 블로커). 콘솔 UI는 두 결함을 정확히 렌더링 — OFFLINE·ConnectError·HOLDING(warn)·지연 조건. 스크린샷 1280×720 육안 확인
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 결함 (a)는 swarm 세션, (b)는 core 세션 귀속 — D-131 2·3단계 이전에 (a)(b)가 선행된다(팔로워가 안 따라오는 대형 화면은 또 다른 보여주기가 된다)
+- 교훈: "보여주기용" 의심의 정체는 데이터 부재가 아니라 **결함 노출의 부재**였다 — 오버레이가 실 장애 상태를 그대로 그려낸 것이 이번 최대 성과다
