@@ -37,3 +37,9 @@
 - 증거: `python -m pytest test/test_dds_rmw_contracts.py -q`
 - gate 변화: 없음. DEVICE PARKED
 
+## 2026-09-20 · uncommitted · feat(control): ArUco dock tag to relative pose (DNC-007)
+
+- 변경: `control/sensing/dock_tag.py` 신규 — DICT_4X4_50 태그 검출 + solvePnP 상대포즈(x fwd/y left/yaw CCW). 미검출·他 태그는 None. 시험 `test/test_dock_tag.py` 5건(합성 고정: 거리·방위 부호·빈 프레임·他 ID·스펙 검증)
+- 증거: `python -m pytest src/apps/control/test/test_dock_tag.py -q` 5 passed. 전체 `src/apps/control/test` 999 passed + 기존 환경 실패 4건(Windows subprocess/launch — clean tree 재현 확인, 본 변경 무관)
+- gate 변화: 없음. ROS-SIM HOLD — 실물 도크·카메라 placement 실측 대기. SRS v1.1에 SAF-006/NAV-007/DNC-007 등록
+
