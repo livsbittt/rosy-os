@@ -700,3 +700,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: D-135 전환 조건 — 26.04 리허설 녹색이 연속되면 게이팅 runs-on 을 26.04 로 바꾸고 그 커밋으로 D-135 종결. 실패 리허설은 24.04 의존 제거 목록이 된다
 - 교훈: 번호도 경합 자원이다 — ADR 번호는 부여 직전 파일 끝과 인덱스를 다시 읽고, 충돌하면 먼저 착지한 쪽을 존중해 다음 번호로 간다
+
+## 2026-09-20 · uncommitted · ci(adr): first ubuntu-26.04 rehearsal is green (D-135)
+
+- 변경: 없음 — 기록. ubuntu-26.04-rehearsal 첫 수동 실행이 26.04 러너에서 전 스텝 통과했다. continue-on-error 는 재사용 워크플로 호출 잡에서 스키마 거부(422)되어 제거했고, 리허설은 별도 워크플로라 자체적으로 비게이팅이다
+- 증거: run 35500103409 conclusion success (ubuntu-26.04, ros:jazzy-ros-base 컨테이너, 전 스텝). 수정 커밋 5d1f1f5
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: D-135 전환 조건은 "리허설 연속 녹색" — 1회 성공으로는 부족하고, 주간 스케줄이 연속 녹색을 쌓으면 그때 runs-on 을 26.04 로 전환한다(전환 커밋으로 D-135 종결)
+- 교훈: 없음
