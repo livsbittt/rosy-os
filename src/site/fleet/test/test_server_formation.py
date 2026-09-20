@@ -195,3 +195,22 @@ def test_omitting_members_keeps_the_all_robots_behaviour():
     console = _console(*robots)
     run(console.formation_start("rosy_01", "COLUMN", 0.6))
     assert set(console.formation_status()["assignment"]) == {"rosy_02", "rosy_03"}
+
+
+class _StreamsNeverReadyRelay(FakeRelay):
+    def streams_ready(self) -> bool:
+        return False
+
+
+def test_start_does_not_touch_robots_until_the_streams_are_open():
+    """D-132 — 스트림이 안 열리면 무장하지 않는다. 로봇 무접촉 거절이다."""
+    robots = _fleet(2)
+    console = _console(*robots)
+    console._relay_factory = lambda leader, followers, **kw: _StreamsNeverReadyRelay(leader, followers)
+
+    with pytest.raises(HubError) as raised:
+        run(console.formation_start("rosy_01"))
+
+    assert raised.value.code == "ARMING_FAILED"
+    for robot in robots:
+        assert not [c for c in robot.calls if c[0] == "follow"]

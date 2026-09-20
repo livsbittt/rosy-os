@@ -44,7 +44,8 @@ def _follows(robot):
     return [c[1] for c in robot.calls if c[0] == "follow"]
 
 
-def test_start_arms_every_follower_with_its_slot_and_then_starts_the_relay():
+def test_start_opens_the_streams_and_then_arms_every_follower_with_its_slot():
+    """D-132 — 무장은 스트림이 연 뒤에 한다. follow 의 1 s 시계를 릴레이와 경주시키지 않는다."""
     async def main():
         leader, followers, log = _robots(2)
         s = _session(leader, followers, log=log)
@@ -56,7 +57,7 @@ def test_start_arms_every_follower_with_its_slot_and_then_starts_the_relay():
         assert sorted(p.distance for p in params.values()) == [0.6, 1.2]
         assert all(p.max_speed == 0.15 and p.stream_timeout_ms == 1000 for p in params.values())
         kinds = [entry[1] for entry in log if entry[0] == "relay" or entry[1] == "follow"]
-        assert kinds.index("start") > max(i for i, k in enumerate(kinds) if k == "follow")
+        assert kinds.index("start") < min(i for i, k in enumerate(kinds) if k == "follow")
         await s.stop()
     run(main())
 
@@ -75,7 +76,7 @@ def test_the_nearest_follower_takes_the_nearest_slot():
     run(main())
 
 
-def test_one_refused_follow_cancels_the_ones_already_armed_and_never_starts_the_relay():
+def test_one_refused_follow_cancels_the_ones_already_armed_and_stops_the_streams():
     async def main():
         leader, followers, log = _robots(2)
         followers[1].follow_error = RobotApiError("rosy_03", 409, "DOCKING_ACTIVE", "busy")
@@ -84,7 +85,8 @@ def test_one_refused_follow_cancels_the_ones_already_armed_and_never_starts_the_
             await s.start()
         assert exc.value.robot_id == "rosy_03" and exc.value.code == "DOCKING_ACTIVE"
         assert ("swarm_cancel",) in followers[0].calls
-        assert ("relay", "start") not in log
+        # D-132 — 스트림은 무장보다 먼저 열렸다. 거절이면 끝까지 책임진다.
+        assert ("relay", "start") in log and ("relay", "stop") in log
         assert s.state is SessionState.STOPPED
     run(main())
 
@@ -434,7 +436,7 @@ def test_a_second_trigger_while_holding_is_kept_and_only_a_reform_clears_it():
     run(main())
 
 
-def test_a_relay_that_cannot_be_built_does_not_leave_the_followers_armed():
+def test_a_relay_that_cannot_be_built_is_refused_before_any_robot_is_touched():
     async def main():
         leader, followers, _ = _robots(2)
 
@@ -446,7 +448,7 @@ def test_a_relay_that_cannot_be_built_does_not_leave_the_followers_armed():
         with pytest.raises(SessionError):
             await s.start()
         assert s.state is SessionState.STOPPED
-        assert all(("swarm_cancel",) in f.calls for f in followers)
+        assert not any(_follows(f) for f in followers)   # D-132 — 접촉 전 거절이다
         assert s.reason[0].startswith("relay_failed")
     run(main())
 
@@ -607,7 +609,7 @@ def test_resume_refuses_while_the_leader_is_still_in_estop():
     run(main())
 
 
-def test_a_relay_that_cannot_be_started_does_not_leave_the_followers_armed():
+def test_a_relay_that_cannot_be_started_is_stopped_before_any_robot_is_touched():
     async def main():
         leader, followers, log = _robots(2)
         created = []
@@ -626,7 +628,7 @@ def test_a_relay_that_cannot_be_started_does_not_leave_the_followers_armed():
         with pytest.raises(SessionError):
             await s.start()
         assert s.state is SessionState.STOPPED
-        assert all(("swarm_cancel",) in f.calls for f in followers)
+        assert not any(_follows(f) for f in followers)   # 무장 시도 자체가 없다
         assert created[0].stopped
         assert s.reason[0].startswith("relay_failed")
     run(main())

@@ -91,8 +91,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · fix(fleet): arm only after the streams are open — session reorder lands (D-132 implementation)
 - 2026-09-20 · uncommitted · docs(adr): arm only after the streams are open; chase the SIGSEGV by its repro path (D-132, D-133)
 - 2026-09-20 · uncommitted · fix(fleet): a hung reference send times out and names itself (D-131 defect a hardening)
 - 2026-09-20 · uncommitted · docs(progress): record the 2026-09-20 Gazebo attempt in control and core ROS-SIM blockers
 - 2026-09-20 · uncommitted · chore(fleet): relay diagnosis fields exposed; live iteration deferred to D-83 (environment)
-- 2026-09-20 · uncommitted · fix(release): scanner recognises checksum manifests and hyphenated SHA-256 prose

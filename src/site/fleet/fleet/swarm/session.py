@@ -119,33 +119,63 @@ class FormationSession:
         self.state = SessionState.ARMING
         try:
             assignment = await self._plan(self.spec)
-            await self._arm(self.spec, assignment)
-            self.assignment = assignment
         except SessionError as exc:
             self.state = SessionState.STOPPED
             self.reason = (f"arming_failed:{exc}", getattr(exc, "robot_id", None))
             raise
-        relay: Optional[Relay] = None
+        # D-132 — 무장은 스트림이 연 뒤에 한다. follow 의 1 s 시계는 명령 시점에
+        # 시작하므로, 릴레이 기동을 그 시계와 경주시키지 않는다. 무장 전에 흐르는
+        # 프레임은 매니저가 버린다(on_reference_pose 의 params-None 드롭) — 안전하다.
+        await self._open_relay()
+        try:
+            await self._arm(self.spec, assignment)
+            self.assignment = assignment
+        except SessionError as exc:
+            # 무장 거절 — 이미 흐르는 스트림을 끊고 팔로워를 푼다.
+            await self._stop_relay()
+            await self._disarm(self._followers)
+            self.state = SessionState.STOPPED
+            self.reason = (f"arming_failed:{exc}", getattr(exc, "robot_id", None))
+            raise
+        for robot in [self._leader, *self._followers]:
+            self._watchers.append(asyncio.create_task(self._watch(robot)))
+        self.state = SessionState.RUNNING
+        self.reason = None
+
+    async def _open_relay(self) -> None:
+        """릴레이를 켜고 스트림이 열리기를 기다린다 (D-132).
+
+        실패 시 로봇을 만지기 전이므로 relay.stop() 만으로 끝난다 — 무장된 팔로워를
+        되돌릴 필요가 없는 것이 이 순서의 이득이다.
+        """
+        relay = None
         try:
             relay = self._relay_factory(self._leader, self._followers)
             await relay.start()
+            self.relay = relay
+            for _ in range(60):                      # 3 s — 개방 상한
+                if relay.streams_ready():
+                    return
+                await self._sleep(0.05)
+            raise SessionError("relay streams did not open within 3s")
+        except SessionError:
+            if relay is not None:
+                try:
+                    await relay.stop()
+                except Exception as exc:
+                    log.warning("relay stop failed after a failed start: %s", exc)
+            self.state = SessionState.STOPPED
+            self.reason = ("relay_failed:streams did not open", None)
+            raise
         except Exception as exc:
-            # 무장은 됐는데 스트림을 못 여는 상태가 가장 나쁘다 — 팔로워는 참조 프레임
-            # 하나에 달려나갈 준비가 된 채로 남는다. 무장을 되돌리고 끝낸다.
             if relay is not None:
                 try:
                     await relay.stop()
                 except Exception as stop_exc:
                     log.warning("relay stop failed after a failed start: %s", stop_exc)
-            await self._disarm(self._followers)
             self.state = SessionState.STOPPED
             self.reason = (f"relay_failed:{exc}", None)
             raise SessionError(f"relay could not be started: {exc}") from exc
-        self.relay = relay
-        for robot in [self._leader, *self._followers]:
-            self._watchers.append(asyncio.create_task(self._watch(robot)))
-        self.state = SessionState.RUNNING
-        self.reason = None
 
     async def reform(self, spec: FormationSpec) -> None:
         """새 대형으로 다시 무장한다. 거절에는 두 종류가 있고 결과가 다르다.

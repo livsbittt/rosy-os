@@ -116,6 +116,7 @@ class Relay:
         self._last_seq: Optional[int] = None
         self._leader_last_error: Optional[str] = None
         self._running = False
+        self._leader_connected = False
 
     # --- 수명 --------------------------------------------------------------------
 
@@ -166,6 +167,10 @@ class Relay:
         lane = self._lanes.get(robot_id)
         return bool(lane and lane.connected)
 
+    def streams_ready(self) -> bool:
+        """리더 스트림과 전 팔로워 sink 가 열려 있는가. 무장은 이 뒤에 한다 (D-132)."""
+        return bool(self._leader_connected) and all(lane.connected for lane in self._lanes.values())
+
     def stats(self) -> RelayStats:
         return RelayStats(
             leader_frames=self._leader_frames,
@@ -186,6 +191,7 @@ class Relay:
         backoff = _BACKOFF_FIRST_S
         while self._running:
             got_frame = False
+            self._leader_connected = True
             try:
                 async for frame in self._leader.pose_stream():
                     got_frame = True
@@ -197,14 +203,17 @@ class Relay:
             except RobotApiError as exc:
                 # 4401/4403: 토큰이나 capability 문제다. 재연결은 계속하되 이유를 남긴다 —
                 # 조용히 0 Hz 로 도는 것이 이 릴레이의 가장 나쁜 실패다.
+                self._leader_connected = False
                 self._leader_last_error = str(exc)
                 log.warning("%s: leader socket refused: %s", self._leader.robot_id, exc)
             except Exception as exc:
                 # 팔로워 레인과 같은 규칙이다: 이름 없는 0 Hz 는 없다. 리더는 더 나쁜 쪽이다 —
                 # 리더가 죽으면 팔로워 전원이 굶는다.
+                self._leader_connected = False
                 self._leader_last_error = str(exc)
                 log.warning("%s: leader socket failed: %s", self._leader.robot_id, exc)
             else:
+                self._leader_connected = False
                 if not got_frame:
                     # 예외 없이, 프레임 하나 없이 끝났다. 전송계층이 연결 거부(OSError)를
                     # 삼키면 이 모양이 된다 — 이유 없는 0 Hz 로 남기지 않는다.

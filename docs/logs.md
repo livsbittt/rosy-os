@@ -684,3 +684,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: D-132 — 무장은 스트림이 연 뒤에 한다(start: 계획→릴레이 기동→개방 대기 3s→무장, 무장 전 프레임은 매니저가 버리므로 안전, Relay.streams_ready 신설). D-133 — SIGSEGV 재현 경로(Rosy/sim_verify.sh)를 계약으로 남기고 네이티브 추적은 core 세션이 안정 세션에서, 흔들리는 환경의 반복은 폐기한다
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · fix(fleet): arm only after the streams are open — session reorder lands (D-132 implementation)
+
+- 변경: session.start 재구성 — 계획 → _open_relay(릴레이 기동 + streams_ready 대기, 상한 3s) → 무장. 스트림 미개방 시 로봇 무접촉 거절(reason relay_failed:streams did not open, 접촉 전 거절과 접촉 후 롤백이 순서로 분리). Relay.streams_ready() 신설(리더 스트림 + 전 팔로워 sink 개방, _leader_connected 추적). FakeRelay에 streams_ready/ready 추가. test_session의 무장-릴레이 순서 계약 4건을 D-132 계약으로 갱신(순서 반전·거절 롤백이 스트림 정지를 책임·접촉 전 거절 단언) + 스트림 미개방 무접촉 시험 신설
+- 증거: `python -m pytest src/site/fleet/test -q` 326 passed 5 skipped, flake8(변경 파일) 0
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 무장 실패가 두 갈래로 분리된다 — 스트림 미개방(로봇 무접촉, relay_failed:streams)과 무장 거절(접촉 후 롤백, arming_failed). stream_timeout_ms는 이제 스트림 단절 판정의 의미만 남는다
+- 교훈: 없음
