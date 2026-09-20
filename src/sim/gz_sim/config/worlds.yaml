@@ -55,3 +55,12 @@ worlds:
     spawn_x: -0.5
     spawn_y: 0.0
     spawn_spacing: 1.0
+  map_260905.world:
+    world_source: package://control/map/map_260905_update_v2/worlds/map_260905.world
+    map: package://control/map/map_260905_update_v2/maps/map_260905.yaml
+    inflation_radius: 0.15
+    # Maximum-clearance point in the spawn-connected main region. The sealed
+    # lower-left X pocket is intentionally not used as a spawn.
+    spawn_x: -0.205
+    spawn_y: 0.275
+    spawn_spacing: 0.0

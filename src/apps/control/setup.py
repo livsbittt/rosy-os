@@ -4,6 +4,15 @@ from glob import glob
 from setuptools import find_packages, setup
 
 package_name = 'control'
+map_bundle = os.path.join('map', 'map_260905_update_v2')
+map_data_files = [
+    (
+        os.path.join('share', package_name, os.path.dirname(path)),
+        [path],
+    )
+    for path in glob(os.path.join(map_bundle, '**', '*'), recursive=True)
+    if os.path.isfile(path)
+]
 
 setup(
     name=package_name,
@@ -16,7 +25,7 @@ setup(
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
         (os.path.join('share', package_name, 'web'), glob('web/*.html')),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
-    ],
+    ] + map_data_files,
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='livsbittt',

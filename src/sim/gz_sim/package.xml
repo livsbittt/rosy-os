@@ -17,6 +17,8 @@
   <!-- launch/gz_multi.launch.py 가 navigation.frame_prefix 를 import 한다 (D-126 S4).
        시뮬 런치가 내비 헬퍼를 쓰는 것은 하향 의존이라 허용, 선언으로 고정한다. -->
   <exec_depend>navigation</exec_depend>
+  <!-- Exact simulation benches may be installed assets owned by Control. -->
+  <exec_depend>control</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

@@ -19,6 +19,7 @@ class WorldProfile:
         spawn_x: float = 0.0,
         spawn_y: float = 0.0,
         spawn_spacing: float = 1.5,
+        world_source: str = "",
     ) -> None:
         self.world_name = world_name
         self.map = map
@@ -26,6 +27,7 @@ class WorldProfile:
         self.spawn_x = spawn_x
         self.spawn_y = spawn_y
         self.spawn_spacing = spawn_spacing
+        self.world_source = world_source
 
     def overlay(self, **updates) -> "WorldProfile":
         payload = {
@@ -35,6 +37,7 @@ class WorldProfile:
             "spawn_x": self.spawn_x,
             "spawn_y": self.spawn_y,
             "spawn_spacing": self.spawn_spacing,
+            "world_source": self.world_source,
         }
         payload.update({k: v for k, v in updates.items() if v is not None})
         return WorldProfile(**payload)
@@ -55,13 +58,18 @@ def load_worlds(path: Path | None = None) -> dict[str, WorldProfile]:
     for name, data in worlds.items():
         if not isinstance(data, dict):
             raise ValueError(f"{catalog}: {name} must be a mapping")
+        def number(key: str, default: float) -> float:
+            value = data.get(key)
+            return default if value is None else float(value)
+
         out[_key(name)] = WorldProfile(
             world_name=_key(name),
             map=str(data.get("map") or ""),
-            inflation_radius=float(data.get("inflation_radius") or 0.0),
-            spawn_x=float(data.get("spawn_x") or 0.0),
-            spawn_y=float(data.get("spawn_y") or 0.0),
-            spawn_spacing=float(data.get("spawn_spacing") or 1.5),
+            inflation_radius=number("inflation_radius", 0.0),
+            spawn_x=number("spawn_x", 0.0),
+            spawn_y=number("spawn_y", 0.0),
+            spawn_spacing=number("spawn_spacing", 1.5),
+            world_source=str(data.get("world_source") or ""),
         )
     return out
 
@@ -104,3 +112,31 @@ def resolve_world(
     if map_yaml:
         updates["map"] = map_yaml
     return base.overlay(**updates) if updates else base
+
+
+def _package_uri_path(uri: str, package_share) -> Path:
+    prefix = "package://"
+    if not uri.startswith(prefix):
+        raise ValueError(f"not a package URI: {uri}")
+    package, separator, relative = uri[len(prefix):].partition("/")
+    if not package or not separator or not relative:
+        raise ValueError(f"invalid package URI: {uri}")
+    return Path(package_share(package)) / relative
+
+
+def resolve_world_path(
+    profile: WorldProfile,
+    gz_sim_share: Path,
+    *,
+    package_share,
+) -> Path:
+    """Resolve a catalog world without copying another package's source asset."""
+    if profile.world_source:
+        return _package_uri_path(profile.world_source, package_share)
+    return Path(gz_sim_share) / "worlds" / profile.world_name
+
+
+def resolve_asset_path(value: str, default_root: Path, *, package_share) -> Path:
+    if value.startswith("package://"):
+        return _package_uri_path(value, package_share)
+    return Path(default_root) / value

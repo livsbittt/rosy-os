@@ -68,3 +68,34 @@ def test_launch_args_override_the_catalog_not_the_other_way_around():
     assert maze.map == "rosy_maze.yaml"
     untouched = resolve_world("rosy_maze.world")
     assert untouched.inflation_radius == 0.55
+
+
+def test_exact_v2_world_resolves_to_the_installed_control_bundle():
+    mod = _mod()
+    profile = profile_for("map_260905.world")
+
+    assert profile.world_source == (
+        "package://control/map/map_260905_update_v2/worlds/map_260905.world"
+    )
+    assert profile.map == "package://control/map/map_260905_update_v2/maps/map_260905.yaml"
+    assert profile.spawn_x == pytest.approx(-0.205)
+    assert profile.spawn_y == pytest.approx(0.275)
+    assert profile.spawn_spacing == 0.0
+    assert profile.inflation_radius > 0.0
+
+    resolved = mod.resolve_world_path(
+        profile,
+        Path("/opt/ros/share/gz_sim"),
+        package_share=lambda package: Path("/opt/ros/share") / package,
+    )
+    assert resolved == Path(
+        "/opt/ros/share/control/map/map_260905_update_v2/worlds/map_260905.world"
+    )
+
+
+def test_control_package_installs_the_complete_v2_map_bundle():
+    setup_py = (ROOT.parents[1] / "apps" / "control" / "setup.py").read_text(
+        encoding="utf-8"
+    )
+    assert "map_260905_update_v2" in setup_py
+    assert "recursive=True" in setup_py

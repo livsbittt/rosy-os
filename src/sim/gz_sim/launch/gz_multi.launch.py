@@ -27,7 +27,7 @@ import tempfile
 _LAUNCH_DIR = os.path.dirname(os.path.abspath(__file__))
 if _LAUNCH_DIR not in sys.path:
     sys.path.insert(0, _LAUNCH_DIR)
-from world_profiles import resolve_world, spawn_xy
+from world_profiles import resolve_asset_path, resolve_world, resolve_world_path, spawn_xy
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -298,7 +298,11 @@ def _launch_setup(context):
     rosy_nav_share = get_package_share_directory("navigation")
     rosy_desc_share = get_package_share_directory("description")
     if not (map_yaml or "").strip() and profile.map:
-        map_yaml = os.path.join(rosy_nav_share, "map", profile.map)
+        map_yaml = str(resolve_asset_path(
+            profile.map,
+            os.path.join(rosy_nav_share, "map"),
+            package_share=get_package_share_directory,
+        ))
     else:
         map_yaml = (map_yaml or "").strip()
 
@@ -313,7 +317,11 @@ def _launch_setup(context):
         )
     ]
 
-    world_path = os.path.join(rosy_gz_share, "worlds", world_name)
+    world_path = str(resolve_world_path(
+        profile,
+        rosy_gz_share,
+        package_share=get_package_share_directory,
+    ))
 
     # Gazebo 서버 (1회) — headless 여부로 GUI 분기
     server_args = f"-r -s -v4 \"{world_path}\""
