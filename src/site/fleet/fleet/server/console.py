@@ -532,8 +532,12 @@ class FleetConsole:
                 "leader_rx_hz": round(stats.leader_rx_hz, 2),
                 "leader_age_s": stats.leader_age_s,
                 "leader_last_error": stats.leader_last_error,
+                "follower_tx": {k: v for k, v in stats.follower_tx.items()},
                 "follower_tx_hz": {k: round(v, 2) for k, v in stats.follower_tx_hz.items()},
                 "follower_connected": dict(stats.follower_connected),
+                # 0 Hz 에 이유가 없으면 화면은 "그냥 멈춘 릴레이"만 보여 준다 — 팔로워
+                # 소켓의 마지막 오류가 진단의 첫 줄이다(D-92 값 관례와 무관한 계약).
+                "follower_last_error": dict(stats.follower_last_error),
             },
         }
 

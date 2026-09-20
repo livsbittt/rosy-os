@@ -89,8 +89,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · chore(fleet): relay diagnosis fields exposed; live iteration deferred to D-83 (environment)
 - 2026-09-20 · uncommitted · fix(release): scanner recognises checksum manifests and hyphenated SHA-256 prose
 - 2026-09-20 · uncommitted · feat(control): land the map_260905_update_v2 bundle and its validation evidence
 - 2026-09-20 · uncommitted · test(fleet): the sim runs end-to-end and the console exposes two real defects (D-131 phase 1 LOCAL evidence)
 - 2026-09-20 · uncommitted · docs(harness): re-verify SOURCE and stamp last_verified at b98642f
-- 2026-09-20 · uncommitted · fix(core): boot crash — D-126 rename misses in node.py, plus web asset packaging (D-129)

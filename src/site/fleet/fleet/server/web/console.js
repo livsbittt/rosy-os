@@ -592,6 +592,8 @@ function renderFormation(status) {
     // 릴레이가 0 Hz 인데 이유가 없으면 화면은 "그냥 멈춰 있다"로만 보인다.
     lines.push(`릴레이 ${relay.paused ? "일시정지" : `${relay.leader_rx_hz} Hz`}` +
       (relay.leader_last_error ? ` (${relay.leader_last_error})` : ""));
+    const errs = Object.entries(relay.follower_last_error || {}).filter(([, e]) => e);
+    if (errs.length) lines.push(errs.map(([id, e]) => `${id}: ${e}`).join(", "));
   }
   if (status.reason) lines.push(`이유: ${status.reason.join(" / ")}`);
   if (status.pending_triggers && status.pending_triggers.length) {
