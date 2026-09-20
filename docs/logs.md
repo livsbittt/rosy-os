@@ -676,3 +676,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 타임아웃 상수 2.0s — 10Hz 입력의 20프레임 분량. 초과 프레임은 깊이 1 큐가 이미 덮으므로 유실이 아니다. 근본 원인(수신 측 rosy_02 CORE의 루프 정체 원인)은 core 세션 귀속 — SIGSEGV 결함 (b)와 함께 추적한다
 - 교훈: connected만으로는 스트림의 살아 있음을 말하지 않는다 — tx 카운트와 마지막 오류가 짝이어야 화면이 거짓말을 하지 않는다
+
+## 2026-09-20 · uncommitted · docs(adr): arm only after the streams are open; chase the SIGSEGV by its repro path (D-132, D-133)
+
+- 변경: ADR **D-132**·**D-133** 신규(색인 행 포함, Accepted — 방향). `docs/progress.md`의 `adrs`에 추가
+- 증거: ROS-SIM LOCAL 실측 — 무장 4초 만에 rosy_02 nav.failed(포트 18081 무청취·tx 0), FOR-004 HOLD 정상 작동. 원인은 시간계: follow의 stream_timeout_ms(1s)가 명령 시점에 시작하는데 session.start()는 무장 뒤에 릴레이를 시작한다. 반복 시도에서는 Nav2 SIGSEGV·-9 리핑 — 2로봇 풀 스택이 공유 WSL 박스 자원을 넘는다
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: D-132 — 무장은 스트림이 연 뒤에 한다(start: 계획→릴레이 기동→개방 대기 3s→무장, 무장 전 프레임은 매니저가 버리므로 안전, Relay.streams_ready 신설). D-133 — SIGSEGV 재현 경로(Rosy/sim_verify.sh)를 계약으로 남기고 네이티브 추적은 core 세션이 안정 세션에서, 흔들리는 환경의 반복은 폐기한다
+- 교훈: 없음

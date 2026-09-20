@@ -139,6 +139,8 @@
 | D-129 | L1 토큰 파일은 하나이고 어휘 표는 보인다 — D-92 제1항을 대체한다 | Accepted |
 | D-130 | L2 문법 분리는 게이트가 지키고, 로직 행위는 headless로 한 번 뽑는다 | Accepted |
 | D-131 | Fleet 콘솔은 군집 제어의 말을 되풀이한다 — 세 단계로 | Accepted |
+| D-132 | 무장은 스트림이 연 뒤에 한다 | Accepted |
+| D-133 | CORE SIGSEGV 는 재현 경로로 쫓고, 흔들리는 환경에서의 반복은 폐기한다 | Accepted |
 
 ---
 
@@ -4160,6 +4162,51 @@ components.css 배포였지, 시각 없는 행위 공유가 아니었다. 마지
 실행 계획: `docs/plans/2026-09-20-ui-grammar-boundary-plan.md`.
 
 **References:** concept 16 §4·§7·§10, D-61, D-73, D-82, D-91, D-92, D-101, D-129.
+
+---
+
+## D-132 무장은 스트림이 연 뒤에 한다
+
+**Status:** Accepted (2026-09-20, 방향). ROS-SIM LOCAL 실측에서 재현된 시간계 결함의 수정이며, fleet 스위트와 ROS-SIM 재실행이 착지를 증명한다.
+
+**Context:** ROS-SIM LOCAL 실측(2026-09-20): 무장 → RUNNING → 4초 안에 rosy_02 `nav.failed` → FOR-004 HOLD. 원인은 시간계다. FOR-003 의 follow 는 `stream_timeout_ms`(기본 1 s) 안에 첫 참조 프레임을 요구하는데, 그 시계는 **follow 명령 시점에 시작한다. 그런데 `session.start()` 는 무장이 끝난 뒤에 릴레이를 시작한다** — 리더 WS 접속, 팔로워 sink 접속, 첫 프레임 전달이 전부 그 1 초 안에 들어와야 한다. 낡은 설치 위의 첫 실측에서 이 경로는 어긋났고(무장 직후 `nav.failed` rosy_02), tx=0 은 HOLD 가 pause 하기 전 프레임을 못 보낸 하류 증상이었다. 릴레이의 관측 공백 — 팔로워 소켓의 마지막 오류가 API 에 없음 — 이 원인 추적을 가렸다.
+
+**Decision:**
+
+1. **무장은 스트림이 연 뒤에 한다.** `start()` 는 계획 → 릴레이 기동 → 스트림 개방 대기(상한 3 s) → 무장 순서로 바뀐다. 스트림이 안 열리면 로봇에게 아무것도 보내지 않은 채 거절한다 — 접촉 전 거절과 접촉 후 롤백이 순서로 분리된다.
+2. **무장 전에 흐르는 프레임은 안전하다.** follow 가 없으면 매니저가 참조 pose 를 버린다(`on_reference_pose` 의 params-None 드롭) — 먼저 흐르는 것은 로봇을 움직이지 않는다.
+3. **릴레이가 준비를 말한다.** `Relay.streams_ready()` — 리더 스트림 + 전 팔로워 sink 개방. 세션은 이것을 기다린다.
+4. 송신 정체의 이름 붙이기(1cf5c5b 의 send 타임아웃)는 유지한다 — 스트림이 열린 뒤의 정체도 이름을 얻는다.
+
+**Alternatives:** `stream_timeout_ms` 기본값을 늘리는 안 — 시계를 이기지 못하는 순서를 그대로 두고 임계만 키운다. 무장과 릴레이를 동시 기동하는 안 — 롤백 경로가 두 갈래로 갈라진다. 현상 유지 — ROS-SIM 재현 결함을 남긴다.
+
+**Consequences:** 무장 실패가 두 갈래로 분리된다 — 스트림 미개방(로봇 무접촉)과 무장 거절(접촉 후 롤백). reform 은 기존대로 `relay.pause()` 후 재무장한다 — 스트림이 살아 있으므로 대기가 없다. `stream_timeout_ms` 는 이제 "스트림 단절 판정"의 의미만 남는다.
+
+**Validation / Transition:** fleet 스위트 — 스트림 미개방 시 follow 무접촉 시험 신설. ROS-SIM 재실행에서 무장 직후 `follower_tx ≥ 1` 실측.
+
+**References:** FOR-001·003, D-31, D-59, D-89, D-131, 1cf5c5b.
+
+---
+
+## D-133 CORE SIGSEGV 는 재현 경로로 쫓고, 흔들리는 환경에서의 반복은 폐기한다
+
+**Status:** Accepted (2026-09-20).
+
+**Context:** ROS-SIM LOCAL 실측: 대형 RUNNING 중 리더(rosy_01) CORE 가 탐색+릴레이 가동 중 SIGSEGV(exit -11) 로 사망했다 — 릴레이 리더 스트림 종료, FOR-004 HOLD, 팔로워 `swarm.aborted`(SWM-004 자보 — 정책대로 작동). 같은 박스의 반복 시도에서는 Nav2 container SIGSEGV·-9 리핑이 확인됐다 — 2로봇 풀 스택이 이 공유 WSL 박스의 자원을 넘는다. 환경이 흔들릴 때의 실패는 결함 데이터와 구별이 안 된다.
+
+**Decision:**
+
+1. **재현 경로를 계약으로 남긴다** — 무장 → 리더 goal → 주행 중 관측(`Rosy/sim_verify.sh`). 누구나 같은 순서로 같은 크래시를 볼 수 있어야 추적이 시작된다.
+2. 네이티브 추적은 core 세션이 **안정 세션**(자원 튜닝된 WSL 또는 Pi)에서 수행한다. 공유 박스에서의 반복은 폐기한다 — 무효 숫자다(D-79 정신).
+3. (b) 가 닫히기 전까지 대형 주행의 FIELD 주장은 존재하지 않는다(D-91).
+
+**Alternatives:** 지금 상자에서의 반복 — 무효 숫자를 낳는다. 재현 없이 추적 포기 — D-83 을 영원히 막는다.
+
+**Consequences:** (b) 가 닫힐 때까지 D-131 의 대형 주행 증거는 LOCAL 진단 수준이다. 재현 경로가 문서화된 첫 사례로, 이후의 네이티브 크래시도 같은 모양으로 기록된다.
+
+**Validation / Transition:** SIGSEGV 재현(시뮬) → core 세션 추적 → D-83 재실행 통과가 이 ADR 을 닫는다.
+
+**References:** D-79, D-83, D-88, D-91, D-131.
 
 ---
 

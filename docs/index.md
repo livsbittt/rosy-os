@@ -66,6 +66,8 @@
 | D-129 | L1 토큰 파일은 하나이고 어휘 표는 보인다 — D-92 제1항을 대체한다 |
 | D-130 | L2 문법 분리는 게이트가 지키고, 로직 행위는 headless로 한 번 뽑는다 |
 | D-131 | Fleet 콘솔은 군집 제어의 말을 되풀이한다 — 세 단계로 |
+| D-132 | 무장은 스트림이 연 뒤에 한다 |
+| D-133 | CORE SIGSEGV 는 재현 경로로 쫓고, 흔들리는 환경에서의 반복은 폐기한다 |
 
 ## 계획·결과 문서
 
@@ -89,8 +91,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · docs(adr): arm only after the streams are open; chase the SIGSEGV by its repro path (D-132, D-133)
 - 2026-09-20 · uncommitted · fix(fleet): a hung reference send times out and names itself (D-131 defect a hardening)
 - 2026-09-20 · uncommitted · docs(progress): record the 2026-09-20 Gazebo attempt in control and core ROS-SIM blockers
 - 2026-09-20 · uncommitted · chore(fleet): relay diagnosis fields exposed; live iteration deferred to D-83 (environment)
 - 2026-09-20 · uncommitted · fix(release): scanner recognises checksum manifests and hyphenated SHA-256 prose
-- 2026-09-20 · uncommitted · feat(control): land the map_260905_update_v2 bundle and its validation evidence
