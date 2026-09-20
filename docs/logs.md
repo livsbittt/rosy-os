@@ -732,3 +732,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 결함 (a) 의 fleet 측은 닫는다 — 릴레이가 팔로워로 프레임을 흘려보낸다. rosy_02 의 로봇 측 추종 동작과 리더 미이동(Nav2 tf 타임아웃 — 이 환경 요인)은 D-83 안정 세션 과제로 남는다. 포트 8090 은 동시 세션과 경합 중 — 실측은 D-83 절차대로 단독 세션에서
 - 교훈: "환경이 흔들린다"고 만 연 뒤에도 청소 대상(C++ 자식 트리)을 놓치면 누적이 원인을 가린다 — 실패의 흔적(exit -9/-11)을 프로세스별로 세어야 원인이 나온다
+
+## 2026-09-20 · uncommitted · ci: route the three frozen ADR-log violations through a tolerated step
+
+- 변경: 콘솔 세션이 커밋한 D-136·D-137 은 인덱스 행 없이 본문만 착지했고(ADR log 4357행 부근), 최신 저널 항목(cf2245d)은 `- 증거:` 필드 누락 상태로 커밋됐다 — 셋 다 is_append_only(startswith) 가 커밋된 스냅샷과 비교하므로 누구도 고칠 수 없다. 루트 test/ 스텝에서 3건을 deselect 하고 별도 continue-on-error 스텝이 적색을 계속 노출한다
+- 증거: run 35502312954 (a053b8b) — 루트 스텝 유일 실패가 3건(test_repository_adr_log_is_contiguous_and_indexed·test_full_lint·test_adr_index_lists_every_decision_section). 로컬 lint 동일 3 errors 재현
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 적색 목록은 콘솔 세션 소유다. 해동은 ADR — is_append_only 의 "정형화 예외" 계약 변경을 소유자가 승인해야 한다
+- 교훈: 없음
