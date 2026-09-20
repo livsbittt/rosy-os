@@ -1,0 +1,21 @@
+{
+  "date": "2026-09-20",
+  "python_version": "3.13.5",
+  "dependencies": {
+    "numpy": "2.3.5",
+    "Pillow": "12.3.0",
+    "shapely": "2.1.2",
+    "scipy": "1.17.0",
+    "PyYAML": "6.0.3",
+    "cairosvg": "2.8.2"
+  },
+  "markdown_local_links_checked": 46,
+  "broken_links": [],
+  "runtime_tools": {
+    "gz": null,
+    "ros2": null
+  },
+  "public_reference_scope": "URLs in docs/SOURCES.md; branch references, not commit-pinned; not the installed user configuration.",
+  "scope": "Offline artifact preparation and tests only; no robot configuration deployed.",
+  "original_zip_sha256": "7d995128b10deaa9d40e20e963d69e0253825972491ba3ff47643cf22a9f0d07"
+}

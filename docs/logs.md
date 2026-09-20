@@ -636,3 +636,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 결함 (a)는 swarm 세션, (b)는 core 세션 귀속 — D-131 2·3단계 이전에 (a)(b)가 선행된다(팔로워가 안 따라오는 대형 화면은 또 다른 보여주기가 된다)
 - 교훈: "보여주기용" 의심의 정체는 데이터 부재가 아니라 **결함 노출의 부재**였다 — 오버레이가 실 장애 상태를 그대로 그려낸 것이 이번 최대 성과다
+
+## 2026-09-20 · uncommitted · feat(control): land the map_260905_update_v2 bundle and its validation evidence
+
+- 변경: map/map_260905_update_v2 번들(world·maps·docs·scripts·tests·MANIFEST.sha256)과 docs/validation/map-260905-update-v2-2026-09-20 검증 기록(result.md·콘솔 스크린샷)을 착지했다. map/AGENTS.md 에 번들을 등록하고 번들 전용 AGENTS.md 를 신설했다
+- 증거: 번들 정적 시험 `pytest map/map_260905_update_v2/tests/ -q` 18 passed. 외부 검증 result.md(2026-09-20 Gazebo Harmonic) — 번들 무결성·월드 로드 PASS, 물리·센서 브리지·SLAM·주행 FAIL/BLOCKED, CORE 부팅 AttributeError 기록. validate_bundle.py 는 scipy 필요 — 리포트는 번들 reports/ 에 이미 수록
+- gate 변화: 없음. CONTROL LOCAL 유지(번들 시험은 control 스위트 밖)
+- 결정: 검증 FAIL 항목은 증거로 남긴다 — Gazebo 물리·센서 브리지 실패와 CORE 부팅 AttributeError(`RosyCoreNode` 가 `core_common` 에 접근 — D-126 분해 런타임 결함 후보)는 소유 세션 인계 사항이다
+- 교훈: 없음

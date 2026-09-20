@@ -1,0 +1,44 @@
+{
+  "status": "PASS_STATIC_CHECKS_ONLY",
+  "source_sha256": "8475464857322d71f6e492171419bf285e7bd034089b90ad59d6f106b0941072",
+  "updated_world_sha256": "3f2e3a822cbf72223634d173d49bd3626c0281e8f433cd54e766134bffa15528",
+  "all_model_semantics_unchanged": true,
+  "wall_count": 16,
+  "visual_collision_pairs_match": true,
+  "physics_numerical_values_unchanged": true,
+  "requested_engine": "gz-physics-dartsim-plugin",
+  "world_bounds_m": [
+    -1.3575,
+    -0.6325,
+    1.3575,
+    0.6325
+  ],
+  "map_width_px": 600,
+  "map_height_px": 300,
+  "resolution_m": 0.005,
+  "origin": [
+    -1.5,
+    -0.75,
+    0.0
+  ],
+  "pgm_sha256": "d23141945700bf9725bc0c2407425abffe4fa93b1167146bf8f259a35a4cd21c",
+  "matches_previous_occupancy_bytes": true,
+  "regeneration_pixel_mismatches": 0,
+  "independent_GEOS_cell_intersections": 180000,
+  "independent_cell_mismatches": 0,
+  "free_components_4_and_8_neighbour": [
+    2,
+    2
+  ],
+  "closed_X_pocket_preserved": true,
+  "raster_boundary_upper_bound_m": 0.007071067811865476,
+  "tests_not_run": [
+    "Gazebo SDFormat parser",
+    "Gazebo plugin loading",
+    "Gazebo collision dynamics",
+    "ROS/Nav2 runtime",
+    "robot footprint clearance",
+    "physical hardware safety"
+  ],
+  "runtime_execution_performed": false
+}

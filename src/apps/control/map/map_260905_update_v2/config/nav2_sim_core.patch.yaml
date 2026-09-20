@@ -1,0 +1,25 @@
+# PARTIAL PATCH ONLY - not a complete Nav2 launch configuration.
+# Target: ROS 2 Jazzy, SimpleGoalChecker + NavfnPlanner.
+# Use scripts/prepare_sim_params.py with YOUR reviewed full base YAML.
+# The script sets simulation time on existing standard Nav2 parameter blocks,
+# adds map_server metadata, and preserves smaller existing tolerances.
+# No footprint, inflation, freshness, watchdog or motor safety values here.
+controller_server:
+  ros__parameters:
+    general_goal_checker:
+      xy_goal_tolerance: 0.03
+      yaw_goal_tolerance: 0.10
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      resolution: 0.01
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      resolution: 0.005
+      track_unknown_space: true
+planner_server:
+  ros__parameters:
+    GridBased:
+      tolerance: 0.02
+      allow_unknown: false

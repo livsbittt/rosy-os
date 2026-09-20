@@ -1,0 +1,99 @@
+{
+  "wall_count": 16,
+  "collision_geometry": {
+    "bounds_m": [
+      -1.3575,
+      -0.6325,
+      1.3575,
+      0.6325
+    ],
+    "outer_size_m": [
+      2.715,
+      1.265
+    ],
+    "wall_thickness_m": 0.01,
+    "wall_height_m": 0.155,
+    "z_range_m": [
+      0,
+      0.155
+    ]
+  },
+  "empty_regions": [
+    {
+      "area_m2": 3.2012207195594575,
+      "centroid_m": [
+        0.02032917630064456,
+        0.016071012566932642
+      ],
+      "bounds_m": [
+        -1.3475000000000001,
+        -0.6224999999999999,
+        1.3475000000000001,
+        0.6224999999999999
+      ],
+      "description": "main connected empty region"
+    },
+    {
+      "area_m2": 0.09307924949283151,
+      "centroid_m": [
+        -0.7517999999999999,
+        -0.5208036894000858
+      ],
+      "bounds_m": [
+        -1.0568889094656764,
+        -0.6224999999999999,
+        -0.4467110905343236,
+        -0.31741106820025755
+      ],
+      "description": "isolated lower X pocket"
+    }
+  ],
+  "measured_gaps": {
+    "right_outer_aisle": {
+      "walls": [
+        "wall_01_col",
+        "wall_13_col"
+      ],
+      "distance_m": 0.28995000000000015
+    },
+    "right_inner_parallel_aisle": {
+      "walls": [
+        "wall_12_col",
+        "wall_13_col"
+      ],
+      "distance_m": 0.28500000000000025
+    },
+    "left_wall_to_nearest_X_tip": {
+      "walls": [
+        "wall_00_col",
+        "diag_0_col"
+      ],
+      "distance_m": 0.2721964260775724
+    }
+  },
+  "raster": {
+    "image": "map_260905.pgm",
+    "mode": "trinary",
+    "resolution": 0.005,
+    "origin": [
+      -1.5,
+      -0.75,
+      0.0
+    ],
+    "negate": 0,
+    "occupied_thresh": 0.65,
+    "free_thresh": 0.196,
+    "width_px": 600,
+    "height_px": 300,
+    "pixel_counts": {
+      "0": 8470,
+      "205": 41828,
+      "254": 129702
+    },
+    "method": "Positive-area cell/box intersection (SAT); conservative boundary extension is bounded by one cell diagonal.",
+    "outside_policy": "Unknown outside the rectangular track; this is an export policy, not a source obstacle.",
+    "robot_inflation_applied": false,
+    "free_components_4_neighbour": 2,
+    "free_components_8_neighbour": 2
+  }
+}

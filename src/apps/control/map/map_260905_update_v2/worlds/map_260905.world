@@ -1,0 +1,311 @@
+<?xml version="1.0"?>
+<!-- MAP 260905 / v2 / 2026-09-20
+  Target: Gazebo Sim Harmonic (Sim 8), ROS 2 Jazzy integration candidate.
+  This file defines the environment only; it does not spawn a robot or start Nav2.
+
+  Source collision envelope: 2.715 x 1.265 m.
+  Bounds: X [-1.3575, 1.3575], Y [-0.6325, 0.6325] m.
+  All 16 wall boxes: thickness 0.010 m; height 0.155 m; Z [0, 0.155] m.
+  Original comment said 2.710 x 1.260 m and 0.005 m thickness.
+  The physical CAD/STL and as-built dimensions have NOT been independently checked.
+
+  All model names, poses, geometries, materials and friction settings are preserved.
+  The lower X pocket remains disconnected. No opening or safety inflation is added.
+  Positive X points right and positive Y up in the generated top view.
+  The floor is intentionally not treated as navigable space outside the track map.
+
+  DART is selected by the Physics system engine tag, not by the physics type alone.
+  Confirm the loaded engine in runtime logs. The ode friction subtree is retained;
+  a tag name does not prove how every property is handled by the active engine.
+  Legacy GUI camera data is retained; camera placement is not runtime-validated.
+
+  Use maps/map_260905.yaml with its PGM, not the annotated PNG/SVG plan.
+  Read README.md and docs/01_GAZEBO_NAV2_CAUTIONS.md before runtime use.
+  Static file checks only. Gazebo, ROS, Nav2 and hardware tests: NOT RUN.
+-->
+<sdf version="1.6">
+  <world name="map_260905">
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics">
+      <engine><filename>gz-physics-dartsim-plugin</filename></engine>
+    </plugin>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+
+    <light type="directional" name="sun">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.4 0.2 -0.9</direction>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>100 100</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>100 100</size></plane></geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient><diffuse>0.8 0.8 0.8 1</diffuse>
+            <specular>0.8 0.8 0.8 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="track_260905">
+      <static>true</static>
+      <pose>0 0 0 0 0 0</pose>
+      <link name="link">
+        <collision name="wall_00_col">
+          <pose>-1.35250 0.00000 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.01000 1.26000 0.15500</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="wall_00_vis">
+          <pose>-1.35250 0.00000 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.01000 1.26000 0.15500</size></box></geometry>
+          <material>
+            <ambient>0.30 0.35 0.45 1</ambient>
+            <diffuse>0.55 0.62 0.72 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_01_col">
+          <pose>1.35250 0.00000 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.01000 1.26000 0.15500</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="wall_01_vis">
+          <pose>1.35250 0.00000 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.01000 1.26000 0.15500</size></box></geometry>
+          <material>
+            <ambient>0.30 0.35 0.45 1</ambient>
+            <diffuse>0.55 0.62 0.72 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_02_col">
+          <pose>0.00000 -0.62750 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>2.71000 0.01000 0.15500</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="wall_02_vis">
+          <pose>0.00000 -0.62750 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>2.71000 0.01000 0.15500</size></box></geometry>
+          <material>
+            <ambient>0.30 0.35 0.45 1</ambient>
+            <diffuse>0.55 0.62 0.72 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_03_col">
+          <pose>0.00000 0.62750 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>2.71000 0.01000 0.15500</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="wall_03_vis">
+          <pose>0.00000 0.62750 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>2.71000 0.01000 0.15500</size></box></geometry>
+          <material>
+            <ambient>0.30 0.35 0.45 1</ambient>
+            <diffuse>0.55 0.62 0.72 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_04_col">
+          <pose>-0.75435 0.39995 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.01000 0.45000 0.15500</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="wall_04_vis">
+          <pose>-0.75435 0.39995 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.01000 0.45000 0.15500</size></box></geometry>
+          <material>
+            <ambient>0.30 0.35 0.45 1</ambient>
+            <diffuse>0.55 0.62 0.72 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_05_col">
+          <pose>0.00495 -0.32745 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.30000 0.01000 0.15500</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="wall_05_vis">
+          <pose>0.00495 -0.32745 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.30000 0.01000 0.15500</size></box></geometry>
+          <material>
+            <ambient>0.30 0.35 0.45 1</ambient>
+            <diffuse>0.55 0.62 0.72 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_06_col">
+          <pose>0.15245 -0.47495 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.01000 0.30000 0.15500</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="wall_06_vis">
+          <pose>0.15245 -0.47495 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.01000 0.30000 0.15500</size></box></geometry>
+          <material>
+            <ambient>0.30 0.35 0.45 1</ambient>
+            <diffuse>0.55 0.62 0.72 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_07_col">
+          <pose>0.15245 0.32495 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.01000 0.60000 0.15500</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="wall_07_vis">
+          <pose>0.15245 0.32495 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.01000 0.60000 0.15500</size></box></geometry>
+          <material>
+            <ambient>0.30 0.35 0.45 1</ambient>
+            <diffuse>0.55 0.62 0.72 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_08_col">
+          <pose>0.30495 0.32245 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.30000 0.01000 0.15500</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="wall_08_vis">
+          <pose>0.30495 0.32245 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.30000 0.01000 0.15500</size></box></geometry>
+          <material>
+            <ambient>0.30 0.35 0.45 1</ambient>
+            <diffuse>0.55 0.62 0.72 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_09_col">
+          <pose>0.45745 -0.12500 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.01000 0.29990 0.15500</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="wall_09_vis">
+          <pose>0.45745 -0.12500 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.01000 0.29990 0.15500</size></box></geometry>
+          <material>
+            <ambient>0.30 0.35 0.45 1</ambient>
+            <diffuse>0.55 0.62 0.72 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_10_col">
+          <pose>0.60750 0.02245 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.30510 0.01000 0.15500</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="wall_10_vis">
+          <pose>0.60750 0.02245 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.30510 0.01000 0.15500</size></box></geometry>
+          <material>
+            <ambient>0.30 0.35 0.45 1</ambient>
+            <diffuse>0.55 0.62 0.72 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_11_col">
+          <pose>0.75500 -0.27245 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.60010 0.01000 0.15500</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="wall_11_vis">
+          <pose>0.75500 -0.27245 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.60010 0.01000 0.15500</size></box></geometry>
+          <material>
+            <ambient>0.30 0.35 0.45 1</ambient>
+            <diffuse>0.55 0.62 0.72 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_12_col">
+          <pose>0.75755 0.17245 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.01000 0.30500 0.15500</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="wall_12_vis">
+          <pose>0.75755 0.17245 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.01000 0.30500 0.15500</size></box></geometry>
+          <material>
+            <ambient>0.30 0.35 0.45 1</ambient>
+            <diffuse>0.55 0.62 0.72 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="wall_13_col">
+          <pose>1.05255 0.17500 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.01000 0.89990 0.15500</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="wall_13_vis">
+          <pose>1.05255 0.17500 0.07750 0 0 0.0000000</pose>
+          <geometry><box><size>0.01000 0.89990 0.15500</size></box></geometry>
+          <material>
+            <ambient>0.30 0.35 0.45 1</ambient>
+            <diffuse>0.55 0.62 0.72 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="diag_0_col">
+          <pose>-0.75357 -0.30857 0.07750 0 0 -0.7853982</pose>
+          <geometry><box><size>0.90000 0.01000 0.15500</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="diag_0_vis">
+          <pose>-0.75357 -0.30857 0.07750 0 0 -0.7853982</pose>
+          <geometry><box><size>0.90000 0.01000 0.15500</size></box></geometry>
+          <material>
+            <ambient>0.30 0.35 0.45 1</ambient>
+            <diffuse>0.55 0.62 0.72 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="diag_1_col">
+          <pose>-0.75003 -0.30857 0.07750 0 0 0.7853982</pose>
+          <geometry><box><size>0.90000 0.01000 0.15500</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="diag_1_vis">
+          <pose>-0.75003 -0.30857 0.07750 0 0 0.7853982</pose>
+          <geometry><box><size>0.90000 0.01000 0.15500</size></box></geometry>
+          <material>
+            <ambient>0.30 0.35 0.45 1</ambient>
+            <diffuse>0.55 0.62 0.72 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <scene><shadows>false</shadows></scene>
+
+    <gui fullscreen="0">
+      <camera name="user_camera">
+        <pose>0 -2.9 2.9 0 0.78 1.5707963</pose>
+        <view_controller>orbit</view_controller>
+        <projection_type>perspective</projection_type>
+      </camera>
+    </gui>
+
+    <!-- The type is aligned with the explicitly requested engine above.
+         Step/rate values below are retained, not a measured performance guarantee. -->
+    <physics name="track_1ms" type="dart">
+      <real_time_update_rate>1000.0</real_time_update_rate>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+    </physics>
+  </world>
+</sdf>
