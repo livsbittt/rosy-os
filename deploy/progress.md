@@ -2,7 +2,7 @@
 module: deploy
 logical_modules: [M01, M13, M14]
 owner: 릴리스·플랫폼
-last_verified: { commit: "uncommitted", date: 2026-09-15 }
+last_verified: { commit: "b98642f", date: 2026-09-20 }
 gates:
   SOURCE:
     state: GO

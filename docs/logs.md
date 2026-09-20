@@ -620,3 +620,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED. 이 수정으로 D-83 재실행의 전제(CORE 부팅)가 열린다
 - 결정: 부팅 로그의 identity 출처는 CoreServices.identity(services.py가 from_config로 생성)다 — node.py가 core_common 모듈을 직접 참조하지 않는다
 - 교훈: 도메인 재편의 import 스윕은 `self.core_*` 형태의 **동적 속성 참조**를 못 잡는다 — grep 정적 스윕에 `self\.(core_common|core_events|core_features)\b`를 추가할 과제. 부팅 크래시는 시뮬 실행에서만 잡힌다 — 호스트 pytest는 rclpy 경로를 못 돈다
+
+## 2026-09-20 · uncommitted · docs(harness): re-verify SOURCE and stamp last_verified at b98642f
+
+- 변경: core·control·fleet·docs·deploy 다섯 모듈의 progress.md last_verified 를 b98642f(2026-09-20)로 갱신 — 도메인 재그룹 이후 쌓인 재검증 지연 lint 경고 해소
+- 증거: 이 호스트 실측 — core 892 passed 10 skipped, control 996 passed 26 skipped 2 failed(기존 환경성 startup 2건 — 패키지 디렉터리 실행 기준), fleet 324 passed 5 skipped, 루트 계약 964 passed 1 failed(docs/plan 이동 전 상태 — 이동 착지 후 CI success 확인), harness 계약 45 passed, lint 0 errors
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: deploy 는 Windows 호스트에서 identity·openssl 계약까지 전부 통과해 처음으로 스탬프했다(이전에는 WSL 경로·openssl 부재로 불가 — Git Bash 선점과 conftest PATH 부트스트랩으로 해소)
+- 교훈: 없음
