@@ -91,8 +91,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · docs(fleet): my session's findings cross-validate the map bundle's result.md — the CORE API gate is closed by 6ff2cb8
 - 2026-09-20 · uncommitted · docs(fleet): the last blocker is named — leader Nav2 has no map TF; probe requirements recorded (D-83 handoff)
 - 2026-09-20 · uncommitted · ci: route the three frozen ADR-log violations through a tolerated step
 - 2026-09-20 · uncommitted · fix(fleet): defect (a) resolved in the live sim — relay delivers, no early HOLD (D-132 validated)
 - 2026-09-20 · uncommitted · ci(adr): flip the gating runner to ubuntu-26.04 — D-135 closed
-- 2026-09-20 · uncommitted · docs(fleet): port 8090 and the sim are contested by a concurrent session — live iteration handed off (D-133 applied)

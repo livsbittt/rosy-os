@@ -748,3 +748,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 리더 Nav2 의 맵/TF 브링업( sensing 프로필에 map_server·SLAM 슬라이스가 있는지) 확인과 프로브 요건 일치는 D-83 세션 인계물이다 — fleet 측 결함 (a) 는 22,791 프레임 전달로 해소됐다
 - 교훈: 진단 스크립트는 대상 프로세스의 environ(/proc/PID/environ)에서 도메인·RMW를 읽고 일치시켜야 한다 — 불일치 프로브는 "시스템이 죽었다"는 거짓 결론을 낳는다
+
+## 2026-09-20 · uncommitted · docs(fleet): my session's findings cross-validate the map bundle's result.md — the CORE API gate is closed by 6ff2cb8
+
+- 변경: 없음(교차 검증과 기록만). 맵 번들 세션의 result.md(src/apps/control/docs/validation/map-260905-update-v2-2026-09-20)와 이 세션의 실측이 정합 — 그들의 FAIL 게이트 "CORE robot API: AttributeError before opening port 18080"는 이 세션의 6ff2cb8(node.py D-126 리네임 누락 4곳 수정)이 닫는다
+- 증거: result.md 게이트 표와 본 세션 관측의 대응 — physics/collision FAIL(DART mesh unimplemented) ↔ 리더 포즈 불변·rosy_02 (0,0) 고정 / sensor bridge FAIL(ROS로 clock·scan·odom 0 메시지) ↔ safety "no lidar"·AMCL 불가·map TF 부재·Nav2 PLANNING 정체 / Live Fleet monitoring FAIL(ConnectError) ↔ 6ff2cb8 이전 상태. sensor bridge·SLAM 게이트는 slam_toolbox 설치 확인 후에도 동일 — 환경(센서 브리지) 귀속이 맞다
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 남은 FAIL 게이트 2개(DART mesh collision, 센서 브리지)는 gz_sim/D-83 도메인이다 — 로봇 SDF의 충돌 지오메트리를 단순 형태로, 센서 브리지를 헤드리스 렌더링 경로로. fleet 측 할 일은 없다
+- 교훈: 두 세션이 같은 장애를 독립 관측했고, 한쪽의 수정이 다른쪽의 FAIL 게이트를 닫았다 — result.md 의 게이트 표가 세션 간 인계의 가장 정확한 언어였다
