@@ -51,3 +51,15 @@
   DEVICE는 Pinky 설치/readback 전까지 HOLD다.
 - 교훈: full SD-image 파이프라인의 미구현 상태와 update bundle builder를 구분하되,
   어느 쪽도 x86/QEMU 산출물을 G0 증거로 승격하지 않는다.
+
+## 2026-09-21 · 6f6c515 · feat(deploy): capture Pinky connection evidence
+
+- 변경: Windows peer verifier에 bounded optional batch SSH, API port/timeout, atomic
+  no-overwrite JSON evidence를 추가했다. 성공은 선택 interface의 SSH 주소와 API/dashboard,
+  실패는 stable code와 HOLD만 기록하며 원격 stderr·credential은 evidence에 넣지 않는다.
+- 증거: 실제 PowerShell+fake SSH+loopback HTTP 시험을 포함한 집중 `81 passed`;
+  전체 `1041 passed, 13 skipped`; PowerShell parser, py_compile, flake8,
+  `git diff --check` 통과. 미연결 `192.168.4.1`은 4초 내 `SSH_ROUTE/HOLD`를 기록했다.
+- gate 변화: SOURCE/LOCAL만 갱신. 연결 GO도 G0 artifact, DEVICE, FIELD를 대신하지 않는다.
+- 교훈: 장치 미연결을 콘솔 timeout으로만 남기지 말고 재실행 가능한 구조화 evidence로
+  남기되, 자동 subnet scan이나 host-key 우회로 장치 identity 경계를 약화하지 않는다.

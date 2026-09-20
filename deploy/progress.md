@@ -2,15 +2,15 @@
 module: deploy
 logical_modules: [M01, M13, M14]
 owner: 릴리스·플랫폼
-last_verified: { commit: "c2bb799", date: 2026-09-21 }
+last_verified: { commit: "6f6c515", date: 2026-09-21 }
 gates:
   SOURCE:
     state: GO
-    evidence: "native ARM64 unsigned payload builder와 Pinky G0-G5/release 경계 집중 516 passed, 8 skipped (2026-09-21)"
-    cmd: "python3 -m pytest test/test_arm64_release_builder.py test/test_publication.py test/test_image_pipeline.py test/test_image_checks.py test/test_release_manifest.py test/test_release_signing.py test/test_release_bundle.py test/test_release_runtime.py test/test_release_updater.py test/test_release_layout.py test/test_release_boundary_guards.py test/test_pinky_commissioning.py test/test_device_readback.py test/test_robot_runtime.py -q"
+    evidence: "Windows connection evidence와 Pinky G0-G5/device readback 집중 81 passed (2026-09-21)"
+    cmd: "python3 -m pytest test/test_windows_connection_evidence.py test/test_pi_wifi_deployment.py test/test_pinky_commissioning.py test/test_device_readback.py -q"
   LOCAL:
     state: GO
-    evidence: "1035 passed, 13 skipped (2026-09-21 Windows, commit c2bb799)"
+    evidence: "1041 passed, 13 skipped (2026-09-21 Windows, commit 6f6c515)"
     cmd: "python3 -m pytest test -q"
   ROS-SIM:
     state: N/A
@@ -31,6 +31,8 @@ plans:
   - docs/plans/2026-09-21-pinky-device-commissioning-design.md
   - docs/plans/2026-09-21-native-arm64-release-builder-design.md
   - docs/plans/2026-09-21-native-arm64-release-builder.md
+  - docs/plans/2026-09-21-pinky-connection-evidence-design.md
+  - docs/plans/2026-09-21-pinky-connection-evidence.md
 ---
 ## 지금 상태
 
@@ -40,7 +42,8 @@ plans:
   install/readback 원문에서 유도하며 G3-G5는 물리 측정 전 템플릿 상태로는 통과하지 않는다.
 - binfmt 등록 후 ARM64 core/io 개발 후보 빌드와 import 확인까지 했다. 발행 가능한 artifact는 아니다.
 - `arm64_release_builder.py`는 native Linux `aarch64`, ARM64 Docker daemon, clean full revision, digest-pinned ROS base만 허용하고 core/io의 linux/arm64·revision label·image ID를 검증한 뒤 비밀 없는 unsigned payload를 원자적으로 만든다. OCI archive는 검사된 immutable image ID에서 저장하며 서명은 기존 offline packager만 수행한다.
-- `c2bb799`의 전체 host 회귀가 통과했다. 이 증거는 장치/물리 인수를 대신하지 않는다.
+- `verify-from-windows.ps1`는 exact host의 bounded SSH와 API/dashboard를 확인하고 성공·실패 모두 no-overwrite JSON evidence로 남긴다. 이 증거는 연결성만 증명하며 G0나 DEVICE를 승격하지 않는다.
+- `6f6c515`의 전체 host 회귀가 통과했다. 이 증거는 장치/물리 인수를 대신하지 않는다.
 
 ## 다음 gate
 

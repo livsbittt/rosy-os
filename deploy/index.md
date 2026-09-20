@@ -26,6 +26,8 @@
 - [2026-09-15-module-harness-design.md](../docs/plans/2026-09-15-module-harness-design.md)
 - [2026-09-21-native-arm64-release-builder-design.md](../docs/plans/2026-09-21-native-arm64-release-builder-design.md)
 - [2026-09-21-native-arm64-release-builder.md](../docs/plans/2026-09-21-native-arm64-release-builder.md)
+- [2026-09-21-pinky-connection-evidence-design.md](../docs/plans/2026-09-21-pinky-connection-evidence-design.md)
+- [2026-09-21-pinky-connection-evidence.md](../docs/plans/2026-09-21-pinky-connection-evidence.md)
 - [2026-09-21-pinky-device-commissioning-design.md](../docs/plans/2026-09-21-pinky-device-commissioning-design.md)
 
 ## 교훈 (docs/solutions)
@@ -38,8 +40,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · 6f6c515 · feat(deploy): capture Pinky connection evidence
 - 2026-09-21 · c2bb799 · feat(release): native ARM64 unsigned payload builder
 - 2026-09-21 · 1acb41a · feat(deploy): fail-closed Pinky commissioning
 - 2026-09-18 · uncommitted · feat(host-agent): structured network status, set_mode, connect (D-124)
 - 2026-09-15 · uncommitted · docs(harness): state excluded gates and rerunnable source evidence
-- 2026-09-15 · uncommitted · docs(harness): start the deploy harness pilot
