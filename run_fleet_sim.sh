@@ -35,7 +35,7 @@ GZ_PID=$!
 echo "Waiting for robots.yaml to be generated..."
 ROBOTS_YAML=""
 SIM_START=$(date +%s)
-for i in {1..120}; do
+for i in {1..240}; do
     # 이번 실행이 시작된 뒤에 생성된 yaml 만 받는다 — 죽은 이전 세대의 stale
     # yaml 을 집으면 죽은 포트의 매니페스트로 콘솔이 떠서 영구 ConnectError 다.
     YAML_PATH=$(find /tmp -maxdepth 2 -path '*rosy_gz_multi*/robots.yaml' \

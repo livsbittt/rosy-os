@@ -836,3 +836,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 11건은 arm64 리허설 비게이팅 스텝에 기록된 ARTIFACT 준비 목록이다 — x86 게이팅과 분리하며, 소유 세션이 다음 스탬프 때 흡수한다
 - 교훈: "ROS-free 스위트"도 rclpy 가 설치된 플랫폼에서는 실행 경로가 달라진다 — ROS-free 는 import 금지가 아니라 경로 문제이며, 아키텍처 리허설이 그 차이를 드러낸다
+
+## 2026-09-20 · uncommitted · fix(sim): double the robots.yaml wait window in run_fleet_sim
+
+- 변경: run_fleet_sim.sh 의 robots.yaml 대기 루프를 120회 → 240회로 연장 — 느린 호스트에서 yaml 생성이 대기창을 넘기면 콘솔이 죽은 포트의 stale 매니페스트를 집는 문제의 여유를 넓혔다
+- 증거: `git diff run_fleet_sim.sh` — for 루프 상한만 수정, 나머지 무변경. map_260905 world·yaml 연결(c5db281)과 결합해 시뮬 기동이 안정화
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 없음
+- 교훈: 없음
