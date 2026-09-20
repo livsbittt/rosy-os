@@ -36,3 +36,18 @@
 - 결정: 없음
 - 교훈: G0-G2는 작업자 요약이 아니라 stage manifest/install/readback 원문에서
   유도하고, G3-G5 미측정 템플릿은 검증을 통과하지 못해야 한다
+
+## 2026-09-21 · c2bb799 · feat(release): native ARM64 unsigned payload builder
+
+- 변경: native Linux aarch64/ARM64 Docker daemon/clean revision/digest-pinned ROS base를 강제하고 `core`/`io`를
+  Buildx로 빌드한 뒤 linux/arm64, OCI revision label, immutable image ID를 검사한다.
+  검사한 image ID로 Docker-save archive, runtime config, provenance, manifest를 원자적으로 만들며 private
+  signing key는 받지 않는다. 기존 offline packager와 publication JSON 검증으로 연결했다.
+- 증거: builder/publication/image/release/runtime/commissioning 집중 `516 passed, 8 skipped`;
+  전체 `1035 passed, 13 skipped`;
+  py_compile, flake8, `git diff --check` 통과. Windows 실제 CLI는
+  `BUILD_HOST_OS`로 종료하고 payload를 만들지 않았다.
+- gate 변화: SOURCE만 갱신. ARTIFACT는 native aarch64 실행과 실제 offline signature,
+  DEVICE는 Pinky 설치/readback 전까지 HOLD다.
+- 교훈: full SD-image 파이프라인의 미구현 상태와 update bundle builder를 구분하되,
+  어느 쪽도 x86/QEMU 산출물을 G0 증거로 승격하지 않는다.
