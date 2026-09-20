@@ -89,8 +89,8 @@
 
 ## 최근 기록
 
-- 2026-09-20 · uncommitted · ci: split the two structural harness failures into a tolerated step
+- 2026-09-20 · uncommitted · feat(fleet): Robot Selection lands (FOR-001) and the gather bench puts a number on N (D-131 phases 2-3)
+- 2026-09-20 · uncommitted · fix(harness): excuse the four known legacy log headings by exact name
 - 2026-09-20 · uncommitted · fix(test): stub systemctl for the recovery gate tests
 - 2026-09-20 · uncommitted · feat(fleet): the console map repeats swarm control — slots, relay evidence, mediation (D-131 phase 1)
 - 2026-09-20 · uncommitted · docs(acceptance): define per-module actual-operation criteria
-- 2026-09-20 · uncommitted · docs(adr): the fleet console repeats what swarm control says, in three phases (D-131)
