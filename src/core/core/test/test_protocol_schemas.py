@@ -99,3 +99,70 @@ def test_pose_stream_envelope():
     assert Envelope.model_validate(env.model_dump()).type == EnvelopeType.POSE
     parsed = PoseSample.model_validate(env.payload)
     assert parsed.pose.x == 1.0 and parsed.seq == 1
+
+
+def _detection(**kwargs):
+    from core_common.protocol.detections import Detection
+    options = dict(label="person", x=0.4, y=0.3, w=0.2, h=0.4, confidence=0.8)
+    options.update(kwargs)
+    return Detection(**options)
+
+
+def _evidence(**kwargs):
+    from core_common.protocol.detections import DetectionEvidence
+    options = dict(model_revision="yolo11n-r1", observed_at=1000.0, seq=41,
+                   input_width=640, input_height=640, input_fps=10.0,
+                   detections=[_detection()])
+    options.update(kwargs)
+    return DetectionEvidence(**options)
+
+
+def test_detection_evidence_roundtrip():
+    from core_common.protocol.detections import DetectionEvidence
+    ev = _evidence()
+    assert DetectionEvidence.model_validate(ev.model_dump()) == ev
+    assert ev.detections[0].label == "person"
+
+
+def test_detection_bounds_are_normalized():
+    import pydantic
+    with pytest.raises(pydantic.ValidationError):
+        _detection(x=0.9, w=0.2)          # x+w > 1
+    with pytest.raises(pydantic.ValidationError):
+        _detection(confidence=1.5)
+    with pytest.raises(pydantic.ValidationError):
+        _detection(label="")
+
+
+def test_evidence_revision_and_seq_are_required():
+    import pydantic
+    with pytest.raises(pydantic.ValidationError):
+        _evidence(model_revision="")
+    with pytest.raises(pydantic.ValidationError):
+        _evidence(seq=-1)
+    with pytest.raises(pydantic.ValidationError):
+        _evidence(input_width=0)
+
+
+def test_freshness_boundary_is_300ms():
+    """D-136: 신선도 >300ms면 INVALID — 깨진 영상의 clear가 제일 위험하다."""
+    ev = _evidence(observed_at=1000.0)
+    assert ev.fresh(now=1000.29)
+    assert not ev.fresh(now=1000.31)
+
+
+def test_empty_detections_is_absence_not_loss():
+    """빈 detections + seq 전진 = "없는 것". seq 점프 = "못 본 것"."""
+    ev = _evidence(detections=[], seq=42)
+    assert ev.detections == []
+    assert ev.gap_after(last_seq=41) == 0
+    assert ev.gap_after(last_seq=39) == 2
+
+
+def test_of_label_filters_by_confidence():
+    ev = _evidence(detections=[_detection(label="person", confidence=0.8),
+                               _detection(label="person", confidence=0.3),
+                               _detection(label="box", confidence=0.9)])
+    assert len(ev.of_label("person", min_confidence=0.5)) == 1
+    assert len(ev.of_label("box")) == 1
+    assert ev.of_label("forklift") == []

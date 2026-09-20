@@ -8,6 +8,8 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
+from core_common.protocol.detections import DETECTION_MAX_AGE_S, DetectionEvidence
+
 
 def finite_velocity(linear: float, angular: float) -> bool:
     return all(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
@@ -116,6 +118,22 @@ class PersonAdvisory:
 #: SAF-006 사람 감속 상한. 사람이 있으면 전진 속도를 기어가기로 묶는다.
 #: 선회율은 손대지 않는다 — 위험은 접근 속도지 제자리 회전이 아니다.
 PERSON_LINEAR_CAP_M_S = 0.05
+
+
+def person_advisory_from(evidence: DetectionEvidence, now: float, *,
+                         label: str = "person", min_confidence: float = 0.5,
+                         max_age_s: float = 1.0) -> Optional[PersonAdvisory]:
+    """D-137 T2→SAF-006 주입 고리. 신선한 라벨 검출만 자문이 된다.
+
+    stale evidence·빈 detections·낮은 confidence는 전부 None이다 — 자문 없음이
+    곧 프로필 복귀다. revision 게이트(known-model registry)는 vision 슬라이스
+    몫이며 여기서 하지 않는다."""
+    persons = evidence.of_label(label, min_confidence)
+    if not persons or not evidence.fresh(now, DETECTION_MAX_AGE_S):
+        return None
+    best = max(persons, key=lambda candidate: candidate.confidence)
+    return PersonAdvisory(present=True, confidence=best.confidence,
+                          observed_at=evidence.observed_at, max_age_s=max_age_s)
 
 
 class SafetyManager:

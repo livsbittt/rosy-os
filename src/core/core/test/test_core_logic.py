@@ -213,6 +213,43 @@ class TestPersonAdvisory:
             safety.set_person_advisory("person!")
 
 
+class TestPersonAdvisoryFromEvidence:
+    """D-137 T2→SAF-006 주입 고리: 신선한 person 검출만 자문이 된다.
+    revision 게이트(known-model registry)는 vision 슬라이스 몫 — 여기 없음."""
+
+    def _evidence(self, **kwargs):
+        from core_common.protocol.detections import Detection, DetectionEvidence
+        detections = kwargs.pop("detections", [
+            Detection(label="person", x=0.4, y=0.3, w=0.2, h=0.4, confidence=0.8)])
+        options = dict(model_revision="yolo11n-r1", observed_at=1000.0, seq=41,
+                       input_width=640, input_height=640, input_fps=10.0,
+                       detections=detections)
+        options.update(kwargs)
+        return DetectionEvidence(**options)
+
+    def test_fresh_person_becomes_advisory(self, safety):
+        from core_features.safety.manager import person_advisory_from
+        advisory = person_advisory_from(self._evidence(), now=1000.1)
+        assert advisory is not None and advisory.present
+        safety.set_person_advisory(advisory)
+        assert safety.clip(0.20, 0.0, now=1000.1)[0] == pytest.approx(0.05)
+
+    def test_stale_evidence_becomes_nothing(self, safety):
+        from core_features.safety.manager import person_advisory_from
+        assert person_advisory_from(self._evidence(), now=1001.0) is None
+
+    def test_absence_becomes_nothing(self, safety):
+        from core_features.safety.manager import person_advisory_from
+        assert person_advisory_from(self._evidence(detections=[]), now=1000.1) is None
+
+    def test_low_confidence_person_becomes_nothing(self, safety):
+        from core_common.protocol.detections import Detection
+        from core_features.safety.manager import person_advisory_from
+        ev = self._evidence(detections=[
+            Detection(label="person", x=0.4, y=0.3, w=0.2, h=0.4, confidence=0.2)])
+        assert person_advisory_from(ev, now=1000.1) is None
+
+
 class TestEventBus:
     def test_seq_monotone_and_history(self, bus):
         bus.publish("nav.completed")

@@ -141,8 +141,11 @@
 | D-131 | Fleet 콘솔은 군집 제어의 말을 되풀이한다 — 세 단계로 | Accepted |
 | D-132 | 무장은 스트림이 연 뒤에 한다 | Accepted |
 | D-133 | CORE SIGSEGV 는 재현 경로로 쫓고, 흔들리는 환경에서의 반복은 폐기한다 | Accepted |
-| D-134 | ??? ?? ??? ???? ??? | Proposed |
-| D-135 | CI ??? Ubuntu ??? ????, ?? LTS ??? ?? ?? ????? | Accepted |
+| D-134 | 릴레이 준비 신호는 실측으로 말한다 | Accepted |
+| D-135 | CI 러너는 Ubuntu 버전을 고정하고, 다음 LTS 이동은 기한 전에 리허설한다 | Accepted |
+| D-136 | 영상 대역폭은 예산으로 다룬다 — 경로 분리 + 상한 + 자동킬 | Proposed |
+| D-137 | YOLO는 자문역이다 — LiDAR/IR가 결정하고 영상은 증거만 낸다 | Proposed |
+| D-138 | 도크 검출기는 센서 provider 포트를 탄다 — 새 정적 간선 없음 | Accepted |
 
 ---
 
