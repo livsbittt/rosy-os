@@ -644,3 +644,11 @@
 - gate 변화: 없음. CONTROL LOCAL 유지(번들 시험은 control 스위트 밖)
 - 결정: 검증 FAIL 항목은 증거로 남긴다 — Gazebo 물리·센서 브리지 실패와 CORE 부팅 AttributeError(`RosyCoreNode` 가 `core_common` 에 접근 — D-126 분해 런타임 결함 후보)는 소유 세션 인계 사항이다
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · fix(release): scanner recognises checksum manifests and hyphenated SHA-256 prose
+
+- 변경: secret_scan — ① `.sha256` 체크섬 목록(sha256sum 출력)은 선행 해시 열을 스크럽 ② 무결성 문맥 정규식에 하이픈형 `sha-256` 추가. map_260905 번들 착지 때 MANIFEST.sha256 전체와 result.md·SOURCES.md·validate_bundle.py 의 공개 해시가 적색으로 잡혔다
+- 증거: `pytest test/test_release_boundary_guards.py` 62 passed — 기존 식별·면제·call 규칙 전부 유지. 번들 쪽은 SOURCES.md 문장-해시 합치기 + validate_bundle 상수에 checksum 주석 + MANIFEST 해시 갱신으로 무결성 정합 유지
+- gate 변화: 없음
+- 결정: 면제는 형식 기반(체크섬 목록·무결성 문말)이고 파일 기반 예외는 추가하지 않았다 — 특정 파일을 예외하면 그곳이 유일한 숨김처가 된다(scanner 자체 주석 원칙)
+- 교훈: 없음

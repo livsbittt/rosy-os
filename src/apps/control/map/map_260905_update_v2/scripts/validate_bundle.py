@@ -17,8 +17,8 @@ import yaml
 from generate_map import load_walls, rasterize
 
 ROOT=Path(__file__).resolve().parents[1]
-ORIGINAL_SHA='8475464857322d71f6e492171419bf285e7bd034089b90ad59d6f106b0941072'
-PREVIOUS_PGM_SHA='d23141945700bf9725bc0c2407425abffe4fa93b1167146bf8f259a35a4cd21c'
+ORIGINAL_SHA='8475464857322d71f6e492171419bf285e7bd034089b90ad59d6f106b0941072'  # checksum of the uploaded source world
+PREVIOUS_PGM_SHA='d23141945700bf9725bc0c2407425abffe4fa93b1167146bf8f259a35a4cd21c'  # checksum of the previously delivered PGM
 
 def require(condition: bool, text: str) -> None:
     if not condition:
