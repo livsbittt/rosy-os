@@ -88,6 +88,8 @@ function renderLineFollow(status = {}) {
   setText("line-follow-source", status.source || "없음");
   setText("line-follow-error", Number.isFinite(Number(status.error)) ? number(status.error, 3) : "—");
   setText("line-follow-confidence", percent((Number(status.confidence) || 0) * 100));
+  setText("line-follow-linear", `${number(status.linear || 0, 3)} m/s`);
+  setText("line-follow-angular", `${number(status.angular || 0, 3)} rad/s`);
   setText("line-follow-reason", status.reason || "mode_off");
   document.querySelectorAll("[data-line-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.lineMode === mode);

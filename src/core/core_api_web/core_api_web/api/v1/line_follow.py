@@ -38,7 +38,7 @@ def set_line_follow_mode(body: LineFollowModeRequest,
     try:
         selected = LineFollowMode(body.mode)
     except ValueError as exc:
-        raise ApiError("VALIDATION_ERROR", 422, "unknown line-follow mode") from exc
+        raise ApiError("VALIDATION_ERROR", 400, "unknown line-follow mode") from exc
 
     if selected is LineFollowMode.OFF:
         was_active = svc.line_follow.active

@@ -702,7 +702,7 @@ body[data-view="operate"] .page-footer { display: none; }
 .line-follow-modes button:last-child { border-right: 0; }
 .line-follow-modes button.active { color: var(--button-primary-ink); background: var(--series-primary); font-weight: 700; }
 .line-follow-modes button:disabled { color: var(--muted); cursor: not-allowed; opacity: 0.35; }
-.line-follow-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-1); margin: 0; }
+.line-follow-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-1); margin: 0; }
 .line-follow-facts div { min-width: 0; padding: var(--space-1); border: 1px solid var(--surface-line); border-radius: var(--radius-control); }
 .line-follow-facts dt { color: var(--nominal-quiet); font: var(--text-micro)/1.2 var(--mono); }
 .line-follow-facts dd { overflow: hidden; margin: var(--space-1) 0 0; font: 700 var(--text-label)/1.2 var(--mono); text-overflow: ellipsis; white-space: nowrap; }

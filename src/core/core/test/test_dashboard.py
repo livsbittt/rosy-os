@@ -115,7 +115,8 @@ def test_dashboard_exposes_exclusive_ir_and_camera_line_follow_modes():
         assert f'data-line-mode="{mode}"' in html
     for element_id in (
         "line-follow-state", "line-follow-source", "line-follow-error",
-        "line-follow-confidence", "line-follow-reason",
+        "line-follow-confidence", "line-follow-linear", "line-follow-angular",
+        "line-follow-reason",
     ):
         assert f'id="{element_id}"' in html
     assert "/api/v1/line-follow" in script

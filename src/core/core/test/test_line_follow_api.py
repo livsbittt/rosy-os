@@ -33,7 +33,7 @@ def test_line_follow_mode_rejects_unknown_values_and_estop(core_client):
     client, services = core_client()
     assert client.put(
         "/api/v1/line-follow/mode", json={"mode": "FUSED"}, headers=OPERATOR,
-    ).status_code == 422
+    ).status_code == 400
 
     services.safety.trigger_estop("test")
     blocked = client.put(

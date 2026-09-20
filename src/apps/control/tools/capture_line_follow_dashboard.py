@@ -34,6 +34,8 @@ def main() -> None:
             document.getElementById('line-follow-source').textContent = 'CAMERA_LINE';
             document.getElementById('line-follow-error').textContent = '-0.214';
             document.getElementById('line-follow-confidence').textContent = '82%';
+            document.getElementById('line-follow-linear').textContent = '0.047 m/s';
+            document.getElementById('line-follow-angular').textContent = '0.171 rad/s';
             document.getElementById('line-follow-reason').textContent = 'tracking · host simulation';
           }
         """)
