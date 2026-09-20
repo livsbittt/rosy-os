@@ -371,3 +371,37 @@ def test_a_follower_failure_without_a_code_is_named_in_the_stats_too():
         assert "sink broke" in (relay.stats().follower_last_error["rosy_02"] or "")
         await relay.stop()
     run(main())
+
+
+def test_a_hung_send_times_out_names_itself_and_the_lane_recovers():
+    """수신 측이 읽지 않는 WS 는 send 를 영원히 붙잡는다 — connected=true · tx=0 인
+    유령 레인이 된다. 타임아웃이 이름을 붙이고 소켓을 끊어 다시 연다(D-131 실측 결함 a)."""
+    async def main():
+        backoff_gate = asyncio.Event()
+
+        async def sleep(_s):
+            # 재연결 직전에서 얼린다 — 다시 열리면 이유는 지워지기 때문이다(설계).
+            await backoff_gate.wait()
+
+        leader, f1 = FakeRobot("rosy_01"), FakeRobot("rosy_02")
+        relay = Relay(leader, [f1], sleep=sleep, send_timeout_s=0.05)
+        await relay.start()
+        await settle()
+        f1.sinks[0].gate = asyncio.Event()      # 이 소켓의 send 는 영원히 리턴하지 않는다
+        for seq in range(1, 4):
+            leader.pose_frames.put_nowait(frame(seq))
+            await asyncio.sleep(0.08)            # 타임아웃(0.05s)보다 길게 — 실제 시간이 흘러야 한다
+        stats = relay.stats()
+        assert "timed out" in (stats.follower_last_error["rosy_02"] or "")
+        assert stats.follower_tx["rosy_02"] == 0      # 걸린 소켓으로는 한 프레임도 못 보냈다
+        assert not relay.is_connected("rosy_02")      # 걸린 소켓은 끊겼다
+        backoff_gate.set()                       # 놓아 주면 다시 열리고 이유는 지워진다
+        await settle()
+        f1.sinks[-1].gate = None                      # 두 번째 소켓은 읽힌다
+        leader.pose_frames.put_nowait(frame(9))
+        await settle()
+        assert frame(9) in f1.sinks[-1].sent          # 다시 열린 소켓으로 흐른다
+        assert relay.is_connected("rosy_02")
+        assert relay.stats().follower_last_error["rosy_02"] is None   # 다시 열리면 지운다
+        await relay.stop()
+    run(main())

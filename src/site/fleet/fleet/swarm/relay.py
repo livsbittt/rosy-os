@@ -30,6 +30,10 @@ _RATE_WINDOW = 20
 _RATE_STALE_S = 0.5
 #: 예외 없이, 프레임 하나 없이 끝난 리더 소켓. `leader_last_error` 에 이 문장이 들어간다.
 _QUIET_END = "leader pose stream ended without frames"
+#: 한 프레임 송신이 이 시간 안에 끝나지 않으면 그 레인은 죽은 것으로 본다. 수신 측이
+#: 읽지 않으면 send 는 영원히 리턴하지 않고, connected=true · tx=0 인 "살아 있는 것
+#: 같은 죽은 레인"을 남긴다 — 이 릴레이가 금지한 이름 없는 0 Hz 의 WS 판이다.
+_SEND_TIMEOUT_S = 2.0
 
 
 @dataclass
@@ -91,6 +95,7 @@ class Relay:
     def __init__(self, leader: RobotClient, followers: Sequence[RobotClient], *,
                  clock: Callable[[], float] = time.monotonic,
                  reconnect_max_s: float = 2.0,
+                 send_timeout_s: float = _SEND_TIMEOUT_S,
                  sleep: Callable[[float], Awaitable[None]] = asyncio.sleep) -> None:
         follower_ids = [f.robot_id for f in followers]
         if len(set(follower_ids)) != len(follower_ids):
@@ -101,6 +106,7 @@ class Relay:
         self._lanes = {f.robot_id: _Lane(f, clock) for f in followers}
         self._clock = clock
         self._reconnect_max = reconnect_max_s
+        self._send_timeout = send_timeout_s
         self._sleep = sleep
         self._paused = False
         self._tasks: list[asyncio.Task] = []
@@ -266,7 +272,13 @@ class Relay:
                     frame, lane.latest = lane.latest, None
                     if frame is None:
                         continue
-                    await lane.sink.send(frame)
+                    try:
+                        await asyncio.wait_for(lane.sink.send(frame), self._send_timeout)
+                    except asyncio.TimeoutError:
+                        # 수신 측이 읽지 않는다. 끊고 다시 열어 이름을 붙인다 —
+                        # connected=true · tx=0 인 유령 레인을 남기지 않는다.
+                        raise TimeoutError(
+                            f"reference send timed out after {self._send_timeout}s")
                     lane.tx += 1
                     lane.rate.tick()
                     lane.last_error = None

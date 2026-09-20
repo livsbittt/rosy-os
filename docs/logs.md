@@ -668,3 +668,11 @@
 - gate 변화: 없음. ROS-SIM HOLD 유지 — 재실행 증거가 생기면 그때 GO 판정
 - 결정: gate 상태 텍스트는 최신 시도 증거를 가리켜야 한다 — HOLD 인 이유가 오래된 문장이면 재검증 판단이 늦어진다
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · fix(fleet): a hung reference send times out and names itself (D-131 defect a hardening)
+
+- 변경: relay.py — 팔로워 레인의 send에 타임아웃(send_timeout_s, 기본 2.0s)을 걸었다. 수신 측이 읽지 않는 WS는 send를 영원히 붙잡아 connected=true·tx=0인 유령 레인을 남긴다(시뮬 실측 결함 a). 타임아웃은 레인을 끊고 follower_last_error에 "reference send timed out"을 남긴 뒤 다시 연다. test_relay에 걸린 send 시험 신설 — 재연결 후 프레임이 다시 흐르는 것까지 단언
+- 증거: `python -m pytest src/site/fleet/test -q` 325 passed 5 skipped. mutation-proven — wait_for를 제거하면 적색, 복원하면 녹색. 실측 배경: 시뮬에서 follower_tx_hz 0.0·connected true·지연 없음의 유령 상태가 관측됐고, 그것은 HOLD의 부산물이 아니라 수신 측 정체 시에도 재현되는 구조 결함이다
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 타임아웃 상수 2.0s — 10Hz 입력의 20프레임 분량. 초과 프레임은 깊이 1 큐가 이미 덮으므로 유실이 아니다. 근본 원인(수신 측 rosy_02 CORE의 루프 정체 원인)은 core 세션 귀속 — SIGSEGV 결함 (b)와 함께 추적한다
+- 교훈: connected만으로는 스트림의 살아 있음을 말하지 않는다 — tx 카운트와 마지막 오류가 짝이어야 화면이 거짓말을 하지 않는다
