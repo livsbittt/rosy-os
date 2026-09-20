@@ -24,3 +24,15 @@
 - gate 변화: 없음. DEVICE HOLD 유지
 - 결정: D-124
 - 교훈: 없음
+
+## 2026-09-21 · 1acb41a · feat(deploy): fail-closed Pinky commissioning
+
+- 변경: G0-G5 순차 세션, 실제 release/readback JSON 유도, 증거 SHA-256,
+  lock/CAS 원자 저장, SSH/console 런북, 유선/무선 인터페이스 검증 추가
+- 증거: `python -m pytest test -q` -> 1001 passed, 13 skipped; 집중 169개,
+  Python/Bash/PowerShell 구문 및 `git diff --check` 통과
+- gate 변화: SOURCE/LOCAL GO 갱신. ARTIFACT/DEVICE는 signed ARM64 bundle과
+  실제 Pinky Pro readback 전까지 HOLD, FIELD는 N/A 유지
+- 결정: 없음
+- 교훈: G0-G2는 작업자 요약이 아니라 stage manifest/install/readback 원문에서
+  유도하고, G3-G5 미측정 템플릿은 검증을 통과하지 못해야 한다

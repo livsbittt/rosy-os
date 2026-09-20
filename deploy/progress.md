@@ -2,15 +2,15 @@
 module: deploy
 logical_modules: [M01, M13, M14]
 owner: 릴리스·플랫폼
-last_verified: { commit: "ab8bf1b", date: 2026-09-20 }
+last_verified: { commit: "1acb41a", date: 2026-09-21 }
 gates:
   SOURCE:
     state: GO
-    evidence: "identity·runtime 계약 시험 통과 (2026-09-15 test/ suite 실행에 포함)"
+    evidence: "Pinky G0-G5, identity, runtime, release 경계 집중 169 tests passed (2026-09-21)"
     cmd: "python3 -m pytest test/test_dds_identity_contracts.py test/test_robot_runtime.py -q"
   LOCAL:
     state: GO
-    evidence: "835 passed, 12 skipped (2026-09-15 Windows + Git Bash/OpenSSL, 미커밋 WIP 포함 작업 트리)"
+    evidence: "1001 passed, 13 skipped (2026-09-21 Windows, commit 1acb41a)"
     cmd: "python3 -m pytest test -q"
   ROS-SIM:
     state: N/A
@@ -28,18 +28,22 @@ plans:
   - docs/plans/2026-09-08-release-delivery-design.md
   - docs/plans/2026-09-13-rosy-os-device-validation-implementation-plan.md
   - docs/plans/2026-09-15-module-harness-design.md
+  - docs/plans/2026-09-21-pinky-device-commissioning-design.md
 ---
 ## 지금 상태
 
 - Compose 기준선은 `core`/`motor`/`hardware` 프로필이다. vision·arm 프로필은 해당 Device 증거 전까지 추가하지 않는다.
 - Device readback은 identity, activation/manifest digest, 서명 상태, core health, `cmd_vel` publisher 수를 secret 없는 JSON으로 수집하고 불일치 시 `device_runtime=HOLD`다.
+- Pinky 커미셔닝 세션은 G0-G5 순서를 강제한다. G0-G2는 서명 stage/manifest,
+  install/readback 원문에서 유도하며 G3-G5는 물리 측정 전 템플릿 상태로는 통과하지 않는다.
 - binfmt 등록 후 ARM64 core/io 개발 후보 빌드와 import 확인까지 했다. 발행 가능한 artifact는 아니다.
-- 작업 트리에 미커밋 변경이 있다(Dockerfile, compose, install-pi.sh, `.env.example`, motion profile). LOCAL 증거는 이 작업 트리 기준이다.
+- `1acb41a`의 전체 host 회귀가 통과했다. 이 증거는 장치/물리 인수를 대신하지 않는다.
 
 ## 다음 gate
 
 1. native 또는 승인된 builder에서 서명 manifest와 immutable digest 발행(ARTIFACT).
-2. SSH 가능한 Pi bench Device 설치 후 readback JSON 보존(DEVICE). 물리 센서·모터·OMX gate는 그 뒤 별도다.
+2. [첫 장치 런북](../docs/deployment/pinky-pro-first-device-runbook.md)의 G0-G5를
+   SSH 또는 console에서 실행하고 session/raw evidence를 보존한다(DEVICE).
 
 ## 현재 유효한 금지사항
 

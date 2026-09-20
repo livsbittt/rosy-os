@@ -6,7 +6,7 @@
 | 모듈 | owner | last verified | SOURCE | LOCAL | ROS-SIM | ARTIFACT | DEVICE | FIELD |
 |---|---|---|---|---|---|---|---|---|
 | [core](src/core/core/progress.md) | CORE | ab8bf1b (2026-09-20) | GO | GO | HOLD | HOLD | HOLD | PARKED |
-| [deploy](deploy/progress.md) | 릴리스·플랫폼 | ab8bf1b (2026-09-20) | GO | GO | N/A | HOLD | HOLD | N/A |
+| [deploy](deploy/progress.md) | 릴리스·플랫폼 | 1acb41a (2026-09-21) | GO | GO | N/A | HOLD | HOLD | N/A |
 | [control](src/apps/control/progress.md) | CONTROL | uncommitted (2026-09-21) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [fleet](src/site/fleet/progress.md) | FLEET | ab8bf1b (2026-09-20) | GO | GO | HOLD | PARKED | PARKED | PARKED |
 | [games](src/apps/games/progress.md) | GAMES | 411a303 (2026-09-18) | GO | GO | N/A | N/A | PARKED | PARKED |
