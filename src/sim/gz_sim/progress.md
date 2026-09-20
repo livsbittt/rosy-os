@@ -2,19 +2,20 @@
 module: gz_sim
 logical_modules: [M03, M07]
 owner: SIM
-last_verified: { commit: "dc89264", date: 2026-09-17 }
+last_verified: { commit: "uncommitted", date: 2026-09-21 }
 gates:
   SOURCE:
     state: GO
-    evidence: "test_gz_package_contract 2 passed, test_world_to_map 6 passed (2026-09-17 Windows). launch 시험은 skip이며 SOURCE가 아니다"
-    cmd: "python -m pytest src/gz_sim/test/test_gz_package_contract.py src/gz_sim/test/test_world_to_map.py -q"
+    evidence: "exact-map route, adaptive speed/recovery, launch/install contracts와 world-to-map 시험 통과 (2026-09-21)"
+    cmd: "python -m pytest src/sim/gz_sim/test -q"
   LOCAL:
     state: GO
-    evidence: "D-114 ros_gz_bridge lock, D-115 spawn_xy/initialpose seed (2026-09-18 Windows). Gazebo 런타임은 ROS-SIM"
-    cmd: "python -m pytest src/gz_sim/test/test_gz_package_contract.py src/gz_sim/test/test_world_to_map.py -q"
+    evidence: "host 계약과 ROS Jazzy 컨테이너 package build/test 통과; Gazebo 실제 실행은 ROS-SIM 증거"
+    cmd: "colcon build --symlink-install --packages-select description core_common gz_sim"
   ROS-SIM:
-    state: HOLD
-    blocker: "gz_multi.launch.py 멀티로봇 시나리오 미실행. ROS 2 Jazzy + Gazebo 필요 (Task 14)"
+    state: GO
+    evidence: "Gazebo Harmonic final_22 단일 로봇 exact v2 live SLAM: 52/52, 13.754679 m, reachable unknown/occupied 0%, collision false, CORE/Fleet same-run readback"
+    cmd: "ros2 launch gz_sim gz_multi.launch.py robots:=1 prefix:=rosy world_name:=map_260905.world mode:=slam headless:=true core:=true"
   ARTIFACT:
     state: N/A
   DEVICE:
@@ -34,11 +35,11 @@ plans:
 - `mode:=nav` 는 spawn 좌표를 `{ns}/initialpose` 로 심는다 (D-115). odom (0,0) 을 관제 pose 로 쓰지 않는다.
 - `world_to_map.py`가 박스 충돌체에서 정답 점유 격자를 만든다. Gazebo 없이 Windows에서 돈다.
 - aarch64 CMake는 `return()` — Pi 이미지에 Gazebo를 싣지 않는다.
-- ROS-SIM(Task 14 실측)은 HOLD. SOURCE/LOCAL은 host-contract + world_to_map이다.
+- 단일 로봇 exact-map live SLAM은 ROS-SIM GO다. 다중 로봇 동시 mapping은 이 증거 범위 밖이다.
 
 ## 다음 gate
 
-1. ROS 2 Jazzy + Gazebo에서 `gz_multi robots:=2 mode:=nav core:=true`를 실행해 ROS-SIM을 되돌린다.
+1. 다중 로봇이 필요할 때 `gz_multi robots:=2 mode:=nav core:=true`를 별도 동시성/port 격리 gate로 실행한다.
 2. ARTIFACT/DEVICE는 이 패키지가 로봇 이미지에 없으므로 N/A.
 
 ## 현재 유효한 금지사항

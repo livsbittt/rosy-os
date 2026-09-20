@@ -95,9 +95,20 @@ def _slam_config(ns: str, rosy_nav_share: str) -> dict:
         # 12 cm 라, 0.5 rad 마다 키프레임을 잡으면 제자리 회전 중 스캔 사이 각도차가
         # coarse_search_angle_offset(0.349 rad)를 넘겨 매칭이 어긋나고 맵에 회전 중복상이
         # 남는다. 로봇·월드 크기에 맞춰 키프레임을 촘촘히 잡는다.
-        "minimum_travel_distance": 0.2,
-        "minimum_travel_heading": 0.2,
-        "scan_buffer_size": 20,
+        # Ten-millimetre track walls and a 172 mm robot need finer mapping
+        # than the generic 5 cm room default.  Two centimetres matches the
+        # absorbed Control mapper and preserves narrow openings without the
+        # CPU/memory cost of the 5 mm navigation reference raster.
+        "resolution": 0.02,
+        "minimum_travel_distance": 0.08,
+        "minimum_travel_heading": 0.10,
+        "scan_buffer_size": 40,
+        # Simulation /odom is published from the exact Gazebo model pose.
+        # Repetitive 10 mm walls can make scan matching select a false nearby
+        # alignment and bend an otherwise exact trajectory.  Rasterize live
+        # scans at their authoritative odometric poses for deterministic SLAM.
+        "use_scan_matching": False,
+        "do_loop_closing": False,
         "transform_timeout": 0.5,
     })
     return {"/**": {"ros__parameters": params}}
@@ -222,6 +233,7 @@ BRIDGE_TEMPLATE = [
     ("cmd_vel", "cmd_vel", "geometry_msgs/msg/Twist", "gz.msgs.Twist", "ROS_TO_GZ"),
     ("joint_states", "joint_states", "sensor_msgs/msg/JointState", "gz.msgs.Model", "GZ_TO_ROS"),
     ("odom", "odom", "nav_msgs/msg/Odometry", "gz.msgs.Odometry", "GZ_TO_ROS"),
+    ("odom_wheel", "odom_wheel", "nav_msgs/msg/Odometry", "gz.msgs.Odometry", "GZ_TO_ROS"),
     ("imu_raw", "imu_raw", "sensor_msgs/msg/Imu", "gz.msgs.IMU", "GZ_TO_ROS"),
 ]
 

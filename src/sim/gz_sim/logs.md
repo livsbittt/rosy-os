@@ -49,3 +49,11 @@
 - 증거: exact map loaded with `map_id=occupancy:2646647774c5`, initial pose became fresh, lifecycle nodes became active, and the relevant simulation tests passed `11 passed in 31.69 s`. A repeat goal timed out under shared WSL load 60--90, so it is not a route pass.
 - gate 변화: none. ROS-SIM full-route remains HOLD; the run proves startup/localization and exposes a prior yaw-dependent `Start occupied` corner case.
 - 교훈: an orientationless global planner must not admit a pose that only the current rectangular yaw can occupy when the controller will need to rotate there.
+
+## 2026-09-21 · uncommitted · feat(sim): finish exact-map live SLAM traversal
+
+- 변경: 설치된 v2 world를 고르는 launch 경로, 52-point 관측 route, live scan 기반 적응 속도, 후방 여유와 본체 직경으로 계산하는 유연한 recovery, 전방위 회전 여유 fail-close, CORE `nav_cmd_vel` 입력, 2 cm live SLAM 저장/감사를 추가했다. 정확한 model-pose odom을 쓰는 sim에서는 scan matching/loop closing을 꺼 반복 벽 오정합을 제거한다.
+- 증거: `final_22` 52/52, `13.754679 m`, 접근 가능한 unknown/occupied/outside `0/0/0%`, collision overlap false, 최소 본체 여유 `0.021789 m`, Fleet online. 좁은 구간 median `0.067975 m/s`, 열린 구간 median `0.122453 m/s`. CORE만 최종 `cmd_vel`을 발행하고 종료 시 `0/0`.
+- gate 변화: ROS-SIM HOLD→GO(단일 로봇 exact-map live SLAM/CORE/Fleet 범위). 다중 로봇 동시 map과 실기기는 별도 범위다.
+- 결정: 정답 world의 전체 픽셀을 요구하지 않고, 실제 본체가 도달 가능한 연결 구성공간의 완전성을 판정한다. 밀폐 포켓은 숨기지 않고 별도 비율로 기록한다.
+- 교훈: Gazebo 정답 pose 위에 scan matcher를 중복 적용하면 반복 벽에서 유령 벽이 생길 수 있다. simulation 전용 설정과 실기기 설정을 분리해야 한다.

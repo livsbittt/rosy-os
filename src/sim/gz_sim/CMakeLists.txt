@@ -40,6 +40,8 @@ install(
     scripts/swarm_bench.py
     scripts/world_to_map.py
     scripts/seed_initialpose.py
+    scripts/map_v2_runner.py
+    launch/map_v2_traversal.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

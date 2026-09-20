@@ -1,6 +1,7 @@
 import numpy as np
+import pytest
 
-from tools.gz.track_map_audit import measure
+from tools.gz.track_map_audit import measure, measure_robot_reachable
 
 
 WALLS = [([0, -1, 0, 0, 0, 0], [2, .02, .2]),
@@ -45,3 +46,31 @@ def test_exact_world_has_a_sealed_triangle_outside_spawn_component():
     assert result['free_components'] == 2
     assert .08 < result['sealed_free_area_m2'] < .11
     assert .02 < result['sealed_free_fraction'] < .04
+
+
+def test_robot_reachable_audit_excludes_a_bay_narrower_than_the_body():
+    from tools.gz.track_map_audit import measure_point_reachable
+
+    # Split the room with a 180 mm throat.  A point passes, but the 172 mm
+    # body plus 10 mm clearance on each side does not.
+    walls = WALLS + [
+        ([0, .545, 0, 0, 0, 0], [.02, .91, .2]),
+        ([0, -.545, 0, 0, 0, 0], [.02, .91, .2]),
+    ]
+    resolution = .01
+    origin = [-1.01, -1.01]
+    arr = np.zeros((202, 202), dtype=np.int16)
+    xs = origin[0] + (np.arange(arr.shape[1]) + .5) * resolution
+    ys = origin[1] + (np.arange(arr.shape[0]) + .5) * resolution
+    xx, yy = np.meshgrid(xs, ys)
+    arr[xx < -.02] = -1
+
+    point = measure_point_reachable(arr, origin, resolution, walls, [.5, 0.])
+    robot = measure_robot_reachable(
+        arr, origin, resolution, walls, [.5, 0.],
+        robot_radius=.086, clearance_margin=.010)
+
+    assert point['unknown_fraction'] > .05
+    assert robot['unknown_fraction'] == 0
+    assert robot['required_center_clearance_m'] == pytest.approx(.096)
+    assert robot['robot_footprint_accessibility'] is True

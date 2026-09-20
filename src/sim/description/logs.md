@@ -23,3 +23,11 @@
 - gate 변화: SOURCE GO→HOLD, FIELD N/A→PARKED
 - 결정: 없음
 - 교훈: 없음
+
+## 2026-09-21 · uncommitted · fix(sim): use stable primitive drive collisions
+
+- 변경: 시뮬레이션 바퀴 충돌체를 축 방향 cylinder로 바꾸고 종방향 마찰과 횡방향 scrub을 분리했다. DART가 지원하지 못한 mesh collision은 sim 렌더에서 primitive로 유지하고, 물리 모델의 상세 mesh는 그대로 보존했다. SLAM용 odom은 Gazebo model pose, wheel odom은 진단 토픽으로 분리했다.
+- 증거: ROS Jazzy 컨테이너에서 xacro 렌더 및 관련 description/gz_sim 시험 통과. `final_22` 실제 주행 52/52, sampled collision overlap `false`, 최소 본체 여유 `0.021789 m`.
+- gate 변화: ROS-SIM HOLD→GO(단일 로봇 exact-map collision/odom 범위). ARTIFACT/DEVICE/FIELD는 변동 없음.
+- 결정: 시뮬레이션 정답 odom과 바퀴 적분 odom을 한 토픽에 경쟁시키지 않는다.
+- 교훈: 구형 mesh collision과 과도한 등방 마찰은 로드 성공 여부뿐 아니라 좁은 공간 회전과 SLAM 궤적까지 왜곡한다.

@@ -15,11 +15,27 @@
                 <max_acceleration>2.0</max_acceleration>  
                 <topic>${namespace}cmd_vel</topic>
                 
-                <odom_topic>${namespace}odom</odom_topic>
+                <!-- Wheel-integrated odometry remains available for slip
+                     diagnostics, but does not drive SLAM in simulation. -->
+                <odom_topic>${namespace}odom_wheel</odom_topic>
                 <frame_id>${namespace}odom</frame_id>
                 <child_frame_id>${namespace}base_footprint</child_frame_id>
                 <odom_publisher_frequency>30</odom_publisher_frequency>
 
+                <tf_topic>${namespace}tf_wheel</tf_topic>
+            </plugin>
+
+            <!-- Gazebo model-pose odometry is the simulation equivalent of a
+                 calibrated localization source.  It prevents DART wheel scrub
+                 from corrupting the SLAM pose while retaining wheel odometry
+                 above for direct comparison. -->
+            <plugin filename="gz-sim-odometry-publisher-system"
+                    name="gz::sim::systems::OdometryPublisher">
+                <odom_frame>${namespace}odom</odom_frame>
+                <robot_base_frame>${namespace}base_footprint</robot_base_frame>
+                <odom_publish_frequency>30</odom_publish_frequency>
+                <dimensions>2</dimensions>
+                <odom_topic>${namespace}odom</odom_topic>
                 <tf_topic>/tf</tf_topic>
             </plugin>
 
@@ -36,8 +52,11 @@
 
         <gazebo reference="l_wheel">
             <self_collide>0</self_collide>
-            <mu1>200</mu1>
-            <mu2>200</mu2>
+            <!-- Longitudinal grip with low lateral scrub resistance lets the
+                 differential drive pivot without dragging the chassis. -->
+            <fdir1>1 0 0</fdir1>
+            <mu1>1.0</mu1>
+            <mu2>0.05</mu2>
             <kp>10000000.0</kp>
             <kd>1.0</kd>
             <!-- <minDepth>0.001</minDepth> -->
@@ -45,8 +64,9 @@
 
         <gazebo reference="r_wheel">
             <self_collide>0</self_collide>
-            <mu1>200</mu1>
-            <mu2>200</mu2>
+            <fdir1>1 0 0</fdir1>
+            <mu1>1.0</mu1>
+            <mu2>0.05</mu2>
             <kp>10000000.0</kp>
             <kd>1.0</kd>
             <!-- <minDepth>0.001</minDepth> -->

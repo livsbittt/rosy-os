@@ -83,3 +83,11 @@
 - 변경: `control/sensing/lane.py` 신규 — 하단 밴드 이진화+열 중심 횡오차(고전 CV, YOLO 없음), `LaneTracker`(3초 유예 후 정지 요구, 재목격 해제). `LANE_MAX_LINEAR_M_S = 0.10`. 시험 `test/test_lane.py` 10건(합성 차선: 중앙·좌우 부호·빈 바닥·추적·유예·상실·재획득·미목격)
 - 증거: `test_lane.py` 10 passed (적색→녹색 — 밝기합/픽셀수 단위 혼동 1건은 구현 결함으로 적색 확인 후 수정). 전체 1019 passed + 기존 환경 실패 4건(본 변경 무관)
 - gate 변화: 없음. 조향 소비(오차→각속도)와 nav.lane_lost 이벤트 배선은 노드 몫 — evidence까지만 닫힘
+
+## 2026-09-21 · uncommitted · feat(mapping): complete the exact v2 Gazebo map
+
+- 변경: `map_260905_update_v2`의 16개 벽을 직접 읽는 감사기가 점이 아닌 반경 `0.086 m` 본체의 spawn 연결 구성공간을 계산하고, 접근 가능한 곳의 unknown/occupied/out-of-raster 비율을 각각 판정한다. 실제 주행 경로는 밀폐 포켓을 제외한 모든 관측 포켓을 방문한다.
+- 증거: Gazebo Harmonic `final_22`에서 52/52 waypoint, odom `13.754679 m`, 접근 가능한 unknown `0.0%`, occupied `0.0%`, 충돌 중첩 없음, 최소 표본 본체 여유 `0.021789 m`. CORE 단독 최종 `cmd_vel` publisher와 Fleet `online=true`, `map_id=occupancy:326966090e60`를 같은 실행에서 읽었다. 상세 수치는 `docs/validation/map-260905-update-v2-2026-09-21/result.md`.
+- gate 변화: Control 전체 ROS-SIM은 HOLD 유지. 정확한 v2 월드의 mapping/CORE/Fleet 슬라이스는 GO지만, camera/calibration/safety-policy 전체 노드 그래프와 실기기는 이 실행이 증명하지 않는다.
+- 결정: 전체 이미지 unknown 비율 대신 실제 본체가 도달 가능한 구성공간을 합격 기준으로 삼고, 밀폐 포켓 비율은 별도 공개한다.
+- 교훈: 반복되는 얇은 벽에서는 scan matcher가 정확한 simulation odom을 잘못 굽힐 수 있다. 시뮬레이션에서는 live scan을 Gazebo model-pose odom에 직접 래스터화해야 재현 가능한 정답 비교가 된다.

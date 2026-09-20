@@ -2,7 +2,7 @@
 module: control
 logical_modules: [M05, M06, M07, M11]
 owner: CONTROL
-last_verified: { commit: "b98642f", date: 2026-09-20 }
+last_verified: { commit: "uncommitted", date: 2026-09-21 }
 gates:
   SOURCE:
     state: GO
@@ -10,11 +10,11 @@ gates:
     cmd: "python3 -m pytest test/test_control_absorption_package.py -q"
   LOCAL:
     state: GO
-    evidence: "998 passed, 26 skipped (2026-09-17 Windows, PYTHONPATH는 ';' 구분, 미커밋 WIP 포함 작업 트리). D-72 S2 뒤 재실행 — 신규 test_map_raster_color_contract.py 3건 포함"
-    cmd: "PYTHONPATH=src/control:src python3 -m pytest src/control/test -q"
+    evidence: "1064 passed, 26 skipped (2026-09-21 Windows, 패키지 cwd). 본체 반경 기반 map audit와 exact-map 회귀 포함"
+    cmd: "cd src/apps/control && python -m pytest test -q"
   ROS-SIM:
     state: HOLD
-    blocker: "ROS 2 Jazzy 노드 그래프(sensing/camera/planning/safety-policy) 재실행 증거 없음. 레거시 전체 스택(launch/robot.launch.py)은 CORE와 병행 기동하지 않는다(AGENTS.md, D-38). 2026-09-20 Gazebo Harmonic end-to-end 시도 기록: 번들 무결성·월드 로드 PASS, 물리 충돌·센서 브리지 FAIL — docs/validation/map-260905-update-v2-2026-09-20/result.md. 재실행 전 물리 메시 충돌과 브리지 무출력을 먼저 해소해야 한다"
+    blocker: "정확한 v2 mapping/CORE/Fleet 슬라이스는 2026-09-21 GO(52/52, 접근 가능 unknown 0%, 충돌 없음). 그러나 Control 전체 gate에는 sensing/camera/calibration/planning/safety-policy 노드 그래프 재실행과 물리 센서가 남아 있다. 레거시 전체 스택은 CORE와 병행 기동하지 않는다(D-38)."
   ARTIFACT:
     state: HOLD
     blocker: "서명된 ARM64 manifest·immutable digest 발행 전. 흡수된 코드는 deploy가 소유하는 OS 이미지에 번들된다"
@@ -40,10 +40,11 @@ plans:
 - 흡수된 Control sensor adapter는 기본 비활성이며, 켜면 Device 보정 generation에 묶인다(D-47; `core/progress.md` 참조).
 - `web_node`+`dashboard.html`은 레거시 런치 진단 화면이다. 운용자 콘솔이 아니며 compose에 없다(D-77).
 - LOCAL 증거는 `8fdd8d2` 기준이다. Windows에서는 `PYTHONPATH`를 `;`로 구분한다.
+- `map_260905_update_v2` 단일 로봇 mapping 슬라이스는 Gazebo Harmonic에서 완주했다. 접근 가능한 본체 구성공간의 unknown/occupied는 모두 0%이고 CORE가 최종 `cmd_vel`을 단독 발행했다.
 
 ## 다음 gate
 
-1. ROS Jazzy container에서 control 노드 그래프 시험을 재실행해 ROS-SIM을 되돌린다.
+1. ROS Jazzy container에서 mapping 외 control 노드 그래프를 재실행해 모듈 전체 ROS-SIM HOLD를 해소한다.
 2. 서명된 ARM64 artifact 발행 후 Pi readback으로 Control sensor adapter 활성화 경로를 확인한다(ARTIFACT → DEVICE).
 
 ## 현재 유효한 금지사항
@@ -80,3 +81,12 @@ plans:
 - `camera_ground_mode` keeps `pinhole` as the default. A validated homography can be enabled for the current session from the diagnostic dashboard; the switch cannot override failed checks and is not persisted.
 - Board-relative lateral coordinates provide forward distance only. Camera metric output remains advisory and does not create speed or final command authority.
 - SOURCE verification is covered by host pure-logic and wiring tests. DEVICE/FIELD remain HOLD until a complete profile, independent captures, measured Pinky Pro distances, and live readback are available.
+
+## 2026-09-21 exact-map live mapping status
+
+- `final_22` ran the installed `map_260905_update_v2` world through all 52 waypoints and returned to the start after `13.754679 m` of model-pose odometry.
+- The footprint-aware audit found `0.0%` unknown, `0.0%` occupied, and `0.0%` outside-raster samples in the spawn-connected robot-center configuration space. The sealed lower-left pocket remains separately reported as inaccessible topology.
+- Sampled body overlap was false and the minimum sampled body-to-wall margin was `0.021789 m` for a `0.172 m` diameter.
+- Adaptive motion was measured in the same run: narrow-space median `0.067975 m/s`, open-space median `0.122453 m/s`, maximum `0.158851 m/s`.
+- CORE was the sole final `cmd_vel` publisher, stopped at zero, and Fleet read back the robot online with `map_id=occupancy:326966090e60`.
+- This is ROS-SIM evidence only. It does not promote the camera homography, device calibration, stopping envelope, Pi artifact, or physical FIELD gate.

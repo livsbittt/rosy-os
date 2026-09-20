@@ -44,6 +44,24 @@ def test_core_config_sets_identity_and_port():
     assert cfg["network"]["api_host"] == "127.0.0.1"
 
 
+def test_slam_config_keeps_small_track_walls_at_mapping_resolution():
+    mod = _module()
+    try:
+        from ament_index_python.packages import get_package_share_directory
+        share = get_package_share_directory("navigation")
+    except Exception as exc:
+        pytest.skip(f"navigation share missing: {exc}")
+
+    params = mod._slam_config("rosy_01", share)["/**"]["ros__parameters"]
+
+    assert params["resolution"] == pytest.approx(.02)
+    assert params["minimum_travel_distance"] <= .10
+    # The Gazebo model-pose odometry is exact.  Letting scan matching refine
+    # it can choose a wrong repeated-wall alignment and create ghost maps.
+    assert params["use_scan_matching"] is False
+    assert params["do_loop_closing"] is False
+
+
 def test_nav_config_applies_reducing_only_narrow_space_trial():
     mod = _module()
     try:

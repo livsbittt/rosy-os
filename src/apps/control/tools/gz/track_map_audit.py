@@ -34,7 +34,8 @@ def measure(arr, origin, resolution, walls):
     points = np.stack((x, y), axis=-1)
     interior = clearance(points, walls) > .03
     cells = np.floor((points-np.array(origin))/resolution).astype(int)
-    valid = (cells[..., 0] >= 0) & (cells[..., 0] < arr.shape[1]) & (cells[..., 1] >= 0) & (cells[..., 1] < arr.shape[0])
+    valid = ((cells[..., 0] >= 0) & (cells[..., 0] < arr.shape[1])
+             & (cells[..., 1] >= 0) & (cells[..., 1] < arr.shape[0]))
     values = np.full(x.shape, -1.)
     values[valid] = arr[cells[..., 1][valid], cells[..., 0][valid]]
     unknown = float(np.mean(values[interior] < 0))
@@ -61,10 +62,12 @@ def measure(arr, origin, resolution, walls):
             'map_raster_complete': bool(unknown <= .01 and purity >= .95 and minimum_recall >= .98 and phantom < .02)}
 
 
-def _point_component(walls, spawn, step):
+def _clearance_component(walls, spawn, step, minimum_clearance):
     import cv2
-    if not walls or not math.isfinite(step) or step <= 0 or not np.isfinite(spawn).all():
-        raise ValueError('Walls, finite spawn and positive sampling required')
+    if (not walls or not math.isfinite(step) or step <= 0
+            or not math.isfinite(minimum_clearance) or minimum_clearance < 0
+            or not np.isfinite(spawn).all()):
+        raise ValueError('Walls, finite spawn, clearance and positive sampling required')
     edge = np.concatenate([wall_edges(wall) for wall in walls])
     lo, hi = edge.min(axis=0), edge.max(axis=0)
     # Exclude the outer 1 cm wall strip, including sub-cell exterior slivers.
@@ -72,13 +75,17 @@ def _point_component(walls, spawn, step):
     x, y = np.meshgrid(np.arange(lo[0]+step/2, hi[0], step),
                        np.arange(lo[1]+step/2, hi[1], step))
     distances = clearance(np.stack((x, y), axis=-1), walls)
-    free = distances > 0
+    free = distances > minimum_clearance
     count, labels = cv2.connectedComponents(free.astype(np.uint8), connectivity=4)
     col, row = np.floor((np.array(spawn)-lo)/step).astype(int)
     if not (0 <= row < labels.shape[0] and 0 <= col < labels.shape[1]) or labels[row, col] == 0:
         raise ValueError('Spawn must lie in free space')
-    sealed = free & (labels != labels[row, col])
-    return x, y, distances, free, sealed, count
+    disconnected = free & (labels != labels[row, col])
+    return x, y, distances, free, disconnected, count
+
+
+def _point_component(walls, spawn, step):
+    return _clearance_component(walls, spawn, step, 0.)
 
 
 def topology(walls, spawn, step=.002):
@@ -119,6 +126,51 @@ def measure_point_reachable(arr, origin, resolution, walls, spawn, step=.002):
             'outside_raster_fraction': float(np.mean(~valid))}
 
 
+def measure_robot_reachable(arr, origin, resolution, walls, spawn, *,
+                            robot_radius, clearance_margin=.010, step=.002):
+    """Measure the mapped configuration space the physical body can reach.
+
+    Point connectivity is intentionally insufficient for a throat narrower
+    than the robot.  This audit erodes free space by the measured body radius
+    and an explicit margin before finding the spawn-connected component.  It
+    therefore neither demands an impossible traversal nor credits unknown or
+    occupied cells in the driveable component.
+    """
+    arr = np.asarray(arr)
+    numeric = (resolution, robot_radius, clearance_margin, step)
+    if (arr.ndim != 2 or not arr.size or np.asarray(origin).shape != (2,)
+            or not np.isfinite(origin).all() or not np.isfinite(arr).all()
+            or np.any((arr < -1) | (arr > 100))
+            or not all(math.isfinite(value) for value in numeric)
+            or resolution <= 0 or robot_radius <= 0 or clearance_margin < 0 or step <= 0):
+        raise ValueError('Valid map, positive body geometry and sampling required')
+    required = robot_radius + clearance_margin
+    x, y, _, free, disconnected, _ = _clearance_component(
+        walls, np.asarray(spawn), step, required)
+    reachable = free & ~disconnected
+    points = np.stack((x[reachable], y[reachable]), axis=-1)
+    if not len(points):
+        raise ValueError('Spawn component has no robot-reachable samples')
+    cells = np.floor((points-np.asarray(origin))/resolution).astype(int)
+    valid = ((cells[:, 0] >= 0) & (cells[:, 0] < arr.shape[1]) &
+             (cells[:, 1] >= 0) & (cells[:, 1] < arr.shape[0]))
+    values = np.full(len(points), -1.)
+    values[valid] = arr[cells[valid, 1], cells[valid, 0]]
+    unknown = float(np.mean(values < 0))
+    blocked = float(np.mean(values >= 65))
+    return {'definition': 'spawn_connected_robot_center_configuration_space',
+            'robot_footprint_accessibility': True,
+            'robot_radius_m': robot_radius,
+            'clearance_margin_m': clearance_margin,
+            'required_center_clearance_m': required,
+            'sampling_m': step, 'sample_count': len(points),
+            'sampled_configuration_area_m2': len(points)*step*step,
+            'unknown_fraction': unknown,
+            'occupied_fraction': blocked,
+            'outside_raster_fraction': float(np.mean(~valid)),
+            'mapping_complete': bool(unknown <= .01 and blocked <= .01)}
+
+
 def main():
     folder = Path(sys.argv[1])
     saved = np.load(folder/'track_map.npz')
@@ -127,6 +179,9 @@ def main():
     result['topology'] = topology(identity['walls'], identity['spawn'])
     result['point_reachable_observation'] = measure_point_reachable(
         saved['data'], saved['origin'], float(saved['resolution']), identity['walls'], identity['spawn'])
+    result['robot_reachable_navigation'] = measure_robot_reachable(
+        saved['data'], saved['origin'], float(saved['resolution']), identity['walls'], identity['spawn'],
+        robot_radius=float(identity['robot_radius_m']))
     result['map_npz_sha256'] = hashlib.sha256((folder/'track_map.npz').read_bytes()).hexdigest()
     result['source_world_sha256'] = identity['sha256']
     (folder/'track_map_audit.json').write_text(json.dumps(result, indent=2))

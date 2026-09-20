@@ -7,10 +7,10 @@
 |---|---|---|---|---|---|---|---|---|
 | [core](src/core/core/progress.md) | CORE | b98642f (2026-09-20) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [deploy](deploy/progress.md) | 릴리스·플랫폼 | b98642f (2026-09-20) | GO | GO | N/A | HOLD | HOLD | N/A |
-| [control](src/apps/control/progress.md) | CONTROL | b98642f (2026-09-20) | GO | GO | HOLD | HOLD | HOLD | PARKED |
+| [control](src/apps/control/progress.md) | CONTROL | uncommitted (2026-09-21) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [fleet](src/site/fleet/progress.md) | FLEET | b98642f (2026-09-20) | GO | GO | HOLD | PARKED | PARKED | PARKED |
 | [games](src/apps/games/progress.md) | GAMES | 411a303 (2026-09-18) | GO | GO | N/A | N/A | PARKED | PARKED |
-| [gz_sim](src/sim/gz_sim/progress.md) | SIM | dc89264 (2026-09-17) | GO | GO | HOLD | N/A | N/A | N/A |
+| [gz_sim](src/sim/gz_sim/progress.md) | SIM | uncommitted (2026-09-21) | GO | GO | GO | N/A | N/A | N/A |
 | [navigation](src/navigation/navigation/progress.md) | NAV | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [bringup](src/hardware/bringup/progress.md) | BRINGUP | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [emotion](src/apps/emotion/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
@@ -19,7 +19,7 @@
 | [sensor_adc](src/hardware/sensor_adc/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
 | [lamp_control](src/hardware/lamp_control/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
 | [interfaces](src/core/interfaces/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | N/A | HOLD | HOLD | PARKED |
-| [description](src/sim/description/progress.md) | 로봇 통합 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
+| [description](src/sim/description/progress.md) | 로봇 통합 | uncommitted (2026-09-21) | GO | GO | GO | HOLD | HOLD | PARKED |
 | [dock](dock/progress.md) | 도킹 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [docs](docs/progress.md) | 거버넌스 | b98642f (2026-09-20) | GO | GO | N/A | N/A | N/A | N/A |
 
@@ -30,11 +30,10 @@
 - core DEVICE: Pi bench Device 설치와 device-readback.sh --json 증거 없음. G4 viewport·보정 상태기계 미실행
 - deploy ARTIFACT: ARM64 개발 후보(ac81f2f core/io)만 존재. 서명 manifest·OCI archive·immutable registry digest 발행 전
 - deploy DEVICE: Pi OS Lite bench Device의 install-pi.sh 설치, verify-pi.sh, device-readback.sh --json 증거 없음
-- control ROS-SIM: ROS 2 Jazzy 노드 그래프(sensing/camera/planning/safety-policy) 재실행 증거 없음. 레거시 전체 스택(launch/robot.launch.py)은 CORE와 병행 기동하지 않는다(AGENTS.md, D-38). 2026-09-20 Gazebo Harmonic end-to-end 시도 기록: 번들 무결성·월드 로드 PASS, 물리 충돌·센서 브리지 FAIL — docs/validation/map-260905-update-v2-2026-09-20/result.md. 재실행 전 물리 메시 충돌과 브리지 무출력을 먼저 해소해야 한다
+- control ROS-SIM: 정확한 v2 mapping/CORE/Fleet 슬라이스는 2026-09-21 GO(52/52, 접근 가능 unknown 0%, 충돌 없음). 그러나 Control 전체 gate에는 sensing/camera/calibration/planning/safety-policy 노드 그래프 재실행과 물리 센서가 남아 있다. 레거시 전체 스택은 CORE와 병행 기동하지 않는다(D-38).
 - control ARTIFACT: 서명된 ARM64 manifest·immutable digest 발행 전. 흡수된 코드는 deploy가 소유하는 OS 이미지에 번들된다
 - control DEVICE: Pi bench Device 설치와 device-readback.sh --json 증거 없음. Control sensor adapter 활성화는 Device 보정 generation에 묶인다(D-47)
 - fleet ROS-SIM: D-87: 현재 트리의 colcon install/setup.bash가 없다. 2026-09-17 WSL Task 14 로그는 설계 입력이며 GO가 아니다 (D-89)
-- gz_sim ROS-SIM: gz_multi.launch.py 멀티로봇 시나리오 미실행. ROS 2 Jazzy + Gazebo 필요 (Task 14)
 - navigation ROS-SIM: Nav2/SLAM Toolbox 실물 launch 미재실행. 현재는 ament_lint와 조합 계약 시험뿐 — ROS 2 Jazzy 환경에서 hardware.launch.py/gz_*.launch.xml 재실행 필요
 - navigation ARTIFACT: ARM64 로봇 이미지에 포함되나(Dockerfile/compose) 서명 manifest와 immutable digest 발행 전
 - navigation DEVICE: Pi bench Device 설치와 device-readback.sh --json 증거 없음
@@ -53,7 +52,6 @@
 - lamp_control ARTIFACT: hardware 프로필이 이미지에 배선되지 않았다. core/io 이미지 제외는 test/test_nav2_hardware_slice.py::test_io_image_packages_nav2_without_slam_or_aux_drivers가 고정한다
 - interfaces ARTIFACT: io 이미지에 포함된다(deploy/robot/Dockerfile `COPY src/interfaces`, `--packages-select`에 포함). 서명 manifest·OCI archive·immutable registry digest 발행 전
 - interfaces DEVICE: Pi OS Lite bench Device의 install-pi.sh 설치, verify-pi.sh, device-readback.sh --json 증거 없음
-- description ROS-SIM: robot_state_publisher·Gazebo(rosy_gz.urdf.xacro)의 xacro 렌더와 TF 트리 확인 미실행. ROS 2 Jazzy 환경 필요
 - description ARTIFACT: io 이미지에 포함된다(deploy/robot/Dockerfile `COPY src/description`, `--packages-select`에 포함; meshes는 `RUN mkdir -p`로 빈 폴더만 생성). 서명 manifest·OCI archive·immutable registry digest 발행 전
 - description DEVICE: Pi OS Lite bench Device의 install-pi.sh 설치, verify-pi.sh, device-readback.sh --json 증거 없음
 - dock ROS-SIM: 코스트맵 충돌 면제(docking/collision_exemption)는 실제 costmap 통합 시험 전까지 intent-only (Device 검증 계획 P1 §7). ROS 2 Jazzy 환경에서 도킹 시퀀스 시뮬레이션 미실행

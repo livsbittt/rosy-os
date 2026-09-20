@@ -50,3 +50,49 @@ def test_physical_description_keeps_detailed_collision_meshes():
     tags = _collision_geometry_tags(_render_robot(is_sim=False))
 
     assert tags.count("mesh") == 7
+
+
+def test_sim_drive_wheels_use_axial_cylinders_not_slipping_spheres():
+    source = (ROOT / "urdf" / "rosy.urdf.xacro").read_text(encoding="utf-8")
+    wheel_macro = source.split(
+        '<xacro:macro name="insert_wheel"', 1
+    )[1].split("</xacro:macro>", 1)[0]
+
+    assert '<cylinder radius="0.028" length="0.016"/>' in wheel_macro
+    assert 'rpy="${pi/2} 0 0"' in wheel_macro
+    assert '<sphere radius="0.028"/>' not in wheel_macro
+
+
+def test_sim_drive_wheels_allow_lateral_scrub_for_differential_turns():
+    source = (ROOT / "urdf" / "rosy_gz.urdf.xacro").read_text(encoding="utf-8")
+    left_wheel = source.split(
+        '<gazebo reference="l_wheel">', 1
+    )[1].split("</gazebo>", 1)[0]
+    right_wheel = source.split(
+        '<gazebo reference="r_wheel">', 1
+    )[1].split("</gazebo>", 1)[0]
+
+    for wheel in (left_wheel, right_wheel):
+        assert "<fdir1>1 0 0</fdir1>" in wheel
+        assert "<mu1>1.0</mu1>" in wheel
+        assert "<mu2>0.05</mu2>" in wheel
+        assert "<mu1>200</mu1>" not in wheel
+        assert "<mu2>200</mu2>" not in wheel
+
+
+def test_sim_slam_uses_model_pose_odom_and_keeps_wheel_odom_for_diagnostics():
+    source = (ROOT / "urdf" / "rosy_gz.urdf.xacro").read_text(encoding="utf-8")
+    diff_drive = source.split(
+        'name="gz::sim::systems::DiffDrive"', 1
+    )[1].split("</plugin>", 1)[0]
+    truth_odom = source.split(
+        'name="gz::sim::systems::OdometryPublisher"', 1
+    )[1].split("</plugin>", 1)[0]
+
+    assert "<odom_topic>${namespace}odom_wheel</odom_topic>" in diff_drive
+    assert "<tf_topic>${namespace}tf_wheel</tf_topic>" in diff_drive
+    assert "<odom_topic>${namespace}odom</odom_topic>" in truth_odom
+    assert "<tf_topic>/tf</tf_topic>" in truth_odom
+    assert "<odom_frame>${namespace}odom</odom_frame>" in truth_odom
+    assert "<robot_base_frame>${namespace}base_footprint</robot_base_frame>" in truth_odom
+    assert "<dimensions>2</dimensions>" in truth_odom

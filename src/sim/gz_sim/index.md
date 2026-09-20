@@ -36,8 +36,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · feat(sim): finish exact-map live SLAM traversal
 - 2026-09-20 · uncommitted · fix(sim): stabilize exact-map Nav2 startup and corner geometry
 - 2026-09-18 · uncommitted · feat(sim): pin Cyclone and keep images off gz_multi (D-117, D-118, D-120)
 - 2026-09-18 · uncommitted · feat(sim): lock ros_gz_bridge and seed spawn initialpose (D-114, D-115)
 - 2026-09-18 · uncommitted · fix(sim): 월드 프로필이 간격을 주도록 하고 공장 팽창을 실측으로 올린다
-- 2026-09-17 · uncommitted · feat(sim): 어려운 월드·정답 맵 생성기·맵을 만들며 주행하는 모드

@@ -101,6 +101,42 @@ def adaptive_speed(
     )
 
 
+def robust_clearance(samples, lower_quantile: float = 0.10) -> float:
+    """Return a conservative lower quantile of valid range samples.
+
+    A single Gaussian low outlier must not turn a traversable narrow aisle
+    into a false collision.  A real nearby surface occupies enough adjacent
+    rays to remain inside the lower decile and is therefore preserved.
+    """
+    if not math.isfinite(lower_quantile) or not 0.0 <= lower_quantile <= 0.5:
+        raise ValueError("lower_quantile must be finite and between 0 and 0.5")
+    values = []
+    for sample in samples:
+        value = _clearance(sample)
+        if value is not None:
+            values.append(value)
+    if not values:
+        return math.nan
+    values.sort()
+    return values[int((len(values) - 1) * lower_quantile)]
+
+
+def bidirectional_heading_error(error: float) -> tuple[float, float]:
+    """Choose forward or reverse so a target behind does not force a U-turn."""
+    if not math.isfinite(error):
+        return 0.0, math.nan
+    wrapped = math.atan2(math.sin(error), math.cos(error))
+    # Keep ordinary right-angle corners in forward drive.  Reverse is for a
+    # genuine U-turn request, where pivoting the body would consume the narrow
+    # corridor's lateral margin.
+    if abs(wrapped) <= 3.0 * math.pi / 4.0:
+        return 1.0, wrapped
+    reverse_error = math.atan2(
+        math.sin(wrapped + math.pi), math.cos(wrapped + math.pi)
+    )
+    return -1.0, reverse_error
+
+
 def recovery_reverse_distance(
     front_clearance_m: float,
     rear_clearance_m: float,
@@ -122,3 +158,92 @@ def recovery_reverse_distance(
     desired += limits.robot_diameter_m * limits.recovery_buffer_ratio
     available = max(0.0, rear - limits.hard_clearance_m)
     return min(desired, available)
+
+
+def turn_clearance_available(
+    directional_clearances_m, limits: TraversalLimits
+) -> bool:
+    """Require the complete circular body envelope before an in-place turn."""
+    values = [_clearance(value) for value in directional_clearances_m]
+    return bool(values) and all(
+        value is not None and value >= limits.hard_clearance_m
+        for value in values
+    )
+
+
+def mapping_route_world() -> tuple[tuple[float, float], ...]:
+    """Collision-reviewed observation route for the exact v2 world.
+
+    The route stays in the robot-reachable component.  It deliberately does
+    not enter the lower-left sealed pocket.  The upper-left bay is reached by
+    approaching the lower edge of its vertical wall, crossing at y=0.03 m,
+    then opening the turn only after the body is through.  Every segment is
+    sampled in tests against the 172 mm body envelope.
+    """
+    return (
+        (-0.205, 0.275),
+        (-0.400, 0.200),
+        (-0.550, 0.150),
+        (-0.620, 0.080),
+        (-0.700, 0.030),
+        (-0.840, 0.030),
+        (-0.950, 0.120),
+        (-1.050, 0.300),
+        (-1.100, 0.480),
+        (-1.200, 0.150),
+        (-1.220, 0.030),
+        (-1.220, -0.100),
+        (-1.100, -0.300),
+        (-1.220, -0.100),
+        (-1.220, 0.030),
+        (-1.200, 0.150),
+        (-1.100, 0.480),
+        (-1.050, 0.300),
+        (-0.950, 0.120),
+        (-0.840, 0.030),
+        (-0.700, 0.030),
+        (-0.620, 0.080),
+        (-0.550, 0.150),
+        (-0.400, 0.200),
+        (-0.100, -0.150),
+        (0.300, -0.150),
+        (0.300, -0.450),
+        (1.200, -0.450),
+        (1.200, 0.450),
+        (1.200, -0.450),
+        (0.300, -0.450),
+        (0.300, -0.150),
+        (0.300, 0.150),
+        (0.600, 0.150),
+        (0.600, 0.450),
+        (0.900, 0.450),
+        (0.900, -0.100),
+        (0.900, 0.450),
+        (0.600, 0.450),
+        (0.600, 0.150),
+        (0.300, 0.150),
+        (0.300, -0.150),
+        (-0.100, -0.150),
+        (-0.320, -0.200),
+        (-0.320, -0.450),
+        (-0.200, -0.500),
+        (-0.040, -0.480),
+        (-0.200, -0.500),
+        (-0.320, -0.450),
+        (-0.320, -0.200),
+        (-0.100, -0.150),
+        (-0.205, 0.275),
+    )
+
+
+def mapping_observation_indices(
+    route: tuple[tuple[float, float], ...],
+) -> tuple[int, ...]:
+    """Return the first deep viewpoint in each otherwise occluded pocket."""
+    targets = (
+        (-1.100, 0.480),
+        (-1.100, -0.300),
+        (0.900, -0.100),
+        (-0.040, -0.480),
+    )
+    return tuple(route.index(point) for point in targets)
