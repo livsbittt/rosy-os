@@ -87,6 +87,15 @@ safety:
   fleet_linear: 0.20
   fleet_angular: 0.80
 
+line_follow:                       # D-143 selected-source, fail-closed policy
+  cruise_speed: 0.08               # straight-line target; reduced by curve/confidence
+  max_linear: 0.10                 # conservative Pinky Pro host default (m/s)
+  steering_gain: 0.80
+  max_angular: 0.70
+  min_confidence: 0.35
+  stale_after_s: 0.30              # stop immediately when evidence lease expires
+  lost_after_s: 3.0                # latch LOST; operator must explicitly reselect
+
 navigation:
   max_linear_velocity: 0.20       # HWA-001에서 주입 (여기值은 폴백)
   max_angular_velocity: 0.80

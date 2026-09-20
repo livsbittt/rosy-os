@@ -184,7 +184,10 @@ def registered(tmp_path, monkeypatch):
 
 #: Period in seconds, in registration order. `1/50` is D-2's sole `cmd_vel`
 #: publisher; `1/10` is `state.rate_hz` from `rosy_default.yaml`.
-EXPECTED_TIMERS = [1.0 / 50.0, 1.0 / 10.0, 1.0, 1.0 / 5.0, 1.0 / 5.0, 1.0 / 5.0]
+EXPECTED_TIMERS = [
+    1.0 / 50.0, 1.0 / 10.0, 1.0, 1.0 / 5.0, 1.0 / 5.0, 1.0 / 5.0,
+    1.0 / 20.0,
+]
 
 #: `(topic, callback, qos)` — read off `ros_bridge.py:89-103`, not off this
 #: harness's own output. Topic alone would not see `scan` rewired to `_on_imu`,
@@ -193,6 +196,7 @@ EXPECTED_SUBSCRIPTIONS = [
     ("odom", "_on_odom", 10),
     ("battery/voltage", "_on_battery", 10),
     ("nav_cmd_vel", "_on_nav_cmd_vel", 10),
+    ("line/observation", "_on_line_observation", 10),
     ("amcl/transition_event", "_on_amcl_transition", 10),
     ("map_server/transition_event", "_on_map_server_transition", 10),
     ("controller_server/transition_event", "_on_controller_transition", 10),
@@ -225,7 +229,7 @@ EXPECTED_PUBLISHERS = [
 EXPECTED_CLIENTS = ["set_led", "start_motor", "stop_motor", "slam_toolbox/save_map"]
 
 
-def test_the_bridge_registers_six_timers_at_the_expected_periods(registered):
+def test_the_bridge_registers_timers_at_the_expected_periods(registered):
     """The one thing this harness exists to hold across a reshape.
 
     Moving the timers must not change how many there are, how fast they run, or

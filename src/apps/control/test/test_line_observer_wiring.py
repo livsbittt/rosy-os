@@ -1,0 +1,34 @@
+"""D-143 ROS wrapper stays a sensing-only evidence publisher."""
+
+from pathlib import Path
+
+import yaml
+
+
+ROOT = Path(__file__).parents[1]
+
+
+def test_line_observer_has_both_inputs_and_one_normalized_output():
+    source = (ROOT / "control/line_observer_node.py").read_text(encoding="utf-8")
+    assert "UInt16MultiArray, 'ir_sensor/range'" in source
+    assert "Image, 'camera/front'" in source
+    assert "String, 'line/observation'" in source
+    assert "create_publisher(Twist" not in source
+
+
+def test_line_observer_detector_settings_are_operator_tunable():
+    config = yaml.safe_load((ROOT / "config/line_follow.yaml").read_text(encoding="utf-8"))
+    params = config["/**/line_observer_node"]["ros__parameters"]
+    assert params["ir_calibration_enabled"] is False
+    assert params["ir_black"] == [0.0, 0.0, 0.0]
+    assert params["ir_white"] == [0.0, 0.0, 0.0]
+    assert 1 <= params["camera_bright_threshold"] <= 254
+    assert 0.0 <= params["camera_roi_top_fraction"] < 1.0
+
+
+def test_package_and_launch_expose_the_line_observer():
+    setup = (ROOT / "setup.py").read_text(encoding="utf-8")
+    launch = (ROOT / "launch/line_follow.launch.py").read_text(encoding="utf-8")
+    assert "line_observer_node = control.line_observer_node:main" in setup
+    assert "line_observer_node" in launch
+    assert "line_follow.yaml" in launch

@@ -169,6 +169,24 @@
             <button type="button" data-mode="MANUAL">MANUAL</button>
             <button type="button" data-mode="NAVIGATION" disabled title="기능 확인 중">NAV</button>
           </div>
+          <div class="line-follow-control" aria-labelledby="line-follow-heading">
+            <div class="line-follow-copy">
+              <h3 id="line-follow-heading">흰색 차선 추종</h3>
+              <span>IR 또는 카메라 중 하나만 선택</span>
+            </div>
+            <div class="line-follow-modes" role="group" aria-label="차선 인식 센서">
+              <button type="button" data-line-mode="OFF">OFF</button>
+              <button type="button" data-line-mode="IR_LINE">IR 센서</button>
+              <button type="button" data-line-mode="CAMERA_LINE">카메라</button>
+            </div>
+            <dl class="line-follow-facts">
+              <div><dt>상태</dt><dd id="line-follow-state">OFF</dd></div>
+              <div><dt>입력</dt><dd id="line-follow-source">없음</dd></div>
+              <div><dt>오차</dt><dd id="line-follow-error"></dd></div>
+              <div><dt>신뢰도</dt><dd id="line-follow-confidence">0%</dd></div>
+            </dl>
+            <p id="line-follow-reason" class="line-follow-message">mode_off</p>
+          </div>
           <div class="teleop-commissioning" aria-labelledby="teleop-heading">
             <div class="teleop-copy">
               <div>

@@ -107,6 +107,22 @@ def test_dashboard_motion_fails_to_zero_on_release_and_page_loss():
     assert "immediateZero" in script
 
 
+def test_dashboard_exposes_exclusive_ir_and_camera_line_follow_modes():
+    html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+    script = dashboard_js()
+
+    for mode in ("OFF", "IR_LINE", "CAMERA_LINE"):
+        assert f'data-line-mode="{mode}"' in html
+    for element_id in (
+        "line-follow-state", "line-follow-source", "line-follow-error",
+        "line-follow-confidence", "line-follow-reason",
+    ):
+        assert f'id="{element_id}"' in html
+    assert "/api/v1/line-follow" in script
+    assert "/api/v1/line-follow/mode" in script
+    assert "lineFollowPending" in script
+
+
 def test_dashboard_html_cannot_bypass_security_headers_through_assets(dashboard_client):
     response = dashboard_client.get("/dashboard/assets/index.html")
 

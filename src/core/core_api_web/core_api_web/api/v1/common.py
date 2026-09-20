@@ -19,6 +19,10 @@ admin = require_role("administrator")
 
 def enter_navigation_mode(svc: CoreServicesLike, auth: AuthContext) -> None:
     """D-2: Nav2 velocity only reaches the wheels in NAVIGATION."""
+    if svc.line_follow.active:
+        status = svc.line_follow.stop()
+        svc.command.clear_navigation()
+        svc.state.set_line_follow(status)
     try:
         svc.nav.require_ready()
     except NavigationError as exc:

@@ -17,6 +17,7 @@ from core_api_web.api.v1.routes import (
     control_router,
     events_router,
     logs_router,
+    line_follow_router,
     host_router,
     map_router,
     metrics_router,
@@ -66,6 +67,7 @@ def create_app(config: dict[str, Any], services: CoreServicesLike) -> FastAPI:
     app.include_router(system_router)
     app.include_router(robot_router)
     app.include_router(control_router)
+    app.include_router(line_follow_router)
     app.include_router(safety_router)
     app.include_router(navigation_router)
     app.include_router(map_router)

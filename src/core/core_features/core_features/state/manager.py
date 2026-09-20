@@ -13,6 +13,7 @@ from core_common.protocol.schemas import (
     BatteryStatus,
     DockingStatus,
     HealthState,
+    LineFollowStatus,
     NavigationState,
     Pose,
     PowerStatus,
@@ -64,6 +65,7 @@ class StateManager:
         self._safety = SafetySummary()
         self._swarm = SwarmStatus()
         self._power = PowerStatus()
+        self._line_follow = LineFollowStatus()
         self._map_id: Optional[str] = None
         self._diagnostics: dict[str, HealthState] = {}
         self._errors: list[str] = []
@@ -124,6 +126,10 @@ class StateManager:
         with self._lock:
             self._power = status
 
+    def set_line_follow(self, status: LineFollowStatus) -> None:
+        with self._lock:
+            self._line_follow = LineFollowStatus.model_validate(status)
+
     def set_battery_status(self, status: BatteryStatus) -> None:
         with self._lock:
             self._battery_status = status
@@ -178,6 +184,7 @@ class StateManager:
                 safety=self._safety.model_copy(),
                 swarm=self._swarm.model_copy(),
                 power=self._power.model_copy(),
+                line_follow=self._line_follow.model_copy(),
                 diagnostics_summary=dict(self._diagnostics),
                 errors=list(self._errors),
                 seq=self._seq,

@@ -1,0 +1,144 @@
+{
+  "modes": {
+    "CAMERA_LINE": {
+      "final_reason": "reselection_required",
+      "lane_lost_events": 1,
+      "loss_latched": true,
+      "maximum_angular": 0.565,
+      "minimum_tracking_speed": 0.01693,
+      "stale_stop": true,
+      "straight_speed": 0.03117,
+      "tracking_samples": 7
+    },
+    "IR_LINE": {
+      "final_reason": "reselection_required",
+      "lane_lost_events": 1,
+      "loss_latched": true,
+      "maximum_angular": 0.6087,
+      "minimum_tracking_speed": 0.04112,
+      "stale_stop": true,
+      "straight_speed": 0.08135,
+      "tracking_samples": 7
+    }
+  },
+  "physical_device_validated": false,
+  "series": {
+    "CAMERA_LINE": [
+      {
+        "angular": 0.565,
+        "confidence": 0.576,
+        "error": -0.7063,
+        "linear": 0.01693,
+        "state": "TRACKING",
+        "t": 0.0
+      },
+      {
+        "angular": 0.365,
+        "confidence": 0.576,
+        "error": -0.4562,
+        "linear": 0.02201,
+        "state": "TRACKING",
+        "t": 0.1
+      },
+      {
+        "angular": 0.165,
+        "confidence": 0.576,
+        "error": -0.2062,
+        "linear": 0.0271,
+        "state": "TRACKING",
+        "t": 0.2
+      },
+      {
+        "angular": 0.005,
+        "confidence": 0.576,
+        "error": -0.0063,
+        "linear": 0.03117,
+        "state": "TRACKING",
+        "t": 0.3
+      },
+      {
+        "angular": -0.155,
+        "confidence": 0.576,
+        "error": 0.1938,
+        "linear": 0.02735,
+        "state": "TRACKING",
+        "t": 0.4
+      },
+      {
+        "angular": -0.355,
+        "confidence": 0.576,
+        "error": 0.4437,
+        "linear": 0.02227,
+        "state": "TRACKING",
+        "t": 0.5
+      },
+      {
+        "angular": -0.555,
+        "confidence": 0.576,
+        "error": 0.6937,
+        "linear": 0.01718,
+        "state": "TRACKING",
+        "t": 0.6
+      }
+    ],
+    "IR_LINE": [
+      {
+        "angular": 0.6087,
+        "confidence": 0.9375,
+        "error": -0.7609,
+        "linear": 0.04112,
+        "state": "TRACKING",
+        "t": 0.0
+      },
+      {
+        "angular": 0.44528,
+        "confidence": 0.825,
+        "error": -0.5566,
+        "linear": 0.04197,
+        "state": "TRACKING",
+        "t": 0.1
+      },
+      {
+        "angular": 0.19829,
+        "confidence": 0.825,
+        "error": -0.2479,
+        "linear": 0.05517,
+        "state": "TRACKING",
+        "t": 0.2
+      },
+      {
+        "angular": -0.0,
+        "confidence": 0.9375,
+        "error": 0.0,
+        "linear": 0.08135,
+        "state": "TRACKING",
+        "t": 0.3
+      },
+      {
+        "angular": -0.19829,
+        "confidence": 0.825,
+        "error": 0.2479,
+        "linear": 0.05517,
+        "state": "TRACKING",
+        "t": 0.4
+      },
+      {
+        "angular": -0.44528,
+        "confidence": 0.825,
+        "error": 0.5566,
+        "linear": 0.04197,
+        "state": "TRACKING",
+        "t": 0.5
+      },
+      {
+        "angular": -0.6087,
+        "confidence": 0.9375,
+        "error": 0.7609,
+        "linear": 0.04112,
+        "state": "TRACKING",
+        "t": 0.6
+      }
+    ]
+  },
+  "status": "HOST_SIMULATION_PASS"
+}

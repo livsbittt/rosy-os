@@ -9,6 +9,7 @@ blind search drive. ROS-free, same contract onboard and in fixtures.
 from __future__ import annotations
 
 import time
+import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -35,17 +36,90 @@ class LaneObservation:
     confidence: float
 
 
-def detect_lane_error(bgr: np.ndarray) -> LaneObservation | None:
+@dataclass(frozen=True)
+class IRLineCalibration:
+    """Per-channel black/white endpoints in robot left/centre/right order.
+
+    Endpoint order carries polarity, so hardware whose ADC reads lower on
+    white does not need a separate and easily-misconfigured boolean.
+    """
+
+    black: tuple[float, float, float]
+    white: tuple[float, float, float]
+    min_span: float = 100.0
+
+    def __post_init__(self) -> None:
+        if len(self.black) != 3 or len(self.white) != 3:
+            raise ValueError("IR calibration requires left, centre, right endpoints")
+        values = tuple(self.black) + tuple(self.white) + (self.min_span,)
+        if any(isinstance(value, bool) or not isinstance(value, (int, float))
+               or not math.isfinite(float(value)) for value in values):
+            raise ValueError("IR calibration endpoints must be finite numbers")
+        if self.min_span <= 0:
+            raise ValueError("IR calibration min_span must be positive")
+        if any(abs(float(white) - float(black)) < self.min_span
+               for black, white in zip(self.black, self.white)):
+            raise ValueError("IR calibration endpoints are not physically separated")
+
+    def normalize(self, values) -> tuple[float, float, float]:
+        if len(values) != 3:
+            raise ValueError("IR sample requires left, centre, right values")
+        normalized = []
+        for raw, black, white in zip(values, self.black, self.white):
+            if (isinstance(raw, bool) or not isinstance(raw, (int, float))
+                    or not math.isfinite(float(raw))):
+                raise ValueError("IR sample values must be finite numbers")
+            value = (float(raw) - float(black)) / (float(white) - float(black))
+            normalized.append(max(0.0, min(1.0, value)))
+        return tuple(normalized)
+
+
+def detect_ir_line(values, calibration: IRLineCalibration, *,
+                   min_white: float = 0.55,
+                   min_contrast: float = 0.15) -> LaneObservation | None:
+    """Convert three calibrated reflectance channels to a line centroid."""
+    if not 0.0 < min_white <= 1.0 or not 0.0 < min_contrast <= 1.0:
+        raise ValueError("IR thresholds must be in (0, 1]")
+    strengths = calibration.normalize(values)
+    peak = max(strengths)
+    contrast = peak - min(strengths)
+    if peak < min_white or contrast < min_contrast:
+        return None
+    total = sum(strengths)
+    if total <= 0.0:
+        return None
+    error = sum(weight * value for weight, value in zip((-1.0, 0.0, 1.0), strengths)) / total
+    confidence = min(1.0, peak * min(1.0, contrast / 0.5))
+    return LaneObservation(error=max(-1.0, min(1.0, error)), confidence=confidence)
+
+
+def detect_lane_error(bgr: np.ndarray, *, bright_threshold: int = _BRIGHT,
+                      roi_top_fraction: float = 0.4,
+                      washed_fraction: float = _WASHED_FRACTION,
+                      min_pixels: int = 1) -> LaneObservation | None:
     """Find the lane centroid in the bottom band, or None when there is no
     lane to follow. A washed-out frame (lights on full white) is also None —
     driving on would be a guess, not tracking."""
+    if (isinstance(bright_threshold, bool) or not isinstance(bright_threshold, int)
+            or not 1 <= bright_threshold <= 254):
+        raise ValueError("bright_threshold must be an integer from 1 through 254")
+    if not isinstance(roi_top_fraction, (int, float)) or not math.isfinite(roi_top_fraction) \
+            or not 0.0 <= roi_top_fraction < 1.0:
+        raise ValueError("roi_top_fraction must be in [0, 1)")
+    if not isinstance(washed_fraction, (int, float)) or not math.isfinite(washed_fraction) \
+            or not 0.0 < washed_fraction <= 1.0:
+        raise ValueError("washed_fraction must be in (0, 1]")
+    if isinstance(min_pixels, bool) or not isinstance(min_pixels, int) or min_pixels < 1:
+        raise ValueError("min_pixels must be a positive integer")
+    if not isinstance(bgr, np.ndarray) or bgr.ndim not in (2, 3) or bgr.size == 0:
+        raise ValueError("camera frame must be a non-empty grayscale or BGR array")
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if bgr.ndim == 3 else bgr
-    band = gray[int(gray.shape[0] * 0.4):, :]
-    _, bright = cv2.threshold(band, _BRIGHT, 255, cv2.THRESH_BINARY)
+    band = gray[int(gray.shape[0] * roi_top_fraction):, :]
+    _, bright = cv2.threshold(band, bright_threshold, 255, cv2.THRESH_BINARY)
     lit = (bright > 0).sum()
-    if lit <= 0:
+    if lit < min_pixels:
         return None
-    if lit > _WASHED_FRACTION * band.size:
+    if lit > washed_fraction * band.size:
         return None
     column = bright.sum(axis=0).astype(np.float64)
     total = float(column.sum())
@@ -56,6 +130,31 @@ def detect_lane_error(bgr: np.ndarray) -> LaneObservation | None:
     if confidence <= 0.0:
         return None
     return LaneObservation(error=error, confidence=confidence)
+
+
+def line_observation_payload(source: str, stamp: float,
+                             observation: LaneObservation | None) -> dict:
+    """One compact wire shape shared by IR and camera publishers."""
+    if source not in ("IR_LINE", "CAMERA_LINE"):
+        raise ValueError("unsupported line observation source")
+    if isinstance(stamp, bool) or not isinstance(stamp, (int, float)) \
+            or not math.isfinite(float(stamp)):
+        raise ValueError("line observation stamp must be finite")
+    if observation is None:
+        return {
+            "source": source,
+            "stamp": float(stamp),
+            "visible": False,
+            "error": None,
+            "confidence": 0.0,
+        }
+    return {
+        "source": source,
+        "stamp": float(stamp),
+        "visible": True,
+        "error": float(observation.error),
+        "confidence": float(observation.confidence),
+    }
 
 
 class LaneTracker:

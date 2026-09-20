@@ -71,6 +71,29 @@ function renderRobotInfo(info) {
 }
 
 let triageSeen = {};
+let lineFollowPending = false;
+
+function updateLineFollowButtons() {
+  const navigationAvailable = session.capabilities?.navigation?.goal_navigation === true;
+  const emergency = session.robotState?.safety?.estop === true;
+  document.querySelectorAll("[data-line-mode]").forEach((button) => {
+    const enabling = button.dataset.lineMode !== "OFF";
+    button.disabled = lineFollowPending || (enabling && (!navigationAvailable || emergency));
+  });
+}
+
+function renderLineFollow(status = {}) {
+  const mode = status.mode || "OFF";
+  setText("line-follow-state", status.state || "OFF");
+  setText("line-follow-source", status.source || "없음");
+  setText("line-follow-error", Number.isFinite(Number(status.error)) ? number(status.error, 3) : "—");
+  setText("line-follow-confidence", percent((Number(status.confidence) || 0) * 100));
+  setText("line-follow-reason", status.reason || "mode_off");
+  document.querySelectorAll("[data-line-mode]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.lineMode === mode);
+  });
+  updateLineFollowButtons();
+}
 
 // 두 문법은 한 화면에 섞이지 않는다(concept 16 §4 L2). 운용은 공간이고
 // 스크롤하지 않으며, 점검은 절차이고 스크롤이 곧 절차다.
@@ -137,6 +160,7 @@ function renderRobotState(state) {
   document.querySelectorAll("[data-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.mode === state.mode);
   });
+  renderLineFollow(state.line_follow);
 
   const stopped = Boolean(state.safety?.estop);
   elements["safety-indicator"].className = `hero-safety ${stopped ? "danger" : "safe"}`;
@@ -161,6 +185,7 @@ function renderSafety(safety) {
   setText("safety-source", safety.source || (stopped ? "source unknown" : "주행 회로 정상"));
   fillSafetyForm(safety);
   updateTeleopControls();
+  updateLineFollowButtons();
 }
 
 
@@ -349,6 +374,7 @@ function renderCapabilities(capabilities) {
   setEnabled("slam-save", slamOn);
   updateModeButtons();
   updateTeleopControls();
+  updateLineFollowButtons();
 }
 
 function renderInventory(inventory) {
@@ -787,6 +813,31 @@ document.querySelectorAll("[data-mode]").forEach((button) => {
     } finally {
       session.modeChangePending = false;
       updateModeButtons();
+    }
+  });
+});
+
+document.querySelectorAll("[data-line-mode]").forEach((button) => {
+  button.addEventListener("click", async () => {
+    if (button.disabled || lineFollowPending) return;
+    const mode = button.dataset.lineMode;
+    stopTeleop("차선 추종 모드 변경 전에 정지했습니다.");
+    if (mode !== "OFF" && !window.confirm(`${button.textContent.trim()} 차선 추종을 시작할까요? 주변 안전을 확인하세요.`)) return;
+    lineFollowPending = true;
+    updateLineFollowButtons();
+    try {
+      const status = await api("/api/v1/line-follow/mode", {
+        method: "PUT",
+        body: JSON.stringify({ mode }),
+      });
+      renderLineFollow(status);
+      setText("action-message", mode === "OFF" ? "차선 추종을 해제했습니다." : `${button.textContent.trim()} 차선 추종을 선택했습니다.`);
+      await refreshRobotState();
+    } catch (error) {
+      setText("action-message", `차선 추종 변경 실패: ${error.message}`);
+    } finally {
+      lineFollowPending = false;
+      updateLineFollowButtons();
     }
   });
 });

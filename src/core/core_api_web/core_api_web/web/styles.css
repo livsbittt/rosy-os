@@ -679,6 +679,35 @@ body[data-view="operate"] .page-footer { display: none; }
 .mode-control button.active { color: var(--button-primary-ink); background: var(--button-primary-bg); font-weight: 700; }
 .mode-control button:disabled { color: var(--muted); cursor: not-allowed; opacity: 0.35; }
 
+.line-follow-control { display: flex; flex-direction: column; gap: var(--space-2); }
+.line-follow-copy { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.line-follow-copy h3 { margin: 0; }
+.line-follow-copy span { color: var(--nominal-quiet); font: var(--text-micro)/1.3 var(--mono); }
+.line-follow-modes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+.line-follow-modes button {
+  min-height: var(--target-secondary);
+  border: 0;
+  border-right: 1px solid var(--surface-line);
+  color: var(--nominal-quiet);
+  background: transparent;
+  font: var(--text-label)/1 var(--mono);
+  cursor: pointer;
+}
+.line-follow-modes button:last-child { border-right: 0; }
+.line-follow-modes button.active { color: var(--button-primary-ink); background: var(--series-primary); font-weight: 700; }
+.line-follow-modes button:disabled { color: var(--muted); cursor: not-allowed; opacity: 0.35; }
+.line-follow-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-1); margin: 0; }
+.line-follow-facts div { min-width: 0; padding: var(--space-1); border: 1px solid var(--surface-line); border-radius: var(--radius-control); }
+.line-follow-facts dt { color: var(--nominal-quiet); font: var(--text-micro)/1.2 var(--mono); }
+.line-follow-facts dd { overflow: hidden; margin: var(--space-1) 0 0; font: 700 var(--text-label)/1.2 var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.line-follow-message { min-height: 1.4em; margin: 0; color: var(--nominal-quiet); font: var(--text-micro)/1.4 var(--mono); }
+
 /* 저속 직접 제어도 카드가 아니다 — 같은 면 위의 묶음이다. */
 .teleop-commissioning { display: flex; flex-direction: column; gap: var(--space-2); }
 /* 묶음 안의 묶음도 같은 줄이다 — 소제목만 다른 모양이면 위계가 아니라 예외가

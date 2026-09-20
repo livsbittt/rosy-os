@@ -56,6 +56,7 @@ from core_features.diagnostics.collector import (
     topic_freshness_provider,
 )
 from core_features.navigation.manager import NavGoalSpec, NavigationError
+from core_features.line_follow import LineFollowMode, LineObservation
 from core_features.power.battery import resolve_led
 from core_common.protocol.schemas import HealthState
 
@@ -91,6 +92,7 @@ class RosBridge:
         node.create_subscription(Odometry, "odom", self._on_odom, 10)
         node.create_subscription(Float32, "battery/voltage", self._on_battery, 10)
         node.create_subscription(Twist, "nav_cmd_vel", self._on_nav_cmd_vel, 10)
+        node.create_subscription(String, "line/observation", self._on_line_observation, 10)
         # Nav2 lifecycle nodes announce their authoritative goal state on
         # transition_event.  CORE never infers readiness from node discovery;
         # it requires these active transitions plus the motor adapter lease.
@@ -133,6 +135,7 @@ class RosBridge:
         self._power_timer = node.create_timer(1.0 / 5.0, self._tick_power)
         self._dock_timer = node.create_timer(1.0 / 5.0, self._tick_docking)
         self._swarm_timer = node.create_timer(1.0 / 5.0, self._tick_swarm)
+        self._line_follow_timer = node.create_timer(1.0 / 20.0, self._tick_line_follow)
         self._goals = GoalTracker()
 
         self._last_odom_ts = 0.0
@@ -194,7 +197,53 @@ class RosBridge:
         battery_policy.apply_voltage(self._svc, voltage)
 
     def _on_nav_cmd_vel(self, msg: Twist) -> None:
+        if self._svc.line_follow.active:
+            return
         self._svc.command.set_nav_twist(CoreTwist(linear=msg.linear.x, angular=msg.angular.z))
+
+    def _on_line_observation(self, msg: String) -> None:
+        """Accept normalized evidence only; malformed or wrong-source data cannot drive."""
+        try:
+            data = json.loads(msg.data)
+            if type(data.get("visible")) is not bool:
+                raise ValueError("visible must be a boolean")
+            visible = data["visible"]
+            observation = LineObservation(
+                source=LineFollowMode(data["source"]),
+                stamp=float(data["stamp"]),
+                visible=visible,
+                error=(float(data["error"]) if visible else None),
+                confidence=float(data["confidence"]),
+            )
+            accepted = self._svc.line_follow.observe(
+                observation, received_at=time.monotonic())
+            self._svc.state.set_sensor("line_follow", {
+                "valid": True,
+                "accepted": accepted,
+                "source": observation.source.value,
+            })
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            now = time.monotonic()
+            if self._svc.line_follow.invalidate(received_at=now):
+                self._svc.command.clear_navigation()
+                self._svc.line_follow.tick(now)
+                self._svc.state.set_line_follow(self._svc.line_follow.status())
+            self._svc.state.set_sensor("line_follow", {
+                "valid": False,
+                "reason": "invalid_observation",
+                "detail": str(exc),
+            })
+
+    def _tick_line_follow(self) -> None:
+        if not self._svc.line_follow.active:
+            return
+        now = time.monotonic()
+        decision = self._svc.line_follow.tick(now)
+        self._svc.command.set_nav_twist(
+            CoreTwist(linear=decision.linear, angular=decision.angular), now=now)
+        status = self._svc.line_follow.status()
+        self._svc.state.set_line_follow(status)
+        self._svc.state.set_sensor("line_follow", status.model_dump())
 
     @staticmethod
     def _lifecycle_active(msg: TransitionEvent) -> bool:

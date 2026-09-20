@@ -40,6 +40,7 @@ setup(
             'calib_node = control.calib_node:main',
             'startup_calibration_node = control.startup_calibration_node:main',
             'camera_detect_node = control.camera_detect_node:main',
+            'line_observer_node = control.line_observer_node:main',
             'obstacle_observer_node = control.obstacle_observer_node:main',
             'watch_node = control.watch_node:main',
             'goal_node = control.goal_node:main',

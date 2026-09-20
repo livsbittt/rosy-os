@@ -25,6 +25,7 @@ from core_common.identity import RobotIdentity
 from core_features.maps import MapSnapshotStore
 from core_features.navigation.manager import NavigationManager
 from core_features.navigation.readiness import NavigationReadinessGate
+from core_features.line_follow import LineFollowConfig, LineFollowManager
 from core_features.swarm import SwarmManager
 from core_features.power.battery import (
     BatteryConfig,
@@ -124,6 +125,20 @@ def _power_config(raw: dict[str, Any]) -> PowerConfig:
     )
 
 
+def _line_follow_config(raw: dict[str, Any]) -> LineFollowConfig:
+    """Parse the operator-tunable D-143 policy with validation in one place."""
+    defaults = LineFollowConfig()
+    return LineFollowConfig(
+        cruise_speed=float(raw.get("cruise_speed", defaults.cruise_speed)),
+        max_linear=float(raw.get("max_linear", defaults.max_linear)),
+        steering_gain=float(raw.get("steering_gain", defaults.steering_gain)),
+        max_angular=float(raw.get("max_angular", defaults.max_angular)),
+        min_confidence=float(raw.get("min_confidence", defaults.min_confidence)),
+        stale_after_s=float(raw.get("stale_after_s", defaults.stale_after_s)),
+        lost_after_s=float(raw.get("lost_after_s", defaults.lost_after_s)),
+    )
+
+
 @dataclass
 class CoreServices:
     config: dict[str, Any]
@@ -138,6 +153,7 @@ class CoreServices:
     safety: SafetyManager
     waypoints: WaypointManager
     nav: NavigationManager
+    line_follow: LineFollowManager
     readiness: NavigationReadinessGate
     power: PowerManager
     battery: BatteryMonitor
@@ -206,6 +222,8 @@ class CoreServices:
         nav = NavigationManager(events, state, waypoints, safety,
                                 stuck_timeout_s=float(safety_cfg.get("stuck_timeout_s", 30.0)),
                                 readiness=readiness)
+        line_follow = LineFollowManager(
+            events, config=_line_follow_config(config.get("line_follow", {}) or {}))
         power = PowerManager(_power_config(config.get("power", {})), events=events)
         battery = BatteryMonitor(
             _battery_config(safety_cfg, data_path=waypoints_path.parent),
@@ -240,6 +258,11 @@ class CoreServices:
         safety.estop_listeners.append(reflect_stop)
         safety.estop_listeners.append(swarm.on_estop)
         safety.estop_listeners.append(lambda: nav.cancel(source='safety_manager'))
+        def stop_line_follow():
+            status = line_follow.stop()
+            command.clear_navigation()
+            state.set_line_follow(status)
+        safety.estop_listeners.append(stop_line_follow)
         runtime_probe = HostRuntimeProbe(
             host_root=os.environ.get("ROSY_HOST_ROOT", "/"),
             data_path=waypoints_path.parent,
@@ -247,6 +270,7 @@ class CoreServices:
         return cls(config=config, identity=identity, profile=profile, capability=capability,
                    events=events, state=state, registry=registry, modes=modes,
                    command=command, safety=safety, waypoints=waypoints, nav=nav,
+                   line_follow=line_follow,
                    readiness=readiness,
                    power=power, battery=battery, docking=docking, swarm=swarm,
                    runtime_probe=runtime_probe, maps=MapSnapshotStore(),

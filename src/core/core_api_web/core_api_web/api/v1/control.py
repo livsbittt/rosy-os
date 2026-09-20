@@ -29,6 +29,10 @@ class TeleopRequest(BaseModel):
 def set_mode(body: ModeRequest, auth: AuthContext = Depends(operator),
              svc: CoreServicesLike = Depends(get_services)):
     new_mode = Mode(body.mode)
+    if svc.line_follow.active:
+        status = svc.line_follow.stop()
+        svc.command.clear_navigation()
+        svc.state.set_line_follow(status)
     if new_mode is Mode.NAVIGATION:
         TaskKind.NAVIGATE.require(svc.capability)
         if svc.modes.mode is not Mode.NAVIGATION:

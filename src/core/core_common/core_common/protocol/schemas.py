@@ -255,6 +255,20 @@ class PoseSample(BaseModel):
     map_id: Optional[str] = None
 
 
+class LineFollowStatus(BaseModel):
+    """Selected line source and the last fail-closed control decision (D-143)."""
+
+    mode: str = "OFF"
+    state: str = "OFF"
+    source: Optional[str] = None
+    error: Optional[float] = None
+    confidence: float = 0.0
+    age_s: Optional[float] = None
+    linear: float = 0.0
+    angular: float = 0.0
+    reason: str = "mode_off"
+
+
 class StateSnapshot(BaseModel):
     """로봇 상태 스냅샷 — /ws/state payload와 동일 (API Ref §6.1)."""
 
@@ -271,6 +285,7 @@ class StateSnapshot(BaseModel):
     safety: SafetySummary = Field(default_factory=SafetySummary)
     swarm: SwarmStatus = Field(default_factory=SwarmStatus)  # v1.1 additive (SWM-006)
     power: PowerStatus = Field(default_factory=PowerStatus)  # v1.4 additive (PWR-001)
+    line_follow: LineFollowStatus = Field(default_factory=LineFollowStatus)  # v1.9 additive
     diagnostics_summary: dict[str, HealthState] = Field(default_factory=dict)
     seq: int = 0
     timestamp: str = Field(default_factory=utc_now_iso)

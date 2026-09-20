@@ -13,6 +13,7 @@ from core_api_web.api.v1.control import control_router
 from core_api_web.api.v1.docking import docking_router
 from core_api_web.api.v1.host import host_router
 from core_api_web.api.v1.map import map_router
+from core_api_web.api.v1.line_follow import line_follow_router
 from core_api_web.api.v1.navigation import navigation_router, slam_router
 from core_api_web.api.v1.observability import (
     diagnostics_router,
@@ -35,6 +36,7 @@ __all__ = [
     "events_router",
     "host_router",
     "logs_router",
+    "line_follow_router",
     "map_router",
     "metrics_router",
     "navigation_router",
