@@ -12,7 +12,8 @@ on:
 
 jobs:
   rehearsal:
+    # 별도 워크플로이므로 적색이어도 push/merge 를 막지 않는다 — 리허설의 적색은
+    # 24.04 의존 제거 목록이다.
     uses: ./.github/workflows/ci.yml
     with:
       runs_on: ubuntu-26.04
-    continue-on-error: true
