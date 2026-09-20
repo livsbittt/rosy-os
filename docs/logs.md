@@ -820,3 +820,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 세 문서 모두 Draft 상태 유지 — 실행 착지 시 각자의 게이트로 판정
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · ci(adr): add D-140 — weekly native arm64 rehearsal (ARTIFACT 코드 수준 선검증)
+
+- 변경: `.github/workflows/arm64-rehearsal.yml` 신설 — 매주 목요일 + 수동 트리거, ubuntu-24.04-arm(공개 저장소 무료) 에서 ROS Jazzy base 설치 → colcon build src → core ROS-free 스위트 실행. 비게이팅(continue-on-error). ADR 로그에 D-140 본문·인덱스 행 착지
+- 증거: 저장소 public 확인(`gh repo view` → PUBLIC) — arm64 호스티드 러너 무료. 워크플로 YAML 파스 통과. ARTIFACT gate blocker "ARM64 개발 후보만 존재"의 코드 수준 선검증 경로
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 이미지 빌드 자체는 D-66 대로 네이티브 Pi — 이 리허설은 코드 수준 선검증이다. 실패 리허설은 ARTIFACT 준비 목록이 된다
+- 교훈: 없음
