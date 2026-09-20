@@ -4,6 +4,7 @@ from control.control.execution_escape import ExecutionEscape
 
 def proposal(t,direction=-1,target=.023,margin=.015):
     return dict(geometry_revision='g',issued_s=t,scan_age_s=.05,
+        robot_diameter_m=.23,max_reposition_m=.23,
         rotation_restored=False,candidates=[dict(direction=direction,target_m=target,
         available_m=.10,predicted_rotation_clearance_m=margin)])
 
@@ -60,16 +61,28 @@ def test_direction_never_flips_midmove_and_wrong_direction_motion_stops():
 
 
 def test_target_requires_observed_room_and_time_and_cannot_expand_past_total_cap():
-    for target,room,remaining in ((.081,.1,30),(.03,.02,30),(.05,.1,10)):
+    for target,room,remaining in ((.231,.3,60),(.03,.02,30),(.05,.1,10)):
         e=ExecutionEscape();p=proposal(0,target=target);p['candidates'][0]['available_m']=room
         update(e,0,proposal=p,remaining_s=remaining);p['issued_s']=5
         assert update(e,5,proposal=p,remaining_s=remaining)[0] is None
-    e=ExecutionEscape();update(e,0);update(e,5)
-    assert update(e,6,(-.02,0,0),proposal=proposal(6,target=.07))==(0.,'execution_escape_stopped')
+    e=ExecutionEscape()
+    initial=proposal(0);initial.update(robot_diameter_m=.12,max_reposition_m=.12)
+    update(e,0,proposal=initial);initial['issued_s']=5;update(e,5,proposal=initial)
+    later=proposal(6,target=.11);later.update(robot_diameter_m=.12,max_reposition_m=.12)
+    assert update(e,6,(-.02,0,0),proposal=later)==(0.,'execution_escape_stopped')
+
+
+def test_missing_measured_diameter_never_falls_back_to_fixed_eight_cm():
+    e = ExecutionEscape()
+    p = proposal(0, target=.04)
+    del p['robot_diameter_m']
+    del p['max_reposition_m']
+    assert e.select(0, p, 'g', 30) is None
+    assert update(e, 0, proposal=p, time_bounded=True)[0] is None
 
 
 def test_time_heading_lateral_and_session_end_stop():
-    for t,pose,changes in ((25,(0,0,0),{}),(6,(0,0,.04),{}),
+    for t,pose,changes in ((51,(0,0,0),{}),(6,(0,0,.04),{}),
                            (6,(0,.004,0),{}),(6,(0,0,0),dict(waiting=False))):
         e=ExecutionEscape();update(e,0);update(e,5)
         assert update(e,t,pose,**changes)==(0.,'execution_escape_stopped')
@@ -117,6 +130,10 @@ def test_physical_dropout_fixture_resumes_with_original_episode_clock():
     e=ExecutionEscape();velocities=[]
     for row in rows:
         p=row['proposal']
+        # Historical evidence predates the measured-bound schema.  Adapt the
+        # replay explicitly; production rejects such legacy proposals.
+        if p is not None:
+            p = dict(p, robot_diameter_m=.23, max_reposition_m=.23)
         now=max(row['now'],p['issued_s'] if p else row['now'])+.001
         velocity,_=e.update(now,tuple(row['pose']),safe=True,proposal=p,
             geometry=row['geometry'],remaining_s=30.,waiting=True,time_bounded=True)
@@ -156,3 +173,13 @@ def test_actual_heading_progress_after_restoration_opens_new_pose_episode():
     update(e,.2,proposal=p,time_bounded=True)
     assert update(e,1,(0,0,.1),time_bounded=True)[0]==-.005
     assert e.started==1.
+
+
+def test_live_diameter_bound_allows_longer_measured_backoff_without_fixed_eight_cm_cap():
+    e = ExecutionEscape()
+    p = proposal(0, target=.12)
+    p['candidates'][0]['available_m'] = .20
+    assert e.select(0, p, 'g', 30)['target_m'] == .12
+
+    p['candidates'][0]['target_m'] = .231
+    assert e.select(0, p, 'g', 60) is None

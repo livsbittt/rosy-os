@@ -16,3 +16,11 @@
 - gate 변화: SOURCE GO 유지(근거 교체), ARTIFACT N/A→HOLD, DEVICE N/A→PARKED, FIELD N/A→PARKED
 - 결정: 없음
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · feat(imu): publish raw calibration and health evidence
+
+- 변경: read temperature, `CALIB_STAT`, `ST_RESULT`, `SYS_STATUS`, and `SYS_ERR`; publish component calibration fields without treating them as robot-level calibration success; replace invented covariance with explicit standard-deviation parameters whose zero defaults mean unknown covariance.
+- 증거: `python -m pytest src/hardware/imu_bno055/test -q -p no:cacheprovider` produced `4 passed, 10 skipped`.
+- gate 변화: SOURCE/host contract GO. ARM64 compiled fault injection, live I2C, DEVICE, and FIELD remain HOLD.
+- 결정: IMUPLUS magnetometer calibration is diagnostic evidence only and does not invalidate an otherwise healthy IMUPLUS stream.
+- 교훈: sensor-internal fusion status cannot substitute for robot geometry, extrinsic, or stopping-envelope validation.

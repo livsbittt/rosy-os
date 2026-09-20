@@ -40,6 +40,10 @@
     <group>
         <push-ros-namespace namespace="$(var namespace)"/>
         <include file="$(find-pkg-share navigation)/launch/localization_launch.xml">
+            <!-- The parent group already owns the namespace.  Passing the
+                 inherited value here makes non-composed child nodes land at
+                 /<namespace>/<namespace>. -->
+            <arg name="namespace" value=""/>
             <arg name="params_file" value="$(var params_file)"/>
             <arg name="map" value="$(var map)"/>
             <arg name="use_sim_time" value="$(var use_sim_time)"/>
@@ -55,6 +59,7 @@
     <group>
         <push-ros-namespace namespace="$(var namespace)"/>
         <include file="$(find-pkg-share navigation)/launch/navigation_launch.xml">
+            <arg name="namespace" value=""/>
             <arg name="params_file" value="$(var params_file)"/>
             <arg name="use_sim_time" value="$(var use_sim_time)"/>
             <arg name="autostart" value="$(var autostart)"/>

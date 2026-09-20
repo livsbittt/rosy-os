@@ -44,6 +44,16 @@ def test_expired_observation_stops_a_fresh_command(linked):
     assert safety.estop
 
 
+def test_snapshot_speed_limit_reaches_core_before_final_clip(linked):
+    command, safety, modes, policy, snapshot = linked
+    assert policy.update(replace(snapshot, sequence=2, linear_limit=.005))
+    command.set_nav_twist(Twist(.01, .2), now=10.)
+    output = command.select_output(now=10.01)
+    assert output.linear == pytest.approx(.005)
+    assert output.angular == pytest.approx(.1)
+    assert safety.policy_reason == ''
+
+
 def test_repeated_read_or_replayed_update_cannot_extend_observation(linked):
     command, safety, modes, policy, snapshot = linked
     assert not policy.update(replace(snapshot, expires_at=10.4))
@@ -57,6 +67,7 @@ def test_repeated_read_or_replayed_update_cannot_extend_observation(linked):
 @pytest.mark.parametrize('changes', [
     {'calibration_revision': 'other'}, {'session': 'previous-process'},
     {'observed_at': 11.}, {'expires_at': 12.}, {'sequence': True},
+    {'linear_limit': float('nan')}, {'linear_limit': -.01},
 ])
 def test_invalid_or_wrong_identity_snapshot_cannot_authorize_motion(linked, changes):
     command, safety, modes, policy, snapshot = linked

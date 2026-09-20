@@ -49,6 +49,7 @@ class GateSnapshot:
     inputs: GateInputs
     translation: TranslationEvidence | None = None
     tracking: TrackedEvidence | None = None
+    linear_limit: float | None = None
 
 
 class CommandPolicy:
@@ -83,7 +84,7 @@ class CommandPolicy:
             self._snapshot = None
 
     def update_observations(self, observations, required, inputs, now, sequence, applied_revision, *, translation=None,
-                            tracking=None):
+                            tracking=None, linear_limit=None):
         """Capture classified state and clocks in one serialized producer callback.
 
         The producer supplies its actually applied revision. Never label sensor
@@ -93,7 +94,8 @@ class CommandPolicy:
         if window is None or applied_revision != self.revision:
             self.invalidate()
             return False
-        return self.update(GateSnapshot(self.session, sequence, applied_revision, *window, inputs, translation, tracking))
+        return self.update(GateSnapshot(self.session, sequence, applied_revision, *window, inputs,
+                                        translation, tracking, linear_limit))
 
     def update(self, snapshot):
         if (not isinstance(snapshot, GateSnapshot) or snapshot.session != self.session or
@@ -102,6 +104,10 @@ class CommandPolicy:
                 not all(type(v) in (int, float) and math.isfinite(v)
                         for v in (snapshot.observed_at, snapshot.expires_at)) or
                 not 0 < snapshot.expires_at - snapshot.observed_at <= .5):
+            return False
+        if (snapshot.linear_limit is not None and
+                (type(snapshot.linear_limit) not in (int, float) or
+                 not math.isfinite(snapshot.linear_limit) or snapshot.linear_limit < 0)):
             return False
         with self._lock:
             if snapshot.sequence <= self._sequence:
@@ -152,6 +158,12 @@ class CommandPolicy:
                 tracking = snapshot.tracking.evaluate(linear, now)
                 if tracking['action'] != 'clear':
                     result = GateResult(0., 0., tracking['reason'], tracking['action'] == 'stop')
+            if (snapshot.linear_limit is not None and result.linear != 0. and
+                    abs(result.linear) > snapshot.linear_limit and
+                    result.reason in ('allow', 'motion_limited')):
+                factor = snapshot.linear_limit/abs(result.linear)
+                result = GateResult(result.linear*factor, result.angular*factor,
+                                    'adaptive_speed_limit')
         with self._lock:
             if snapshot is not self._snapshot:
                 return None

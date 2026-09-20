@@ -40,3 +40,22 @@
     camera_principal_x: 0.0     # cx (px)
     camera_principal_y: 0.0     # cy (px)
     camera_max_range_m: 0.0     # trustworthy range (m); beyond it is unknown
+    # Select pinhole (existing six values above), homography, or off. A
+    # homography only becomes active after every profile check passes and the
+    # session enable switch is on. The dashboard switch is deliberately not
+    # persisted; make an intentional config change for a boot default.
+    camera_ground_mode: pinhole
+    camera_homography_path: ''
+    camera_homography_enabled: false
+    # Allows only equal X/Y scale (for example validated 640x480 -> runtime
+    # 320x240). Rotation and camera profile revision must still match exactly.
+    camera_homography_allow_uniform_resize: false
+    # Tunable safety gates. Code rejects values outside documented bounds,
+    # instead of allowing a very large value to disable validation.
+    camera_homography_max_fit_rmse_cm: 0.8          # 0.05..5.0
+    camera_homography_max_validation_rmse_cm: 1.0   # 0.05..10.0
+    camera_homography_max_validation_error_cm: 2.0  # 0.1..20.0
+    camera_homography_min_validation_points: 8      # 4..200
+    camera_homography_min_validation_frames: 2      # 2..20
+    camera_homography_min_validation_span_cm: 10.0  # 3..100
+    camera_homography_max_range_m: 0.6              # 0.05..3.0

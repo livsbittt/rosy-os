@@ -46,6 +46,7 @@ class StartupLaunchTests(unittest.TestCase):
                 raise AssertionError('Disabled optional package must not be resolved')
             return '/share/' + package
         context = {'profile': profile, 'calibration_sensing_only': 'auto',
+                   'web_port': '', 'web_backend_port': '',
                    **{'start_' + name: 'auto' for name in FEATURES}, **(overrides or {})}
         source = Path(__file__).parents[1] / 'launch/robot.launch.py'
         tree = ast.parse(source.read_text(encoding='utf-8-sig'))

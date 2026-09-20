@@ -19,6 +19,9 @@ def generate_launch_description():
         DeclareLaunchArgument("frame_id", default_value="imu_link"),
         DeclareLaunchArgument("rate", default_value="100.0"),
         DeclareLaunchArgument("reset_on_start", default_value="false"),
+        DeclareLaunchArgument("orientation_stddev_rad", default_value="0.0"),
+        DeclareLaunchArgument("angular_velocity_stddev_deg_s", default_value="0.0"),
+        DeclareLaunchArgument("linear_acceleration_stddev_mps2", default_value="0.0"),
         Node(
             package="imu_bno055",
             executable="main_node",
@@ -34,6 +37,17 @@ def generate_launch_description():
                     ),
                     "reset_on_start": ParameterValue(
                         LaunchConfiguration("reset_on_start"), value_type=bool
+                    ),
+                    "orientation_stddev_rad": ParameterValue(
+                        LaunchConfiguration("orientation_stddev_rad"), value_type=float
+                    ),
+                    "angular_velocity_stddev_deg_s": ParameterValue(
+                        LaunchConfiguration("angular_velocity_stddev_deg_s"),
+                        value_type=float,
+                    ),
+                    "linear_acceleration_stddev_mps2": ParameterValue(
+                        LaunchConfiguration("linear_acceleration_stddev_mps2"),
+                        value_type=float,
                     ),
                 },
             ],

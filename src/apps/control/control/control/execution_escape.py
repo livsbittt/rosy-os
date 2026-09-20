@@ -8,12 +8,14 @@ def _number(value):
 
 class ExecutionEscape:
     SPEED = .005
-    MAX_DISTANCE = .08
-    MAX_SECONDS = 20.
+    ABSOLUTE_MAX_DISTANCE = .50
+    ABSOLUTE_MAX_SECONDS = 60.
 
     def __init__(self):
         self.used = self.active = False
         self.wait_since = self.origin = self.started = self.geometry = None
+        self.distance_limit = 0.
+        self.time_limit = 0.
         self.direction = self.pending_direction = 0
         self.episode_open = False
         self.saw_restored = False
@@ -28,12 +30,31 @@ class ExecutionEscape:
 
     @staticmethod
     def proposal_valid(now, proposal, geometry):
+        bound_fields = ('robot_diameter_m', 'max_reposition_m')
+        bound_valid = (isinstance(proposal, dict) and
+            all(_number(proposal.get(name)) for name in bound_fields) and
+            0 < proposal['max_reposition_m'] <= proposal['robot_diameter_m'] <=
+            ExecutionEscape.ABSOLUTE_MAX_DISTANCE)
         return bool(isinstance(proposal,dict) and geometry and
             proposal.get('geometry_revision') == geometry and
             _number(now) and _number(proposal.get('issued_s')) and
             0 <= now-proposal['issued_s'] <= .25 and
             _number(proposal.get('scan_age_s')) and 0 <= proposal['scan_age_s'] <= .2 and
-            type(proposal.get('rotation_restored')) is bool)
+            type(proposal.get('rotation_restored')) is bool and
+            bound_valid)
+
+    @classmethod
+    def _proposal_limit(cls, proposal):
+        diameter = proposal.get('robot_diameter_m') if isinstance(proposal, dict) else None
+        limit = proposal.get('max_reposition_m') if isinstance(proposal, dict) else None
+        if (all(_number(value) for value in (diameter, limit)) and
+                0 < limit <= diameter <= cls.ABSOLUTE_MAX_DISTANCE):
+            return limit
+        return 0.
+
+    @classmethod
+    def _time_limit(cls, distance):
+        return min(cls.ABSOLUTE_MAX_SECONDS, distance / cls.SPEED + 4.)
 
     def select(self, now, proposal, geometry, remaining_s):
         if not self.proposal_valid(now,proposal,geometry) or not _number(remaining_s):
@@ -42,6 +63,7 @@ class ExecutionEscape:
         if not isinstance(candidates,list) or len(candidates)>2:
             return None
         valid=[]
+        distance_limit = self._proposal_limit(proposal)
         for c in candidates:
             if not isinstance(c,dict):
                 continue
@@ -53,7 +75,7 @@ class ExecutionEscape:
             if not all(_number(c.get(k)) for k in (
                     'target_m','available_m','predicted_rotation_clearance_m')):
                 continue
-            if not 0 < c['target_m'] <= min(self.MAX_DISTANCE,c['available_m']):
+            if not 0 < c['target_m'] <= min(distance_limit,c['available_m']):
                 continue
             if c['target_m']/self.SPEED+2 > remaining_s:
                 continue
@@ -76,9 +98,10 @@ class ExecutionEscape:
         issued=proposal.get('issued_s') if isinstance(proposal,dict) else None
         age=now-issued if _number(now) and _number(issued) else None
         scan_age=proposal.get('scan_age_s') if isinstance(proposal,dict) else None
-        diagnostic_remaining=(max(0.,min(remaining_s,self.MAX_SECONDS-(now-self.started)))
+        diagnostic_remaining=(max(0.,min(remaining_s,self.time_limit-(now-self.started)))
             if _number(now) and _number(remaining_s) and self.started is not None else
-            max(0.,min(remaining_s,self.MAX_SECONDS)) if _number(remaining_s) else None)
+            max(0.,min(remaining_s,self._time_limit(self._proposal_limit(proposal))))
+            if _number(remaining_s) else None)
         def stop(reason,hold=False,complete=False):
             self.active=False
             if hold and finite and self.hold_pose is None:
@@ -130,9 +153,11 @@ class ExecutionEscape:
             lateral=-dx*math.sin(self.origin[2])+dy*math.cos(self.origin[2])
             yaw=math.atan2(math.sin(pose[2]-self.origin[2]),math.cos(pose[2]-self.origin[2]))
             progress=forward*self.direction
+            self.distance_limit = min(self.distance_limit, self._proposal_limit(proposal))
+            self.time_limit = min(self.time_limit, self._time_limit(self.distance_limit))
             if geometry!=self.geometry or abs(yaw)>.035 or abs(lateral)>.003 or progress<-.003:
                 return stop('pose_or_geometry_changed',hold=True)
-            if now<self.started or now-self.started>=self.MAX_SECONDS or progress>=self.MAX_DISTANCE:
+            if now<self.started or now-self.started>=self.time_limit or progress>=self.distance_limit:
                 return stop('budget',hold=True)
             if progress-self.best_progress>=.001:
                 self.best_progress=progress
@@ -144,8 +169,8 @@ class ExecutionEscape:
         candidate=self.select(now,proposal,geometry,remaining_s)
         if candidate is None:
             return stop('waiting_for_candidate')
-        if self.episode_open and (progress+candidate['target_m']>self.MAX_DISTANCE or
-                now-self.started+candidate['target_m']/self.SPEED>self.MAX_SECONDS):
+        if self.episode_open and (progress+candidate['target_m']>self.distance_limit or
+                now-self.started+candidate['target_m']/self.SPEED>self.time_limit):
             return stop('budget',hold=True)
         if not self.episode_open:
             self.episode_open=True
@@ -154,11 +179,14 @@ class ExecutionEscape:
             self.best_progress=0.
             self.geometry=geometry
             self.direction=candidate['direction']
+            self.distance_limit=self._proposal_limit(proposal)
+            self.time_limit=self._time_limit(self.distance_limit)
         self.active=True
         self.decision=dict(reason='motion',active=True,direction=self.direction,
             target_remaining_m=candidate['target_m'],available_m=candidate['available_m'],
             episode_elapsed_s=now-self.started,
-            remaining_s=max(0.,min(remaining_s,self.MAX_SECONDS-(now-self.started))),
+            distance_limit_m=self.distance_limit,
+            remaining_s=max(0.,min(remaining_s,self.time_limit-(now-self.started))),
             proposal_age_s=age,scan_age_s=scan_age if _number(scan_age) else None)
         return self.SPEED*self.direction,'execution_escape_forward' if self.direction>0 else 'execution_escape_reverse'
 
@@ -175,15 +203,17 @@ class ExecutionEscape:
                 yaw=math.atan2(math.sin(pose[2]-self.origin[2]),math.cos(pose[2]-self.origin[2]))
             progress=forward*self.direction
             if (not allowed or geometry!=self.geometry or not _number(remaining_s) or remaining_s<=0 or
-                    now<self.started or now-self.started>=self.MAX_SECONDS or
-                    abs(lateral)>.003 or abs(yaw)>.035 or progress<-.003 or progress>self.MAX_DISTANCE):
+                    now<self.started or now-self.started>=self.time_limit or
+                    abs(lateral)>.003 or abs(yaw)>.035 or progress<-.003 or progress>self.distance_limit):
                 self.active=False
                 return 0.,'execution_escape_stopped'
             if proposal['rotation_restored']:
                 self.active=False
                 return 0.,'execution_escape_complete'
-            if (candidate is None or progress+candidate['target_m']>self.MAX_DISTANCE or
-                    now-self.started+candidate['target_m']/self.SPEED>self.MAX_SECONDS):
+            self.distance_limit=min(self.distance_limit,self._proposal_limit(proposal))
+            self.time_limit=min(self.time_limit,self._time_limit(self.distance_limit))
+            if (candidate is None or progress+candidate['target_m']>self.distance_limit or
+                    now-self.started+candidate['target_m']/self.SPEED>self.time_limit):
                 self.active=False
                 return 0.,'execution_escape_stopped'
             return self.SPEED*self.direction,'execution_escape_forward' if self.direction>0 else 'execution_escape_reverse'
@@ -203,4 +233,6 @@ class ExecutionEscape:
         self.started=now
         self.geometry=geometry
         self.direction=direction
+        self.distance_limit=self._proposal_limit(proposal)
+        self.time_limit=self._time_limit(self.distance_limit)
         return self.SPEED*direction,'execution_escape_forward' if direction>0 else 'execution_escape_reverse'

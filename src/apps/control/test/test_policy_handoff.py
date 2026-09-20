@@ -55,3 +55,23 @@ class ControlPolicyProducerTests(unittest.TestCase):
         result = self.policy.evaluate(.01, 0., 10.02)
         self.assertIsNotNone(result)
         self.assertIs(result[0].tracking, evidence)
+
+    def test_live_linear_limit_is_snapshot_bound_and_preserves_curvature(self):
+        self.assertTrue(self.producer.publish(GateInputs(), now=10.01,
+                                              linear_limit=.005))
+        snapshot, result = self.policy.evaluate(.01, .2, 10.02)
+        self.assertEqual(snapshot.linear_limit, .005)
+        self.assertAlmostEqual(result.linear, .005)
+        self.assertAlmostEqual(result.angular, .1)
+        self.assertEqual(result.reason, 'adaptive_speed_limit')
+
+        # A limit is reducing-only; it cannot increase a smaller request.
+        _, result = self.policy.evaluate(.003, .2, 10.03)
+        self.assertEqual((result.linear, result.angular), (.003, .2))
+
+    def test_malformed_linear_limit_invalidates_previous_authority(self):
+        self.assertTrue(self.producer.publish(GateInputs(), now=10.01,
+                                              linear_limit=.005))
+        self.assertFalse(self.producer.publish(GateInputs(), now=10.02,
+                                               linear_limit=float('nan')))
+        self.assertIsNone(self.policy.evaluate(.01, 0., 10.03))

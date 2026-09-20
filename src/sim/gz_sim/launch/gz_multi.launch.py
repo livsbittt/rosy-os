@@ -19,6 +19,7 @@ N대의 로봇을 rosy_01 .. rosy_NN namespace로 시뮬레이션한다.
   ros2 launch gz_sim gz_multi.launch.py robots:=3 mode:=nav core:=true   # 로봇별 core, 8080..8082
 """
 
+import math
 import os
 import sys
 import tempfile
@@ -38,6 +39,7 @@ from launch.actions import (
     LogInfo,
     OpaqueFunction,
     SetEnvironmentVariable,
+    TimerAction,
 )
 from launch_ros.actions import Node, PushRosNamespace, SetRemap
 from launch.launch_description_sources import AnyLaunchDescriptionSource, PythonLaunchDescriptionSource
@@ -137,6 +139,70 @@ def _nav_config(ns: str, rosy_nav_share: str,
         for costmap in ("local_costmap", "global_costmap"):
             layer = params[costmap][costmap]["ros__parameters"]["inflation_layer"]
             layer["inflation_radius"] = inflation_radius
+
+    # SmacPlanner2D searches x/y cells without a heading state.  A rectangular
+    # footprint can therefore be accepted near a corner at yaw=0 even though
+    # the controller must later rotate it through the corner; the next replan
+    # then reports "Start occupied".  Simulation uses the padded
+    # circumscribed radius in both costmaps so planning is conservative for
+    # every yaw.  This never shrinks the physical envelope or inflation layer.
+    costmap_params = [
+        params[name][name]["ros__parameters"]
+        for name in ("local_costmap", "global_costmap")
+    ]
+    source_footprint = next(
+        (item.get("footprint") for item in costmap_params if item.get("footprint")),
+        None,
+    )
+    if source_footprint is not None:
+        vertices = yaml.safe_load(source_footprint)
+        padding = max(float(item.get("footprint_padding", 0.)) for item in costmap_params)
+        circumscribed_radius = max(math.hypot(float(x), float(y)) for x, y in vertices) + padding
+        for item in costmap_params:
+            item.pop("footprint", None)
+            item["robot_radius"] = circumscribed_radius
+            item["footprint_padding"] = 0.
+
+    # Simulation-only, reducing-only narrow-space trial. These values mirror the
+    # reviewed map_260905 candidate: preserve footprint/inflation/collision
+    # guards while reducing speed, lookahead and progress distance. Hardware
+    # speed authority still requires a commissioning certificate.
+    controller = params["controller_server"]["ros__parameters"]
+    follow = controller["FollowPath"]
+    follow["desired_linear_vel"] = min(float(follow["desired_linear_vel"]), .10)
+    follow["use_velocity_scaled_lookahead_dist"] = True
+    follow["lookahead_dist"] = .20
+    follow["min_lookahead_dist"] = .15
+    follow["max_lookahead_dist"] = .30
+    follow["rotate_to_heading_angular_vel"] = min(
+        float(follow["rotate_to_heading_angular_vel"]), .40)
+    follow["min_approach_linear_velocity"] = min(
+        float(follow["min_approach_linear_velocity"]), .03)
+    follow["regulated_linear_scaling_min_speed"] = min(
+        float(follow["regulated_linear_scaling_min_speed"]), .03)
+    follow["use_regulated_linear_velocity_scaling"] = True
+    follow["use_cost_regulated_linear_velocity_scaling"] = True
+    follow["cost_scaling_gain"] = min(float(follow["cost_scaling_gain"]), 1.0)
+    local_inflation = params["local_costmap"]["local_costmap"]["ros__parameters"][
+        "inflation_layer"]
+    follow["cost_scaling_dist"] = min(
+        float(follow["cost_scaling_dist"]), float(local_inflation["inflation_radius"]))
+    follow["inflation_cost_scaling_factor"] = float(
+        local_inflation["cost_scaling_factor"])
+    controller["progress_checker"]["required_movement_radius"] = min(
+        float(controller["progress_checker"]["required_movement_radius"]), .05)
+
+    smoother = params["velocity_smoother"]["ros__parameters"]
+    smoother["max_velocity"] = [
+        min(float(smoother["max_velocity"][0]), .10),
+        0.,
+        min(float(smoother["max_velocity"][2]), .50),
+    ]
+    smoother["min_velocity"] = [
+        max(float(smoother["min_velocity"][0]), -.10),
+        0.,
+        max(float(smoother["min_velocity"][2]), -.50),
+    ]
     return {ns: params}
 
 
@@ -320,16 +386,27 @@ def _launch_setup(context):
             )
         )
 
-        # 4) Nav2 / SLAM (mode)
+        # 4) Nav2 / SLAM (mode). Wait in wall time, not simulation time. Gazebo
+        # can advance five simulated seconds before its rendering sensors have
+        # finished initializing; starting slam_toolbox in that interval misses
+        # its lifecycle transition and leaves a 0x0 map until a manual reset.
+        mode_actions = []
         if mode == "nav":
             nav_cfg = os.path.join(bridge_dir, f"nav2_{ns}.yaml")
             with open(nav_cfg, "w", encoding="utf-8") as f:
                 yaml.safe_dump(_nav_config(ns, rosy_nav_share, inflation_radius),
                                f, sort_keys=False)
-            nav_args = {"namespace": ns, "params_file": nav_cfg}
+            nav_args = {
+                "namespace": ns,
+                "params_file": nav_cfg,
+                # Localization and navigation otherwise issue concurrent load
+                # requests to one component container. Under constrained field
+                # hosts that race can abort the manager before /load_node exists.
+                "use_composition": "False",
+            }
             if map_yaml:
                 nav_args["map"] = map_yaml
-            group_actions.append(
+            mode_actions.append(
                 IncludeLaunchDescription(
                     AnyLaunchDescriptionSource(
                         os.path.join(rosy_nav_share, "launch", "gz_bringup_launch.xml")
@@ -341,7 +418,7 @@ def _launch_setup(context):
             slam_cfg = os.path.join(bridge_dir, f"mapper_{ns}.yaml")
             with open(slam_cfg, "w", encoding="utf-8") as f:
                 yaml.safe_dump(_slam_config(ns, rosy_nav_share), f, sort_keys=False)
-            group_actions.append(
+            mode_actions.append(
                 GroupAction([
                     PushRosNamespace(ns),
                     # slam_toolbox 는 맵을 절대 토픽 `/map`·`/map_metadata` 로 발행한다
@@ -369,16 +446,7 @@ def _launch_setup(context):
                 with open(nav_cfg, "w", encoding="utf-8") as f:
                     yaml.safe_dump(_nav_config(ns, rosy_nav_share, inflation_radius),
                                    f, sort_keys=False)
-                group_actions.append(
-                    GroupAction([
-                        PushRosNamespace(ns),
-                        Node(package="rclcpp_components",
-                             executable="component_container_isolated",
-                             name="nav2_container", output="screen",
-                             parameters=[nav_cfg, {"use_sim_time": True, "autostart": True}]),
-                    ])
-                )
-                group_actions.append(
+                mode_actions.append(
                     GroupAction([
                         PushRosNamespace(ns),
                         IncludeLaunchDescription(
@@ -389,15 +457,17 @@ def _launch_setup(context):
                                 "params_file": nav_cfg,
                                 "use_sim_time": "True",
                                 "autostart": "True",
-                                "use_composition": "True",
-                                "container_name": f"{ns}/nav2_container",
+                                "use_composition": "False",
                             }.items(),
                         ),
                     ])
                 )
 
         # 5) map 시드 — odom (0,0) 을 관제 pose 로 쓰지 않는다 (D-115)
-        if mode in ("nav", "slam_nav"):
+        if mode_actions:
+            group_actions.append(TimerAction(period=15.0, actions=mode_actions))
+
+        if mode == "nav":
             group_actions.append(
                 Node(
                     package="gz_sim",

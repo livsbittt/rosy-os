@@ -29,16 +29,20 @@ class ControlPolicyProducer:
         self.applied_revision = applied_revision
         self.sequence = 0
 
-    def publish(self, inputs, *, now=None, applied_revision=None, translation=None, tracking=None):
+    def publish(self, inputs, *, now=None, applied_revision=None, translation=None, tracking=None,
+                linear_limit=None):
         """Attempt one snapshot; every attempt consumes a sequence number."""
         self.sequence += 1
         if now is None:
             now = time.monotonic()
         revision = self.applied_revision if applied_revision is None else applied_revision
         if (not isinstance(inputs, GateInputs) or type(now) not in (int, float) or
-                not math.isfinite(now)):
+                not math.isfinite(now) or
+                (linear_limit is not None and
+                 (type(linear_limit) not in (int, float) or
+                  not math.isfinite(linear_limit) or linear_limit < 0))):
             self.policy.invalidate()
             return False
         return self.policy.update_observations(
             self.observations, self.required, inputs, now, self.sequence, revision,
-            translation=translation, tracking=tracking)
+            translation=translation, tracking=tracking, linear_limit=linear_limit)

@@ -20,7 +20,8 @@ if not hasattr(launch, "LaunchContext"):
     pytest.skip("`launch` resolved to this package's launch/ directory, not ROS 2 launch",
                 allow_module_level=True)
 from launch import LaunchContext  # noqa: E402
-from launch_ros.actions import Node  # noqa: E402
+from launch.actions import TimerAction  # noqa: E402
+from launch_ros.actions import Node, ROSTimer  # noqa: E402
 
 LAUNCH = Path(__file__).resolve().parents[1] / "launch" / "gz_multi.launch.py"
 
@@ -41,6 +42,41 @@ def test_core_config_sets_identity_and_port():
     # 이 코어들은 시뮬이고 유일한 클라이언트는 같은 기계의 fleet 이다. 0.0.0.0 이면
     # 개발용 토큰을 문 API 가 랜에 열린다.
     assert cfg["network"]["api_host"] == "127.0.0.1"
+
+
+def test_nav_config_applies_reducing_only_narrow_space_trial():
+    mod = _module()
+    try:
+        from ament_index_python.packages import get_package_share_directory
+        share = get_package_share_directory("navigation")
+    except Exception as exc:
+        pytest.skip(f"navigation share missing: {exc}")
+
+    params = mod._nav_config("rosy_01", share)["rosy_01"]
+    controller = params["controller_server"]["ros__parameters"]
+    follow = controller["FollowPath"]
+    smoother = params["velocity_smoother"]["ros__parameters"]
+
+    assert follow["desired_linear_vel"] == pytest.approx(.10)
+    assert follow["min_lookahead_dist"] == pytest.approx(.15)
+    assert follow["max_lookahead_dist"] == pytest.approx(.30)
+    assert follow["use_regulated_linear_velocity_scaling"] is True
+    assert follow["use_cost_regulated_linear_velocity_scaling"] is True
+    assert follow["cost_scaling_dist"] == pytest.approx(.15)
+    assert controller["progress_checker"]["required_movement_radius"] == pytest.approx(.05)
+    assert smoother["max_velocity"] == pytest.approx([.10, 0., .50])
+    assert smoother["min_velocity"] == pytest.approx([-.10, 0., -.50])
+
+    # SmacPlanner2D is orientationless.  Give both costmaps the padded
+    # circumscribed radius so a square robot cannot enter a corner that only
+    # fits at yaw=0 and then become "start occupied" while turning.
+    padded_radius = (2 * .06 ** 2) ** .5 + .03
+    for costmap in ("local_costmap", "global_costmap"):
+        costmap_params = params[costmap][costmap]["ros__parameters"]
+        assert "footprint" not in costmap_params
+        assert costmap_params["robot_radius"] == pytest.approx(padded_radius)
+        assert costmap_params["footprint_padding"] == pytest.approx(0.)
+        assert costmap_params["inflation_layer"]["inflation_radius"] == pytest.approx(.15)
 
 
 def test_robots_manifest_lists_every_core_with_the_dev_operator_token():
@@ -115,3 +151,14 @@ def test_core_false_adds_no_core():
     mod = _module()
     actions, context = _setup(mod, core="false")
     assert not _core_nodes(actions, context)
+
+
+def test_slam_start_waits_for_sensor_startup_in_wall_time():
+    mod = _module()
+    actions, _ = _setup(mod, robots="1", core="false", mode="slam")
+    timers = [action for action in actions if isinstance(action, TimerAction)]
+
+    assert len(timers) == 1
+    assert not isinstance(timers[0], ROSTimer)
+    assert timers[0].period == 15.0
+    assert timers[0].actions

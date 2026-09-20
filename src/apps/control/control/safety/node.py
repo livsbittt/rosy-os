@@ -600,7 +600,7 @@ class SafetyNode(Node, Bumper, Hazard, Gate, Scale, Evidence, Obstacles):
             if self._policy_producer is not None:
                 self.sensor_policy_published = self._policy_producer.publish(
                     self.sensor_state, now=handoff_now, translation=translation_evidence,
-                    tracking=tracking_evidence)
+                    tracking=tracking_evidence, linear_limit=self.profile.max_linear)
             return
 
         if self.estop:

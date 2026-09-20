@@ -15,6 +15,7 @@ def test_package_and_multi_robot_launch_exist():
     assert "spawn_x" in launch
     assert "inflation_radius" in launch
     assert "slam_nav" in launch
+    assert launch.count('"use_composition": "False"') >= 2
     assert (ROOT / "config" / "worlds.yaml").is_file()
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
     assert "config" in cmake
@@ -37,11 +38,28 @@ def test_gz_multi_seeds_map_initialpose_at_spawn():
     assert "spawn_xy" in launch
     script = ROOT / "scripts" / "seed_initialpose.py"
     assert script.is_file()
+    raw = script.read_bytes()
+    assert raw.startswith(b"#!/usr/bin/env python3\n")
+    assert b"\r\n" not in raw
     text = script.read_text(encoding="utf-8")
     assert "initialpose" in text
+    assert "get_subscription_count" in text
+    assert "while rclpy.ok() and not node.done" in text
     assert "import core" not in text
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
     assert "scripts/seed_initialpose.py" in cmake
+
+
+def test_non_composed_nav2_does_not_apply_namespace_twice():
+    """The parent owns the namespace; child launch groups must receive an empty one."""
+    bringup = (
+        ROOT.parents[1]
+        / "navigation"
+        / "navigation"
+        / "launch"
+        / "bringup_launch.xml"
+    ).read_text(encoding="utf-8")
+    assert bringup.count('<arg name="namespace" value=""/>') == 2
 
 
 def test_world_to_map_is_installed_and_bench_worlds_exist():

@@ -22,17 +22,22 @@ def escape_space_plan(points, *, rotation_radius, center, pivot_radius,
         # A prediction never fills missing scan rays or authorizes a turn.
         cx, cy = center if fully_observed else (0., 0.)
         radius = pivot_radius if fully_observed else rotation_radius
+        robot_diameter = 2. * rotation_radius
         offsets = obstacles.astype(float)-np.array([cx, cy])
         current = float(np.hypot(offsets[:, 0], offsets[:, 1]).min())-radius
         report.update(current_rotation_clearance_m=current,
+                      robot_diameter_m=robot_diameter,
+                      max_reposition_m=robot_diameter,
                       rotation_restored=bool(can_rotate),
                       reason='rotation_ready' if can_rotate else 'no_observed_improvement')
         if report['rotation_restored']:
             return report
         for direction, available in ((1, forward_room), (-1, reverse_room)):
-            # Bound the local search, and reserve 5 mm beyond its destination
-            # inside the independently checked straight-translation corridor.
-            maximum = min(.08, max(0., available-.005))
+            # Search as far as one measured robot diameter, not a fixed 8 cm.
+            # The independent straight corridor remains authoritative and keeps
+            # a 5 mm reserve beyond the proposed destination.  Execution stops
+            # as soon as a fresh scan says rotation clearance is restored.
+            maximum = min(robot_diameter, max(0., available-.005))
             distances = np.arange(1, math.floor((maximum+1e-12)/.001)+1)*.001
             if not len(distances):
                 continue
@@ -54,6 +59,7 @@ def escape_space_plan(points, *, rotation_radius, center, pivot_radius,
                 report['candidates'].append(best)
         report['candidates'].sort(key=lambda c: (
             c['objective'] != 'restore_rotation',
+            c['direction'] != -1,
             c['target_m'] if c['objective'] == 'restore_rotation' else -c['predicted_rotation_clearance_m']))
         if report['candidates']:
             report['reason'] = 'observed_space_candidate'

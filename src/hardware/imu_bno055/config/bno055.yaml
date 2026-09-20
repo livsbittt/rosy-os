@@ -6,3 +6,7 @@ imu_bno055:
     frame_id: imu_link
     rate: 100.0
     reset_on_start: false
+    # Zero means the reported quantity is available but covariance is unknown.
+    orientation_stddev_rad: 0.0
+    angular_velocity_stddev_deg_s: 0.0
+    linear_acceleration_stddev_mps2: 0.0

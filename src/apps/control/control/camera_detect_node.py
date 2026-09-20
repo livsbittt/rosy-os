@@ -18,7 +18,7 @@ import json
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Float32, String
 
@@ -27,6 +27,7 @@ from .sensing.camera_controls import (
     lock_action, lock_controls, lock_summary, static_controls)
 from .sensing.camera_evidence import observation_payload
 from .sensing.camera_ground import ground_plane
+from .sensing.camera_homography import CalibrationThresholds, load_homography_profile
 from .sensing.camera_policy import CameraPolicy
 from .sensing.camera_worker import CameraFrame, CameraPreprocessProfile, CameraPreprocessWorker
 
@@ -64,6 +65,20 @@ class CameraDetectNode(Node):
         self.declare_parameter('camera_principal_x', 0.0)
         self.declare_parameter('camera_principal_y', 0.0)
         self.declare_parameter('camera_max_range_m', 0.0)
+        # Optional image-to-floor homography. The profile is only a candidate
+        # until its independent and physical validation checks pass. Thresholds
+        # are tunable inside bounds enforced by CalibrationThresholds.valid().
+        self.declare_parameter('camera_ground_mode', 'pinhole')
+        self.declare_parameter('camera_homography_path', '')
+        self.declare_parameter('camera_homography_enabled', False)
+        self.declare_parameter('camera_homography_allow_uniform_resize', False)
+        self.declare_parameter('camera_homography_max_fit_rmse_cm', 0.8)
+        self.declare_parameter('camera_homography_max_validation_rmse_cm', 1.0)
+        self.declare_parameter('camera_homography_max_validation_error_cm', 2.0)
+        self.declare_parameter('camera_homography_min_validation_points', 8)
+        self.declare_parameter('camera_homography_min_validation_frames', 2)
+        self.declare_parameter('camera_homography_min_validation_span_cm', 10.0)
+        self.declare_parameter('camera_homography_max_range_m', 0.6)
 
         self.cliff_pub = self.create_publisher(Bool, 'camera/cliff', 10)
         self.block_pub = self.create_publisher(Bool, 'camera/blocked', 10)
@@ -73,6 +88,15 @@ class CameraDetectNode(Node):
         self.observation_pub = self.create_publisher(String, 'camera/observation', 10)
         self.controls_pub = self.create_publisher(String, 'camera/controls', 10)
         self.telemetry_pub = self.create_publisher(String, 'camera/telemetry', 10)
+        calibration_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.ground_status_pub = self.create_publisher(
+            String, 'camera/calibration/status', calibration_qos)
+        self.create_subscription(
+            String, 'camera/calibration/cmd', self._on_ground_calibration_cmd, 10)
 
         self._settle_deadline = None
         self._locked = None
@@ -90,13 +114,43 @@ class CameraDetectNode(Node):
             classifier=self._classify_frame,
         )
         self._frame_id = 0
-        self._ground = ground_plane(
+        self._pinhole_ground = ground_plane(
             height_m=float(self.get_parameter('camera_height_m').value),
             pitch_rad=float(self.get_parameter('camera_pitch_rad').value),
             focal_px=float(self.get_parameter('camera_focal_px').value),
             principal_x=float(self.get_parameter('camera_principal_x').value),
             principal_y=float(self.get_parameter('camera_principal_y').value),
             max_range_m=float(self.get_parameter('camera_max_range_m').value))
+        self._ground_mode = str(self.get_parameter('camera_ground_mode').value).strip().lower()
+        self._homography_enabled = bool(
+            self.get_parameter('camera_homography_enabled').value)
+        self._homography = load_homography_profile(
+            str(self.get_parameter('camera_homography_path').value),
+            runtime_image_size=(int(self.get_parameter('width').value),
+                                int(self.get_parameter('height').value)),
+            runtime_rotate_deg=int(self.get_parameter('rotate_deg').value),
+            runtime_profile_revision=str(
+                self.get_parameter('camera_profile_revision').value),
+            thresholds=CalibrationThresholds(
+                max_fit_rmse_cm=float(self.get_parameter(
+                    'camera_homography_max_fit_rmse_cm').value),
+                max_validation_rmse_cm=float(self.get_parameter(
+                    'camera_homography_max_validation_rmse_cm').value),
+                max_validation_error_cm=float(self.get_parameter(
+                    'camera_homography_max_validation_error_cm').value),
+                min_validation_points=int(self.get_parameter(
+                    'camera_homography_min_validation_points').value),
+                min_validation_frames=int(self.get_parameter(
+                    'camera_homography_min_validation_frames').value),
+                min_validation_span_cm=float(self.get_parameter(
+                    'camera_homography_min_validation_span_cm').value),
+                max_range_m=float(self.get_parameter(
+                    'camera_homography_max_range_m').value),
+            ),
+            allow_uniform_resize=bool(self.get_parameter(
+                'camera_homography_allow_uniform_resize').value),
+        )
+        self._apply_ground_mode()
         # Hysteresis and the warmup gate belong to the policy, not to this node:
         # the Gazebo adapter needs the same ones, and when each kept its own they
         # diverged silently.
@@ -106,12 +160,61 @@ class CameraDetectNode(Node):
         self._start_cam()
         period = 1.0 / max(1.0, float(self.get_parameter('fps').value))
         self.create_timer(period, self.tick)
+        self.create_timer(2.0, self._publish_ground_calibration_status)
+        self._publish_ground_calibration_status()
         self.get_logger().info(
             f'camera_detect ready {int(self.get_parameter("width").value)}x'
             f'{int(self.get_parameter("height").value)} @ '
             f'{float(self.get_parameter("fps").value):.0f}Hz '
             f'rotate={int(self.get_parameter("rotate_deg").value)}'
         )
+
+    def _apply_ground_mode(self):
+        if self._ground_mode == 'pinhole':
+            self._ground = self._pinhole_ground
+        elif self._ground_mode == 'homography':
+            self._ground = (self._homography.model
+                            if self._homography_enabled and self._homography.eligible
+                            else None)
+        else:
+            self._ground = None
+
+    def _ground_calibration_status(self):
+        status = self._homography.status(
+            enabled_requested=self._homography_enabled,
+            mode=self._ground_mode)
+        status['active'] = bool(
+            self._ground_mode == 'homography'
+            and self._homography_enabled
+            and self._homography.eligible
+            and self._ground is self._homography.model)
+        status['pinhole_active'] = bool(
+            self._ground_mode == 'pinhole' and self._pinhole_ground is not None)
+        if self._ground_mode not in ('pinhole', 'homography', 'off'):
+            status['reason'] = 'unsupported_mode'
+        elif self._ground_mode != 'homography':
+            status['reason'] = 'mode_' + self._ground_mode
+        return status
+
+    def _publish_ground_calibration_status(self):
+        self.ground_status_pub.publish(String(data=json.dumps(
+            self._ground_calibration_status(), sort_keys=True)))
+
+    def _on_ground_calibration_cmd(self, msg):
+        command = str(msg.data).strip().lower()
+        if command not in ('enable', 'disable'):
+            self.get_logger().warn(f'ignored camera calibration command: {command}')
+            return
+        self._homography_enabled = command == 'enable'
+        self._apply_ground_mode()
+        self._publish_ground_calibration_status()
+        status = self._ground_calibration_status()
+        if command == 'enable' and not status['active']:
+            self.get_logger().warn(
+                f'camera homography remains inactive: {status["reason"]}')
+        else:
+            self.get_logger().info(
+                f'camera homography active={status["active"]} (session only)')
 
     def _start_cam(self):
         try:

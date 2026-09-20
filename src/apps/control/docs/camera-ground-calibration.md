@@ -1,4 +1,4 @@
-# 카메라 지면 캘리브레이션 (약 20분)
+# 카메라 지면 캘리브레이션
 
 `camera_detect_node`가 영역(region)까지의 거리를 미터로 보고하려면 카메라 높이·피치·초점거리가
 필요합니다. 이 값이 없으면 `ground_plane()`이 `None`을 돌려주고, 모든 영역은 지금처럼
@@ -18,6 +18,22 @@
   이 경우는 초음파 센서가 담당합니다(원 논문도 같은 처방을 냅니다).
 
 ## 절차
+
+### 권장 구조: 내부 보정과 지면 보정을 분리
+
+ArUco 마커 한 장을 한 번 보는 것은 카메라 내부 파라미터와 로봇 기준 지면 거리를 동시에
+확정하지 못합니다. 다음 두 단계를 분리합니다.
+
+1. **내부 보정**: ChArUco 보드를 여러 거리·각도·화면 위치에서 촬영해 카메라 행렬과 렌즈 왜곡을 구합니다.
+2. **고정 장착 지면 보정**: 마운트를 고정한 뒤 바닥에 둔 보드의 점과 실측 로봇 전방 거리를 대응시켜
+   호모그래피를 만들고, 학습에 쓰지 않은 별도 사진으로 검증합니다.
+
+OpenCV도 일반 ArUco 모서리보다 ChArUco 모서리의 정확도가 높아 카메라 보정에는 ChArUco 사용을
+권장합니다. 일부 가림을 허용하는 장점도 있습니다.
+
+- [OpenCV ChArUco 카메라 보정](https://docs.opencv.org/4.12.0/da/d13/tutorial_aruco_calibration.html)
+- [OpenCV ChArUco 검출·자세 추정](https://docs.opencv.org/4.12.0/df/d4a/tutorial_charuco_detection.html)
+- [OpenCV 보정 품질·뷰 선택](https://docs.opencv.org/4.5.5/d7/d21/tutorial_interactive_calibration.html)
 
 ### 1. 내부 파라미터 (초점거리, 주점)
 
@@ -84,6 +100,93 @@ camera_detect_node:
 
 여섯 값이 모두 유효해야 거리 보고가 켜집니다. 하나라도 0이거나 비정상이면 전체가 꺼지고
 `distance_m: null`로 되돌아갑니다 — 부분적으로 맞는 캘리브레이션은 없느니만 못하기 때문입니다.
+
+## 선택형 ChArUco/호모그래피 프로필
+
+기존 핀홀 모델 대신 검증된 이미지→지면 행렬을 쓰려면 `camera.yaml`에서 모드를 명시적으로
+바꿉니다. 기본값은 기존 동작을 보존하는 `pinhole`입니다.
+
+```yaml
+camera_ground_mode: homography
+camera_homography_path: /var/lib/rosy/camera/ground-profile.json
+camera_homography_enabled: false
+camera_homography_allow_uniform_resize: false
+camera_homography_max_fit_rmse_cm: 0.8
+camera_homography_max_validation_rmse_cm: 1.0
+camera_homography_max_validation_error_cm: 2.0
+camera_homography_min_validation_points: 8
+camera_homography_min_validation_frames: 2
+camera_homography_min_validation_span_cm: 10.0
+camera_homography_max_range_m: 0.6
+```
+
+대시보드의 `카메라 지면 거리 보정 사용` 스위치는 현재 세션에서만 `enable`/`disable`을 보냅니다.
+재부팅 기본값을 바꾸려면 검증 기록을 검토한 뒤 YAML을 의도적으로 수정해야 합니다.
+
+### 프로필 필수 구조
+
+```json
+{
+  "version": 3,
+  "status": "validated",
+  "method": "charuco_ground_homography",
+  "image_size": [320, 240],
+  "processed_rotate_deg": 180,
+  "camera_profile_revision": "camera-profile-v1",
+  "intrinsic_calibration": {
+    "revision": "ov5647-intrinsic-v1",
+    "image_size": [320, 240],
+    "distortion_model": "opencv_plumb_bob",
+    "points_undistorted": true
+  },
+  "image_to_ground_homography": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+  "coordinates": {
+    "x": "board-relative lateral right; NOT robot lateral",
+    "y": "forward floor distance from camera ground projection, cm"
+  },
+  "reference_frames": [
+    {"image": "fit-01.jpg", "pixel_points": [[0, 0]], "ground_points_cm": [[0, 0]]}
+  ],
+  "validation_frames": [
+    {"image": "holdout-01.jpg", "pixel_points": [[0, 0]], "ground_points_cm": [[0, 0]]}
+  ],
+  "physical_validation": {
+    "square_size_measured": true,
+    "board_flat": true,
+    "camera_mount_locked": true,
+    "robot_forward_axis_checked": true
+  }
+}
+```
+
+예시는 필드 모양을 보여줄 뿐이며 단위행렬이나 한 점으로는 절대 통과하지 않습니다. 런타임은 파일의
+`fit_rmse_cm`을 신뢰하지 않고 모든 대응점을 다시 투영해 오차를 계산합니다. `validation_frames`의
+파일 이름은 `reference_frames`와 달라야 하고 설정한 최소 점 수, RMSE, 최대 오차를 모두 통과해야 합니다.
+독립 사진 수와 검증 전방 거리 폭도 각각 설정한 최소값을 넘어야 하므로, 같은 거리의 한 사진을
+복제하거나 좁은 구간만 잘 맞춘 프로필은 활성화되지 않습니다.
+
+### 화면 체크박스의 의미
+
+다음 항목은 조작 체크박스가 아니라 노드 판정의 읽기 전용 표시입니다.
+
+- 프로필 로드
+- 해상도·회전·카메라 프로필 일치
+- 내부 보정 리비전·왜곡 제거점 계약
+- 행렬·참조점 오차
+- 독립 검증점 오차
+- 보드·바닥·마운트·로봇축 물리 확인
+
+자동 검사 실패를 사람이 체크해서 통과시키는 우회는 없습니다. `board-relative` X는 전방 Y 거리만
+사용하고 좌우 로봇 좌표는 항상 미상으로 둡니다. 좌우 거리가 필요하면 보드를 `base_link`에 정렬한
+별도 검증과 그 좌표계 계약이 필요합니다.
+
+### 제공된 640x480 값의 현재 판정
+
+제공된 `two_photo_checker_ground_homography`는 `status`가
+`approximate_requires_physical_validation`이고, 현재 처리 영상은 320x240/180도입니다. 균일 1/2 축소는
+옵션으로 지원하지만, 보정 당시 회전과 `camera-profile-v1` 결합 정보, 독립 검증 사진, 물리 확인이
+없으므로 현재 값은 **후보 표시만 가능하고 활성화 불가**입니다. 또한 X가 보드 기준이라고 명시되어
+있어 로봇 좌우 여유에는 사용하지 않습니다.
 
 ## 섀시를 건드렸다면
 

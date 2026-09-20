@@ -141,7 +141,8 @@ class SafetyManager:
                 raise ValueError('Control observation unavailable')
             snapshot, result = output
             disposition = ('limit' if result.reason in ('allow', 'motion_limited', 'trajectory_changed',
-                           'obstacle_replan', 'obstacle_wait', 'camera_obstacle_unranged')
+                           'adaptive_speed_limit', 'obstacle_replan', 'obstacle_wait',
+                           'camera_obstacle_unranged')
                            else 'stop')
             return SafetyDecision(request.command_id, request.source, snapshot.calibration_revision,
                                   snapshot.observed_at, snapshot.expires_at,

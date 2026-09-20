@@ -91,6 +91,14 @@ void Device::wait_register(int reg, int expected, const char *stage, int timeout
   }
   throw std::runtime_error(detail(stage, reg, last, error) + " BNO055 " + stage + " timed out");
 }
+int Device::read_register(int reg, const char *stage)
+{
+  errno = 0;
+  int value = wiringPiI2CReadReg8(fd_, reg);
+  int error = errno;
+  if (value < 0) {throw std::runtime_error(detail(stage, reg, value, error));}
+  return value;
+}
 std::array<uint8_t, 32> Device::read()
 {
   std::array<uint8_t, 32> data{};
@@ -102,5 +110,15 @@ std::array<uint8_t, 32> Device::read()
         " BNO055 measurement read failed; no IMU sample published");
   }
   return data;
+}
+Health Device::health()
+{
+  Health value;
+  value.temperature_c = static_cast<int8_t>(read_register(0x34, "health_temperature"));
+  value.calibration = static_cast<uint8_t>(read_register(0x35, "health_calibration"));
+  value.self_test = static_cast<uint8_t>(read_register(0x36, "health_self_test"));
+  value.system_status = static_cast<uint8_t>(read_register(0x39, "health_system_status"));
+  value.system_error = static_cast<uint8_t>(read_register(0x3A, "health_system_error"));
+  return value;
 }
 }

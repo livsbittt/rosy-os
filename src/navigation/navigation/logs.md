@@ -40,3 +40,10 @@
 - gate 변화: 없음
 - 결정: 없음
 - 교훈: 좁은 통로의 교행은 파라미터로 풀리지 않는다. 팽창을 낮추면 벽에 더 붙을 뿐 상대를 비켜 가지는 못한다 — 누가 먼저 갈지 정해 주는 쪽(Fleet 양보)이 있어야 한다. 그리고 `PASSING_WIDTH_M` 처럼 "여기서는 Fleet 이 빠져도 된다"를 정하는 상수는 실측 없이 낮추면 안 된다. 1.2 로 두면 폭 1.3 m 통로에서 양보를 접고 두 대 다 선다
+
+## 2026-09-20 · uncommitted · fix(nav2): keep non-composed nodes in one robot namespace
+
+- 변경: the parent launch group retains namespace ownership and passes an empty child namespace to localization and navigation includes, preventing `/<robot>/<robot>` node names.
+- 증거: isolated exact-map runtime showed map server, AMCL, planner, controller and behavior server active under `/codex_01`; the initial-pose seed completed. Contract coverage is in `test_gz_package_contract.py`.
+- gate 변화: none. Stack startup is proven, but the exact-map unattended route and device execution remain HOLD.
+- 교훈: switching composition modes changes which launch scope owns the namespace; the child cannot inherit and push the same namespace again.

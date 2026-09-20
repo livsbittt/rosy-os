@@ -44,3 +44,13 @@ plans:
 
 - chip ID 미확인이나 초기화 타임아웃은 stage/register/errno 로그와 함께 nonzero exit로 처리한다(조용한 실패 금지).
 - `reset_on_start` 기본값을 false에서 바꾸지 않는다 — 응답 중인 칩을 재시작 사이에 보존하는 계약이다.
+
+## 2026-09-20 health evidence status
+
+- `sensors/imu/status` now includes freshness, sample/error counts, four calibration components, self-test, system status/error, and temperature.
+- Health validity requires a fresh sample, fusion system status, zero system error, and passing self-test bits. It does not require magnetometer calibration in IMUPLUS mode.
+- Covariance is no longer hard-coded to `0.01`. The three standard-deviation parameters default to `0.0`, producing ROS all-zero unknown covariance, and configured positive values are squared onto the diagonal.
+- Host verification: `4 passed, 10 skipped`.
+- ARTIFACT HOLD: no Linux ARM64 C++ build in this Windows run.
+- DEVICE HOLD: no injected executable or live BNO055 register readback.
+- FIELD HOLD: sensor evidence has not been correlated with physical stop and trajectory measurements.

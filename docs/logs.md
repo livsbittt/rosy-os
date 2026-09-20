@@ -557,3 +557,11 @@
 - gate 변화: 없음
 - 결정: deselect는 목록 고정이다 — 목록 밖 신규 실패는 루트 스텝을 적색으로 만든다
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · feat(calibration): separate estimation from speed authority
+
+- 변경: document the primary-source research and implement candidate/holdout certificates, a measured motion envelope, adaptive clearance limiting, numeric Control-to-CORE speed caps, and richer BNO055 evidence.
+- 증거: focused Control `37 passed`; CORE `895 passed, 11 skipped`; IMU host `4 passed, 10 skipped`; `rosy_harness.py generate` passed.
+- gate 변화: no higher speed is active. ROS-SIM, ARM64 artifact, Device stopping trials, complete `map_260905_update_v2` traversal, supervision, and FIELD acceptance remain HOLD.
+- 결정: map confidence alone is never enough to raise speed; speed authority requires an active geometry certificate, independent stopping envelope, matching runtime conditions, fresh health/localization/clearance evidence, and a final CORE-side reducing-only cap. Harness lint remains blocked by four pre-existing malformed headings at `docs/logs.md:295,302,308,314` and stale verification warnings.
+- 교훈: map confidence, calibration evidence, runtime evidence, and final actuator authorization are distinct gates.

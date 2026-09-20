@@ -1,5 +1,7 @@
 import math
 
+import pytest
+
 from control.control.escape_space import escape_space_plan
 
 
@@ -40,3 +42,18 @@ def test_restoration_requires_actual_rotation_permission_and_measured_margin():
     assert not escape_space_plan(points, can_rotate=False, **args)['rotation_restored']
     report = escape_space_plan([(0., .111), (.3, .2), (-.3, .2)], can_rotate=True, **args)
     assert report['rotation_restored'] and not report['candidates']
+
+
+def test_reposition_search_scales_to_measured_robot_diameter_not_fixed_eight_cm():
+    report = escape_space_plan(
+        [(0., .08), (.3, .2), (-.3, .2)],
+        rotation_radius=.115, center=(0., 0.), pivot_radius=.115,
+        fully_observed=True, can_rotate=False,
+        forward_room=.25, reverse_room=.25,
+    )
+    assert report['robot_diameter_m'] == pytest.approx(.23)
+    assert report['max_reposition_m'] == pytest.approx(.23)
+    restoring = [row for row in report['candidates']
+                 if row['objective'] == 'restore_rotation']
+    assert restoring
+    assert restoring[0]['target_m'] > .08

@@ -51,3 +51,32 @@ plans:
 - 순수 로직 결정은 `control/control/`, `control/planning/`, `control/sensing/`, `control/watch.py`에만 두고 ROS import를 넣지 않는다(AGENTS.md).
 - 이 패키지의 레거시 최종 `/cmd_vel` publisher를 CORE와 나란히 기동하지 않는다(AGENTS.md, D-38).
 - `config/robot.yaml`이 단일 공유 파라미터 소스이며 per-node yaml은 이후에만 override한다(AGENTS.md).
+
+## 2026-09-20 adaptive speed authorization status
+
+- Geometry/sensor estimates now have candidate and active certificate states, context binding, evidence digests, bounds, observability checks, and independent holdout promotion.
+- Motion envelopes are direction-specific and bind stopping, latency, lateral error, environment, payload, battery, temperature, wheel revision, and the active geometry digest.
+- Runtime limiting is fail-closed for stale/unknown evidence and continuously reduces speed using uncertainty plus latency/braking distance. Drift immediately returns authority to at most `0.014 m/s`.
+- The Control-to-CORE snapshot carries a numeric `linear_limit`; CORE remains the sole final `cmd_vel` owner.
+- Current default and sensor-node publication remain `0.014 m/s`. A higher ceiling requires explicit commissioned configuration and is not active in this change.
+- Verified: focused Control `37 passed`; CORE package `895 passed, 11 skipped`; IMU host `4 passed, 10 skipped`.
+- Final host Control gate: `1038 passed, 26 skipped`; the startup-profile fixture now supplies the declared empty `web_port` and `web_backend_port` defaults.
+- ROS-SIM HOLD: no Jazzy runtime proof for the new policy.
+- DEVICE HOLD: no Pi/ARM64 build, BNO055 live readback, stopping trials, `map_260905_update_v2` traversal, or physical clearance proof.
+- FIELD HOLD: no unattended complete-route or supervision acceptance.
+
+## 2026-09-20 flexible clearance recovery status
+
+- The fixed 0.08 m execution cap and compatibility fallback are removed from the measured escape executor.
+- A fresh proposal must bind `robot_diameter_m` and `max_reposition_m`; the latter cannot exceed the calibrated circumscribed diameter or the current measured corridor.
+- Reverse is preferred among equivalent recovery candidates, but forward remains available when rear evidence is unsafe or produces no improvement.
+- The episode stops on restored turn clearance, stale scan/proposal, geometry revision change, pose deviation, no progress, hazard, or budget exhaustion. Its bound may shrink but cannot expand while moving.
+- Verified in pure logic and the real legacy adapter: `30 passed` focused tests, `102 passed` in the wider recovery/adaptive-speed/certificate/calibration set, and final full Control `1038 passed, 26 skipped`. The active CORE/Nav2 recovery connection remains HOLD to preserve CORE as the only final `cmd_vel` owner.
+
+## 2026-09-20 optional camera ground homography status
+
+- A camera-ground profile is now separated into candidate, eligible, requested, and active states. Reported residuals are ignored; reference and independent validation errors are recomputed from the point pairs.
+- The runtime image size, processed rotation, camera profile revision, intrinsic/undistorted-point contract, coordinate semantics, bounded thresholds, independent image names/count/distance span, and four physical attestations all fail closed.
+- `camera_ground_mode` keeps `pinhole` as the default. A validated homography can be enabled for the current session from the diagnostic dashboard; the switch cannot override failed checks and is not persisted.
+- Board-relative lateral coordinates provide forward distance only. Camera metric output remains advisory and does not create speed or final command authority.
+- SOURCE verification is covered by host pure-logic and wiring tests. DEVICE/FIELD remain HOLD until a complete profile, independent captures, measured Pinky Pro distances, and live readback are available.

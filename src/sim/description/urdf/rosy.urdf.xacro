@@ -12,10 +12,18 @@
                 </geometry>
             </visual>
             <collision>
-                <origin xyz="0 0 0" rpy="0 0 0"/>
-                <geometry>
-                    <mesh filename="package://description/meshes/collision/base_link.stl" scale="1 1 1"/>
-                </geometry>
+                <xacro:if value="${is_sim}">
+                    <origin xyz="-0.017900 0.003387 0.031511" rpy="0 0 0"/>
+                    <geometry>
+                        <box size="0.113200 0.087874 0.106658"/>
+                    </geometry>
+                </xacro:if>
+                <xacro:unless value="${is_sim}">
+                    <origin xyz="0 0 0" rpy="0 0 0"/>
+                    <geometry>
+                        <mesh filename="package://description/meshes/collision/base_link.stl" scale="1 1 1"/>
+                    </geometry>
+                </xacro:unless>
             </collision>
             <inertial>
                 <origin xyz="-0.025 0 0.025" rpy="0 0 0"/>
@@ -70,10 +78,18 @@
                 </geometry>
             </visual>
             <collision>
-                <origin xyz="0 0 0" rpy="0 0 0"/>
-                <geometry>
-                    <mesh filename="package://description/meshes/collision/caster_mount.stl" scale="1 1 1"/>
-                </geometry>
+                <xacro:if value="${is_sim}">
+                    <origin xyz="0 0 -0.001750" rpy="0 0 0"/>
+                    <geometry>
+                        <box size="0.028000 0.027000 0.003500"/>
+                    </geometry>
+                </xacro:if>
+                <xacro:unless value="${is_sim}">
+                    <origin xyz="0 0 0" rpy="0 0 0"/>
+                    <geometry>
+                        <mesh filename="package://description/meshes/collision/caster_mount.stl" scale="1 1 1"/>
+                    </geometry>
+                </xacro:unless>
             </collision>
             <inertial>
                 <origin xyz="0 0 -0.0015" rpy="0 0 0"/>
@@ -96,10 +112,18 @@
                 </geometry>
             </visual>
             <collision>
-                <origin xyz="0 0 0" rpy="0 0 0"/>
-                <geometry>
-                    <mesh filename="package://description/meshes/collision/caster_rotate.stl" scale="1 1 1"/>
-                </geometry>
+                <xacro:if value="${is_sim}">
+                    <origin xyz="-0.004000 0 -0.006250" rpy="0 0 0"/>
+                    <geometry>
+                        <box size="0.020000 0.016000 0.012500"/>
+                    </geometry>
+                </xacro:if>
+                <xacro:unless value="${is_sim}">
+                    <origin xyz="0 0 0" rpy="0 0 0"/>
+                    <geometry>
+                        <mesh filename="package://description/meshes/collision/caster_rotate.stl" scale="1 1 1"/>
+                    </geometry>
+                </xacro:unless>
             </collision>
             <inertial>
                 <origin xyz="-0.010 0 -0.006" rpy="0 0 0"/>
@@ -150,10 +174,18 @@
                 </geometry>
             </visual>
             <collision>
-                <origin xyz="0 0 0" rpy="0 0 0"/>
-                <geometry>
-                    <mesh filename="package://description/meshes/collision/robot_lamp.stl" scale="1 1 1"/>
-                </geometry>
+                <xacro:if value="${is_sim}">
+                    <origin xyz="-0.064250 0 0.076306" rpy="0 0 0"/>
+                    <geometry>
+                        <box size="0.016500 0.058000 0.017389"/>
+                    </geometry>
+                </xacro:if>
+                <xacro:unless value="${is_sim}">
+                    <origin xyz="0 0 0" rpy="0 0 0"/>
+                    <geometry>
+                        <mesh filename="package://description/meshes/collision/robot_lamp.stl" scale="1 1 1"/>
+                    </geometry>
+                </xacro:unless>
             </collision>
             <inertial>
                 <origin xyz="-0.06425 0 0.078" rpy="0 0 0"/>
@@ -176,10 +208,18 @@
                 </geometry>
             </visual>
             <collision>
-                <origin xyz="0 0 0" rpy="0 0 0"/>
-                <geometry>
-                    <mesh filename="package://description/meshes/collision/rplidar_c1.stl" scale="1 1 1"/>
-                </geometry>
+                <xacro:if value="${is_sim}">
+                    <origin xyz="0 0 0.020550" rpy="0 0 0"/>
+                    <geometry>
+                        <cylinder radius="0.027800" length="0.041300"/>
+                    </geometry>
+                </xacro:if>
+                <xacro:unless value="${is_sim}">
+                    <origin xyz="0 0 0" rpy="0 0 0"/>
+                    <geometry>
+                        <mesh filename="package://description/meshes/collision/rplidar_c1.stl" scale="1 1 1"/>
+                    </geometry>
+                </xacro:unless>
             </collision>
             <inertial>
                 <origin xyz="0 0 0.021" rpy="0 0 0"/>
@@ -217,10 +257,18 @@
                 </geometry>
             </visual>
             <collision>
-                <origin xyz="0 0 0" rpy="0 0 0"/>
-                <geometry>
-                    <mesh filename="package://description/meshes/collision/camera_assy.stl" scale="1 1 1"/>
-                </geometry>
+                <xacro:if value="${is_sim}">
+                    <origin xyz="0.008302 0 -0.011500" rpy="0 0 0"/>
+                    <geometry>
+                        <box size="0.023638 0.044912 0.030000"/>
+                    </geometry>
+                </xacro:if>
+                <xacro:unless value="${is_sim}">
+                    <origin xyz="0 0 0" rpy="0 0 0"/>
+                    <geometry>
+                        <mesh filename="package://description/meshes/collision/camera_assy.stl" scale="1 1 1"/>
+                    </geometry>
+                </xacro:unless>
             </collision>
             <inertial>
                 <origin xyz="0.01 0 -0.0121" rpy="0 0 0"/>
@@ -250,10 +298,18 @@
                 </geometry>
             </visual>
             <collision>
-                <origin xyz="0 0 0" rpy="0 0 0"/>
-                <geometry>
-                    <mesh filename="package://description/meshes/collision/screen_assy.stl" scale="1 1 1"/>
-                </geometry>
+                <xacro:if value="${is_sim}">
+                    <origin xyz="0.006511 0 -0.003500" rpy="0 0 0"/>
+                    <geometry>
+                        <box size="0.020978 0.076000 0.041000"/>
+                    </geometry>
+                </xacro:if>
+                <xacro:unless value="${is_sim}">
+                    <origin xyz="0 0 0" rpy="0 0 0"/>
+                    <geometry>
+                        <mesh filename="package://description/meshes/collision/screen_assy.stl" scale="1 1 1"/>
+                    </geometry>
+                </xacro:unless>
             </collision>
             <inertial>
                 <origin xyz="0.01 0 -0.004" rpy="0 0 0"/>

@@ -19,6 +19,7 @@ Backend API (all CORS *, JSON contract unchanged since v1):
   POST /map/reset    stop commands + reset SLAM, paused; clear map caches
   POST /map/resume   resume SLAM measurements only (no motion commands)
   POST /map/pause    stop autonomous navigation, pause SLAM and verify readback
+  POST /camera/calibration enable|disable -> optional ground homography session toggle
   POST /teleop       {"x":..,"z":..} Twist on /cmd_vel_raw, through safety.
 
 No decision logic — a view + relay, like goal_node is thin I/O over
@@ -374,11 +375,16 @@ class WebNode(Node):
         self.wander_pub = self.create_publisher(String, 'wander/cmd', 10)
         self.estop_pub = self.create_publisher(String, 'estop/cmd', 10)
         self.calibration_pub = self.create_publisher(String, 'calibration/cmd', 10)
+        self.camera_calibration_pub = self.create_publisher(
+            String, 'camera/calibration/cmd', 10)
         with LOCK:
             STATE['calibration_ready'] = False
             STATE.pop('calibration_received', None)
             STATE['calibration'] = {'phase': 'unavailable', 'ready': False,
                                     'message': 'Waiting for startup calibration', 'sensors': {}}
+            STATE['camera_calibration'] = {
+                'candidate': False, 'eligible': False, 'active': False,
+                'reason': 'waiting_for_camera_node', 'checks': {}}
         self.map_control = MapControl(self)
         self.map_frame = 'map'
         self.declare_parameter('pose_timeout', 1.0)
@@ -423,6 +429,8 @@ class WebNode(Node):
         self.create_subscription(Bool, 'estop/state', self.on_estop, latched)
         self.create_subscription(Bool, 'calibration/ready', self.on_calibration_ready, latched)
         self.create_subscription(String, 'calibration/status', self.on_calibration_status, 10)
+        self.create_subscription(
+            String, 'camera/calibration/status', self.on_camera_calibration_status, latched)
         self.create_subscription(String, 'safety/profile', self.on_safety_profile, latched)
         self.create_subscription(String, 'safety/decision', self.on_safety_decision, 10)
         self.create_subscription(Bool, 'robot/ok', self.on_ok, 10)
@@ -620,6 +628,20 @@ class WebNode(Node):
             return
         with LOCK:
             STATE['calibration'] = status
+
+    def on_camera_calibration_status(self, msg):
+        try:
+            status = json.loads(msg.data)
+            if (not isinstance(status, dict)
+                    or type(status.get('active')) is not bool
+                    or type(status.get('eligible')) is not bool
+                    or not isinstance(status.get('checks', {}), dict)):
+                raise ValueError('Invalid camera calibration status')
+        except (ValueError, TypeError):
+            status = {'candidate': False, 'eligible': False, 'active': False,
+                      'reason': 'invalid_camera_calibration_status', 'checks': {}}
+        with LOCK:
+            STATE['camera_calibration'] = status
 
     def on_wander(self, msg):
         with LOCK:
@@ -865,7 +887,7 @@ def _handler(node, html, api):
                 return
             ln = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(ln).decode()
-            logged_action = self.path in ('/calibration', '/estop', '/wander', '/navigation/start', '/goal', '/map/reset', '/map/resume', '/map/pause')
+            logged_action = self.path in ('/calibration', '/camera/calibration', '/estop', '/wander', '/navigation/start', '/goal', '/map/reset', '/map/resume', '/map/pause')
             if logged_action:
                 print(json.dumps({'event': 'operator_request', 'path': self.path,
                                   'command': body[:180], 'client': self.client_address[0]}), flush=True)
@@ -887,6 +909,18 @@ def _handler(node, html, api):
                 mapping_active = STATE.get('map_control', {}).get('paused') is False
                 planner_fresh = 0 <= time.monotonic()-STATE.get('planner_received', -1e9) <= 5.
                 calibration_received = STATE.get('calibration_received')
+                camera_calibration = dict(STATE.get('camera_calibration', {}))
+            if self.path == '/camera/calibration':
+                if body not in ('enable', 'disable'):
+                    reject('Camera calibration command must be enable or disable', status=400)
+                    return
+                if body == 'enable' and camera_calibration.get('eligible') is not True:
+                    reject('Camera ground calibration has not passed validation')
+                    return
+                node.camera_calibration_pub.publish(String(data=body))
+                self.send_response(202)
+                self.end_headers()
+                return
             if self.path == '/calibration':
                 if body not in ('retry', 'retry:stay', 'retry:return_origin', 'retry:stay:full',
                                 'retry:stay:skip_motion', 'retry:return_origin:full',

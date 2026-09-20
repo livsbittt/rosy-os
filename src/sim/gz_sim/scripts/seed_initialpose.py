@@ -21,12 +21,23 @@ class SeedInitialPose(Node):
         self.declare_parameter("yaw", 0.0)
         self.declare_parameter("count", 30)
         self.declare_parameter("period_s", 0.5)
+        self.declare_parameter("max_wait_count", 240)
         self._pub = self.create_publisher(PoseWithCovarianceStamped, "initialpose", 10)
         self._left = int(self.get_parameter("count").value)
+        self._wait_left = int(self.get_parameter("max_wait_count").value)
+        self.done = False
         period = float(self.get_parameter("period_s").value)
         self._timer = self.create_timer(period, self._tick)
 
     def _tick(self) -> None:
+        if self._pub.get_subscription_count() == 0:
+            self._wait_left -= 1
+            if self._wait_left <= 0:
+                self.get_logger().error("initialpose subscriber did not become ready")
+                self.done = True
+                self._timer.cancel()
+            return
+
         x = float(self.get_parameter("x").value)
         y = float(self.get_parameter("y").value)
         yaw = float(self.get_parameter("yaw").value)
@@ -46,6 +57,7 @@ class SeedInitialPose(Node):
         self._left -= 1
         if self._left <= 0:
             self.get_logger().info(f"seeded initialpose map ({x:.3f}, {y:.3f})")
+            self.done = True
             self._timer.cancel()
 
 
@@ -53,10 +65,12 @@ def main() -> None:
     rclpy.init()
     node = SeedInitialPose()
     try:
-        rclpy.spin(node)
+        while rclpy.ok() and not node.done:
+            rclpy.spin_once(node, timeout_sec=0.5)
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":

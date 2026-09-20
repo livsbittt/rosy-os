@@ -42,8 +42,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · feat(camera): add validated tunable ground homography
+- 2026-09-20 · uncommitted · feat(control): replace fixed 8 cm escape cap with measured diameter bound
+- 2026-09-20 · uncommitted · feat(safety): evidence-gated adaptive speed authorization
 - 2026-09-18 · uncommitted · feat(control): camera/front publishes sensor-data QoS (D-119)
 - 2026-09-17 · 8fdd8d2 · docs(control): D-77 diagnostic surface, CSS/JS token mirror
-- 2026-09-17 · uncommitted · fix(sensing): stop writing RGB tuples into the BGR map raster
-- 2026-09-15 · uncommitted · docs(harness): rerun control LOCAL with the Windows path separator
-- 2026-09-15 · uncommitted · docs(harness): start the control harness record

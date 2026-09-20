@@ -446,6 +446,18 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline:2px s
       <progress id="calibrationprogress" value="0" max="9" aria-label="정상 검사 수"></progress>
       <p class="hint" id="calibrationsummary" aria-live="polite">센서 검사 대기</p>
       <p class="hint" id="calibrationenvironment" aria-live="polite">환경 여유 측정 대기</p>
+      <fieldset>
+        <legend>카메라 지면 거리 보정</legend>
+        <label class="switchrow"><div><span>카메라 지면 거리 보정 사용</span><small>검증된 호모그래피만 · 세션 동안만 적용</small></div><input id="camera_ground_toggle" type="checkbox" role="switch" aria-label="카메라 지면 거리 보정 사용" disabled></label>
+        <p class="hint" id="camera_ground_status" role="status">카메라 보정 상태 대기</p>
+        <label><input id="camera_ground_check_profile_loaded" type="checkbox" disabled> 프로필 로드</label>
+        <label><input id="camera_ground_check_image_contract" type="checkbox" disabled> 해상도·회전·카메라 프로필 일치</label>
+        <label><input id="camera_ground_check_intrinsic_calibration" type="checkbox" disabled> 내부 보정·왜곡 제거점 계약</label>
+        <label><input id="camera_ground_check_reference_fit" type="checkbox" disabled> 행렬·참조점 오차</label>
+        <label><input id="camera_ground_check_independent_validation" type="checkbox" disabled> 독립 검증점 오차</label>
+        <label><input id="camera_ground_check_physical_validation" type="checkbox" disabled> 보드·바닥·마운트·로봇축 물리 확인</label>
+        <details><summary>보정값과 튜닝 기준</summary><pre class="hint" id="camera_ground_detail" style="white-space:pre-wrap;overflow-wrap:anywhere">보정 프로필 대기</pre></details>
+      </fieldset>
       <details><summary>센서별 상세값</summary><pre class="hint" id="calibrationsensors" style="white-space:pre-wrap;overflow-wrap:anywhere">센서 데이터 대기</pre></details>
       <details class="procedure"><summary>검증 절차와 주의사항</summary><p>센서 확인 → 공간에 맞춘 전후 왕복 → 좌우 회전 검증 → 보정값 적용 확인 순서로 진행합니다. 이동과 회전 공간을 확보하세요. 실패·중단 시 정지하며 재시작은 직접 선택합니다.</p></details>
       <label for="calibrationscope">보정 범위</label>
@@ -684,6 +696,7 @@ function togglePreview() {
   renderOverview(S.data);
 }
 function renderCalibration(s) {
+  cameraGroundCalibration(s && s.camera_calibration);
   const calibration = s && s.calibration;
   const phase = calibration && calibration.phase;
   const limited = limitedSensors(s);
@@ -822,6 +835,43 @@ function renderCalibration(s) {
     button.disabled = button.dataset.hold !== 'stop' && (!calibrationReady(s) || s.estop !== false);
   });
   if (!calibrationReady(s) && S.held.size) { S.held.clear(); ksync(); }
+}
+function cameraGroundCalibration(calibration) {
+  const value = calibration || {eligible:false, active:false, reason:'waiting_for_camera_node', checks:{}};
+  const checks = value.checks || {};
+  const toggle = $('camera_ground_toggle');
+  toggle.disabled = value.mode !== 'homography' || value.eligible !== true;
+  toggle.checked = value.active === true;
+  const labels = {
+    waiting_for_camera_node:'카메라 노드 연결 대기', profile_missing:'보정 프로필 없음',
+    validation_failed:'후보 로드됨 · 검증 미통과', disabled:'검증 통과 · 사용 안 함',
+    active:'검증 통과 · 거리 보정 사용 중', mode_pinhole:'기존 핀홀 모델 선택',
+    mode_off:'카메라 거리 보정 꺼짐', unsupported_mode:'지원하지 않는 모드'
+  };
+  setTxt('camera_ground_status', labels[value.reason] || value.reason || '상태 미확인');
+  ['profile_loaded', 'image_contract', 'intrinsic_calibration', 'reference_fit', 'independent_validation',
+   'physical_validation'].forEach(name => {
+    const input = $('camera_ground_check_' + name);
+    input.checked = !!(checks[name] && checks[name].passed === true);
+  });
+  const metric = value.metrics || {};
+  const threshold = value.thresholds || {};
+  const range = Array.isArray(value.validated_range_m) && value.validated_range_m.length === 2
+    ? (value.validated_range_m[0] * 100).toFixed(1) + '–' + (value.validated_range_m[1] * 100).toFixed(1) + 'cm' : '미검증';
+  const number = (v, unit) => Number.isFinite(v) ? v.toFixed(3) + unit : '없음';
+  setTxt('camera_ground_detail',
+    '모드: ' + (value.mode || '미수신') + '\n' +
+    '프로필: ' + (value.source || '없음') + '\n' +
+    '상태: ' + (value.profile_status || '없음') + '\n' +
+    '참조 RMSE: ' + number(metric.fit_rmse_cm, 'cm') + ' / 기준 ' + number(threshold.max_fit_rmse_cm, 'cm') + '\n' +
+    '독립 RMSE: ' + number(metric.validation_rmse_cm, 'cm') + ' / 기준 ' + number(threshold.max_validation_rmse_cm, 'cm') + '\n' +
+    '독립 최대 오차: ' + number(metric.validation_max_error_cm, 'cm') + ' / 기준 ' + number(threshold.max_validation_error_cm, 'cm') + '\n' +
+    '독립 사진/점: ' + (metric.validation_frames || 0) + '/' + (metric.validation_points || 0) +
+      ' / 기준 ' + (threshold.min_validation_frames || '-') + '/' + (threshold.min_validation_points || '-') + '\n' +
+    '검증 거리 폭: ' + number(metric.validation_span_cm, 'cm') + ' / 기준 ' + number(threshold.min_validation_span_cm, 'cm') + '\n' +
+    '검증 거리: ' + range + '\n' +
+    '좌우 거리: ' + (value.lateral_available ? 'robot frame 사용 가능' : '사용 안 함') + '\n' +
+    '적용: 세션 전용');
 }
 async function calibrationAction(action) {
   if (action === 'validate_motion' && $('calibrationmotion').disabled) return;
@@ -1773,6 +1823,13 @@ $('mapsave').addEventListener('click', saveMapImage);
 $('mapresume').addEventListener('click', () => mappingAction('resume'));
 $('mappingtoggle').addEventListener('change', () => mappingAction($('mappingtoggle').checked ? 'resume' : 'pause'));
 $('cameratoggle').addEventListener('change', togglePreview);
+$('camera_ground_toggle').addEventListener('change', async () => {
+  const toggle = $('camera_ground_toggle');
+  const requested = toggle.checked;
+  toggle.disabled = true;
+  const ok = await post('/camera/calibration', requested ? 'enable' : 'disable');
+  if (!ok) toggle.checked = !requested;
+});
 try { S.previewEnabled = localStorage.getItem('pinky.preview') !== 'off'; } catch (_) {}
 $('cameratoggle').checked = S.previewEnabled;
 $('camcard').hidden = !S.previewEnabled;

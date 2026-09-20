@@ -30,6 +30,9 @@ int wiringPiI2CReadReg8(int fd, int reg) {
  if (reset_at && strcmp(getenv("BNO_FAULT"), "reset_nack") == 0) return -1;
  if (reset_at && now()-reset_at < .650) return -1;
  if (reg == 0) return 0xa0;
+ if (reg == 0x34) return 25;
+ if (reg == 0x35) return 0xfc;
+ if (reg == 0x36) return 0x0f;
  if (reg == 0x3a) return 0;
  if (reg == 0x39) return strcmp(getenv("BNO_FAULT"), "fusion_stuck") == 0 ? 0 : 5;
  return 0;
