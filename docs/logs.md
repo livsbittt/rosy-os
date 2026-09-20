@@ -756,3 +756,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 남은 FAIL 게이트 2개(DART mesh collision, 센서 브리지)는 gz_sim/D-83 도메인이다 — 로봇 SDF의 충돌 지오메트리를 단순 형태로, 센서 브리지를 헤드리스 렌더링 경로로. fleet 측 할 일은 없다
 - 교훈: 두 세션이 같은 장애를 독립 관측했고, 한쪽의 수정이 다른쪽의 FAIL 게이트를 닫았다 — result.md 의 게이트 표가 세션 간 인계의 가장 정확한 언어였다
+
+## 2026-09-20 · uncommitted · docs(control): review the received camera-ground homography draft with verification math
+
+- 변경: 공급받은 two_photo_checker_ground_homography 초안(version 2, 미착지)을 순수 산술 재계산으로 검증 — img1 자기정합 RMSE 0.306cm 재현, top-level 호모그래피가 두 캡처(18.3~36.5cm) 모두 ≈0.5cm 커버 확인. 검토 문서를 docs/validation 에 착지(재계산 결과·포맷 게이트·내용 갭·수용 체크리스트)
+- 증거: 재계산 — img1 12점 자기정합 0.306 재현, top-level H 로 img2 8점 근거리 평균 0.36/원거리 0.46cm(거리 의존 열화 없음). 포맷 — 수신본에 context 5필드·digest 체인 전무(`calibration_record.validate_context`/`decode_record` 거부 대상)
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 수용 보류 — ① 포맷 래핑(encode_record) ② img2 후반 데이터 수령 ③ 융합 근거 문서화를 공급자에게 요구. 물리 체크박스에는 ArUco dock tag pose(bf0ed54)와의 교차검증을 포함했다
+- 교훈: 검증 도구의 출력도 의심한다 — "1.75cm 열화"는 내 스크립트가 잘린 데이터를 잘못 짝지은 오판이었다. 잘린 입력 위의 정밀 숫자는 정확한 착각이다
