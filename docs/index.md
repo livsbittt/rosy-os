@@ -89,8 +89,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · fix(core): boot crash — D-126 rename misses in node.py, plus web asset packaging (D-129)
 - 2026-09-20 · uncommitted · docs: retire docs/plan — the WBS and parity checklist join the plans trail
 - 2026-09-20 · uncommitted · fix(test): make the host contract suite green on the Windows dev host
 - 2026-09-20 · uncommitted · perf(fleet): the WSL addendum bench kills the dev-box temptation (D-131 phase 3 addendum)
 - 2026-09-20 · uncommitted · ci: restore single-step root gating — the harness waiver cleared the structural reds
-- 2026-09-20 · uncommitted · ci: route the two frozen harness contracts through a tolerated step

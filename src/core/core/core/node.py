@@ -86,18 +86,18 @@ class RosyCoreNode(Node):
         self.bridge = RosBridge(self, self.core)
 
         self.get_logger().info(
-            f"core up: robot_id={self.core_common.identity.robot_id} model={profile.model}")
+            f"core up: robot_id={self.core.identity.robot_id} model={profile.model}")
         self._start_events()
-        self.core_features.state.set_map_id(config.get("navigation", {}).get("map_id"))
-        self.core_events.events.publish("system.boot", source="core",
-                                     data={"version": SOFTWARE_VERSION})
+        self.core.state.set_map_id(config.get("navigation", {}).get("map_id"))
+        self.core.events.publish("system.boot", source="core",
+                                 data={"version": SOFTWARE_VERSION})
         self._start_api()
 
     def _start_events(self) -> None:
         def _on_event(event) -> None:
             self.get_logger().debug("event %s seq=%d", event.type, event.seq)
 
-        self.core_events.events.subscribe(_on_event)
+        self.core.events.subscribe(_on_event)
 
     def _start_api(self) -> None:
         port = int(self._config.get("network", {}).get("api_port", 8080))
@@ -127,6 +127,6 @@ class RosyCoreNode(Node):
     def shutdown(self) -> None:
         if self._api_server is not None:
             self._api_server.should_exit = True
-        self.core_events.events.publish("system.shutdown", severity="warning", source="core")
+        self.core.events.publish("system.shutdown", severity="warning", source="core")
         self.control_adapter.close()
         self.get_logger().info("core shutting down")

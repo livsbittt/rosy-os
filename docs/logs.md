@@ -612,3 +612,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: control 의 map 검증 덤프(map_260905_update_v2/)는 untracked 로 남긴다 — 기기 검증 자산의 귀속은 소유자 확인 후
 - 교훈: PowerShell Get-Content/Set-Content 는 UTF-8 한국어 파일을 cp949 로 재해석해 유실시킨다 — 문서 편집은 read/edit 도구나 UTF-8 명시 파이썬으로만
+
+## 2026-09-20 · uncommitted · fix(core): boot crash — D-126 rename misses in node.py, plus web asset packaging (D-129)
+
+- 변경: `core/node.py`의 D-126 리네임 누락 4곳 수정 — `self.core_common.identity`→`self.core.identity`, `self.core_features.state`→`self.core.state`, `self.core_events.events`(×3)→`self.core.events`. 이 결함은 ROS-SIM에서 CORE 부팅을 죽였다(AttributeError: 'RosyCoreNode' object has no attribute 'core_common' — line 89에서 발견, 뒤이어 91·92·100·130). `core_api_web/setup.py`에 web 자산 package_data 추가(D-129 배포 정합성 — 복사 설치에서 tokens.css·index.html 누락 방지)
+- 증거: ROS-SIM 단계 실측 — Gazebo 기동 ✓ → 수정 전 CORE 부팅 크래시(양쪽 robot_id) → 수정 후 양쪽 `core up: robot_id=rosy_01/02` 도달 ✓ → `/ui/tokens.css` 200(시뮬 내 D-129 동작 확인). 이후 단계는 공유 WSL의 백그라운드 라이프사이클(SIGKILL, gz 로그 exit -9 흔적)이 스택을 정리해 완주 불가 — 대화형 검증은 D-83 세션 절차로
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED. 이 수정으로 D-83 재실행의 전제(CORE 부팅)가 열린다
+- 결정: 부팅 로그의 identity 출처는 CoreServices.identity(services.py가 from_config로 생성)다 — node.py가 core_common 모듈을 직접 참조하지 않는다
+- 교훈: 도메인 재편의 import 스윕은 `self.core_*` 형태의 **동적 속성 참조**를 못 잡는다 — grep 정적 스윕에 `self\.(core_common|core_events|core_features)\b`를 추가할 과제. 부팅 크래시는 시뮬 실행에서만 잡힌다 — 호스트 pytest는 rclpy 경로를 못 돈다
