@@ -73,6 +73,25 @@ class TestDockType:
         db.add(a_dock(id="dock_2", x=9.0))
         assert db.type_of("dock_1") is db.type_of("dock_2")
 
+    def test_a_type_without_tag_spec_cannot_drive_vision(self):
+        """DNC-007: 태그 제원 없는 기종은 태그 검출기를 고를 수 없다."""
+        dock_type = DockType(name="rosy_v1", detector="aruco")
+        assert dock_type.tag_id is None
+        assert dock_type.tag_size_m is None
+
+    def test_a_type_carries_the_tag_contract(self):
+        dock_type = DockType(name="rosy_v1", detector="aruco",
+                             tag_family="DICT_4X4_50", tag_id=7, tag_size_m=0.10)
+        assert dock_type.tag_family == "DICT_4X4_50"
+        assert dock_type.tag_id == 7
+        assert dock_type.tag_size_m == pytest.approx(0.10)
+
+    def test_a_tag_size_must_be_positive_when_set(self):
+        with pytest.raises(ValueError):
+            DockType(name="bad", detector="aruco", tag_id=7, tag_size_m=0.0)
+        with pytest.raises(ValueError):
+            DockType(name="bad", detector="aruco", tag_id=-1, tag_size_m=0.10)
+
 
 # --- DockInstance: 개체 --------------------------------------------------------
 

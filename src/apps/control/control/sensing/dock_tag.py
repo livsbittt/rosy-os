@@ -49,6 +49,8 @@ class DockTagObservation:
     yaw: float
     range_m: float
     revision: str
+    confidence: float = 1.0   # reprojection-based; 1.0 is a perfect fit
+    at: float = 0.0           # capture clock; the lifecycle wrapper stamps it
 
 
 def detect_dock_tag(bgr: np.ndarray, spec: DockTagSpec,
@@ -73,9 +75,17 @@ def detect_dock_tag(bgr: np.ndarray, spec: DockTagSpec,
     if not ok:
         return None
     tx, _, tz = (float(v) for v in tvec.flatten())
+    # Reprojection error maps to confidence: a perfect fit is 1.0, a fit
+    # several pixels off decays toward 0. A warped or half-hidden tag reads
+    # as unsure, never as a confident wrong pose.
+    projected, _ = cv2.projectPoints(obj, rvec, tvec, camera_matrix, dist_coeffs)
+    err_px = float(np.mean(np.linalg.norm(
+        projected.reshape(4, 2) - match.reshape(4, 2).astype(np.float64), axis=1)))
+    confidence = 1.0 / (1.0 + err_px)
     # Camera x-right/z-forward to robot x-forward/y-left; bearing CCW-positive.
     x, y = tz, -tx
     return DockTagObservation(tag_id=spec.tag_id, x=x, y=y,
                               yaw=math.atan2(-tx, tz),
                               range_m=math.hypot(x, y),
-                              revision=spec.revision)
+                              revision=spec.revision,
+                              confidence=confidence)

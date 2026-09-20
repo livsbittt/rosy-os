@@ -19,7 +19,7 @@ import math
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class DockError(Exception):
@@ -43,6 +43,11 @@ class DockType(BaseModel):
     docking_threshold_m: float = 0.05   # 접점이 맞물렸다고 볼 잔여 거리
     max_retries: int = 3                # 재시도 상한 — 도킹은 한 번에 되지 않는다
     undock_distance_m: float = 0.35     # 언도킹 후진 거리 (오도메트리 전용)
+    # DNC-007 도크 태그 제원. 셋 중 하나라도 없으면 태그 검출기를 고를 수 없다 —
+    # 크기를 모르면 상대 포즈를 풀 수 없으므로 fail-closed.
+    tag_family: str = "DICT_4X4_50"
+    tag_id: Optional[int] = None
+    tag_size_m: Optional[float] = None
 
     @field_validator("staging_offset_m")
     @classmethod
@@ -51,6 +56,14 @@ class DockType(BaseModel):
         if value <= 0.0:
             raise ValueError("staging_offset_m must be positive")
         return value
+
+    @model_validator(mode="after")
+    def _tag_spec_is_all_or_nothing(self) -> "DockType":
+        if self.tag_id is not None and self.tag_id < 0:
+            raise ValueError("tag_id must be non-negative")
+        if self.tag_size_m is not None and self.tag_size_m <= 0.0:
+            raise ValueError("tag_size_m must be positive")
+        return self
 
 
 class DockInstance(BaseModel):
