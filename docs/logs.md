@@ -716,3 +716,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: D-133 대로 공유 환경에서의 실측 반복을 중단한다 — D-132 코드는 계약 시험으로 증명됐고(326 passed), 무장 직후 follower_tx ≥ 1 실측은 포트를 혼자 쓰는 안정 세션(D-83 절차)에서 한다. sim_verify.sh와 run_fleet_sim.sh 수정(--ui-tokens·PYTHONPATH·정리 대기)은 D-83 세션 인계물이다
 - 교훈: append-only 로그의 동시 커밋 충돌에 이어, 이번에는 포트와 시뮬까지 걸렸다 — 다중 에이전트 저장소에서 "환경"도 소유 대상이다. 점유 전 세션 목록(포트·프로세스·/tmp)을 확인하는 것은 기록만큼 중요하다
+
+## 2026-09-20 · uncommitted · ci(adr): flip the gating runner to ubuntu-26.04 — D-135 closed
+
+- 변경: 게이팅 러너 기본값을 ubuntu-24.04 → ubuntu-26.04 로 전환했다. ubuntu-26.04-rehearsal 워크플로는 목적(이동 전 리허설)을 다해 제거 — 이제 모든 push 가 26.04 에서 직접 검증된다. 되돌림은 runs_on 기본값을 24.04 로 한 줄 바꾸면 충분하다
+- 증거: 리허설 연속 녹색 2회 — run 35500103409·35501110977 conclusion success (26.04 러너, 전 스텝). D-135 의 전환 조건 충족
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: workflow_call 입력(runs_on)은 유지한다 — 러너 후퇴도 한 줄이다
+- 교훈: 없음
