@@ -596,3 +596,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: fleet_gather_bench를 게이트 절차로 고정한다 — 규모 판정은 "같은 스크립트, 대상 환경"에서만. 개발 박스 숫자는 방향 감지용으로만 쓴다
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · fix(test): make the host contract suite green on the Windows dev host
+
+- 변경: ① test/conftest.py — Windows 호스트에서 openssl 이 PATH 에 없으면 Git for Windows 것을 앞에 붙인다(서명·readback·bundle 계약이 전부 openssl 을 부른다) ② test_dds_identity_contracts — bash 후보에서 Git Bash 를 선점하고(`_find_usable_bash`, runtime_slices 와 같은 순서) 임시 경로를 bash 뷰(`/mnt/x/…` 또는 `X:/…`)로 번역하는 `_bash_view`를 추가 — WSL bash.EXE 는 `X:\…` 를 읽지 못해 identity 계약 13건이 전부 죽었다
+- 증거: `python -m pytest test/ -q` → 964 passed 1 failed 13 skipped. 유일 실패는 test_network_topology_contracts 1건으로, 다른 세션이 진행 중인 미커밋 docs/plan 이동 때문이다(커밋된 CI 상태에서는 통과 — run 35485570913 success). 이동이 착지하면 그 세션이 같은 커밋에 경로 갱신을 넣어야 한다
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: openssl 이 이미 PATH 에 있으면 아무 것도 건드리지 않는다. bash 후보 순위는 runtime_slices 가 밟은 패턴을 따른다
+- 교훈: 로컬에서만 깨지는 스위트는 "환경 문제"로 묻혀 있다가 이동 대규모 변경 때 한꺼번에 터진다 — CI 그린과 로컬 그린은 별개의 계약이다
