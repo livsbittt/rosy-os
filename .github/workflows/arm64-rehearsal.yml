@@ -25,7 +25,7 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key | sudo tee /usr/share/keyrings/ros-archive-keyring.gpg > /dev/null
           echo "deb [arch=arm64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu noble main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
           sudo apt-get update -qq
-          sudo apt-get install -y -qq ros-jazzy-ros-base python3-colcon-common-extensions python3-pip openssl
+          sudo apt-get install -y -qq ros-jazzy-ros-base ros-jazzy-xacro ros-jazzy-realtime-tools ros-jazzy-rmw-cyclonedds-cpp ros-jazzy-nav2-msgs python3-colcon-common-extensions python3-pip openssl
 
       - name: Install python deps
         run: |
@@ -35,7 +35,11 @@ jobs:
         run: |
           source /opt/ros/jazzy/setup.sh
           cd src
-          colcon build --symlink-install --event-handlers console_direct+
+          # Pi 전용 C++ 드라이버(wiringPi/ws2811)와 Gazebo(gz_sim)는 이 리허설
+          # 범위 밖 — 나머지 전 패키지를 네이티브 arm64 로 빌드한다
+          colcon build --symlink-install \
+            --packages-skip gz_sim lamp_control sensor_adc imu_bno055 \
+            --event-handlers console_direct+
 
       - name: Core suite (ROS-free pytest, native arm64)
         run: |
