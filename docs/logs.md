@@ -788,3 +788,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: D-132·D-134 의 최종 실측("무장 직후 follower_tx ≥ 1", 팔로워 실제 추종)은 D-83 세션의 절차(안정 세션에서 sim_verify.sh 실행)로 확정 인계 — 인계물 전부 자리했다(Rosy/sim_verify.sh·run_fleet_sim.sh 수정·진단 필드·재현 경로)
 - 교훈: 세 번의 다른 실패 양상 뒤에 같은 환경 원인이 있었다. 같은 환경에서 세 번 다른 그림이 나오면, 그것은 코드 결함이 아니라 환경 한계의 세 얼굴이다 — 갈아타라
+
+## 2026-09-20 · uncommitted · docs(fleet): background-launched sims are reaped - live full-chain verification requires the interactive D-83 session (final)
+
+- 변경: 없음(실측과 기록만). 백그라운드 검증 1회 추가 시도 — 콘솔 기동은 늦게 성공(대기 창 200s 초과)했으나 gz_multi 가 이후 사망(프로세스 부재, scan/토픽 0), 세션 IDLE
+- 증거: /tmp/rosy_gz.log 부재 근처 — pgrep 'gz_multi.launch.py' 빈 결과, /api/fleet/state 빈 응답(gather 타임아웃), /api/fleet/formation 은 IDLE 응답(콘솔 생존). 백그라운드 기동 스택이 세션 수명 내에 재피해 왔고, 동시 세션(codex)의 포트·콘솔 충돌까지 겹쳤다
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 실측 완주(무장 직후 follower_tx ≥ 1 → 팔로워 추종 → 오버레이 검증)는 대화형 세션에서만 가능함이 세 번째로 확인됐다 — D-83 세션의 절차는 유효하며(Rosy/sim_verify.sh, 정리 절차 강제·RMW 통일·도메인 격리·map:= 주입 모두 반영됨), 인계를 이대로 종결한다
+- 교훈: 세 번의 다른 실패 뒤에는 같은 결론이 있었다 — 환경이 허락할 때까지 기다리는 것과, 환경을 바꾸는 것, 그리고 환경 밖에서 할 수 있는 것을 다 하고 멈추는 것. 이번은 세 번째다
