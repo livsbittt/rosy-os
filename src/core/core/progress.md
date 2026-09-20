@@ -14,7 +14,7 @@ gates:
     cmd: "PYTHONPATH=src/core:src python3 -m pytest src/core/test -q"
   ROS-SIM:
     state: HOLD
-    blocker: "2026-09-13 실제 ROS 출력 시험 이후 미재실행. ROS 2 Jazzy 환경에서 현재 트리로 재실행 필요"
+    blocker: "2026-09-13 실제 ROS 출력 시험 이후 미재실행. ROS 2 Jazzy 환경에서 현재 트리로 재실행 필요. 2026-09-20 Gazebo 시도에서 부팅 AttributeError(self.core_common — D-126 개명 잔재)를 기록했고 6ff2cb8 에서 수정 — 재실행 증거는 아직 없음(docs/validation/map-260905-update-v2-2026-09-20/result.md)"
   ARTIFACT:
     state: HOLD
     blocker: "ARM64 개발 후보만 존재. 서명 manifest와 immutable digest 발행 전"

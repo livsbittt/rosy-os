@@ -25,12 +25,12 @@
 
 ## HOLD blockers
 
-- core ROS-SIM: 2026-09-13 실제 ROS 출력 시험 이후 미재실행. ROS 2 Jazzy 환경에서 현재 트리로 재실행 필요
+- core ROS-SIM: 2026-09-13 실제 ROS 출력 시험 이후 미재실행. ROS 2 Jazzy 환경에서 현재 트리로 재실행 필요. 2026-09-20 Gazebo 시도에서 부팅 AttributeError(self.core_common — D-126 개명 잔재)를 기록했고 6ff2cb8 에서 수정 — 재실행 증거는 아직 없음(docs/validation/map-260905-update-v2-2026-09-20/result.md)
 - core ARTIFACT: ARM64 개발 후보만 존재. 서명 manifest와 immutable digest 발행 전
 - core DEVICE: Pi bench Device 설치와 device-readback.sh --json 증거 없음. G4 viewport·보정 상태기계 미실행
 - deploy ARTIFACT: ARM64 개발 후보(ac81f2f core/io)만 존재. 서명 manifest·OCI archive·immutable registry digest 발행 전
 - deploy DEVICE: Pi OS Lite bench Device의 install-pi.sh 설치, verify-pi.sh, device-readback.sh --json 증거 없음
-- control ROS-SIM: ROS 2 Jazzy 노드 그래프(sensing/camera/planning/safety-policy) 재실행 증거 없음. 레거시 전체 스택(launch/robot.launch.py)은 CORE와 병행 기동하지 않는다(AGENTS.md, D-38)
+- control ROS-SIM: ROS 2 Jazzy 노드 그래프(sensing/camera/planning/safety-policy) 재실행 증거 없음. 레거시 전체 스택(launch/robot.launch.py)은 CORE와 병행 기동하지 않는다(AGENTS.md, D-38). 2026-09-20 Gazebo Harmonic end-to-end 시도 기록: 번들 무결성·월드 로드 PASS, 물리 충돌·센서 브리지 FAIL — docs/validation/map-260905-update-v2-2026-09-20/result.md. 재실행 전 물리 메시 충돌과 브리지 무출력을 먼저 해소해야 한다
 - control ARTIFACT: 서명된 ARM64 manifest·immutable digest 발행 전. 흡수된 코드는 deploy가 소유하는 OS 이미지에 번들된다
 - control DEVICE: Pi bench Device 설치와 device-readback.sh --json 증거 없음. Control sensor adapter 활성화는 Device 보정 generation에 묶인다(D-47)
 - fleet ROS-SIM: D-87: 현재 트리의 colcon install/setup.bash가 없다. 2026-09-17 WSL Task 14 로그는 설계 입력이며 GO가 아니다 (D-89)

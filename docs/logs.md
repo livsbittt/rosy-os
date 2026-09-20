@@ -660,3 +660,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 릴레이 follower_tx 0 진단과 실 로봇 오버레이 검증은 D-83 세션의 절차(안정 세션·자원 튜닝 후 sim_verify 절차 재실행)로 귀속한다 — 검증 스크립트는 Rosy/sim_verify.sh에 남긴다. 이 환경에서의 반복 시도는 무효 숫자를 낳는다(D-79 정신)
 - 교훈: 환경이 흔들릴 때 얻는 실패 데이터는 결함 데이터와 구별이 안 된다 — 구별이 안 되는 순간 그 환경에서의 반복은 중단하는 것이 기록이다
+
+## 2026-09-20 · uncommitted · docs(progress): record the 2026-09-20 Gazebo attempt in control and core ROS-SIM blockers
+
+- 변경: control·core progress.md 의 ROS-SIM blocker 에 오늘 Gazebo Harmonic end-to-end 시도의 증거를 연결했다 — control 은 번들 무결성 PASS와 물리 충돌·센서 브리지 FAIL을, core 는 부팅 AttributeError 기록과 6ff2cb8 수정 사실을 명시. gate 상태는 HOLD 유지
+- 증거: docs/validation/map-260905-update-v2-2026-09-20/result.md (판정표·immutable inputs·static checks). 부팅 결함은 9b77daa 에서 유입되고 6ff2cb8 에서 수정 — `git log -S "self.core_common"` 확인
+- gate 변화: 없음. ROS-SIM HOLD 유지 — 재실행 증거가 생기면 그때 GO 판정
+- 결정: gate 상태 텍스트는 최신 시도 증거를 가리켜야 한다 — HOLD 인 이유가 오래된 문장이면 재검증 판단이 늦어진다
+- 교훈: 없음
