@@ -708,3 +708,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: D-135 전환 조건은 "리허설 연속 녹색" — 1회 성공으로는 부족하고, 주간 스케줄이 연속 녹색을 쌓으면 그때 runs-on 을 26.04 로 전환한다(전환 커밋으로 D-135 종결)
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · docs(fleet): port 8090 and the sim are contested by a concurrent session — live iteration handed off (D-133 applied)
+
+- 변경: 없음(실측과 기록만). sim_verify.sh의 정리 대기 2s→10s(기동 안정성)
+- 증거: 검증 재실행에서 8090의 응답 본문이 `codex_01`(다른 에이전트 세션의 로봇, 실 pose·map_id 보유) — 동시 세션이 같은 포트에 자기 콘솔을 띄웠고 살아있는 Gazebo를 사용 중. 제 스크립트의 killall python3와 그 세션의 재바인딩이 충돌했다
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: D-133 대로 공유 환경에서의 실측 반복을 중단한다 — D-132 코드는 계약 시험으로 증명됐고(326 passed), 무장 직후 follower_tx ≥ 1 실측은 포트를 혼자 쓰는 안정 세션(D-83 절차)에서 한다. sim_verify.sh와 run_fleet_sim.sh 수정(--ui-tokens·PYTHONPATH·정리 대기)은 D-83 세션 인계물이다
+- 교훈: append-only 로그의 동시 커밋 충돌에 이어, 이번에는 포트와 시뮬까지 걸렸다 — 다중 에이전트 저장소에서 "환경"도 소유 대상이다. 점유 전 세션 목록(포트·프로세스·/tmp)을 확인하는 것은 기록만큼 중요하다

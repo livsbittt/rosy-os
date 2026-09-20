@@ -91,8 +91,8 @@
 
 ## 최근 기록
 
+- 2026-09-20 · uncommitted · docs(fleet): port 8090 and the sim are contested by a concurrent session — live iteration handed off (D-133 applied)
 - 2026-09-20 · uncommitted · ci(adr): first ubuntu-26.04 rehearsal is green (D-135)
 - 2026-09-20 · uncommitted · docs(adr): land D-134 relay readiness (console session) and add D-135 — pin the CI runner, rehearse ubuntu-26.04 weekly
 - 2026-09-20 · uncommitted · fix(fleet): arm only after the streams are open — session reorder lands (D-132 implementation)
 - 2026-09-20 · uncommitted · docs(adr): arm only after the streams are open; chase the SIGSEGV by its repro path (D-132, D-133)
-- 2026-09-20 · uncommitted · fix(fleet): a hung reference send times out and names itself (D-131 defect a hardening)
