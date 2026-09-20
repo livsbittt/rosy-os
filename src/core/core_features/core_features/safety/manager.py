@@ -120,14 +120,61 @@ class PersonAdvisory:
 PERSON_LINEAR_CAP_M_S = 0.05
 
 
+@dataclass(frozen=True)
+class ModelSpec:
+    """Known model revision: weights identity plus the input geometry the
+    revision was commissioned with. A revision names the whole contract —
+    weights alone do not (D-47 pattern)."""
+
+    revision: str
+    input_width: int
+    input_height: int
+    input_fps: float
+
+
+class ModelRegistry:
+    """D-137 T3: 아는 revision만 통과시키는 명부. 비어 있으면 아무것도 모른다 —
+    fail-closed가 기본값이다. 누가 등록하는지는 vision 슬라이스 몫이며, 이
+    명부는 판단만 한다."""
+
+    def __init__(self) -> None:
+        self._known: dict[str, ModelSpec] = {}
+
+    def register(self, revision: str, *, input_width: int,
+                 input_height: int, input_fps: float) -> ModelSpec:
+        if not revision or not revision.strip():
+            raise ValueError("model revision required")
+        for name, value in (("input_width", input_width),
+                            ("input_height", input_height),
+                            ("input_fps", input_fps)):
+            if (not isinstance(value, (int, float)) or isinstance(value, bool)
+                    or not math.isfinite(value) or not value > 0):
+                raise ValueError(f"model {name} must be positive")
+        spec = ModelSpec(revision=revision, input_width=int(input_width),
+                         input_height=int(input_height), input_fps=float(input_fps))
+        self._known[revision] = spec
+        return spec
+
+    def is_known(self, evidence: DetectionEvidence) -> bool:
+        spec = self._known.get(evidence.model_revision)
+        if spec is None:
+            return False
+        return (evidence.input_width == spec.input_width
+                and evidence.input_height == spec.input_height
+                and evidence.input_fps == spec.input_fps)
+
+
 def person_advisory_from(evidence: DetectionEvidence, now: float, *,
                          label: str = "person", min_confidence: float = 0.5,
-                         max_age_s: float = 1.0) -> Optional[PersonAdvisory]:
+                         max_age_s: float = 1.0,
+                         registry: Optional[ModelRegistry] = None) -> Optional[PersonAdvisory]:
     """D-137 T2→SAF-006 주입 고리. 신선한 라벨 검출만 자문이 된다.
 
     stale evidence·빈 detections·낮은 confidence는 전부 None이다 — 자문 없음이
-    곧 프로필 복귀다. revision 게이트(known-model registry)는 vision 슬라이스
-    몫이며 여기서 하지 않는다."""
+    곧 프로필 복귀다. `registry`가 있으면 아는 revision+입력 제원만 통과한다.
+    revision 게이트를 거는 주체는 vision 슬라이스이며, 여기서는 판단만 한다."""
+    if registry is not None and not registry.is_known(evidence):
+        return None
     persons = evidence.of_label(label, min_confidence)
     if not persons or not evidence.fresh(now, DETECTION_MAX_AGE_S):
         return None

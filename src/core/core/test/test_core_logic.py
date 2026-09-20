@@ -250,6 +250,59 @@ class TestPersonAdvisoryFromEvidence:
         assert person_advisory_from(ev, now=1000.1) is None
 
 
+class TestModelRegistry:
+    """D-137 T3: 아는 revision만 통과. 모르는 revision·어긋난 입력 제원은
+    fail-closed — 모르는 모델이 봤다는 것이 증거가 될 수 없다."""
+
+    def _registry(self, revision="yolo11n-r1"):
+        from core_features.safety.manager import ModelRegistry
+        registry = ModelRegistry()
+        registry.register(revision, input_width=640, input_height=640, input_fps=10.0)
+        return registry
+
+    def _evidence(self, **kwargs):
+        from core_common.protocol.detections import Detection, DetectionEvidence
+        detections = kwargs.pop("detections", [
+            Detection(label="person", x=0.4, y=0.3, w=0.2, h=0.4, confidence=0.8)])
+        options = dict(model_revision="yolo11n-r1", observed_at=1000.0, seq=41,
+                       input_width=640, input_height=640, input_fps=10.0,
+                       detections=detections)
+        options.update(kwargs)
+        return DetectionEvidence(**options)
+
+    def test_known_revision_with_matching_geometry_passes(self, safety):
+        from core_features.safety.manager import person_advisory_from
+        advisory = person_advisory_from(
+            self._evidence(), now=1000.1, registry=self._registry())
+        assert advisory is not None and advisory.present
+
+    def test_unknown_revision_is_rejected(self, safety):
+        from core_features.safety.manager import person_advisory_from
+        assert person_advisory_from(
+            self._evidence(model_revision="evil-v9"), now=1000.1,
+            registry=self._registry()) is None
+
+    def test_geometry_mismatch_is_rejected(self, safety):
+        from core_features.safety.manager import person_advisory_from
+        assert person_advisory_from(
+            self._evidence(input_width=320), now=1000.1,
+            registry=self._registry()) is None
+
+    def test_no_registry_means_no_gate(self, safety):
+        """게이트 없이 부르면 옛 동작 — 게이트 자체는 vision 슬라이스가 건다."""
+        from core_features.safety.manager import person_advisory_from
+        assert person_advisory_from(
+            self._evidence(model_revision="anything"), now=1000.1) is not None
+
+    def test_bad_registration_is_rejected(self):
+        from core_features.safety.manager import ModelRegistry
+        registry = ModelRegistry()
+        with pytest.raises(ValueError):
+            registry.register("", input_width=640, input_height=640, input_fps=10.0)
+        with pytest.raises(ValueError):
+            registry.register("r1", input_width=0, input_height=640, input_fps=10.0)
+
+
 class TestEventBus:
     def test_seq_monotone_and_history(self, bus):
         bus.publish("nav.completed")
