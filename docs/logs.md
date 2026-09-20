@@ -804,3 +804,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: control 의 환경성 2건이 소멸한 것은 콘솔 세션의 최근 커밋(web_port 런치 정리)과 무관하지 않아 보이나 원인 규명은 하지 않았다 — 다음 스탬프 때 재현 여부 확인
 - 교훈: 없음
+
+## 2026-09-20 · uncommitted · fix(sim): run_fleet_sim pins CycloneDDS — the D-117 bridge FAIL cause
+
+- 변경: 콘솔 세션이 작업 트리에 남긴 수정을 소유자 지시로 착지 — run_fleet_sim.sh 에 `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` 명시 export 추가. 비대화형 실행은 env.sh 를 거치지 않아 누락 시 ros_gz_bridge 가 FastDDS 로 올라 clock/scan/odom 이 ROS 로 넘어가지 않는다(브리지 FAIL 원인)
+- 증거: 맵 검증 result.md 의 센서 브리지 FAIL 항목과 동일 증상(브리지 무출력). 스크립트 내 주석에 원인 기록. D-117 의 Cyclone 고정 계약과 일치
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: 시뮬 런처도 D-117 의 Cyclone 고정을 따른다
+- 교훈: 없음
