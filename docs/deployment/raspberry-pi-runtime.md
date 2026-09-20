@@ -1,5 +1,9 @@
 # Raspberry Pi 5 Robot Runtime
 
+For the first physical Pinky Pro connection, use the ordered, evidence-bound
+[G0-G5 commissioning runbook](pinky-pro-first-device-runbook.md). This runtime
+reference does not replace its E-stop, lifted-wheel, or physical HOLD gates.
+
 **Target:** Raspberry Pi 5 8GB, Raspberry Pi OS Lite 64-bit, ROSY Phase 1
 
 유선 LAN 없이 SD 카드를 굽고 Wi-Fi로 설치·접속하는 전체 절차는

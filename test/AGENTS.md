@@ -22,6 +22,7 @@ Host-side pytest for deploy/release/motor/network contracts. These tests do **no
 | `test_network_provisioner.py` | Wi-Fi / nmcli provisioning |
 | `test_network_topology_contracts.py` | Pins ADR D-26 / CORE SRS / OS design / Implementation Plan on `SITE_STA` + opt-in `RELAY_AP_STA` |
 | `test_pi_wifi_deployment.py` | SD-card Wi-Fi/SSH first-boot contracts |
+| `test_pinky_commissioning.py` | Ordered G0-G5 session, evidence hashing, and first-device runbook contracts |
 | `test_dds_identity_contracts.py` | Pins ADR D-33: identity derives from one robot number, with no default in the template, installer or compose. Drives the real installer through bash rather than asserting the call exists |
 | `test_nav2_bandwidth_contracts.py` | Pins ADR D-34 publish rates against the dashboard poll they are matched to, including the launch-time rewritten params file |
 | `test_release_boundary_guards.py` | CORE must not hold host privilege (D-22) |

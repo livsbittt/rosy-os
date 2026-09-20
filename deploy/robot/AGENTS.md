@@ -21,6 +21,7 @@ On-device runtime: multi-stage Dockerfile (`core` / `io` targets), Compose `rosy
 | `verify-from-windows.ps1` | Remote verify |
 | `verify-pi.sh` / `verify-motors.sh` / `verify-power.sh` | On-device checks. `verify-motors.sh` refuses to probe the UART whenever it cannot establish that the motor runtime is down — a compose failure counts, so missing docker or an unset identity now stops it rather than opening the gate |
 | `device-readback.py` / `device-readback.sh` | Secret-free JSON evidence for OS identity, activation manifest, core health, and ROS graph |
+| `commission-pinky.py` / `commissioning_session.py` | Ordered G0-G5 evidence recorder; operator procedure is `docs/deployment/pinky-pro-first-device-runbook.md` |
 | `measure-dds-baseline.sh` | Phase 0 DDS baseline (D-34). Requires `hardware` mode; records each topic's pre-attach subscriber count because attaching `ros2 topic bw` creates the traffic it measures |
 | `rosy-runtime.service` | systemd unit for compose runtime |
 | `rosy-lowbatt-shutdown.service` / `.path` / `.sh` | D-27: host watches CORE sentinel file and halts |

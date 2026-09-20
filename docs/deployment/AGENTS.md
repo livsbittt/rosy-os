@@ -20,6 +20,8 @@ Operator runbooks for Raspberry Pi 5: first Wi-Fi image, runtime services, power
 | `power-bench-verification.md` | Power/idle/standby bench |
 | `release-signing-key.md` | Ed25519 signing key handling |
 | `release-retention.md` | How many signed releases to keep |
+| `pinky-pro-first-device-runbook.md` | Fail-closed G0-G5 first physical Pinky Pro commissioning |
+| `pinky-pro-commissioning-body-templates.md` | Exact operator-attested G3-G5 JSON bodies; invalid until physically measured |
 
 ## Subdirectories
 

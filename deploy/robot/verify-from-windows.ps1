@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$PiHost = "rosy-01.local",
-    [string]$PiUser = "rosy"
+    [string]$PiUser = "rosy",
+    [string]$NetworkInterface = "auto"
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,6 +14,10 @@ if ($PiHost -notmatch '^[A-Za-z0-9.-]+$') {
 if ($PiUser -notmatch '^[a-z_][a-z0-9_-]*$') {
     throw "PiUser is not a safe Linux account name."
 }
+if ($NetworkInterface -ne "auto" -and
+    $NetworkInterface -notmatch '^[A-Za-z0-9_.:-]+$') {
+    throw "NetworkInterface must be auto or a safe Linux interface name."
+}
 foreach ($commandName in @("ssh")) {
     if (-not (Get-Command $commandName -ErrorAction SilentlyContinue)) {
         throw "Required command is unavailable: $commandName"
@@ -20,20 +25,34 @@ foreach ($commandName in @("ssh")) {
 }
 
 $remoteTarget = "${PiUser}@${PiHost}"
-$addressCommand = "ip -4 -o addr show dev wlan0 scope global"
+if ($NetworkInterface -eq "auto") {
+    $routeOutput = (& ssh $remoteTarget "ip -4 route show default" 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to inspect the Pi default route over SSH: $routeOutput"
+    }
+    if ($routeOutput -notmatch '\bdev\s+([A-Za-z0-9_.:-]+)') {
+        throw "Pi has no default-route interface; pass -NetworkInterface explicitly."
+    }
+    $NetworkInterface = $Matches[1]
+}
+if ($NetworkInterface -eq "lo") {
+    throw "Loopback cannot be used for peer verification."
+}
+
+$addressCommand = "ip -4 -o addr show dev $NetworkInterface scope global"
 $addressOutput = (& ssh $remoteTarget $addressCommand 2>&1 | Out-String).Trim()
 if ($LASTEXITCODE -ne 0) {
-    throw "Unable to read wlan0 address over SSH: $addressOutput"
+    throw "Unable to read $NetworkInterface address over SSH: $addressOutput"
 }
 if ($addressOutput -notmatch '\binet\s+([0-9.]+)/') {
-    throw "Pi did not report a wlan0 IPv4 address."
+    throw "Pi did not report an IPv4 address on $NetworkInterface."
 }
-$wlanAddress = $Matches[1]
+$networkAddress = $Matches[1]
 
 $parsedAddress = [Net.IPAddress]::None
-if (-not [Net.IPAddress]::TryParse($wlanAddress, [ref]$parsedAddress) -or
+if (-not [Net.IPAddress]::TryParse($networkAddress, [ref]$parsedAddress) -or
     $parsedAddress.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork) {
-    throw "Pi did not report a valid wlan0 IPv4 address."
+    throw "Pi did not report a valid IPv4 address on $NetworkInterface."
 }
 
 function Test-RosyHttp {
@@ -54,15 +73,15 @@ function Test-RosyHttp {
     }
 }
 
-Test-RosyHttp -HostName $wlanAddress
-if ($PiHost -ne $wlanAddress) {
+Test-RosyHttp -HostName $networkAddress
+if ($PiHost -ne $networkAddress) {
     try {
         Test-RosyHttp -HostName $PiHost
     }
     catch {
         Write-Warning $_.Exception.Message
-        Write-Warning "Use the verified WLAN address when mDNS is unavailable."
+        Write-Warning "Use the verified LAN address when mDNS is unavailable."
     }
 }
 
-Write-Host "PASS WLAN_PEER http://${wlanAddress}:8080/dashboard"
+Write-Host "PASS LAN_PEER $NetworkInterface http://${networkAddress}:8080/dashboard"

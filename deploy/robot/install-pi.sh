@@ -199,7 +199,9 @@ install_release() {
         "$INSTALL_ROOT/deploy/robot/verify-pi.sh" \
         "$INSTALL_ROOT/deploy/robot/configure-uart-pi5.sh" \
         "$INSTALL_ROOT/deploy/robot/verify-motors.sh" \
-        "$INSTALL_ROOT/deploy/robot/device-readback.sh"
+        "$INSTALL_ROOT/deploy/robot/device-readback.sh" \
+        "$INSTALL_ROOT/deploy/robot/commission-pinky.py" \
+        "$INSTALL_ROOT/deploy/robot/commissioning_session.py"
 }
 
 write_initial_config() {

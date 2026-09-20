@@ -231,7 +231,7 @@ def test_an_unknown_mode_names_what_it_would_have_accepted():
     assert "board.yaml" in result.stderr
 
 
-def test_network_verifier_separates_wifi_lan_internet_and_dashboard():
+def test_network_verifier_supports_auto_wired_or_wifi_lan():
     script = _text(VERIFIER)
 
     for command in (
@@ -244,13 +244,18 @@ def test_network_verifier_separates_wifi_lan_internet_and_dashboard():
         "/api/v1",
         "/dashboard",
         "--require-internet",
+        "--interface",
+        'network_interface="auto"',
+        "default_interface",
     ):
         assert command in script
     for gate in ("WIFI", "LAN", "DNS", "INTERNET", "RUNTIME", "DASHBOARD"):
         assert gate in script
     assert "WIFI_PASSWORD" not in script
-    assert "ip route show default dev wlan0" in script
-    assert "curl --interface wlan0" in script
+    assert 'ip route show default dev "$network_interface"' in script
+    assert 'curl --interface "$network_interface"' in script
+    assert 'if [[ "$network_interface" == wlan* ]]' in script
+    assert '"$network_interface" == "lo"' in script
     assert 'runtime_service="rosy-motor"' in script
     assert 'runtime_service="rosy-io"' in script
     assert "capabilities.${configured_mode}.yaml" in script
@@ -406,10 +411,12 @@ def test_the_motor_runtime_gate_fails_closed_when_compose_cannot_answer(tmp_path
     assert "docker compose failed" in result.stderr
 
 
-def test_windows_peer_verifier_checks_api_and_dashboard_over_wlan():
+def test_windows_peer_verifier_checks_api_and_dashboard_over_selected_lan():
     script = _text(WINDOWS_VERIFY)
 
-    assert "ip -4 -o addr show dev wlan0" in script
+    assert '[string]$NetworkInterface = "auto"' in script
+    assert "ip -4 route show default" in script
+    assert 'show dev $NetworkInterface scope global' in script
     assert "Invoke-WebRequest" in script
     assert "/api/v1" in script
     assert "/dashboard" in script

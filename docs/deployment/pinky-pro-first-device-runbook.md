@@ -1,0 +1,381 @@
+# Pinky Pro first-device commissioning runbook
+
+Date: 2026-09-21
+Scope: first physical connection, install, stationary proof, motor/deadman check,
+LiDAR mapping, and a bounded navigation smoke test.
+
+This is a fail-closed G0-G5 procedure. A `GO` means only that its named gate has
+valid evidence. ARTIFACT, DEVICE, calibration, and FIELD stay `HOLD` until their
+own physical evidence exists. Do not copy Gazebo geometry, robot diameter,
+speed, stopping distance, or `map_260905_update_v2` results into a device
+certificate.
+
+## 1. Prepare before power-on
+
+- Two people for G4/G5: one operator and one person at the physical power cut.
+- Wheels-off-ground stand, clear floor zone, tape measure/caliper, charger, and
+  a wired LAN cable. Keep the E-stop reachable at all times.
+- Raspberry Pi 5, arm64 Raspberry Pi OS Lite, camera, LiDAR, and motors must be
+  mechanically secured. Do not hot-plug motor power or the CSI ribbon.
+- Bring the complete calibration input file. The supplied two-photo checker
+  homography marked `approximate_requires_physical_validation` is a candidate,
+  not an accepted robot-frame calibration. A truncated chat copy is unusable.
+- Create an evidence directory. Raw outputs are never edited after hashing:
+
+```bash
+sudo install -d -o "$USER" -g "$(id -gn)" -m 0750 /var/lib/rosy/commissioning
+SESSION=/var/lib/rosy/commissioning/pinky-01-$(date -u +%Y%m%dT%H%M%SZ).json
+EVIDENCE="${SESSION%.json}.evidence"
+mkdir -m 0750 "$EVIDENCE"
+```
+
+## 2. Connection choice
+
+### SSH path
+
+Connect the Pi and workstation to the same wired LAN, find the address from the
+router/DHCP lease, and pin the host key before transferring anything:
+
+```powershell
+ssh-keygen -F pinky-01.local
+ssh rosy@pinky-01.local
+```
+
+If mDNS is unavailable, use the DHCP address. A changed host key is a stop
+condition until the Pi identity is physically confirmed.
+
+Verify the selected LAN before commissioning. `auto` prefers the default-route
+interface; use `eth0` explicitly on the wired bench:
+
+```bash
+sudo /opt/rosy/deploy/robot/verify-pi.sh --interface eth0
+```
+
+From Windows, verify that the API and dashboard are reachable by another host:
+
+```powershell
+./deploy/robot/verify-from-windows.ps1 -PiHost pinky-01.local -NetworkInterface eth0
+```
+
+### Local console path
+
+Connect a display and keyboard, sign in locally, and use the same commands
+below. The session records `console`; it does not weaken any gate. Network loss
+after installation is not a reason to skip readback or safety checks.
+
+G0 stages and verifies the signed bundle before `commission-pinky.py init`, so
+the session revision comes from that verified manifest. Run the evidence CLI as
+the ordinary owner of `/var/lib/rosy/commissioning`, never through `sudo`; only
+the release/runtime commands below need root. For the Local console path, use
+`--connection console`. Never attach a password, token, credential, private
+key, or `.env` file.
+
+## 3. Record contract
+
+For every gate, save raw output under `$EVIDENCE`. `prepare` derives G0-G2 from
+the actual release/readback JSON and validates the G3-G5 operator-attested body.
+`record` re-derives/rechecks the claims, hashes every supplied file, locks the
+session, and appends one gate atomically:
+
+In the examples, `python3 "$COMMISSION" record` is the installed equivalent of
+the `commission-pinky.py record` operation.
+
+```bash
+COMMISSION=/opt/rosy/deploy/robot/commission-pinky.py
+python3 "$COMMISSION" prepare \
+  --session "$SESSION" --record "$EVIDENCE/G2-record.json" \
+  --evidence-file "$EVIDENCE/G2-device-readback.json"
+python3 "$COMMISSION" record \
+  --session "$SESSION" --record "$EVIDENCE/G2-record.json" \
+  --evidence-file "$EVIDENCE/G2-device-readback.json"
+python3 "$COMMISSION" status --session "$SESSION"
+```
+
+G3-G5 use an exact body file from
+[the body templates](pinky-pro-commissioning-body-templates.md):
+
+```bash
+python3 "$COMMISSION" prepare \
+  --session "$SESSION" --body "$EVIDENCE/G3-stationary.json" \
+  --record "$EVIDENCE/G3-record.json"
+python3 "$COMMISSION" record \
+  --session "$SESSION" --record "$EVIDENCE/G3-record.json" \
+  --evidence-file "$EVIDENCE/G3-stationary.json" \
+  --evidence-file "$EVIDENCE/G3-state-samples.jsonl"
+```
+
+For G3-G5, the exact body is an explicit operator attestation backed by raw
+telemetry. It is not a cryptographic sensor signature. G0 is instead derived
+from the verified signed manifest and `STAGED` result; G1 from the successful
+activation result and device readback; G2 from the readback itself.
+
+The record common fields are filled by `prepare`: `schema_version`, `gate`,
+`captured_at`, full lowercase `source_revision`, integer `robot_number`, and
+`outcome: "GO"`. A validation error leaves the session unchanged. After G1,
+use `/opt/rosy/deploy/robot/commission-pinky.py`; before it, use the copy inside
+the same verified release payload.
+
+## 4. Gates
+
+### G0 - signed native artifact
+
+Before installation, prove the release is signed, its manifest matches the full
+Git revision, the target is Raspberry Pi 5 arm64 Raspberry Pi OS Lite, and both
+`rosy_core` and `rosy_io` use immutable `sha256:` image digests.
+
+```bash
+RELEASE_ID=YYYY.MM.DD-NNN
+COMMISSION=/trusted/verified-release/deploy/robot/commission-pinky.py
+sudo rosy-release stage "/trusted/rosy-release-${RELEASE_ID}.tar.zst" --json \
+  | tee "$EVIDENCE/G0-stage.json"
+sudo install -o "$USER" -g "$(id -gn)" -m 0640 \
+  "/var/cache/rosy/releases/${RELEASE_ID}/manifest.json" \
+  "$EVIDENCE/G0-manifest.json"
+REVISION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["git_revision"])' \
+  "$EVIDENCE/G0-manifest.json")"
+python3 "$COMMISSION" init \
+  --session "$SESSION" --robot-number 1 --source-revision "$REVISION" \
+  --connection ssh --operator "OPERATOR_NAME"
+python3 "$COMMISSION" prepare \
+  --session "$SESSION" --record "$EVIDENCE/G0-record.json" \
+  --evidence-file "$EVIDENCE/G0-manifest.json" \
+  --evidence-file "$EVIDENCE/G0-stage.json"
+python3 "$COMMISSION" record \
+  --session "$SESSION" --record "$EVIDENCE/G0-record.json" \
+  --evidence-file "$EVIDENCE/G0-manifest.json" \
+  --evidence-file "$EVIDENCE/G0-stage.json"
+```
+
+Stop on any signature, target, revision, or digest mismatch. A Windows source
+upload and a locally built candidate do not satisfy G0.
+
+### G1 - install, core only
+
+Install the verified release by its release ID. The installer must finish with
+exit code 0 and leave the requested robot identity in `core` mode:
+
+```bash
+sudo rosy-release runtime down
+sudo rosy-release install --release-id YYYY.MM.DD-NNN --json \
+  | tee "$EVIDENCE/G1-install.json"
+sudo /opt/rosy/deploy/robot/runtime-mode.sh status \
+  | tee "$EVIDENCE/G1-runtime-status.txt"
+sudo /opt/rosy/deploy/robot/device-readback.sh \
+  | tee "$EVIDENCE/G2-device-readback.json"
+COMMISSION=/opt/rosy/deploy/robot/commission-pinky.py
+python3 "$COMMISSION" prepare \
+  --session "$SESSION" --record "$EVIDENCE/G1-record.json" \
+  --evidence-file "$EVIDENCE/G1-install.json" \
+  --evidence-file "$EVIDENCE/G2-device-readback.json"
+python3 "$COMMISSION" record \
+  --session "$SESSION" --record "$EVIDENCE/G1-record.json" \
+  --evidence-file "$EVIDENCE/G1-install.json" \
+  --evidence-file "$EVIDENCE/G2-device-readback.json" \
+  --evidence-file "$EVIDENCE/G1-runtime-status.txt"
+```
+
+For robot 1 the derived values are `ROS_DOMAIN_ID=41` and namespace `rosy_01`.
+Never proceed if the installer quarantines the runtime or starts motor/hardware.
+
+### G2 - immutable device readback
+
+```bash
+python3 "$COMMISSION" prepare \
+  --session "$SESSION" --record "$EVIDENCE/G2-record.json" \
+  --evidence-file "$EVIDENCE/G2-device-readback.json"
+python3 "$COMMISSION" record \
+  --session "$SESSION" --record "$EVIDENCE/G2-record.json" \
+  --evidence-file "$EVIDENCE/G2-device-readback.json"
+```
+
+Record the complete JSON as the G2 `readback`. It must match the G0 revision and
+both image digests, report a verified signature, active/healthy CORE, derived
+identity, exactly one final `cmd_vel` publisher, and `device_runtime: GO`.
+
+### G3 - stationary CORE proof
+
+Keep wheels lifted and keep E-stop asserted. CORE stays in `IDLE`; do not start
+motor or hardware. Capture at least 10 ordered samples over at least 2 seconds.
+Every sample must report zero linear/angular velocity and `estop: true` while
+the graph still has exactly one final `cmd_vel` publisher.
+
+Create a mode-0600 curl config containing only the operator/viewer authorization
+header (never place the token on the command line), then capture the server
+states. The body template identifies the fields copied from these raw files:
+
+```bash
+install -d -m 0700 "$HOME/.config/rosy"
+install -m 0600 /dev/null "$HOME/.config/rosy/viewer.curl"
+${EDITOR:-vi} "$HOME/.config/rosy/viewer.curl"  # header = "Authorization: Bearer ..."
+for n in 01 02 03 04 05 06 07 08 09 10; do
+  curl --config "$HOME/.config/rosy/viewer.curl" --fail-with-body --silent --show-error \
+    http://127.0.0.1:8080/api/v1/robot/state \
+    >"$EVIDENCE/G3-state-${n}.json" || exit 1
+  sleep 0.25
+done
+```
+
+Fill `$EVIDENCE/G3-stationary.json` from those ten states and the G2 publisher
+count, then run the G3 `prepare`/`record` commands in section 3. Preserve all ten
+state files as additional `--evidence-file` arguments.
+
+If a sample moves, E-stop clears, the mode changes, or publisher count differs
+from one: stop, preserve the raw output, and do not create a GO record.
+
+### G4 - lifted-wheel motor and deadman
+
+Hazardous gate: it is never auto-executed by `commission-pinky.py`.
+
+```bash
+sudo /opt/rosy/deploy/robot/runtime-mode.sh down
+sudo /opt/rosy/deploy/robot/verify-motors.sh \
+  | tee "$EVIDENCE/G4-motor-preflight.txt"
+sudo ROSY_RUNTIME_MODE=motor /opt/rosy/deploy/robot/runtime-mode.sh up
+```
+
+Only after the torque-free preflight passes: confirm wheels lifted, physical cut
+reachable, IDs 1 and 2 both respond, then switch deliberately to motor mode.
+Run two deadman trials each for forward, reverse, clockwise, and
+counter-clockwise. Each command release must reach final zero velocity within
+0.65 s. Any timeout, unexpected direction, vibration, runaway, or missing ID is
+an immediate E-stop and power-cut condition.
+
+For each of the eight trials, use the authenticated dashboard's momentary
+manual control at the lowest configured speed. Keep E-stop asserted while
+selecting the direction; the safety operator explicitly releases it only for
+the trial. Record `/rosy_01/odom` with ROS timestamps while the control is held.
+The second terminal records the host stop time and stops only CORE to create a
+real command-loss condition (replace `forward-1` for every trial):
+
+```bash
+timeout 30 docker compose --env-file /opt/rosy/deploy/robot/.env \
+  -f /opt/rosy/deploy/robot/compose.yaml exec -T rosy-motor \
+  ros2 topic echo --csv /rosy_01/odom \
+  >"$EVIDENCE/G4-forward-1-odom.csv" &
+printf '%s stop_core forward 1\n' "$(date +%s.%N)" \
+  >>"$EVIDENCE/G4-deadman-events.txt"
+docker compose --env-file /opt/rosy/deploy/robot/.env \
+  -f /opt/rosy/deploy/robot/compose.yaml stop --timeout 0 rosy-core
+# Wait for measured odometry to reach zero; immediately press E-stop if it does not.
+sudo ROSY_RUNTIME_MODE=motor /opt/rosy/deploy/robot/runtime-mode.sh up
+```
+
+Reassert E-stop before restarting CORE and before changing direction. Compute
+`stop_latency_s` from the recorded `stop_core` timestamp to the first
+sustained-zero odometry timestamp. Do not type a passing value from visual
+estimation alone.
+
+After the trials:
+
+```bash
+sudo /opt/rosy/deploy/robot/runtime-mode.sh down
+python3 "$COMMISSION" prepare \
+  --session "$SESSION" --body "$EVIDENCE/G4-motor.json" \
+  --record "$EVIDENCE/G4-record.json"
+python3 "$COMMISSION" record \
+  --session "$SESSION" --record "$EVIDENCE/G4-record.json" \
+  --evidence-file "$EVIDENCE/G4-motor.json" \
+  --evidence-file "$EVIDENCE/G4-motor-preflight.txt" \
+  --evidence-file "$EVIDENCE/G4-deadman-events.txt" \
+  --evidence-file "$EVIDENCE/G4-forward-1-odom.csv"
+```
+
+### G5 - controlled hardware mapping/navigation
+
+Lower the robot only in a cleared, supervised area. Keep E-stop asserted, start
+hardware mode, then verify one `cmd_vel` publisher and fresh LiDAR before the
+operator explicitly releases E-stop. Start with the lowest accepted physical
+motion envelope; simulator speeds are not evidence.
+
+Create a separate mode-0600 operator curl config as in G3, then run:
+
+```bash
+sudo /opt/rosy/deploy/robot/runtime-mode.sh down
+sudo ROSY_RUNTIME_MODE=hardware /opt/rosy/deploy/robot/runtime-mode.sh up
+curl --config "$HOME/.config/rosy/operator.curl" --fail-with-body --silent --show-error \
+  -X POST http://127.0.0.1:8080/api/v1/slam/start \
+  | tee "$EVIDENCE/G5-slam-start.json"
+# Drive only through the supervised dashboard while mapping.
+curl --config "$HOME/.config/rosy/operator.curl" --fail-with-body --silent --show-error \
+  -H 'Content-Type: application/json' -d '{"name":"pinky_01_physical_001"}' \
+  http://127.0.0.1:8080/api/v1/slam/save \
+  | tee "$EVIDENCE/G5-map-save.json"
+curl --config "$HOME/.config/rosy/operator.curl" --fail-with-body --silent --show-error \
+  -X POST http://127.0.0.1:8080/api/v1/slam/stop \
+  | tee "$EVIDENCE/G5-slam-stop.json"
+curl --config "$HOME/.config/rosy/operator.curl" --fail-with-body --silent --show-error \
+  -H 'Content-Type: application/json' -d '{"x":0.25,"y":0.0,"yaw":0.0}' \
+  http://127.0.0.1:8080/api/v1/navigation/goal \
+  | tee "$EVIDENCE/G5-goal.json"
+```
+
+Capture a fresh LiDAR rate, a fresh occupancy map ID, and one short Nav2 goal.
+The goal must finish `SUCCEEDED`, with no observed collision. Finish at zero
+velocity with E-stop asserted. `map_260905_update_v2` may be used as a route
+reference only after coordinate/frame and clearance checks; the first physical
+map gets a new evidence-bound ID.
+
+Capture final state, fill the invalid-until-measured G5 body template, record,
+then take hardware down:
+
+```bash
+curl --config "$HOME/.config/rosy/viewer.curl" --fail-with-body --silent --show-error \
+  http://127.0.0.1:8080/api/v1/robot/state >"$EVIDENCE/G5-final-state.json"
+curl --config "$HOME/.config/rosy/viewer.curl" --fail-with-body --silent --show-error \
+  http://127.0.0.1:8080/api/v1/navigation/state >"$EVIDENCE/G5-navigation-state.json"
+python3 "$COMMISSION" prepare \
+  --session "$SESSION" --body "$EVIDENCE/G5-hardware.json" \
+  --record "$EVIDENCE/G5-record.json"
+python3 "$COMMISSION" record \
+  --session "$SESSION" --record "$EVIDENCE/G5-record.json" \
+  --evidence-file "$EVIDENCE/G5-hardware.json" \
+  --evidence-file "$EVIDENCE/G5-final-state.json" \
+  --evidence-file "$EVIDENCE/G5-navigation-state.json" \
+  --evidence-file "$EVIDENCE/G5-map-save.json" \
+  --evidence-file "$EVIDENCE/G5-goal.json"
+sudo /opt/rosy/deploy/robot/runtime-mode.sh down
+```
+
+## 5. Calibration checklist
+
+All four items remain `HOLD` until measured on this assembled Pinky Pro:
+
+1. Measure the actual robot diameter/footprint at its widest rotating envelope,
+   including protrusions and cable sweep. Validate by slow 360-degree rotation.
+2. Measure command-to-stop distance repeatedly by direction and battery state.
+   Tune adaptive speed from measured free clearance minus robot radius, stopping
+   distance, localization uncertainty, and a safety margin; do not use a fixed
+   maximum 8 cm clearance rule.
+3. Validate camera intrinsics first. Then collect checkerboard and ArUco floor
+   targets at multiple lateral positions and near/mid/far distances. The image
+   homography coordinates must be converted from board-relative lateral-right
+   into the declared robot frame before promotion.
+4. Keep candidate and independent holdout captures separate. Record camera
+   mount height/pitch, image size, focus, target size, lighting, RMSE by range,
+   and raw image digests. Reject a homography that extrapolates beyond its
+   validated floor region or fails physical tape-measure checks.
+
+When clearance becomes insufficient, the planner may stop, reverse into its
+already observed free corridor, rotate, and re-plan. It must include the full
+measured footprint and swept path; it must not reverse into unknown occupancy.
+
+## 6. Recovery and end-of-day evidence
+
+On any unexplained state, collision, sensor staleness, command timeout, or loss
+of supervision:
+
+```bash
+# Press/hold the physical E-stop first.
+sudo /opt/rosy/deploy/robot/runtime-mode.sh down
+sudo systemctl disable --now rosy-runtime.service
+sudo rosy-release status --json
+```
+
+Use `sudo rosy-release recover --json` for an interrupted transaction. Use
+`sudo rosy-release rollback --json` only for an explicit previous signed
+release. Do not clear a recovery hold until its cause is understood.
+
+At the end, keep the session, every referenced raw evidence file, camera/LiDAR
+captures, and map artifacts together. Verify all recorded SHA-256 values from a
+second copy. A session ending before G5 is resumable and remains `HOLD`; never
+edit it to look complete.
