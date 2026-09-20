@@ -189,10 +189,24 @@ def test_malformed_logs_are_reported(broken, fragment):
     assert any(fragment in e for e in errors), errors
 
 
-def test_logs_may_only_grow_at_the_end():
+def test_logs_must_not_lose_or_edit_committed_entries():
+    # 항목 보존(순서 무관) — 끝 추가·병합 재배열은 합격, 내용 변형은 위반.
     assert harness.is_append_only(GOOD_LOG, GOOD_LOG + "\n## 2026-09-16 · abcdef0 · x\n")
     assert harness.is_append_only(GOOD_LOG.replace("\n", "\r\n"), GOOD_LOG)
     assert not harness.is_append_only(GOOD_LOG, GOOD_LOG.replace("- 변경: a", "- 변경: rewritten"))
+
+
+def test_logs_tolerate_merge_reordering_but_not_loss_or_edits():
+    """두 세션이 각자 항목을 추가한 브랜치를 병합하면 순서가 섞인다 — 보존만 되면 합격."""
+    a = GOOD_LOG + "\n## 2026-09-20 · abcdef1 · a-entry\n\n- 변경: a1\n"
+    b = GOOD_LOG + "\n## 2026-09-20 · abcdef2 · b-entry\n\n- 변경: b1\n"
+    merged = GOOD_LOG + "\n## 2026-09-20 · abcdef2 · b-entry\n\n- 변경: b1\n\n## 2026-09-20 · abcdef1 · a-entry\n\n- 변경: a1\n"
+    assert harness.is_append_only(a, merged)   # a 의 항목이 가운데 끼여도 보존이다
+    assert harness.is_append_only(b, merged)   # 반대 방향에서도 같다
+    lost = merged.replace("## 2026-09-20 · abcdef1 · a-entry\n\n- 변경: a1\n", "", 1)
+    assert not harness.is_append_only(merged, lost)          # 항목 유실은 위반
+    edited = merged.replace("- 변경: b1", "- 변경: b1 (변형)", 1)
+    assert not harness.is_append_only(merged, edited)        # 본문 변형도 위반
 
 
 # --- ADR log ---------------------------------------------------------------

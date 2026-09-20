@@ -235,11 +235,32 @@ def validate_log(text: str) -> list[str]:
     return errors
 
 
+def _log_entry_blocks(text: str) -> set:
+    """`## ` 헤딩 단위로 로그를 항목 블록으로 분해한다(정규화·양끝 여백 제거)."""
+    blocks: set = set()
+    current: list = []
+    for line in _normalize(text).split("\n"):
+        if line.startswith("## "):
+            if current:
+                blocks.add("\n".join(current).strip())
+            current = [line]
+        elif current:
+            current.append(line)
+    if current:
+        blocks.add("\n".join(current).strip())
+    return blocks
+
+
 def is_append_only(old: str, new: str) -> bool:
-    old, new = _normalize(old), _normalize(new)
-    old = old if old.endswith("\n") else old + "\n"
-    new = new if new.endswith("\n") else new + "\n"
-    return new.startswith(old)
+    """커밋된 항목이 새 버전에 변형 없이 모두 살아 있으면 합격이다.
+
+    prefix 비교가 아니라 **항목 보존 비교**다 — 여러 세션이 각자 항목을 추가한
+    브랜치를 병합하면 항목 순서가 섞이는 것은 정상이지만(2026-09-20 codex 브랜치
+    병합 실측), 이미 커밋된 항목의 내용이 바뀌거나 사라지는 것은 여전히 위반이다.
+    """
+    old_blocks = _log_entry_blocks(old)
+    new_blocks = _log_entry_blocks(new)
+    return old_blocks <= new_blocks
 
 
 # --- ADR log ---------------------------------------------------------------
