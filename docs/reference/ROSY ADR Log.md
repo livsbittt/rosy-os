@@ -146,6 +146,7 @@
 | D-136 | 영상 대역폭은 예산으로 다룬다 — 경로 분리 + 상한 + 자동킬 | Proposed |
 | D-137 | YOLO는 자문역이다 — LiDAR/IR가 결정하고 영상은 증거만 낸다 | Proposed |
 | D-138 | 도크 검출기는 센서 provider 포트를 탄다 — 새 정적 간선 없음 | Accepted |
+| D-139 | OS는 자리만 내고, 무엇을 볼지는 제품이 정한다 | Accepted |
 
 ---
 
@@ -4517,3 +4518,38 @@ core 전체 901 passed·10 skipped, control 도크 15건. ROS-SIM/DEVICE 실측�
 카메라 placement 뒤.
 
 **References:** D-64, D-126, D-66, D-47, D-137, DNC-004, DNC-005, DNC-007.
+
+---
+
+## D-139 OS는 자리만 내고, 무엇을 볼지는 제품이 정한다
+
+**Status:** Accepted (2026-09-20). 선언 — SRS v1.1(SAF-006/NAV-007/DNC-007)이
+근거. vision 실측 전까지 구현 착수 금지의 기준선이다.
+
+**Context:** YOLO·스트리밍 논의가 "어떻게 올릴 것인가"만 설계하고 "무엇을 위해
+올리는가"를 빠뜨렸다. Rosy README는 "어떤 로봇이든 웹·표준 API로 제어하고
+중앙 Fleet에서 군집 관리하는 범용 로봇 플랫폼" — 미들웨어지 제품이 아니다.
+목적 없는 구조는 과잉으로 간다 (H264/H265, RTSP/WebRTC가 그랬다).
+
+**Decision:**
+
+1. **OS층은 메커니즘만 둔다.** 슬라이스 자리(D-62), evidence 계약(D-47/D-137),
+   대역폭 예산(D-136), provider 포트(D-64/D-138)까지가 OS다.
+2. **제품 목적은 SRS ID가 있어야 OS 작업이 된다.** 사람 회피 SAF-006, 차선
+   추종 NAV-007, 도크 태그 DNC-007 — ID 없는 vision 작업은 PARKED.
+3. **모델·객체·검출율은 제품층이다.** 어떤 클래스를 볼지, 몇 m에서 볼지는
+   제품이 정하고 OS는 revision 바인딩으로만 받는다.
+4. **미디어 서버는 되지 않는다.** dashboard 프리뷰(MJPEG)까지가 D-23의 끝.
+   RTSP/WebRTC/H265는 요구 생기기 전엔 과잉으로 기록만 남긴다.
+
+**Alternatives:** 목적 없이 구조 먼저 — H264/WebRTC를 다 올려놓고 쓰는 쪽이
+나중에 정하는 것. 예산 없는 플랫폼은 현장에서 터진다. 전부 제품층에 맡기기 —
+evidence 계약 없이 각자 붙이면 안전 논증이 깨진다.
+
+**Consequences:** vision 구현 착수는 ARTIFACT 서명 → Pi readback → 카메라
+placement 실측(Task 5) 뒤. 그 전까지 D-136/D-137은 계약 문서로 잠긴다.
+
+**Validation / Transition:** SRS v1.1 등록됨. ID 없는 vision PR은 이 ADR로
+거절한다.
+
+**References:** D-23, D-62, D-64, D-136, D-137, D-138, SRS v1.1.
