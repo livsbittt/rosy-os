@@ -588,3 +588,11 @@
 - gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
 - 결정: 없음
 - 교훈: PowerShell here-string은 비ASCII를 깨뜨린다 — 저널 append는 UTF-8 파일 경유로만 한다
+
+## 2026-09-20 · uncommitted · perf(fleet): the WSL addendum bench kills the dev-box temptation (D-131 phase 3 addendum)
+
+- 변경: 없음(측정만). WSL(/mnt/f 워크스페이스)에서 fleet_gather_bench 재실행
+- 증거: N=10, M=20 — p50 1557.0ms · p95 1639.3ms · mean 1333.7ms. 같은 코드가 Windows 호스트 루프백에서는 p50 44.5ms였다. WSL2·9P·스레드 스케줄링이 섞인 개발 박스 환경은 배포 타이밍의 유효한 프록시가 아니라는 것을 수치가 말한다 — N 상한 판정은 사이트 PC·LAN 재측정(D-88)에서만 낸다
+- gate 변화: 없음. SOURCE/LOCAL GO 유지. ARTIFACT/DEVICE/FIELD HOLD·PARKED
+- 결정: fleet_gather_bench를 게이트 절차로 고정한다 — 규모 판정은 "같은 스크립트, 대상 환경"에서만. 개발 박스 숫자는 방향 감지용으로만 쓴다
+- 교훈: 없음
