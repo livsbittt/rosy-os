@@ -58,6 +58,7 @@ KNOWN_LEGACY_HEADINGS = frozenset({
     "## 2026-09-19: Core 패키지 모듈화 완료 (Level 3 Phase 4 & 5)",
     "## 2026-09-19: Fleet 도메인 폴더명 변경 (site)",
     "## 2026-09-20 · uncommitted · feat(fleet): Robot Selection lands (FOR-001) and the gather bench puts a number on N (D-131 phases 2-3)",
+    "## 2026-09-20 · uncommitted · test(fleet): the sim runs end-to-end and the console exposes two real defects (D-131 phase 1 LOCAL evidence)",
 })
 
 GENERATED_MARK = (
