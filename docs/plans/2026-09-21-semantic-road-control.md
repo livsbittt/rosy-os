@@ -104,7 +104,6 @@
 1. Write a failing end-to-end host simulation contract.
 2. Implement deterministic approach, red wait, green resume, and stale stop sequence.
 3. Record raw samples and create a rendered semantic-map/command plot.
-4. Add D-147 for the evidence-policy-command separation.
+4. Add D-151 for the evidence-policy-command separation.
 5. Run focused suites, full host pytest, flake8, harness lint/generate, and `git diff --check`.
 6. Commit the verified unit and integrate only after review.
-

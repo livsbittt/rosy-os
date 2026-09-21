@@ -10,7 +10,7 @@ gates:
     cmd: "python3 -m pytest test/test_control_absorption_package.py -q"
   LOCAL:
     state: GO
-    evidence: "1084 passed, 26 skipped (2026-09-21 Windows, 패키지 cwd). D-143 IR/camera detector와 폐루프 운동학 수렴, 본체 반경 기반 map audit 포함"
+    evidence: "1103 passed, 26 skipped (2026-09-21 Windows, 패키지 cwd). D-143 IR/camera와 D-151 semantic-road detector·host closed loop, 본체 반경 기반 map audit 포함"
     cmd: "cd src/apps/control && python -m pytest test -q"
   ROS-SIM:
     state: HOLD
@@ -23,7 +23,7 @@ gates:
     blocker: "Pi bench Device 설치와 device-readback.sh --json 증거 없음. Control sensor adapter 활성화는 Device 보정 generation에 묶인다(D-47)"
   FIELD:
     state: PARKED
-adrs: [D-37, D-38, D-40, D-42, D-47, D-50, D-57, D-58, D-77, D-118, D-119, D-143]
+adrs: [D-37, D-38, D-40, D-42, D-47, D-50, D-57, D-58, D-77, D-118, D-119, D-143, D-151]
 plans:
   - docs/plans/2026-09-06-module-split-criteria.md
   - docs/plans/2026-09-12-rosy-control-absorption-plan.md
@@ -34,6 +34,8 @@ plans:
   - docs/plans/2026-09-17-interface-design-implementation-design.md
   - docs/plans/2026-09-21-line-follow-modes-design.md
   - docs/plans/2026-09-21-line-follow-modes.md
+  - docs/plans/2026-09-21-semantic-road-control-design.md
+  - docs/plans/2026-09-21-semantic-road-control.md
 ---
 ## 지금 상태
 
@@ -104,3 +106,11 @@ plans:
 - Adaptive motion was measured in the same run: narrow-space median `0.067975 m/s`, open-space median `0.122453 m/s`, maximum `0.158851 m/s`.
 - CORE was the sole final `cmd_vel` publisher, stopped at zero, and Fleet read back the robot online with `map_id=occupancy:326966090e60`.
 - This is ROS-SIM evidence only. It does not promote the camera homography, device calibration, stopping envelope, Pi artifact, or physical FIELD gate.
+
+## 2026-09-21 semantic-road control status
+
+- `map_260905_update_v2` 파생 장면에 차선, 정지선, 횡단보도, 신호등을 추가했고 기본 16-wall geometry는 변경하지 않았다.
+- 합성 camera frame은 실제 road detector, strict decoder, traffic policy, atomic command gate를 통과했다. 의미 YAML 정답은 detector에 입력하지 않았다.
+- red에서는 완전 정지와 dwell/대기, green에서는 제한 속도 재출발, stale evidence에서는 `HOLD` zero command를 확인했다.
+- 관제는 상태·사유·scene/policy revision을 읽고 stage 후 정지 상태에서만 apply한다. tuning과 simulation signal은 안전 경계를 우회하지 못한다.
+- 이 결과는 HOST simulation PASS다. 실제 Gazebo camera graph와 Pinky Pro 카메라·모터·제동거리는 ROS-SIM/DEVICE/FIELD HOLD다.

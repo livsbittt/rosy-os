@@ -27,6 +27,12 @@ def _scene():
     return yaml.safe_load((ROOT / "semantic" / "road_scene.yaml").read_text(encoding="utf-8"))
 
 
+def test_scene_identity_is_revision_bound_for_runtime_policy():
+    scene = _scene()
+    assert scene["map_id"] == "map_260905_update_v2"
+    assert scene["scene_revision"] == "road-scene-v1"
+
+
 def test_scene_rejects_duplicate_ids_across_feature_types():
     scene = _scene()
     scene["stop_lines"][0]["id"] = scene["lanes"][0]["id"]

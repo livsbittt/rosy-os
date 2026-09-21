@@ -1,5 +1,6 @@
 schema_version: 1
 map_id: map_260905_update_v2
+scene_revision: road-scene-v1
 frame_id: map
 source_world: worlds/map_260905.world
 source_world_sha256: 11ec992501af7027c4f6fc1effd6c3a54ed185759a57e4ca135e5f3f96875a72
@@ -40,4 +41,3 @@ traffic_signals:
     default_state: RED
     controlled_stop_line_id: stop_line_main
     controlled_lane_id: lane_main
-

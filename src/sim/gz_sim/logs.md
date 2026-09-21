@@ -62,3 +62,10 @@
 - 변경: scripts/swarm_bench.py 의 fleet 내부 직접 import 4건을 fleet.bench 경유로 교체. test/test_bench_boundary.py 2건 추가 — scripts/ 전체에서 fleet.swarm/formation 직접 import 금지 + swarm_bench 의 파사드 사용 검사.
 - 증거: 결합도 평가(2026-09-19) §6 C등급 sim→site 내용 결합 해소. 텍스트 구조 검사라 ROS 오버레이 없이 검증된다.
 - gate 변화: 없음
+
+## 2026-09-21 · uncommitted · feat(sim): add semantic road scene and host closed loop (D-151)
+
+- 변경: 측정된 16-wall 기본 맵은 그대로 두고 차선·정지선·횡단보도·신호등이 있는 파생 semantic YAML, Gazebo world, map preview를 추가했다. scene revision과 map identity를 검증한다.
+- 증거: host synthetic camera simulation은 장면 정답을 detector에 넣지 않고 실제 perception-policy-command 경로로 red stop, green proceed, stale HOLD를 재현했다. 결과 JSON, montage, timeline, 관제 Chromium 캡처를 `docs/validation/semantic-road-2026-09-21/`에 보존한다.
+- gate 변화: 기존 exact-map ROS-SIM GO는 유지하되 semantic 카메라 흐름 자체는 host 증거다. 실제 Gazebo camera/ROS graph를 새로 실행한 것으로 간주하지 않는다.
+- 결정: D-151. semantic scene은 파생 asset이고 base mapping geometry를 변경하지 않는다.

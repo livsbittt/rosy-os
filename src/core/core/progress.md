@@ -2,7 +2,7 @@
 module: core
 logical_modules: [M03, M04, M06, M07, M11, M12, M13]
 owner: CORE
-last_verified: { commit: "ab8bf1b", date: 2026-09-20 }
+last_verified: { commit: "uncommitted", date: 2026-09-21 }
 gates:
   SOURCE:
     state: GO
@@ -10,7 +10,7 @@ gates:
     cmd: "python3 -m pytest src/core/test/test_module_criteria.py test/test_control_absorption_package.py -q"
   LOCAL:
     state: GO
-    evidence: "826 passed, 10 skipped (2026-09-17 Windows, 미커밋 WIP 포함 작업 트리). D-72 S0–S7과 D-82 팔레트 게이트 포함 — evidence 바인딩, tokens, dashboard G4, inventory 4상태, test_palette_gates.py 10건. 이 호스트 python3에는 PyYAML이 없어 `python` 3.14.5로 실행했고, skip 수는 선택 의존성(httpx/playwright) 설치 여부에 따라 달라진다"
+    evidence: "1005 passed, 11 skipped (2026-09-21 Windows). D-151 traffic policy, atomic command gate, stage/apply API와 dashboard 계약 포함; 실제 Chromium 정책 적용 흐름 1 passed"
     cmd: "PYTHONPATH=src/core:src python3 -m pytest src/core/test -q"
   ROS-SIM:
     state: HOLD
@@ -23,7 +23,7 @@ gates:
     blocker: "Pi bench Device 설치와 device-readback.sh --json 증거 없음. G4 viewport·보정 상태기계 미실행"
   FIELD:
     state: PARKED
-adrs: [D-1, D-2, D-8, D-18, D-23, D-32, D-38, D-42, D-47, D-58, D-60, D-72, D-75, D-77, D-82, D-119, D-121, D-122, D-123, D-124, D-144]
+adrs: [D-1, D-2, D-8, D-18, D-23, D-32, D-38, D-42, D-47, D-58, D-60, D-72, D-75, D-77, D-82, D-119, D-121, D-122, D-123, D-124, D-144, D-151]
 plans:
   - docs/plans/2026-09-06-module-split-criteria.md
   - docs/plans/2026-09-13-control-safety-boundary.md
@@ -33,6 +33,8 @@ plans:
   - docs/plans/2026-09-17-interface-design-implementation-design.md
   - docs/plans/2026-09-21-hardware-mapping-g5-design.md
   - docs/plans/2026-09-21-hardware-mapping-g5.md
+  - docs/plans/2026-09-21-semantic-road-control-design.md
+  - docs/plans/2026-09-21-semantic-road-control.md
 ---
 ## 지금 상태
 
@@ -51,3 +53,10 @@ plans:
 - API·Nav2·흡수 Control 어디서도 `cmd_vel`을 CORE 밖에서 발행하지 않는다.
 - Fleet은 `cmd_vel` 소스가 아니다.
 - Pinky+OMX 합성 Asset은 v1이 아니다(D-55, D-71).
+
+## 2026-09-21 supervised traffic-policy status
+
+- CORE는 road evidence를 ROS-free policy로 평가하고 차선 주행 후보를 Command Manager 직전의 원자적 traffic gate에서 제한한다.
+- stale/conflict/scene mismatch는 `HOLD`와 zero command다. 정책은 `DISABLED`, `MONITOR_ONLY`, `ENFORCED`로 분리되며 기본값은 `DISABLED`다.
+- 관제 stage/apply는 fresh zero velocity 또는 E-stop, `IDLE`/`EMERGENCY`, line-follow OFF를 요구한다. simulation signal은 simulation runtime과 capability가 모두 있어야 한다.
+- LOCAL `1005 passed, 11 skipped`; 실제 Chromium stage→apply `1 passed`. 실제 ROS bridge graph와 물리 주행은 여전히 ROS-SIM/DEVICE/FIELD HOLD다.

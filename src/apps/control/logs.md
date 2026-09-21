@@ -114,3 +114,10 @@
 - 변경: web_node.py 독스트링에 D-150 디버그 서피스 선언 추가(운영 launch/deploy 불가, 포트는 deploy 계약 테스트가 고정, 운용자 콘솔은 CORE /dashboard D-23). web/AGENTS.md 와 map/AGENTS.md 도 같은 계약으로 갱신 — map 은 캘리브레이션 기준 자산으로 격하, 운영 맵 홈은 navigation/map.
 - 증거: python -m pytest test/test_control_launch_boundary.py -q 통과. 신규 deploy 포트 가드 포함 5종 계약 테스트 변이 증명 완료(망가뜨림→적색→복구→초록).
 - gate 변화: 없음
+
+## 2026-09-21 · uncommitted · feat(control): detect semantic road evidence (D-151)
+
+- 변경: camera frame에서 차선·정지선·횡단보도·적색/황색/녹색 신호와 충돌을 검출하는 sensing-only observer를 추가했다. 수평 표식은 차선 중심 계산에서 제외하고, 정지선 거리는 검증된 ground model이 활성일 때만 발행한다.
+- 증거: `map_260905_update_v2` synthetic camera closed loop가 `FOLLOW` → `APPROACH` → `STOP_REQUIRED` → `WAIT_SIGNAL` → `PROCEED` → stale `HOLD`를 통과했다. Control 패키지 `1103 passed, 26 skipped`; semantic scene/simulation focused `8 passed`.
+- gate 변화: SOURCE/LOCAL GO 유지. 실제 Gazebo camera topic graph, Pi camera/IR, 물리 homography·제동거리와 FIELD는 HOLD/PARKED 유지.
+- 결정: D-151. Control은 evidence만 만들고 최종 주행 명령은 CORE가 중재한다.

@@ -97,7 +97,7 @@ line_follow:                       # D-143 selected-source, fail-closed policy
   stale_after_s: 0.30              # stop immediately when evidence lease expires
   lost_after_s: 3.0                # latch LOST; operator must explicitly reselect
 
-traffic_policy:                    # D-147 semantic road evidence gate
+traffic_policy:                    # D-151 semantic road evidence gate
   mode: DISABLED                   # DISABLED | MONITOR_ONLY | ENFORCED
   map_id: map_260905_update_v2
   scene_revision: road-scene-v1

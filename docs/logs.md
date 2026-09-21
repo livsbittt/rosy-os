@@ -889,3 +889,11 @@
 - gate 변화: none. 자문 전용 계약 변경 없음 — additive 필드뿐이다.
 - 결정: D-137, PRT-006 additive.
 - 교훈: 와이어 스키마가 이미 `detections.py` 서브모듈로 착지해 있으면 그 모듈이 진실이다 — 진실이 둘로 쪼개지기 전에 기존 착지물부터 찾는다.
+
+## 2026-09-21 · uncommitted · docs(adr): separate semantic evidence, policy, and command (D-151)
+
+- 변경: D-151과 설계·실행 계획에 `road_scene` → `road_perception` → `traffic_policy` → CORE command gate → 관제의 책임 경계를 고정했다. 정책 변경은 stage 후 정지 증거가 있는 상태에서만 apply하며 simulation signal은 명시적 capability로 제한한다.
+- 증거: synthetic camera closed loop가 실제 detector·strict decoder·policy·command gate를 통과하고 Chromium 관제 흐름이 stage→apply 순서를 검증한다.
+- gate 변화: SOURCE/LOCAL 증거만 추가. 실제 Gazebo camera graph, Pi/ARM64, Pinky Pro 보정·정지거리와 FIELD는 승격하지 않는다.
+- 결정: D-151 Accepted.
+- 교훈: 장면 정답은 렌더링과 평가에만 쓰며 detector 입력으로 재사용하면 인식 검증이 아니다.

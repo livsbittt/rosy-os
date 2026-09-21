@@ -18,6 +18,7 @@
 | D-117 | RMW는 CycloneDDS만 쓴다 |
 | D-118 | 생 Image는 Fleet·보드·gz_multi 브리지에 타지 않는다 |
 | D-120 | 시뮬 디스커버리는 LOCALHOST 범위이며 ROS_LOCALHOST_ONLY를 쓰지 않는다 |
+| D-151 | 도로 의미 인식·정책·최종 명령을 분리하고 관제 변경은 정지 상태에서만 적용한다 |
 
 ## 계획·결과 문서
 
@@ -25,6 +26,8 @@
 - [2026-09-08-swarm-formation-slice-results.md](../../../docs/plans/2026-09-08-swarm-formation-slice-results.md)
 - [2026-09-08-swarm-formation-slice.md](../../../docs/plans/2026-09-08-swarm-formation-slice.md)
 - [2026-09-15-module-harness-design.md](../../../docs/plans/2026-09-15-module-harness-design.md)
+- [2026-09-21-semantic-road-control-design.md](../../../docs/plans/2026-09-21-semantic-road-control-design.md)
+- [2026-09-21-semantic-road-control.md](../../../docs/plans/2026-09-21-semantic-road-control.md)
 
 ## 교훈 (docs/solutions)
 
@@ -36,8 +39,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · feat(sim): add semantic road scene and host closed loop (D-151)
 - 2026-09-21 · uncommitted · refactor(gz_sim): swarm_bench consumes fleet.bench only (D-148)
 - 2026-09-21 · uncommitted · feat(sim): finish exact-map live SLAM traversal
 - 2026-09-20 · uncommitted · fix(sim): stabilize exact-map Nav2 startup and corner geometry
 - 2026-09-18 · uncommitted · feat(sim): pin Cyclone and keep images off gz_multi (D-117, D-118, D-120)
-- 2026-09-18 · uncommitted · feat(sim): lock ros_gz_bridge and seed spawn initialpose (D-114, D-115)

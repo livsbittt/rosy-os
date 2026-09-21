@@ -155,3 +155,11 @@
 - 변경: core_api_web v1 라우터 9개 모듈의 core_features 직접 import 12건을 api/deps.py 재수출 면으로 교체(Mode, NavigationError, Dock*, LineFollowMode, valid_costmap_scope, worst, SwarmError, Waypoint). core/test/test_v1_import_boundary.py 2건 추가 — v1 의 core_features 직접 import 금지 + deps 가 타입 면을 소유하는지 검사.
 - 증거: 결합도 평가(2026-09-19) §7-5 — features 재조정의 전파 반경이 deps 에서 멈춘다. 텍스트 검사라 rclpy/fastapi 불필요.
 - gate 변화: 없음
+
+## 2026-09-21 · uncommitted · feat(core): gate line driving with supervised traffic policy (D-151)
+
+- 변경: ROS-free traffic policy와 원자적 bridge gate, 교통 상태/API, 정지 상태 전용 stage/apply, capability-gated simulation signal, 관제 정책 카드를 추가했다. CORE Command Manager가 계속 유일한 최종 `cmd_vel` 소유자다.
+- 안전: stale/conflict/scene mismatch는 `HOLD`와 zero command이며, 관제는 이 fail-closed 판단을 우회할 수 없다.
+- 증거: 정책·API·bridge·dashboard focused tests와 실제 Chromium stage→apply 흐름이 통과했다. 첫 캡처에서 발견한 test-stub state 유실과 거짓 양성 문자열 검사를 수정해 성공 문구를 정확히 단언한다.
+- gate 변화: SOURCE/LOCAL 증거만 추가. 실제 ROS graph와 장치·현장 gate는 HOLD/PARKED 유지.
+- 결정: D-151.

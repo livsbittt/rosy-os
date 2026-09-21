@@ -27,6 +27,22 @@ FETCH_INIT = """
 sessionStorage.setItem('rosy.dashboard.token', 'operator-test-token');
 window.__teleopCommands = [];
 window.__apiCalls = [];
+window.__trafficReadback = {
+  status: {
+    mode: 'MONITOR_ONLY', state: 'FOLLOW', reason: 'clear_road',
+    signal_colour: 'GREEN', stop_line_distance_m: null,
+    scene_revision: 'road-scene-v1', policy_revision: 'traffic-policy-v1',
+  },
+  active: {
+    mode: 'MONITOR_ONLY', map_id: 'map_260905_update_v2',
+    scene_revision: 'road-scene-v1', policy_revision: 'traffic-policy-v1',
+    approach_distance_m: 0.35, stop_distance_m: 0.12,
+    stop_dwell_s: 0.5, stale_after_s: 0.4,
+    min_confidence: 0.5, proceed_speed_scale: 0.5,
+  },
+  staged: null,
+  simulation_signal: {available: true, colour: 'GREEN'},
+};
 window.WebSocket = class extends EventTarget {
   constructor() { super(); setTimeout(() => this.dispatchEvent(new Event('open')), 0); }
   close() {}
@@ -71,22 +87,7 @@ window.fetch = async (input, options = {}) => {
       battery: {warning_percent: 20, critical_percent: 10, deep_percent: 5, critical_policy: 'RETURN_HOME'},
     },
     '/api/v1/events': {events: []},
-    '/api/v1/traffic': {
-      status: {
-        mode: 'MONITOR_ONLY', state: 'FOLLOW', reason: 'clear_road',
-        signal_colour: 'GREEN', stop_line_distance_m: null,
-        scene_revision: 'road-scene-v1', policy_revision: 'traffic-policy-v1',
-      },
-      active: {
-        mode: 'MONITOR_ONLY', map_id: 'map_260905_update_v2',
-        scene_revision: 'road-scene-v1', policy_revision: 'traffic-policy-v1',
-        approach_distance_m: 0.35, stop_distance_m: 0.12,
-        stop_dwell_s: 0.5, stale_after_s: 0.4,
-        min_confidence: 0.5, proceed_speed_scale: 0.5,
-      },
-      staged: null,
-      simulation_signal: {available: true, colour: 'GREEN'},
-    },
+    '/api/v1/traffic': window.__trafficReadback,
     '/api/v1/waypoints': {waypoints: []},
     '/api/v1/docking/status': {state: 'UNDOCKED', dock_id: null, supported: false},
     '/api/v1/docking/docks': {docks: []},
@@ -175,10 +176,19 @@ def _launch_page(playwright):
         "http://rosy.test/dashboard",
         lambda route: route.fulfill(status=200, content_type="text/html", body=html),
     )
-    page.route(
-        "http://rosy.test/dashboard/assets/styles.css",
-        lambda route: route.fulfill(status=200, content_type="text/css", body=""),
-    )
+    def _serve_style(route):
+        name = Path(urlparse(route.request.url).path).name
+        source = WEB / name
+        if not source.is_file():
+            route.fulfill(status=404, body="")
+            return
+        route.fulfill(
+            status=200,
+            content_type="text/css",
+            body=source.read_text(encoding="utf-8"),
+        )
+
+    page.route("http://rosy.test/dashboard/assets/*.css", _serve_style)
 
     def _serve_module(route):
         """Serve every real ES module from the tree; only map.js is stubbed.
@@ -320,8 +330,13 @@ def test_traffic_policy_is_staged_before_stopped_only_apply():
         page.locator("#traffic-policy-apply").click()
         page.wait_for_function(
             "document.getElementById('traffic-policy-message')"
-            "?.textContent?.includes('적용')"
+            "?.textContent === '정지 상태에서 정책을 적용했습니다.'"
         )
+        if screenshot := os.environ.get("ROSY_DASHBOARD_SCREENSHOT"):
+            output = Path(screenshot)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            page.locator(".traffic-policy-control").screenshot(
+                path=str(output))
         calls = page.evaluate("window.__apiCalls")
         browser.close()
 
