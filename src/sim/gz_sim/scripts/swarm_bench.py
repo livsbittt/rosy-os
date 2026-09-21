@@ -30,10 +30,18 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from fleet.formation.geometry import Formation, slot_world_position
-from fleet.swarm.robots import load_robots
-from fleet.swarm.session import FormationSession, FormationSpec, SessionState
-from fleet.swarm.transport import HttpRobotClient, RobotApiError
+# D-148: 시뮬 벤치는 fleet 의 공개면만 본다. fleet.swarm.* / fleet.formation.*
+# 내부 직접 import 는 gz_sim 구조 테스트(test_bench_boundary.py)가 금지한다.
+from fleet.bench import (
+    Formation,
+    slot_world_position,
+    load_robots,
+    FormationSession,
+    FormationSpec,
+    SessionState,
+    HttpRobotClient,
+    RobotApiError,
+)
 
 OBSTACLE_SDF = """<sdf version='1.9'><model name='{name}'><static>true</static>
 <link name='l'><collision name='c'><geometry><box><size>0.3 0.6 0.5</size></box></geometry></collision>

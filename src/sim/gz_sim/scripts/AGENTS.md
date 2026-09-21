@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-14 | Updated: 2026-09-14 -->
+<!-- Generated: 2026-09-14 | Updated: 2026-09-21 -->
 
 # scripts
 
@@ -39,7 +39,7 @@ asyncio throughout. Writes CSV; does not synthesize relay frames.
 
 ### Internal
 
-- `fleet.formation.geometry`, `fleet.swarm.{robots,session,transport}`
+- `fleet.bench` (D-148 공개면). `fleet.swarm.*` / `fleet.formation.*` 내부 직접 import는 금지 — `../test/test_bench_boundary.py` 가 고정한다.
 
 ### External
 

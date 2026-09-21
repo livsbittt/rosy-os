@@ -57,3 +57,8 @@
 - gate 변화: ROS-SIM HOLD→GO(단일 로봇 exact-map live SLAM/CORE/Fleet 범위). 다중 로봇 동시 map과 실기기는 별도 범위다.
 - 결정: 정답 world의 전체 픽셀을 요구하지 않고, 실제 본체가 도달 가능한 연결 구성공간의 완전성을 판정한다. 밀폐 포켓은 숨기지 않고 별도 비율로 기록한다.
 - 교훈: Gazebo 정답 pose 위에 scan matcher를 중복 적용하면 반복 벽에서 유령 벽이 생길 수 있다. simulation 전용 설정과 실기기 설정을 분리해야 한다.
+
+## 2026-09-21 · uncommitted · refactor(gz_sim): swarm_bench consumes fleet.bench only (D-148)
+- 변경: scripts/swarm_bench.py 의 fleet 내부 직접 import 4건을 fleet.bench 경유로 교체. test/test_bench_boundary.py 2건 추가 — scripts/ 전체에서 fleet.swarm/formation 직접 import 금지 + swarm_bench 의 파사드 사용 검사.
+- 증거: 결합도 평가(2026-09-19) §6 C등급 sim→site 내용 결합 해소. 텍스트 구조 검사라 ROS 오버레이 없이 검증된다.
+- gate 변화: 없음
