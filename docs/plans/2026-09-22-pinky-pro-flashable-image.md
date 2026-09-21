@@ -145,7 +145,7 @@ sign offline; personalize only after writing each card.
 
 ## Current checkpoint
 
-- Task 1: source-complete. D-163, the lock and executable contract agree on the exact
+- Task 1: source-complete. D-164, the lock and executable contract agree on the exact
   `.img.xz` filename, required signed sidecars, device-neutral fields and ISO prohibition.
 - Task 2: source-complete. The fetcher now pins Canonical's checksum document,
   detached signature, Ubuntu image-signing key fingerprint and trusted keyring; it

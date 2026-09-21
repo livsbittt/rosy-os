@@ -1,4 +1,4 @@
-## D-163 Pinky Pro 제품 산출물은 ISO가 아니라 서명된 Raspberry Pi 디스크 이미지다
+## D-164 Pinky Pro 제품 산출물은 ISO가 아니라 서명된 Raspberry Pi 디스크 이미지다
 
 **Date:** 2026-09-22
 

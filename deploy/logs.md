@@ -134,7 +134,7 @@
 - 결정: D-154와 D-161. 공통 서명 이미지는 device-neutral로 유지하고 장치별 비밀과
   신원은 카드별 bundle 및 첫 부팅 serial binding에서만 적용한다.
 
-## 2026-09-22 · uncommitted · docs(image): plan the flashable `.img.xz` pipeline (D-163)
+## 2026-09-22 · uncommitted · docs(image): plan the flashable `.img.xz` pipeline (D-164)
 
 - 변경: Canonical Pi preinstalled image에서 native ARM64 loop/mount/chroot 방식으로
   ROSY를 설치하고 `.img.xz`를 생성하는 설계와 TDD 실행 계획을 추가했다. offline
@@ -143,17 +143,17 @@
 - 증거: 공식 Canonical/Raspberry Pi 문서 확인과 ADR/plan 계약. 실제 native build는
   아직 실행하지 않았다.
 - gate 변화: 없음. ARTIFACT와 DEVICE는 HOLD 유지.
-- 결정: D-163. ISO는 제품 artifact가 아니다.
+- 결정: D-164. ISO는 제품 artifact가 아니다.
 
 ## 2026-09-22 · uncommitted · test(image): freeze the Pinky flashable image contract
 
 - 변경: `inputs.lock.yaml`에 exact `.img.xz` filename, raw disk/partition 계약,
   Raspberry Pi Imager 호환성, 11개 signed sidecar, device-neutral 제외 필드와 ISO 금지를
   추가하고 `test_pinky_flashable_image_contract.py`로 고정했다.
-- 증거: D-163 계약과 기존 Ubuntu-native/image pipeline 집중 시험 63 passed;
+- 증거: D-164 계약과 기존 Ubuntu-native/image pipeline 집중 시험 63 passed;
   `git diff --check` 통과.
 - gate 변화: SOURCE 계약만 갱신. 실제 image가 없으므로 ARTIFACT/MEDIA는 HOLD다.
-- 결정: D-163 Task 1 완료.
+- 결정: D-164 Task 1 완료.
 
 ## 2026-09-22 · uncommitted · feat(image): verify Canonical Pi image provenance
 
@@ -164,7 +164,7 @@
   `git diff --check` 통과.
 - gate 변화: SOURCE만 갱신. 실제 native ARM64 host 검증 전이므로
   `base_image.verified: false`와 ARTIFACT HOLD를 유지한다.
-- 결정: D-163 Task 2 source-complete.
+- 결정: D-164 Task 2 source-complete.
 
 ## 2026-09-22 · uncommitted · feat(image): add fail-closed Pi image workspace
 
@@ -176,4 +176,4 @@
   없어 실제 loop device에는 아직 실행하지 않았다.
 - gate 변화: SOURCE만 갱신. Task 4 customizer가 없으면 `build-image.sh`가 계속
   fail-closed하므로 ARTIFACT는 HOLD다.
-- 결정: D-163 Task 3 source-complete.
+- 결정: D-164 Task 3 source-complete.

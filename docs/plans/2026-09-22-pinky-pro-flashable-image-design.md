@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-22
 
-**Decision:** D-163
+**Decision:** D-164
 
 **Target:** Raspberry Pi 5 / Pinky Pro / Ubuntu Server 24.04 LTS arm64 / ROS 2 Jazzy
 

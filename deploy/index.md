@@ -21,7 +21,7 @@
 | D-145 | 네이티브 ARM64 빌드는 unsigned artifact까지만 자동화한다 |
 | D-146 | unsigned ARM64 handoff는 검증 후에만 오프라인 서명 입력이 된다 |
 | D-161 | Ubuntu Server 24.04 + ROS 2 Jazzy 네이티브 제품 런타임으로 즉시 전환 |
-| D-163 | Pinky Pro 제품 산출물은 ISO가 아니라 서명된 Raspberry Pi 디스크 이미지다 |
+| D-164 | Pinky Pro 제품 산출물은 ISO가 아니라 서명된 Raspberry Pi 디스크 이미지다 |
 
 ## 계획·결과 문서
 
@@ -56,7 +56,7 @@
 - 2026-09-22 · uncommitted · feat(image): add fail-closed Pi image workspace
 - 2026-09-22 · uncommitted · feat(image): verify Canonical Pi image provenance
 - 2026-09-22 · uncommitted · test(image): freeze the Pinky flashable image contract
-- 2026-09-22 · uncommitted · docs(image): plan the flashable `.img.xz` pipeline (D-163)
+- 2026-09-22 · uncommitted · docs(image): plan the flashable `.img.xz` pipeline (D-164)
 - 2026-09-22 · uncommitted · feat(provisioning): connect native rollback and Ubuntu first boot
 - 2026-09-22 · uncommitted · feat(runtime): begin D-161 Ubuntu-native transition
 - 2026-09-21 · 5dd076c · feat(robot): vendor stock image read-only baseline capture (pre-G0)

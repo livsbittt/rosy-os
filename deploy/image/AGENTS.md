@@ -7,7 +7,7 @@
 
 Build a signed Ubuntu Server 24.04 LTS arm64 ROSY OS release image with native ROS 2 Jazzy on **native aarch64**. The scripts refuse x86/QEMU release hosts. Inputs must be pinned in `inputs.lock.yaml`; producing a file is not enough — `verify-artifacts.sh` is the go/no-go.
 
-D-163 fixes the product artifact as
+D-164 fixes the product artifact as
 `rosy-os-pinky-pro-<release-id>-arm64.img.xz`. A generic installer ISO is not
 a Pinky Pro release artifact.
 

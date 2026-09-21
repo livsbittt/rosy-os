@@ -1,4 +1,4 @@
-"""D-163 contracts for the Pinky Pro flashable product image."""
+"""D-164 contracts for the Pinky Pro flashable product image."""
 
 from __future__ import annotations
 
@@ -9,18 +9,18 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 ADR_LOG = ROOT / "docs/reference/ROSY ADR Log.md"
-D163 = ROOT / "docs/adr/D-163-pinky-pro-flashable-image.md"
+D164 = ROOT / "docs/adr/D-164-pinky-pro-flashable-image.md"
 DESIGN = ROOT / "docs/plans/2026-09-22-pinky-pro-flashable-image-design.md"
 PLAN = ROOT / "docs/plans/2026-09-22-pinky-pro-flashable-image.md"
 LOCK = ROOT / "deploy/image/inputs.lock.yaml"
 IMAGE_GUIDE = ROOT / "deploy/image/AGENTS.md"
 
 
-def test_d163_accepts_a_pi_disk_image_and_rejects_an_installer_iso():
+def test_d164_accepts_a_pi_disk_image_and_rejects_an_installer_iso():
     log = ADR_LOG.read_text(encoding="utf-8-sig")
-    adr = D163.read_text(encoding="utf-8-sig")
+    adr = D164.read_text(encoding="utf-8-sig")
 
-    assert "| D-163 |" in log
+    assert "| D-164 |" in log
     assert "**Status:** Accepted" in adr
     assert "rosy-os-pinky-pro-<release-id>-arm64.img.xz" in adr
     assert "`.iso`" in adr and "만들거나 제품 파일로 홍보하지 않는다" in adr

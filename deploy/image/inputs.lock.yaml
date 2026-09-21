@@ -44,7 +44,7 @@ product_artifact:
     - fleet_pairing_credential
     - ssh_private_key
   note: >-
-    D-163 product output. The common signed image remains device-neutral;
+    D-164 product output. The common signed image remains device-neutral;
     per-card identity and credentials enter only through deploy/sd after write.
 
 image_tool:
