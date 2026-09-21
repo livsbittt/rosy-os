@@ -171,6 +171,28 @@ def turn_clearance_available(
     )
 
 
+def route_start_index(value: int, route_count: int) -> int:
+    """Validate the first target without silently skipping route coverage."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError("route start index must be an integer")
+    if route_count <= 0 or value < 0 or value >= route_count:
+        raise ValueError("route start index is outside the route")
+    return value
+
+
+def completion_exit_ready(
+    done_since: float | None,
+    now: float,
+    dwell_s: float,
+) -> bool:
+    """Return true only after a measurable terminal-zero dwell."""
+    if not math.isfinite(dwell_s) or dwell_s < 0.0:
+        raise ValueError("completion zero dwell must be finite and nonnegative")
+    if done_since is None:
+        return False
+    return now - done_since >= dwell_s
+
+
 def mapping_route_world() -> tuple[tuple[float, float], ...]:
     """Collision-reviewed observation route for the exact v2 world.
 

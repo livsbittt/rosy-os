@@ -19,7 +19,7 @@ def generate_launch_description():
         control_share, "map", "map_260905_update_v2", "worlds",
         "map_260905_traffic.world")
     line_config = os.path.join(control_share, "config", "line_follow.yaml")
-    core_overlay = os.path.join(
+    default_core_overlay = os.path.join(
         gz_share, "config", "semantic_road_core.yaml")
 
     simulation = IncludeLaunchDescription(
@@ -48,6 +48,8 @@ def generate_launch_description():
         DeclareLaunchArgument("camera_width", default_value="320"),
         DeclareLaunchArgument("camera_height", default_value="180"),
         DeclareLaunchArgument("camera_update_rate", default_value="5"),
+        DeclareLaunchArgument(
+            "core_overlay", default_value=default_core_overlay),
         simulation,
         Node(
             package="control",
@@ -82,7 +84,8 @@ def generate_launch_description():
             name="core",
             output="screen",
             parameters=[{"use_sim_time": True}],
-            additional_env={"ROSY_CONFIG": core_overlay},
+            additional_env={
+                "ROSY_CONFIG": LaunchConfiguration("core_overlay")},
         ),
         LogInfo(msg=(
             "Semantic road camera dashboard: http://127.0.0.1:8080/dashboard "

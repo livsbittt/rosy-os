@@ -48,6 +48,8 @@ from map_v2_traversal import (  # noqa: E402
     mapping_route_world,
     recovery_reverse_distance,
     robust_clearance,
+    route_start_index,
+    completion_exit_ready,
     turn_clearance_available,
 )
 
@@ -81,6 +83,10 @@ class MappingRunner(Node):
         self.declare_parameter("max_angular_rps", 0.60)
         self.declare_parameter("waypoint_tolerance_m", 0.045)
         self.declare_parameter("clearance_quantile", 0.30)
+        self.declare_parameter("start_route_index", 1)
+        self.declare_parameter("exit_on_complete", False)
+        self.declare_parameter("completion_zero_dwell_s", 0.5)
+        self.declare_parameter("run_id", "unset")
         self.declare_parameter("core_api", "http://127.0.0.1:8080")
         self.declare_parameter("operator_token", "rosy-dev-operator")
         diameter = float(self.get_parameter("robot_diameter_m").value)
@@ -98,12 +104,26 @@ class MappingRunner(Node):
         )
         self.core_api = str(self.get_parameter("core_api").value).rstrip("/")
         self.operator_token = str(self.get_parameter("operator_token").value)
+        self.run_id = str(self.get_parameter("run_id").value)
 
         # Ground-truth simulation odometry shares the exact world's absolute
         # coordinate frame, so the reviewed route must not be re-zeroed at the
         # spawn point.
         self.route = mapping_route_world()
-        self.index = 1
+        self.index = route_start_index(
+            int(self.get_parameter("start_route_index").value),
+            len(self.route),
+        )
+        self.exit_on_complete = bool(
+            self.get_parameter("exit_on_complete").value
+        )
+        self.completion_zero_dwell = float(
+            self.get_parameter("completion_zero_dwell_s").value
+        )
+        # Validate the dwell at startup rather than discovering a bad
+        # acceptance setting after the robot has moved.
+        completion_exit_ready(None, 0.0, self.completion_zero_dwell)
+        self.exit_requested = False
         # The lidar is genuinely 360 degrees, so ordinary route points need no
         # artificial scan turn.  A deliberate half-turn is retained only at
         # each pocket's deepest viewpoint to collect repeated stable scans
@@ -220,6 +240,7 @@ class MappingRunner(Node):
         message = String()
         message.data = json.dumps(
             {
+                "run_id": self.run_id,
                 "phase": self.phase,
                 "detail": detail,
                 "waypoint": self.index,
@@ -356,6 +377,10 @@ class MappingRunner(Node):
             if self.done_since is None:
                 self.done_since = self.now()
                 self.publish_status("route_complete_final_zero")
+            elif self.exit_on_complete and completion_exit_ready(
+                self.done_since, self.now(), self.completion_zero_dwell
+            ):
+                self.exit_requested = True
             return
 
         if self.phase == "blocked":
@@ -434,7 +459,8 @@ def main() -> None:
     rclpy.init()
     node = MappingRunner()
     try:
-        rclpy.spin(node)
+        while rclpy.ok() and not node.exit_requested:
+            rclpy.spin_once(node, timeout_sec=0.1)
     except KeyboardInterrupt:
         pass
     finally:
