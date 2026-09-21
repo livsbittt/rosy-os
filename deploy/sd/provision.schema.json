@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rosy.invalid/schemas/sd-provision-v1.json",
+  "title": "ROSY one-time SD personalization bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "device_identity", "release", "dds", "runtime",
+    "network", "fleet", "created_at", "nonce", "payload_checksum"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "device_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["device_uid", "device_name", "hostname", "model"],
+      "properties": {
+        "device_uid": {"type": "string", "format": "uuid"},
+        "device_name": {"type": "string", "pattern": "^rosy-pinky-[a-hj-km-np-z2-9]{4}$"},
+        "hostname": {"type": "string", "pattern": "^rosy-pinky-[a-hj-km-np-z2-9]{4}$"},
+        "model": {"const": "pinky_pro"}
+      }
+    },
+    "release": {
+      "type": "object", "additionalProperties": false,
+      "required": ["release_id"],
+      "properties": {"release_id": {"type": "string", "pattern": "^[0-9]{4}\\.[0-9]{2}\\.[0-9]{2}-[0-9]{3}$"}}
+    },
+    "dds": {
+      "type": "object", "additionalProperties": false,
+      "required": ["robot_number", "ros_domain_id", "namespace"],
+      "properties": {
+        "robot_number": {"type": "integer", "minimum": 1, "maximum": 61},
+        "ros_domain_id": {"type": "integer", "minimum": 41, "maximum": 101},
+        "namespace": {"type": "string", "pattern": "^rosy_[0-9]{2}$"}
+      }
+    },
+    "runtime": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requested_preset"],
+      "properties": {"requested_preset": {"enum": ["core", "motor", "hardware"]}}
+    },
+    "network": {
+      "type": "object", "additionalProperties": false,
+      "required": ["country_code", "ssid", "wpa_psk"],
+      "properties": {
+        "country_code": {"type": "string", "pattern": "^[A-Z]{2}$"},
+        "ssid": {"type": "string", "minLength": 1, "maxLength": 32},
+        "wpa_psk": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "fleet": {
+      "type": "object", "additionalProperties": false,
+      "required": ["endpoint", "trust_profile", "pairing_required"],
+      "properties": {
+        "endpoint": {"type": "string", "pattern": "^https://"},
+        "trust_profile": {"type": "string", "minLength": 1, "maxLength": 128},
+        "pairing_required": {"type": "boolean"},
+        "pairing_credential": {"type": "string", "minLength": 16, "maxLength": 512}
+      }
+    },
+    "created_at": {"type": "string", "format": "date-time"},
+    "nonce": {"type": "string", "minLength": 16, "maxLength": 128},
+    "payload_checksum": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

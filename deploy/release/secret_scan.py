@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import csv
 import re
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -253,6 +253,11 @@ KNOWN_FIXTURES = frozenset({
     # The network.connect fixture PSK used by the host-agent and host-card
     # tests. Deliberately invented; never a value a real device holds.
     "supersecretpsk",
+    "fixture-pass-9384",
+    "fixture-one-time-pairing-credential",
+    "fixture-one-time-credential",
+    "fixture-reusable-token",
+    "must-never-ship",
 })
 
 #: Fixture values are only excused here. Anywhere else they are secrets.
@@ -359,6 +364,65 @@ def scan_text(path: str, text: str) -> list[Finding]:
             findings.append(Finding(path, number, "high-entropy-token", stripped[:120]))
             break
 
+    return findings
+
+
+_TRANSIENT_SECRET_PATHS = frozenset({
+    "/network/wpa_psk",
+    "/fleet/pairing_credential",
+})
+_SECRET_FIELD = re.compile(
+    r"(?:passwo?rd|passphrase|private[_-]?key|reusable[_-]?token|api[_-]?token|access[_-]?token|wpa[_-]?psk|pairing[_-]?credential)",
+    re.IGNORECASE,
+)
+
+
+def _payload_items(value: object, path: str = "") -> Iterator[tuple[str, str, object]]:
+    if isinstance(value, Mapping):
+        for key, child in value.items():
+            child_path = f"{path}/{key}"
+            yield child_path, str(key), child
+            yield from _payload_items(child, child_path)
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            yield from _payload_items(child, f"{path}/{index}")
+
+
+def _payload_finding(path: str, kind: str, reason: str) -> Finding:
+    # Never include the rejected value. This object is safe to render in logs.
+    return Finding(path or "payload", 0, kind, reason)
+
+
+def validate_transient_card_bundle(payload: Mapping[str, object]) -> list[Finding]:
+    """Allow only the schema-scoped raw PSK and one-time Fleet credential."""
+    findings: list[Finding] = []
+    for path, key, value in _payload_items(payload):
+        if isinstance(value, str) and _PRIVATE_KEY.search(value):
+            findings.append(_payload_finding(path, "private-key", "private key material is forbidden"))
+            continue
+        if not _SECRET_FIELD.search(key):
+            continue
+        if path not in _TRANSIENT_SECRET_PATHS:
+            findings.append(_payload_finding(path, "credential", "secret field is not permitted here"))
+        elif path == "/network/wpa_psk" and (
+            not isinstance(value, str) or not _SHA256.fullmatch(value)
+        ):
+            findings.append(_payload_finding(path, "wifi-psk", "PSK must be raw 64-hex output"))
+        elif path == "/fleet/pairing_credential" and (
+            not isinstance(value, str) or not 16 <= len(value) <= 512
+        ):
+            findings.append(_payload_finding(path, "credential", "one-time credential shape is invalid"))
+    return findings
+
+
+def validate_redacted_payload(payload: Mapping[str, object], *, path: str) -> list[Finding]:
+    """Reject every secret-bearing path from receipts and log records."""
+    findings: list[Finding] = []
+    for item_path, key, value in _payload_items(payload):
+        if _SECRET_FIELD.search(key):
+            findings.append(_payload_finding(f"{path}{item_path}", "credential", "secret fields are forbidden"))
+        elif isinstance(value, str) and _PRIVATE_KEY.search(value):
+            findings.append(_payload_finding(f"{path}{item_path}", "private-key", "private key material is forbidden"))
     return findings
 
 

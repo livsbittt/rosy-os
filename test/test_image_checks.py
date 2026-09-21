@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from secret_scan import validate_redacted_payload, validate_transient_card_bundle
 from image_checks import (  # via test/conftest.py
     check_core_account,
     check_no_device_secrets,
@@ -344,6 +345,37 @@ def test_a_shared_api_token_in_the_image_is_refused(image):
 
 def test_a_clean_image_reports_no_secrets(image):
     assert check_no_device_secrets(image) == []
+
+
+def test_transient_bundle_allows_only_schema_scoped_one_time_secrets():
+    payload = {
+        "network": {"ssid": "fixture-lab", "wpa_psk": "a" * 64},
+        "fleet": {
+            "pairing_required": True,
+            "pairing_credential": "fixture-one-time-credential",
+        },
+    }
+    assert validate_transient_card_bundle(payload) == []
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"network": {"passphrase": "must-never-ship"}},
+        {"fleet": {"reusable_token": "fixture-reusable-token"}},
+        {"network": {"wpa_psk": "not-a-raw-64-hex-psk"}},
+        {"notes": "-" * 5 + "BEGIN PRIVATE KEY" + "-" * 5},
+    ],
+)
+def test_transient_bundle_refuses_unapproved_secret_material(payload):
+    assert validate_transient_card_bundle(payload)
+
+
+def test_receipt_and_log_payloads_allow_no_secret_paths():
+    for kind in ("receipt", "log"):
+        assert validate_redacted_payload(
+            {"kind": kind, "network": {"wpa_psk": "a" * 64}}, path=kind
+        )
 
 
 # --- the whole pass --------------------------------------------------------
