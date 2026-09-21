@@ -145,7 +145,9 @@ sign offline; personalize only after writing each card.
 
 ## Current checkpoint
 
-- Tasks 1-7: planned; existing native payload, systemd, rollback and first-boot pieces
+- Task 1: source-complete. D-163, the lock and executable contract agree on the exact
+  `.img.xz` filename, required signed sidecars, device-neutral fields and ISO prohibition.
+- Tasks 2-7: planned; existing native payload, systemd, rollback and first-boot pieces
   are inputs, not proof of a completed disk image.
 - Task 8: blocked until a native ARM64 run produces the actual signed `.img.xz`.
 - Tasks 9-10: physical and destructive; connected media remains untouched until the

@@ -144,3 +144,13 @@
   아직 실행하지 않았다.
 - gate 변화: 없음. ARTIFACT와 DEVICE는 HOLD 유지.
 - 결정: D-163. ISO는 제품 artifact가 아니다.
+
+## 2026-09-22 · uncommitted · test(image): freeze the Pinky flashable image contract
+
+- 변경: `inputs.lock.yaml`에 exact `.img.xz` filename, raw disk/partition 계약,
+  Raspberry Pi Imager 호환성, 11개 signed sidecar, device-neutral 제외 필드와 ISO 금지를
+  추가하고 `test_pinky_flashable_image_contract.py`로 고정했다.
+- 증거: D-163 계약과 기존 Ubuntu-native/image pipeline 집중 시험 63 passed;
+  `git diff --check` 통과.
+- gate 변화: SOURCE 계약만 갱신. 실제 image가 없으므로 ARTIFACT/MEDIA는 HOLD다.
+- 결정: D-163 Task 1 완료.
