@@ -912,3 +912,19 @@
 - 증거: ADR/API/harness 계약과 CORE·Control 전체 회귀, Chromium dashboard 흐름을 통합 main 병합 상태에서 재검증했다.
 - gate 변화: 문서 SOURCE/LOCAL 유지. HOST-SIM 캡처는 ROS-SIM/DEVICE 증거가 아니다.
 - 결정: D-152. raw/Fleet/WebSocket/MJPEG/녹화는 범위 밖이며 D-136의 예산 원칙은 유지한다.
+
+## 2026-09-21 · uncommitted · docs(adr): separate common image from per-device SD personalization (D-154)
+
+- 변경: D-154를 추가해 공통 signed image와 장치별 personalization bundle을 분리하고, 공개 장치명을 `rosy-pinky-<4자리>`로 고정했다. UUID, Pi serial, 내부 DDS 번호는 서로 다른 신원 층으로 유지한다.
+- 증거: SD 개인화 설계/실행 계획과 ADR 본문·색인을 함께 검증한다. 실제 image build, SD write, Pi boot와 Pinky Pro G0–G5는 아직 실행하지 않았다.
+- gate 변화: 없음. SOURCE 문서 계약만 추가하며 ARTIFACT/MEDIA/BOOT/DEVICE는 HOLD다.
+- 결정: D-154 Accepted. Wi-Fi passphrase는 공통 이미지·Git·명령행·로그에 두지 않고 운영자 PC의 보호 credential에서 읽어 일회성 카드 bundle으로 전달한다. 첫 부팅은 core-only다.
+- 교훈: 사람이 보는 짧은 이름, 전역 UUID, hardware serial, DDS 번호를 하나의 문자열로 합치면 재번호·부품 교체·Fleet 등록이 같은 사건으로 무너진다.
+
+## 2026-09-21 · uncommitted · docs(adr): record the surface-based UI/UX evaluation decision (D-153)
+
+- 변경: 병렬 작업 트리에 있던 D-153의 Accepted 결정을 정식 ADR 순서와 색인에 포함했다. 평가 단위는 화면 파일이 아니라 청중별 표면이며 G1 기계 계약, G2 상태 캡처, G3 근거 체크리스트를 모두 요구한다.
+- 증거: ADR 연속성·색인 계약으로 D-153/D-154의 번호와 본문 존재를 함께 검증한다.
+- gate 변화: 없음. 첫 UI/UX 회차가 없으므로 관련 표면 판정은 HOLD다.
+- 결정: D-153 Accepted.
+- 교훈: 병렬 작업이 이미 점유한 ADR 번호를 새 결정이 재사용하지 않도록 현재 작업 트리까지 확인해야 한다.

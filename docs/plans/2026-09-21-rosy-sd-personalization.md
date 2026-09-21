@@ -8,12 +8,13 @@
 
 **Tech Stack:** PowerShell 7, Python 3.12 standard library, JSON Schema, systemd, NetworkManager, Raspberry Pi `rpi-image-gen`, Raspberry Pi Imager CLI, pytest.
 
+**Decision prerequisite:** D-154 is Accepted. Implementation must preserve its common-image, public/device/DDS identity separation, secret-handling, core-only first boot, and evidence-tier boundaries.
+
 ---
 
 ### Task 1: Lock the device-name and identity contract
 
 **Files:**
-- Modify: `docs/reference/ROSY ADR Log.md`
 - Modify: `deploy/robot/config/board.yaml`
 - Create: `deploy/sd/AGENTS.md`
 - Create: `deploy/sd/personalization.py`
@@ -42,10 +43,10 @@ Run: `python -m pytest test/test_sd_personalization.py test/test_dds_identity_co
 
 Expected: collection fails because `deploy/sd/personalization.py` does not exist.
 
-**Step 3: Add the decision and minimal generator**
+**Step 3: Implement the D-154 catalog and minimal generator**
 
-Append a new ADR that supersedes only D-15's `robot_id`/hostname naming clause;
-do not rewrite D-15. Declare this catalog data:
+Do not rewrite D-15 or D-154. Declare the accepted identity taxonomy as catalog
+data:
 
 ```yaml
 identity:
@@ -74,7 +75,7 @@ Expected: all identity tests pass.
 **Step 6: Commit**
 
 ```bash
-git add docs/reference/ROSY\ ADR\ Log.md deploy/robot/config/board.yaml deploy/sd/AGENTS.md deploy/sd/personalization.py test/test_sd_personalization.py test/test_dds_identity_contracts.py
+git add deploy/robot/config/board.yaml deploy/sd/AGENTS.md deploy/sd/personalization.py test/test_sd_personalization.py test/test_dds_identity_contracts.py
 git commit -m "feat(deploy): define short Pinky device identities"
 ```
 

@@ -160,6 +160,8 @@
 | D-150 | web_node는 control 디버그 서피스로 잔류하고 맵의 단일 홈은 navigation/map이다 | Accepted |
 | D-151 | 도로 의미 인식·정책·최종 명령을 분리하고 관제 변경은 정지 상태에서만 적용한다 | Accepted |
 | D-152 | CORE 관제의 카메라 표시는 저주기 최신 1장 preview 예외다 | Accepted |
+| D-153 | UI/UX 평가는 세 계층이고 판정 단위는 표면이다 | Accepted |
+| D-154 | 공통 OS 이미지와 장치별 SD 개인화를 분리한다 | Accepted |
 
 ---
 
@@ -4999,3 +5001,145 @@ a regressed capture timestamp only after the prior local receipt lease expired
 tab transitions abort in-flight fetches and revoke the previous blob.
 
 **References:** D-23, D-34, D-47, D-77, D-118, D-136, D-150, D-151.
+
+---
+
+## D-153 UI/UX 평가는 세 계층이고 판정 단위는 표면이다
+
+**Status:** Accepted (2026-09-21, 기준). 이 ADR은 평가 방법을 고정한다. 첫 평가
+회차가 열리기 전까지 어떤 표면의 UI/UX 판정도 GO로 쓰지 않는다.
+
+**Context:** 값과 문법에는 게이트가 있는데 화면에는 없다. D-82가 팔레트를 수치로,
+D-129가 토큰을 단일 파일로, D-130이 문법 분리를 모듈 게이트로 잠갔다. 그러나
+"이 화면이 그 표면 청중의 질문에 답하는가"를 보는 절차는 정의된 적이 없다.
+D-131이 실측으로 드러낸 결함 — 콘솔 맵이 응답에 있는 assignment·relay를 그리지
+않아 시연용 데모로 읽힌 것 — 은 우연한 목격이지 기준의 산물이 아니며, 같은
+종류의 발견은 재현 가능해야 한다. D-130이 기록했듯 여러 에이전트 세션이 같은
+트리를 쓰고 에이전트의 기본 동작은 기존 콘솔 CSS의 복제다. 무엇이 "개선"이고
+무엇이 위반인지는 논쟁 뒤가 아니라 앞에 있어야 한다. 증거 서열도 제각각이다 —
+D-152는 "Windows HOST-SIM 스크린샷은 브라우저 경로 증거일 뿐"이라고 그 자리에서
+규정해야 했다. 화면 평가가 모듈 게이트(D-61·D-79)와 같은 증거 언어를 쓰도록
+미리 정한다.
+
+**Decision:**
+
+1. **판정 단위는 표면이고 축은 concept 16 §2의 질문이다.** 여섯 표면(운용자
+   콘솔, 장비 런타임, Fleet, 로봇 얼굴, control 레거시 진단, 게임 호스트)이
+   각자 평가 카드를 가진다. 운용자 콘솔과 장비 런타임은 `/dashboard` 하나가
+   같이 서빙하지만 청중이 달라 카드는 둘이다. 카드의 첫 판정 문장은 "이 표면이
+   선언된 모든 상태에서 자기 질문에 답하는가"다.
+2. **평가는 세 계층이다.**
+   - **G1 값과 문법 (기계).** 기존 게이트가 그대로 재심판이다 —
+     `test_palette_gates.py`, `test_ui_token_contracts.py`,
+     `test_grammar_separation.py`, `test_evidence.py`, `test_styleguide.py`.
+     하나라도 빨간 표면은 즉시 HOLD다. 이 ADR은 새 기계 게이트를 만들지
+     않는다.
+   - **G2 상태 매트릭스 (캡처).** 표면 × 선언된 뷰포트 × 최소 상태 집합의
+     캡처 행렬. 최소 상태 집합은 이 ADR이 고정한다: 증거 4상태
+     (`fresh`/`delayed`/`disconnected`/`unavailable` — concept 16 §5)에 빈
+     목록·미등록, 최초 기동, 오류·거부(501·권한), `SAFE_STOP`, 그리고 입력이
+     있는 표면은 불가역 확인 대화상자. 뷰포트 목록은 각 표면 카드가 회차
+     시작에 선언한다. 선언한 셀을 찍지 못하면 그 상태는 평가되지 않은 것이고
+     그 표면은 HOLD다.
+   - **G3 법 체크리스트 (사람).** 여덟 항을 이 ADR이 고정한다. 각 항목의
+     판정은 근거 셀 또는 코드 위치를 지적해야 한다: 정직, 증거 상태, 색, 위계,
+     불가역 조작, 청중별 어휘, 표면 질문, 표면 문법.
+3. **판정과 증거 어휘는 모듈 게이트를 잇는다.** 표면마다 회차 단위로
+   GO/HOLD/PARKED/N/A다. GO는 G1 현재 트리 재실행 통과(D-79), G2 선언 셀 전부
+   캡처, G3 위반 0의 셋이다. 호스트 브라우저 캡처는 LOCAL, 실제 로봇 스택 위
+   캡처는 SIM, 실물 장치 화면은 BENCH/DEVICE, 현장은 FIELD다. LOCAL 화면은
+   DEVICE/FIELD 주장으로 승격되지 않는다.
+4. **기록은 회차 폴더에 산다.** `docs/validation/uiux-surfaces-<date>/`에
+   README와 캡처를 남긴다. ADR 로그는 기준만 소유하고 회차 결과를 다시 쓰지
+   않는다.
+5. **변경은 재평가를 일으킨다.** token, 어휘, 새 패널, 불가역 조작, 증거 상태,
+   뷰포트, 새 표면과 릴리스 변경 범위에 맞춰 해당 표면을 다시 평가한다.
+
+**Alternatives:** 기계 게이트만으로 버티는 안은 값·문법은 지키면서 표면이 실제
+질문에 답하는지를 놓친다. 별도 심각도 체계는 기존 모듈 게이트와 증거 언어를
+갈라 기각한다. ADR 없이 회차 문서만 남기면 기준이 회차마다 변해 기각한다.
+
+**Consequences:** 첫 회차 전까지 여섯 표면의 UI/UX 판정은 HOLD다. UI 변경은
+회차 폴더를 근거로 삼는다. G3은 사람 판단이지만 항목과 근거 셀을 고정해 회차 간
+비교가 가능하다.
+
+**Validation / Transition:** 첫 회차 폴더가 착지 증거다. G1은 기존 계약 시험을
+재사용한다. 회차 종료 시 `docs/logs.md`에 기록하고 index를 재생성한다. 호스트
+회차는 DEVICE/FIELD 게이트를 승격하지 않는다.
+
+**References:** [concept 16](../concept/16_ROSY_Interface_Design_Principles.md),
+D-23, D-61, D-72, D-75, D-77, D-79, D-82, D-88, D-91, D-92, D-101, D-129,
+D-130, D-131, D-152.
+
+---
+
+## D-154 공통 OS 이미지와 장치별 SD 개인화를 분리한다
+
+**Status:** Accepted (2026-09-21). D-15의 `robot_id=rosy_NN`,
+`hostname=rosy-NN` 명명 결정 중 사람이 보는 장치명과 hostname 부분을 대체한다.
+플랫폼명 Rosy 결정과 D-33의 내부 DDS 신원 계약은 유지한다.
+
+**Context:** D-15는 플랫폼명과 함께 공개 장치명까지 순번에 결합했고, D-33은
+`ROSY_ROBOT_NUMBER`에서 ROS domain과 namespace를 파생한다. 이 구성을 SD에 그대로
+넣으면 카드 복제 시 여러 장치가 같은 이름과 DDS 신원을 가지며, Pi 또는 SD 교체와
+로봇 재번호를 같은 사건으로 오인한다. 반대로 로봇마다 전체 OS 이미지를 다시 만들면
+동일 release의 artifact가 장치 수만큼 갈라지고 서명·checksum·rollback 증거를
+재사용할 수 없다. 현장 Wi-Fi를 자동 설정해야 하지만 site passphrase를 공통 이미지,
+Git, 명령행 또는 감사 로그에 넣을 수도 없다. 마지막으로 Windows에서 drive letter만
+보고 SD를 쓰는 절차는 시스템 디스크 오선택을 막지 못한다.
+
+**Decision:**
+
+1. **서명된 기본 이미지는 기종별 공통 artifact다.** Pinky Pro용 Rosy OS 이미지는
+   Robot ID, hostname, 현장 Wi-Fi, API token, SSH private key를 포함하지 않는다.
+   장치별 값은 이미지 검증과 기록이 끝난 뒤 별도 personalization bundle로만 넣는다.
+2. **공개 장치 신원은 세 층으로 분리한다.** 불변 `device_uid`는 UUIDv4,
+   사람이 입력하는 `device_name`과 hostname은 `rosy-pinky-<4자리>`, 실제 보드
+   결속은 첫 부팅에서 읽은 Raspberry Pi hardware serial이다. 네 글자는 소문자
+   영숫자에서 `0`, `o`, `1`, `i`, `l`을 제외한 alphabet으로 생성하고, 등록부와
+   현재 네트워크에서 충돌하면 다시 만든다. 짧은 이름은 전역 신원의 대체물이 아니다.
+3. **DDS 신원은 공개 이름과 분리해 D-33을 유지한다.** 명시적
+   `ROSY_ROBOT_NUMBER=N`이 `ROS_DOMAIN_ID=40+N`, `ROSY_NAMESPACE=rosy_NN`을
+   파생한다. 번호에는 기본값이 없고, hostname 또는 4자리 code에서 domain이나
+   namespace를 추측·파생하지 않는다.
+4. **Windows personalizer는 physical disk를 두 번 확인한다.** disk number,
+   bus type, model, serial, size, boot/system/read-only/offline 상태를 계획 시점과
+   기록 직전에 비교한다. 사용자가 `ERASE DISK <n> <device_name>`을 정확히 입력한
+   뒤에만 signed checksum을 통과한 이미지를 write verification과 함께 기록한다.
+   drive letter만으로 대상을 선택하거나 verification을 끄는 경로는 만들지 않는다.
+5. **Wi-Fi 자동 주입은 비밀정보 경계를 유지한다.** 운영자 PC의 passphrase는
+   저장소 밖 DPAPI 보호 credential에서 읽고 명령행에 넣지 않는다. 카드에는
+   PBKDF2-HMAC-SHA1로 파생한 raw WPA PSK만 일회성 bundle에 넣는다. 이 값도
+   비밀로 취급하며 readback·receipt·로그에 내보내지 않는다. 첫 부팅은 검증 후
+   NetworkManager profile을 mode `0600`으로 설치하고 boot bundle을 소비한다.
+6. **첫 부팅은 항상 `core`로 제한한다.** 요청 preset은 의도로만 기록한다.
+   최초 bundle 또는 Wi-Fi 후보가 실패하면 후보를 폐기하고 `PROVISIONING_AP`로
+   돌아가며 motor/hardware를 시작하지 않는다. 이미 provisioned인 장치의 일반
+   WLAN 장애는 D-26대로 `NETWORK_HOLD`이고 자동 recovery AP를 열지 않는다.
+7. **증거는 SOURCE, ARTIFACT, MEDIA, BOOT, DEVICE로 분리한다.** 호스트 테스트,
+   native ARM64 image, SD write/readback, Pi 부팅, Pinky Pro G0–G5 중 어느 하나도
+   다른 단계를 대신하지 않는다.
+
+**Alternatives:** 장치별 완성 이미지는 artifact와 서명 단위를 불필요하게 분기해
+기각한다. `rosy_01`을 공개 hostname으로 계속 쓰는 안은 재번호와 하드웨어 교체를
+장치 정체성과 결합해 기각한다. 4자리 이름을 ROS namespace/domain으로 사용하는
+안은 충돌과 운용 진단을 어렵게 하고 D-33을 깨므로 기각한다. 평문 passphrase를
+boot 파티션이나 PowerShell 인자에 쓰는 안은 복구 가능한 비밀을 로그·shell history와
+이동식 매체에 남겨 기각한다.
+
+**Consequences:** 장치 목록은 `rosy-pinky-k7m4`처럼 플랫폼→기종→개체 순서로
+정렬되고, 향후 다른 Rosy 기종도 같은 taxonomy를 쓸 수 있다. 짧은 이름 충돌을
+전역 UUID, 등록부, 첫 부팅 serial binding으로 보완해야 한다. raw WPA PSK는 평문
+passphrase보다 노출을 줄이지만 약한 비밀번호의 오프라인 추측 위험을 제거하지
+않는다. D-15의 플랫폼명 Rosy와 D-33의 내부 번호 계약은 계속 유효하다.
+
+**Validation / Transition:** `test_sd_personalization.py`는 이름 alphabet, UUID,
+등록 충돌, manifest와 secret redaction을 고정한다. `test_sd_writer_contract.py`는
+비파괴 `-PlanOnly`, disk drift와 erase 확인을 검증한다.
+`test_first_boot_provisioning.py`는 원자 적용, mode `0600`, one-shot 소비,
+serial binding과 네트워크 fallback을 검증한다. native ARM64 image와 현재 연결된
+SD/Pi 실행 증거가 생기기 전에는 ARTIFACT, MEDIA, BOOT, DEVICE를 GO로 쓰지 않는다.
+
+**References:** D-15, D-22, D-26, D-30, D-33, D-36, D-46, D-53, D-66, D-78,
+`docs/plans/2026-09-21-rosy-sd-personalization-design.md`,
+`docs/plans/2026-09-21-rosy-sd-personalization.md`.
