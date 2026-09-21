@@ -509,6 +509,53 @@ class TestAdvisoryFeedServices:
                                                     pytest.approx(0.50))
 
 
+class TestD137MetricStopComposition:
+    """D-137 T4 fault-injection 구성: 깨진 영상 + LiDAR 장애물 → 정지 유지.
+
+    metric 정지는 Control 정책(obstacle)이 내고, vision 자문은 clip 상한만
+    건드린다. 자문이 살아 있어도 정지는 유지되고, 깨진 영상이 와도 정지가
+    풀리지 않는다 — vision에는 정책 입력 경로가 아예 없다(구조적 분리).
+    Gazebo 종단 실측 전 단계의 순수 합성 증명이다."""
+
+    def _packet(self, observed_at=1000.0):
+        return {
+            "model_revision": "yolo11n-r1", "observed_at": observed_at,
+            "seq": 41, "input_width": 640, "input_height": 640,
+            "input_fps": 10.0, "inference_ms": 12.0,
+            "detections": [{"label": "person", "x": 0.4, "y": 0.3, "w": 0.2,
+                            "h": 0.4, "confidence": 0.8, "track_id": 3}],
+        }
+
+    def test_metric_stop_holds_while_and_after_broken_vision(self):
+        from control.control.command_gate import CommandPolicy, GateInputs, GateSnapshot
+        from core_features.safety.manager import PersonAdvisoryFeed
+        safety = SafetyManager(SpeedLimits(), BatteryPolicy(), policy_required=True)
+        policy = CommandPolicy('applied-revision')
+        safety.bind_control_policy(policy)
+        now = time.monotonic()
+        assert policy.update(GateSnapshot(
+            policy.session, 1, policy.revision, now, now + .5,
+            GateInputs(obstacle=True, bounded_motion=False, can_rotate=True),
+            None, None))
+        feed = PersonAdvisoryFeed(safety, clock=lambda: 1000.1,
+                                  seat_clock=lambda: now)
+
+        # 사람 자문이 좌석에 앉아 있어도(상한 발동 — 영향력 증명) metric 정지는 유지된다.
+        assert feed.ingest(self._packet()) == {'advisory': True,
+                                               'reason': 'person_advisory_set'}
+        assert safety.clip(0.10, 0.0, now=now)[0] == pytest.approx(0.05)
+        # 장애물 정지는 limit 경로(상한 0)로 온다 — 출력은 0이다.
+        assert safety.evaluate_candidate(1, 'nav', 0.10, 0.0, now + 0.01) == (0., 0.)
+
+        # 깨진 영상이 와도 정지는 그대로고, vision이 만든 정지·해제도 없었다.
+        assert feed.ingest("broken") == {'advisory': False,
+                                         'reason': 'invalid_packet'}
+        assert safety.clip(0.10, 0.0, now=now + 0.02) == (pytest.approx(0.10),
+                                                          pytest.approx(0.0))
+        assert safety.evaluate_candidate(1, 'nav', 0.10, 0.0, now + 0.02) == (0., 0.)
+        assert safety.estop is False
+
+
 class TestEventBus:
     def test_seq_monotone_and_history(self, bus):
         bus.publish("nav.completed")

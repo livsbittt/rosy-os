@@ -12,7 +12,7 @@ ROS-101: the only module allowed to import rclpy message types and talk to the R
 | File | Description |
 |------|-------------|
 | `__init__.py` | Package marker |
-| `ros_bridge.py` | 17 subs, 5 pubs, 4 service clients, 6 timers, the Nav2 action client and TF. Exact list pinned in `test/test_bridge_timers.py` — update both together |
+| `ros_bridge.py` | 22 subs, 5 pubs, 4 service clients, 6 timers, the Nav2 action client and TF. Exact list pinned in `test/test_bridge_timers.py` — update both together |
 | `translate.py` | ROS-free message → domain dict conversion. Imports no ROS type, so host pytest runs it |
 | `goal_tracker.py` | ROS-free Nav2 goal generations: which result is current, what to cancel |
 | `display.py` | ROS-free `display/info` decisions: address resolution and payload rounding (PWR-003) |
