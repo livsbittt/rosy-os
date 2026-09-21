@@ -18,6 +18,8 @@ a Pinky Pro release artifact.
 | `build-image.sh` | Native arm64 image build; requires `--release-id YYYY.MM.DD-NNN` |
 | `fetch-base-image.sh` | Fetch/cache the exact HTTPS Ubuntu image and verify size + SHA-256 |
 | `image-workspace.sh` | Disposable raw-image expansion, loop/mount lifecycle and fail-closed cleanup |
+| `customize-rootfs.sh` | Native chroot ROS 2 Jazzy/ROSY installation and device-neutral systemd staging |
+| `verify-mounted-image.py` | Read-only mounted-root package, unit, Docker and device-state checks |
 | `build-native-payload.sh` | Native ARM64 rosdep/colcon build and deterministic inventory export |
 | `verify-package-inventory.sh` | Required-package and `ros2 pkg prefix` release-root readback |
 | `required-ros-packages.txt` | Mandatory offline Pinky Pro ROS package set |

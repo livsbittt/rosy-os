@@ -96,8 +96,10 @@ ros:
   distribution: jazzy
   installation: native-deb
   architecture: arm64
-  apt_repository: http://packages.ros.org/ros2/ubuntu
-  apt_key_fingerprint: null
+  apt_repository: https://packages.ros.org/ros2/ubuntu
+  apt_source_version: 1.2.0
+  apt_source_url: https://github.com/ros-infrastructure/ros-apt-source/releases/download/1.2.0/ros2-apt-source_1.2.0.noble_all.deb
+  apt_source_sha256: 0804d9b13db770eb87019be414cd78378835228ad5fa801fc88758596dd8f7e5
   verified: false
 
 containers:

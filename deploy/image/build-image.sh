@@ -91,6 +91,8 @@ is ready but no raw product image may be published before Task 4"
     --expand-mib "$EXPAND_MIB" \
     -- "$CUSTOMIZER" \
         --payload "$OUT/payload" \
+        --source-tree "$WORKSPACE/src" \
+        --lock "$LOCK" \
         --release-id "$RELEASE_ID" \
         --source-revision "$SOURCE_REVISION"
 

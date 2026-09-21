@@ -186,3 +186,12 @@
   `20 passed`.
 - gate 변화: SOURCE만 갱신. 실제 signed image와 물리 write가 없으므로 MEDIA HOLD.
 - 결정: D-164 Task 7 writer preflight source-complete.
+
+## 2026-09-22 · uncommitted · feat(image): install native ROSY into Ubuntu Pi image
+
+- 변경: SHA-pinned 공식 `ros2-apt-source` deb를 검증하고 native ARM64 chroot에서
+  ROS 2 Jazzy, CycloneDDS, rosdep 의존성, ROSY payload, CORE-only systemd와 first-boot
+  overlay를 설치하며 machine identity와 device credentials는 제거한다.
+- 증거: customization, payload, systemd, first-boot 집중 계약 `27 passed`; shell syntax 통과.
+- gate 변화: SOURCE만 갱신. 실제 ARM64 chroot 실행 전 ARTIFACT HOLD.
+- 결정: D-164 Task 4 source-complete.

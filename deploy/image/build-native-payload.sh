@@ -47,6 +47,8 @@ DEB_INVENTORY="$RELEASE_ROOT/deb-packages.txt"
 NATIVE_RUNTIME_SOURCE="$WORKSPACE/deploy/robot/native"
 FIRST_BOOT_SOURCE="$WORKSPACE/deploy/image/first-boot"
 SD_TOOLS_SOURCE="$WORKSPACE/deploy/sd"
+ROBOT_CONFIG_SOURCE="$WORKSPACE/deploy/robot/config"
+CYCLONEDDS_SOURCE="$WORKSPACE/src/hardware/bringup/config/cyclonedds_localhost.xml"
 [[ -d "$NATIVE_RUNTIME_SOURCE" ]] \
     || fail "native runtime support is missing: deploy/robot/native"
 [[ -d "$FIRST_BOOT_SOURCE" ]] \
@@ -81,7 +83,8 @@ cp -a "$NATIVE_RUNTIME_SOURCE" "$RELEASE_ROOT/deploy/robot/native"
 # switchable release.  Recovery cannot live below /opt/rosy/current because
 # it must run precisely when that link was interrupted.
 OVERLAY="$RELEASE_ROOT/image-overlay"
-mkdir -p "$OVERLAY/opt/rosy" "$OVERLAY/opt/rosy/deploy" "$OVERLAY/etc/systemd/system"
+mkdir -p "$OVERLAY/opt/rosy" "$OVERLAY/opt/rosy/deploy" \
+    "$OVERLAY/etc/systemd/system" "$OVERLAY/etc/rosy"
 cp -a "$NATIVE_RUNTIME_SOURCE" "$OVERLAY/opt/rosy/native-runtime"
 cp -a "$FIRST_BOOT_SOURCE" "$OVERLAY/opt/rosy/first-boot"
 cp -a "$SD_TOOLS_SOURCE" "$OVERLAY/opt/rosy/deploy/sd"
@@ -90,6 +93,9 @@ cp "$NATIVE_RUNTIME_SOURCE/rosy-release-recover.service" "$OVERLAY/etc/systemd/s
 cp "$NATIVE_RUNTIME_SOURCE/rosy-sd-provision.service" "$OVERLAY/etc/systemd/system/"
 cp "$NATIVE_RUNTIME_SOURCE/rosy-core.service" "$OVERLAY/etc/systemd/system/"
 cp "$NATIVE_RUNTIME_SOURCE/rosy-runtime.target" "$OVERLAY/etc/systemd/system/"
+cp "$NATIVE_RUNTIME_SOURCE/rosy-runtime.env" "$OVERLAY/etc/rosy/runtime.env.template"
+cp "$ROBOT_CONFIG_SOURCE/motion_profiles.yaml" "$OVERLAY/etc/rosy/motion_profiles.yaml"
+cp "$CYCLONEDDS_SOURCE" "$OVERLAY/etc/rosy/cyclonedds.xml"
 
 # shellcheck disable=SC1090
 source "$INSTALL_ROOT/setup.bash"
