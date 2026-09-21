@@ -73,3 +73,23 @@ def test_road_observer_has_an_explicit_gazebo_only_ground_mode():
     assert "allow_simulation_ground" in source
     assert "self.get_parameter('use_sim_time').value" in source
     assert "use_sim_time=use_sim_time" in source
+
+
+def test_road_observer_scene_context_is_off_and_sensing_only():
+    source = (ROOT / "control/road_observer_node.py").read_text(
+        encoding="utf-8")
+    assert "SceneContextMatcher" in source
+    assert "default_scene_context_store" in source
+    assert "declare_parameter('scene_context_enabled', False)" in source
+    assert "_scene_matcher.reset()" in source
+    assert "context_id=context.context_id" in source
+    assert "cmd_vel" not in source
+    assert "create_publisher(Twist" not in source
+
+    config = yaml.safe_load(
+        (ROOT / "config/line_follow.yaml").read_text(encoding="utf-8"))
+    params = config["/**/road_observer_node"]["ros__parameters"]
+    assert params["scene_context_enabled"] is False
+    assert params["scene_context_enter_frames"] >= 1
+    assert params["scene_context_exit_frames"] >= 1
+    assert 0.0 < params["scene_context_min_confidence"] <= 1.0

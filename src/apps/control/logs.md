@@ -149,3 +149,17 @@
 - 변경: `test_calibration_spaces.py`와 `test_os_calibration_concurrency.py`가 자식 프로세스에 `cwd=PKG_ROOT`를 넘긴다. 저장소 루트에서 모듈을 합쳐 pytest를 돌려도 `tools.gz`·`control` 임포트가 실패하지 않는다. calibration_spaces CLI 자식은 `capture_output`으로 stderr를 실패 메시지에 남긴다.
 - 증거: `python -m pytest src/apps/control/test/test_calibration_spaces.py src/apps/control/test/test_os_calibration_concurrency.py -q` 15 passed (2026-09-22 Windows, 저장소 루트)
 - gate 변화: 없음. SOURCE/LOCAL GO 유지.
+
+## 2026-09-22 · uncommitted · feat(sensing): D-162 장면 상황 프로파일+히스테리시스 매처 (T1/T2)
+
+- 변경: `control/sensing/scene_context.py` 추가 — `SceneContextProfile`(RoadPerceptionConfig 필드 전체를 명시 기록+`profile_revision`), `SceneContextStore`(닫힌 context 집합 generic/lane_follow/stop_line/crosswalk, 중복 id·revision 거부, generic 필수, 미등록 id는 KeyError), `SceneContextMatcher`(우선순위 crosswalk > stop_line > lane_follow, enter/exit 프레임 히스테리시스, signal_conflict 프레임 계수 동결, reset). `test/test_scene_context.py` 27 시험 추가.
+- 증거: `python -m pytest test -q` 1168 passed, 28 skipped (2026-09-22 Windows, 패키지 cwd). D-137/D-151/D-152 회귀 없음.
+- gate 변화: 없음. SOURCE/LOCAL GO 유지, LOCAL evidence 문자열만 갱신. 노드 wiring(T3)과 CORE 수용(T5)은 미착수.
+- 결정: D-162 Proposed — 학습된 장면은 설정이지 권한이 아니다. 프로파일은 인지 파라미터만 바꾸고 명령 권한은 CORE에 남는다.
+
+## 2026-09-22 · uncommitted · feat(sensing): D-162 T3 scene context 노드 wiring + additive payload
+
+- 변경: `road_observer_node`에 `scene_context_enabled`(기본 False)/`enter_frames`/`exit_frames`/`min_confidence` 파라미터 추가. 활성 시 프레임마다 matcher를 update하고 `road_observation_payload`가 additive `context`(id/confidence/profile_revision)를 실는다. 3필드는 all-or-none 검증이고 비활성 payload는 이전과 완전히 동일하다. 보정 명령(ground model 교체) 시 `matcher.reset()`으로 세션을 폐기한다. `config/line_follow.yaml`에 기본값(비활성) 기록. `sensing/scene_context.py`에 `default_scene_context_store()` 추가(v0 중립 프로파일 — 값은 제네릭과 동일, 튜닝은 DEVICE gate).
+- 증거: `python -m pytest test -q` 1179 passed, 28 skipped (2026-09-22 Windows, 패키지 cwd). road/scene 관련 집중 시험 68 passed.
+- gate 변화: 없음. SOURCE/LOCAL GO 유지, LOCAL evidence 문자열 갱신. CORE 수용(T5)과 ROS-SIM은 core 모듈 게이트다.
+- 결정: context 전환은 검출 파라미터만 바꾼다 — 노드는 motion topic을 여전히 발행하지 않는다(wiring 시험 유지).

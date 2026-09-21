@@ -25,6 +25,7 @@
 | D-152 | CORE 관제의 카메라 표시는 저주기 최신 1장 preview 예외다 |
 | D-155 | Zero-Coupling AST Validation (Build-time Guard) |
 | D-156 | ROS 2 Namespace Strict Segregation (Runtime Guard) |
+| D-162 | 학습된 장면은 설정이지 권한이 아니다 — 장면 상황 프로파일은 등록·리비전·보수 폴백으로만 적용한다 |
 
 ## 계획·결과 문서
 
@@ -41,6 +42,8 @@
 - [2026-09-21-line-follow-modes.md](../../../docs/plans/2026-09-21-line-follow-modes.md)
 - [2026-09-21-semantic-road-control-design.md](../../../docs/plans/2026-09-21-semantic-road-control-design.md)
 - [2026-09-21-semantic-road-control.md](../../../docs/plans/2026-09-21-semantic-road-control.md)
+- [2026-09-22-scene-context-road-design.md](../../../docs/plans/2026-09-22-scene-context-road-design.md)
+- [2026-09-22-scene-context-road.md](../../../docs/plans/2026-09-22-scene-context-road.md)
 
 ## 교훈 (docs/solutions)
 
@@ -53,8 +56,8 @@
 
 ## 최근 기록
 
+- 2026-09-22 · uncommitted · feat(sensing): D-162 T3 scene context 노드 wiring + additive payload
+- 2026-09-22 · uncommitted · feat(sensing): D-162 장면 상황 프로파일+히스테리시스 매처 (T1/T2)
 - 2026-09-22 · uncommitted · test(control): anchor subprocess children to the package root
 - 2026-09-21 · uncommitted · refactor(control): move cross-domain simulations to repository tools
 - 2026-09-21 · uncommitted · feat(control): publish the bounded semantic camera preview (D-152)
-- 2026-09-21 · uncommitted · feat(control): detect semantic road evidence (D-151)
-- 2026-09-21 · uncommitted · feat(control): burst trigger gate — corroboration or operator (D-137 T4 순수 조각)

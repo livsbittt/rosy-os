@@ -316,8 +316,17 @@ def _marking_payload(observation: RoadMarkingObservation | None) -> dict:
 
 def road_observation_payload(source: str, stamp: float, map_id: str,
                              scene_revision: str,
-                             observation: RoadObservation) -> dict:
-    """Build revision-bound JSON evidence for CORE's traffic policy."""
+                             observation: RoadObservation, *,
+                             context_id: str | None = None,
+                             context_confidence: float | None = None,
+                             context_profile_revision: str | None = None
+                             ) -> dict:
+    """Build revision-bound JSON evidence for CORE's traffic policy.
+
+    The optional scene context (D-162) is additive: when any context field
+    is given all three are required, and the "context" key is present only
+    for consumers that opted in, so older CORE builds keep decoding.
+    """
     if source != "CAMERA_ROAD":
         raise ValueError("unsupported road observation source")
     if (isinstance(stamp, bool) or not isinstance(stamp, (int, float))
@@ -329,9 +338,30 @@ def road_observation_payload(source: str, stamp: float, map_id: str,
         raise ValueError("road observation scene_revision is required")
     if not isinstance(observation, RoadObservation):
         raise ValueError("road observation is required")
+    provided = (
+        context_id is not None,
+        context_confidence is not None,
+        context_profile_revision is not None,
+    )
+    if any(provided) and not all(provided):
+        raise ValueError(
+            "road observation context requires id, confidence and revision")
+    if context_id is not None:
+        if not isinstance(context_id, str) or not context_id.strip():
+            raise ValueError("road observation context_id is required")
+        if (isinstance(context_confidence, bool)
+                or not isinstance(context_confidence, (int, float))
+                or not math.isfinite(float(context_confidence))
+                or not 0.0 <= float(context_confidence) <= 1.0):
+            raise ValueError(
+                "road observation context_confidence must be in [0, 1]")
+        if (not isinstance(context_profile_revision, str)
+                or not context_profile_revision.strip()):
+            raise ValueError(
+                "road observation context_profile_revision is required")
     lane = observation.lane
     signal = observation.signal
-    return {
+    payload = {
         "source": source,
         "stamp": float(stamp),
         "map_id": map_id,
@@ -350,3 +380,10 @@ def road_observation_payload(source: str, stamp: float, map_id: str,
             "conflict": bool(observation.signal_conflict),
         },
     }
+    if context_id is not None:
+        payload["context"] = {
+            "id": context_id,
+            "confidence": float(context_confidence),
+            "profile_revision": context_profile_revision,
+        }
+    return payload

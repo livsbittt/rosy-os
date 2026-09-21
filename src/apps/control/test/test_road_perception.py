@@ -159,6 +159,56 @@ def test_payload_rejects_unbound_or_invalid_evidence(args):
         road_observation_payload(*args, detect_road_observation(_frame()))
 
 
+def test_payload_omits_scene_context_by_default():
+    payload = road_observation_payload(
+        "CAMERA_ROAD", 1.0, "map", "rev",
+        RoadObservation(None, None, None, None, False))
+
+    assert "context" not in payload
+
+
+def test_payload_carries_scene_context_when_provided():
+    payload = road_observation_payload(
+        "CAMERA_ROAD", 1.0, "map", "rev",
+        RoadObservation(None, None, None, None, False),
+        context_id="crosswalk",
+        context_confidence=0.8,
+        context_profile_revision="ctx-crosswalk-v1")
+
+    assert payload["context"] == {
+        "id": "crosswalk",
+        "confidence": 0.8,
+        "profile_revision": "ctx-crosswalk-v1",
+    }
+
+
+@pytest.mark.parametrize("drop", ["context_id", "context_confidence",
+                                  "context_profile_revision"])
+def test_payload_rejects_partial_scene_context(drop):
+    kwargs = {
+        "context_id": "crosswalk",
+        "context_confidence": 0.8,
+        "context_profile_revision": "ctx-crosswalk-v1",
+    }
+    kwargs.pop(drop)
+
+    with pytest.raises(ValueError):
+        road_observation_payload(
+            "CAMERA_ROAD", 1.0, "map", "rev",
+            RoadObservation(None, None, None, None, False), **kwargs)
+
+
+@pytest.mark.parametrize("confidence", [-0.1, 1.5, float("nan"), True])
+def test_payload_rejects_out_of_range_context_confidence(confidence):
+    with pytest.raises(ValueError):
+        road_observation_payload(
+            "CAMERA_ROAD", 1.0, "map", "rev",
+            RoadObservation(None, None, None, None, False),
+            context_id="crosswalk",
+            context_confidence=confidence,
+            context_profile_revision="ctx-crosswalk-v1")
+
+
 def test_preview_draws_detected_evidence_without_mutating_source_frame():
     source = _frame(
         lane_x=220, stop_y=190,

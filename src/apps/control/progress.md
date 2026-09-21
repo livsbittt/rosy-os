@@ -2,7 +2,7 @@
 module: control
 logical_modules: [M05, M06, M07, M11]
 owner: CONTROL
-last_verified: { commit: "uncommitted", date: 2026-09-21 }
+last_verified: { commit: "uncommitted", date: 2026-09-22 }
 gates:
   SOURCE:
     state: GO
@@ -10,7 +10,7 @@ gates:
     cmd: "python3 -m pytest test/test_control_absorption_package.py -q"
   LOCAL:
     state: GO
-    evidence: "1131 passed, 26 skipped (2026-09-21 Windows, 통합 main 병합 상태, 패키지 cwd). D-137 DetectionEvidence/burst gate, D-151 semantic road, D-152 bounded preview 포함"
+    evidence: "1179 passed, 28 skipped (2026-09-22 Windows, 패키지 cwd). D-162 T1/T2 장면 프로파일·매처 27 시험 + T3 노드 wiring·additive payload 11 시험 포함 — D-137/D-151/D-152 회귀 없음"
     cmd: "cd src/apps/control && python -m pytest test -q"
   ROS-SIM:
     state: HOLD
@@ -23,7 +23,7 @@ gates:
     blocker: "Pi bench Device 설치와 device-readback.sh --json 증거 없음. Control sensor adapter 활성화는 Device 보정 generation에 묶인다(D-47)"
   FIELD:
     state: PARKED
-adrs: [D-37, D-38, D-40, D-42, D-47, D-50, D-57, D-58, D-77, D-118, D-119, D-143, D-151, D-152, D-155, D-156]
+adrs: [D-37, D-38, D-40, D-42, D-47, D-50, D-57, D-58, D-77, D-118, D-119, D-143, D-151, D-152, D-155, D-156, D-162]
 plans:
   - docs/plans/2026-09-06-module-split-criteria.md
   - docs/plans/2026-09-12-rosy-control-absorption-plan.md
@@ -36,6 +36,8 @@ plans:
   - docs/plans/2026-09-21-line-follow-modes.md
   - docs/plans/2026-09-21-semantic-road-control-design.md
   - docs/plans/2026-09-21-semantic-road-control.md
+  - docs/plans/2026-09-22-scene-context-road-design.md
+  - docs/plans/2026-09-22-scene-context-road.md
   - docs/plans/2026-09-21-camera-preview-dashboard-design.md
   - docs/plans/2026-09-21-camera-preview-dashboard.md
 ---
@@ -64,6 +66,12 @@ plans:
 - 외부 read-only YAML로 IR 끝점과 detector 임계값을 이미지 재빌드 없이 조정하며, 카메라 영상은 exposure/white-balance 수동 잠금 readback 전까지 전달하지 않는다.
 - mode generation과 sensor evidence revision을 한 잠금에서 확인해 mode 전환이나 더 최신의 차선 상실 evidence 뒤에 이전 주행 명령이 적용되지 않는다.
 - LOCAL Control `1084 passed, 26 skipped`, CORE `955 passed, 11 skipped`, root `1008 passed, 13 skipped`. Pi 카메라·I²C readback과 물리 차선 주행은 DEVICE/FIELD HOLD다.
+
+## 2026-09-22 scene context status
+
+- D-162(Proposed): 학습된 장면은 설정이지 권한이 아니다. `sensing/scene_context.py`(프로파일/스토어/매처)와 `road_observer_node` wiring(T3)이 착지했다. 비활성이 기본이며, 활성 시 payload에 additive `context` 필드를 실고 보정 명령 시 matcher 세션을 폐기한다. CORE 수용(T5)은 `core` 모듈 게이트 참조.
+- context는 인지 파라미터만 바꾼다. 정지·명령 결정은 여전히 LiDAR/IR 메트릭과 CORE가 소유하며(D-137/D-151), 프로파일 값 튜닝은 DEVICE gate 전까지 제네릭과 동일하게 둔다.
+- LOCAL: `1179 passed, 28 skipped` (2026-09-22).
 
 ## 현재 유효한 금지사항
 

@@ -31,6 +31,10 @@ from .sensing.road import (
     render_road_preview,
     road_observation_payload,
 )
+from .sensing.scene_context import (
+    SceneContextMatcher,
+    default_scene_context_store,
+)
 
 
 class RoadObserverNode(Node):
@@ -52,6 +56,13 @@ class RoadObserverNode(Node):
         self.declare_parameter('crosswalk_max_gap_px', 20)
         self.declare_parameter('signal_roi_bottom_fraction', 0.35)
         self.declare_parameter('signal_min_pixels', 50)
+        # Scene contexts tune perception parameters only (D-162): no
+        # motion authority, off by default, neutral values until DEVICE
+        # evidence justifies per-scene tuning.
+        self.declare_parameter('scene_context_enabled', False)
+        self.declare_parameter('scene_context_enter_frames', 3)
+        self.declare_parameter('scene_context_exit_frames', 8)
+        self.declare_parameter('scene_context_min_confidence', 0.5)
         self.declare_parameter('dashboard_preview_fps', 2.0)
         self.declare_parameter('dashboard_preview_max_width', 640)
         self.declare_parameter('dashboard_preview_jpeg_quality', 72)
@@ -92,6 +103,17 @@ class RoadObserverNode(Node):
             signal_min_pixels=int(
                 self.get_parameter('signal_min_pixels').value),
         )
+        self._scene_matcher = None
+        if bool(self.get_parameter('scene_context_enabled').value):
+            self._scene_matcher = SceneContextMatcher(
+                default_scene_context_store(),
+                enter_frames=int(self.get_parameter(
+                    'scene_context_enter_frames').value),
+                exit_frames=int(self.get_parameter(
+                    'scene_context_exit_frames').value),
+                min_confidence=float(self.get_parameter(
+                    'scene_context_min_confidence').value),
+            )
         self._preview_config = RoadPreviewConfig(
             fps=float(self.get_parameter('dashboard_preview_fps').value),
             max_width=int(self.get_parameter(
@@ -201,12 +223,21 @@ class RoadObserverNode(Node):
             return self._homography.model
         return None
 
-    def _publish(self, stamp: float, observation: RoadObservation) -> None:
+    def _publish(self, stamp: float, observation: RoadObservation,
+                 context=None) -> None:
+        extra = {}
+        if context is not None:
+            extra = dict(
+                context_id=context.context_id,
+                context_confidence=context.confidence,
+                context_profile_revision=context.profile_revision,
+            )
         payload = road_observation_payload(
             'CAMERA_ROAD', stamp,
             str(self.get_parameter('map_id').value),
             str(self.get_parameter('scene_revision').value),
             observation,
+            **extra,
         )
         encoded = json.dumps(payload, sort_keys=True)
         self.observation_pub.publish(String(data=encoded))
@@ -237,7 +268,10 @@ class RoadObserverNode(Node):
             self.get_logger().warning(
                 f'invalid semantic road frame: {exc}')
         stamp = self._stamp(msg)
-        self._publish(stamp, observation)
+        context = None
+        if self._scene_matcher is not None:
+            context = self._scene_matcher.update(observation)
+        self._publish(stamp, observation, context)
         if frame is not None:
             self._publish_preview(msg, frame, observation, stamp)
 
@@ -288,6 +322,10 @@ class RoadObserverNode(Node):
         command = str(msg.data).strip().lower()
         if command not in ('enable', 'disable'):
             return
+        # The ground model changes here, so scene-context continuity from
+        # the previous ranging session is discarded (D-151 session rule).
+        if self._scene_matcher is not None:
+            self._scene_matcher.reset()
         self._homography_enabled = command == 'enable'
         if self._homography_enabled and not self._homography.eligible:
             self.get_logger().warning(
