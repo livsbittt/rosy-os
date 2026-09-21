@@ -164,6 +164,27 @@ def test_mapping_route_keeps_the_pinky_envelope_clear_of_every_wall():
     } <= observation_points
 
 
+def test_route_start_index_accepts_connector_phase_without_skipping_bounds():
+    mod = _mod()
+
+    assert mod.route_start_index(0, 52) == 0
+    assert mod.route_start_index(1, 52) == 1
+    with pytest.raises(ValueError):
+        mod.route_start_index(-1, 52)
+    with pytest.raises(ValueError):
+        mod.route_start_index(52, 52)
+
+
+def test_completion_exit_waits_for_a_nonnegative_final_zero_dwell():
+    mod = _mod()
+
+    assert mod.completion_exit_ready(None, 10.0, 0.5) is False
+    assert mod.completion_exit_ready(10.0, 10.49, 0.5) is False
+    assert mod.completion_exit_ready(10.0, 10.5, 0.5) is True
+    with pytest.raises(ValueError):
+        mod.completion_exit_ready(10.0, 10.5, -0.1)
+
+
 def test_runtime_runner_uses_core_navigation_input_not_final_cmd_vel():
     source = (SCRIPT.parents[1] / "scripts" / "map_v2_runner.py").read_text(
         encoding="utf-8"
@@ -187,6 +208,12 @@ def test_runtime_runner_uses_core_navigation_input_not_final_cmd_vel():
     assert "hard_clearance_m + 0.015" not in source
     assert 'self.phase = "blocked"' in source
     assert "reverse_unavailable_turn_in_place" not in source
+    assert 'declare_parameter("start_route_index", 1)' in source
+    assert 'declare_parameter("exit_on_complete", False)' in source
+    assert 'declare_parameter("completion_zero_dwell_s", 0.5)' in source
+    assert 'declare_parameter("run_id", "unset")' in source
+    assert '"run_id": self.run_id' in source
+    assert "while rclpy.ok() and not node.exit_requested" in source
 
 
 def test_runtime_runner_resets_stall_timer_after_scans_and_while_aligning():

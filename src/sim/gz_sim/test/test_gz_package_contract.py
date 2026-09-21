@@ -113,6 +113,30 @@ def test_actual_semantic_runtime_evidence_is_pose_checked_and_enforced():
         "HOLD_")
 
 
+def test_integrated_acceptance_is_sequential_and_uses_measured_geometry():
+    launch = (
+        ROOT / "launch" / "pinky_integrated_acceptance.launch.py"
+    ).read_text(encoding="utf-8")
+    cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+    package = (ROOT / "package.xml").read_text(encoding="utf-8")
+
+    assert "semantic_road_dashboard.launch.py" in launch
+    assert "map_260905_update_v2" in launch
+    assert "wall_geometry.json" in launch
+    assert '"robot_radius": 0.086' in launch
+    assert '"footprint_padding": 0.010' in launch
+    assert '"start_route_index": 0' in launch
+    assert '"exit_on_complete": True' in launch
+    assert "OnProcessExit" in launch
+    assert "target_action=mapping_runner" in launch
+    assert "navigation_launch.xml" in launch
+    assert "pinky_nav2_probe.py" in launch
+    assert "pinky_acceptance.py" in launch
+    assert (ROOT / "launch" / "pinky_integrated_acceptance.launch.py").is_file()
+    assert "DIRECTORY" in cmake and "launch" in cmake
+    assert "<exec_depend>navigation</exec_depend>" in package
+
+
 def test_gz_multi_uses_ros_gz_bridge_not_domain_bridge():
     """D-114: 시뮬은 네임스페이스 + ros_gz_bridge. domain_bridge / ROS_DOMAIN_ID 없음."""
     launch = (ROOT / "launch" / "gz_multi.launch.py").read_text(encoding="utf-8")

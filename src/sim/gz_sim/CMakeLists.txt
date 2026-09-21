@@ -41,7 +41,10 @@ install(
     scripts/world_to_map.py
     scripts/seed_initialpose.py
     scripts/map_v2_runner.py
+    scripts/pinky_nav2_probe.py
+    scripts/pinky_acceptance.py
     launch/map_v2_traversal.py
+    launch/pinky_acceptance_policy.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
