@@ -87,25 +87,14 @@ jobs:
       # 실행되지 않았다. 위 스텝이 src/core/core/test 만 돌기 때문이다. 그래서
       # compose 권한 경계와 Wi-Fi 배포 계약이 검증 없이 지나갔다.
       # ROS 오버레이는 필요 없다 — test_motor_control.py 가 직접 sys.path 를 잡는다.
+      # 2026-09-21: 구조적 적색 3건(D-136·D-137 인덱스 행 + D-137 T2 저널 필드)이
+      # 수습돼 더 이상 deselect 하지 않고 게이팅한다.
       - name: Test (deployment and release contracts)
         env:
           # module harness: logs.md 는 이 base 이후로 앞부분이 보존되어야 한다 (비면 origin/main merge-base).
           HARNESS_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
-        # 구조적 적색 3건(D-136·D-137 인덱스 행 부재 + 저널 증거 필드 누락 — append-only
-        # 로 동결, 콘솔 세션 소유)은 아래 비차단 스텝이 노출한다. 이 스텝은 나머지 전체를 게이팅한다.
         run: |
-          python3 -m pytest test/ -v \
-            --deselect test/test_harness_contracts.py::test_repository_adr_log_is_contiguous_and_indexed \
-            --deselect test/test_harness_contracts.py::test_full_lint_including_git_history_checks \
-            --deselect test/test_network_topology_contracts.py::test_adr_index_lists_every_decision_section
-
-      - name: Harness and ADR log contracts (known structural reds)
-        continue-on-error: true
-        env:
-          HARNESS_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          python3 -m pytest test/test_harness_contracts.py \
-            test/test_network_topology_contracts.py::test_adr_index_lists_every_decision_section -v
+          python3 -m pytest test/ -v
 
       # 호스트 테스트는 ros_bridge 를 임포트하지 않으므로, 모듈 최상단의 ROS
       # 임포트가 노드 생성자를 죽이는 결함을 잡지 못한다. 이 러너에는
