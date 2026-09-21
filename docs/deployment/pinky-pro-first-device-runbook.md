@@ -141,6 +141,35 @@ connectivity evidence only: it proves bounded key-based SSH plus `/api/v1` and
 acceptance and does not advance DEVICE or FIELD. Preserve the file with the
 session evidence; the verifier refuses to replace an existing evidence file.
 
+#### One-command stationary validation from Windows
+
+When the signed manifest revision and robot number are known, run this from the
+repository root. It joins peer connectivity, API/dashboard reachability, device
+readback, exact robot identity, and exact release revision into one verdict. It
+does not change runtime mode or send motor commands.
+
+```powershell
+$Revision = "<signed-manifest-full-40-character-git-revision>"
+$Evidence = Join-Path $PWD ("pinky-01-preflight-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+./deploy/robot/validate-pinky-from-windows.ps1 `
+  -PiHost pinky-01.local -PiUser rosy -NetworkInterface eth0 `
+  -ExpectedRobotNumber 1 -ExpectedRevision $Revision `
+  -EvidenceDirectory $Evidence
+```
+
+The directory contains raw `G0-connection.json`, `G2-device-readback.json` when
+collection succeeds, final `user-validation-summary.json`, and
+`SHA256SUMS.txt`. Existing evidence is never replaced. If
+`summary.outcome=HOLD`, repair the named `failed_checks`. If non-interactive
+`sudo` is unavailable over SSH, the tool still records HOLD evidence and the
+operator switches to the Pi local-console procedure.
+
+`GO != motion authorization`. Even a GO result keeps
+`motion_authorized: false`; its next gate is `G3_SENSOR_ONLY`. Open the reported
+`dashboard_url` for observation. G4 wheels-off-ground work and G5 low-speed
+floor motion still require their separate physical conditions and two-person
+procedure.
+
 ### Local console path
 
 Connect a display and keyboard, sign in locally, and use the same commands

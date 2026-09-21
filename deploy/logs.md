@@ -214,3 +214,14 @@
   YAML parse와 `git diff --check` 통과.
 - gate 변화: SOURCE만 갱신. workflow 실실행 전 ARTIFACT HOLD.
 - 결정: D-164 Task 8 실행 경로 준비 완료.
+## 2026-09-21 · uncommitted · feat(deploy): add operator stationary validation bundle
+
+- 변경: added a one-command Windows collector that binds peer reachability,
+  device readback, expected robot identity, and exact release revision into
+  no-overwrite GO/HOLD evidence with SHA-256 hashes.
+- Safety: the result always carries `motion_authorized: false`; it never changes
+  runtime mode or sends a motor command, and GO advances only to G3 sensor-only.
+- 증거: focused Python and real PowerShell fake-SSH/loopback tests cover both
+  GO and unreachable-device HOLD paths.
+- gate 변화: none. DEVICE remains HOLD until the physical Pinky produces the
+  same evidence from an installed signed ARM64 release.
