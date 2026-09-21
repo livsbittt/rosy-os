@@ -106,6 +106,17 @@
 - 결정: 카드 A(vendor 원본 보존) + 카드 B(Rosy OS) 2장 운용을 G0–G5 절차에 명시한다. 캡처 결과는 비밀정보 검토와 scanner 통과 후 필요한 증거만 docs/validation/vendor-baseline-<date>/에 착지한다.
 - 교훈: 조사 문서의 UNKNOWN은 실물에서 읽을 수 있는 항목과 그렇지 않은 항목을 갈라 둬야 한다 — 읽기 가능 항목은 절차와 가드로 고정하면 실기 세션 비용이 줄어든다.
 
+## 2026-09-21 · uncommitted · feat(deploy): add operator stationary validation bundle
+
+- 변경: added a one-command Windows collector that binds peer reachability,
+  device readback, expected robot identity, and exact release revision into
+  no-overwrite GO/HOLD evidence with SHA-256 hashes.
+- Safety: the result always carries `motion_authorized: false`; it never changes
+  runtime mode or sends a motor command, and GO advances only to G3 sensor-only.
+- 증거: focused Python and real PowerShell fake-SSH/loopback tests cover both
+  GO and unreachable-device HOLD paths.
+- gate 변화: none. DEVICE remains HOLD until the physical Pinky produces the
+  same evidence from an installed signed ARM64 release.
 ## 2026-09-22 · uncommitted · feat(runtime): begin D-161 Ubuntu-native transition
 
 - 변경: Canonical Ubuntu 24.04.5 Raspberry Pi arm64 base URL/SHA-256을 lock에
@@ -214,14 +225,3 @@
   YAML parse와 `git diff --check` 통과.
 - gate 변화: SOURCE만 갱신. workflow 실실행 전 ARTIFACT HOLD.
 - 결정: D-164 Task 8 실행 경로 준비 완료.
-## 2026-09-21 · uncommitted · feat(deploy): add operator stationary validation bundle
-
-- 변경: added a one-command Windows collector that binds peer reachability,
-  device readback, expected robot identity, and exact release revision into
-  no-overwrite GO/HOLD evidence with SHA-256 hashes.
-- Safety: the result always carries `motion_authorized: false`; it never changes
-  runtime mode or sends a motor command, and GO advances only to G3 sensor-only.
-- 증거: focused Python and real PowerShell fake-SSH/loopback tests cover both
-  GO and unreachable-device HOLD paths.
-- gate 변화: none. DEVICE remains HOLD until the physical Pinky produces the
-  same evidence from an installed signed ARM64 release.

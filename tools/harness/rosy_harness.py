@@ -61,6 +61,9 @@ KNOWN_LEGACY_HEADINGS = frozenset({
     "## 2026-09-20 · uncommitted · test(fleet): the sim runs end-to-end and the console exposes two real defects (D-131 phase 1 LOCAL evidence)",
     "## 2026-09-20 · uncommitted · chore(fleet): relay diagnosis fields exposed; live iteration deferred to D-83 (environment)",
     "## 2026-09-20 · uncommitted · fix(fleet): defect (a) resolved in the live sim — relay delivers, no early HOLD (D-132 validated)",
+    # 2026-09-22 road-world entries committed with a bare date heading
+    # (e0e6397); the history gate forbids reforming them in place.
+    "## 2026-09-22",
 })
 
 GENERATED_MARK = (

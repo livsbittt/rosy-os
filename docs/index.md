@@ -120,4 +120,3 @@
 - 2026-09-22 · uncommitted · test(control): D-162 노드 그래프 검증 PASS — scene context 슬라이스
 - 2026-09-22 · uncommitted · test(core): ROS-SIM 재실행 PASS — D-162 T5 이후 트리 복원
 - 2026-09-22 · uncommitted · fix(core)+docs(validation): import json 결함 수정, ROS-SIM 재실행 절차문
-- 2026-09-22 · uncommitted · feat(control+core): D-162 T3·T5 scene context 착지

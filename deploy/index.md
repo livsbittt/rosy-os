@@ -53,10 +53,8 @@
 
 ## 최근 기록
 
+- 2026-09-22 · uncommitted · ci(image): build Pinky image on native ARM64
+- 2026-09-22 · uncommitted · feat(image): emit verifiable Pinky image handoff
+- 2026-09-22 · uncommitted · feat(image): install native ROSY into Ubuntu Pi image
+- 2026-09-22 · uncommitted · feat(sd): verify signed image before media selection
 - 2026-09-22 · uncommitted · feat(image): add fail-closed Pi image workspace
-- 2026-09-22 · uncommitted · feat(image): verify Canonical Pi image provenance
-- 2026-09-22 · uncommitted · test(image): freeze the Pinky flashable image contract
-- 2026-09-22 · uncommitted · docs(image): plan the flashable `.img.xz` pipeline (D-164)
-- 2026-09-22 · uncommitted · feat(provisioning): connect native rollback and Ubuntu first boot
-- 2026-09-22 · uncommitted · feat(runtime): begin D-161 Ubuntu-native transition
-- 2026-09-21 · 5dd076c · feat(robot): vendor stock image read-only baseline capture (pre-G0)
