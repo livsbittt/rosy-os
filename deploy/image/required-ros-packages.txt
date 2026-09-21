@@ -1,0 +1,13 @@
+# Mandatory Pinky Pro ROSY packages in every product image (D-161).
+interfaces
+core
+bringup
+description
+navigation
+control
+omx_adapter
+led
+sensor_adc
+lamp_control
+emotion
+imu_bno055
