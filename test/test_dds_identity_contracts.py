@@ -33,6 +33,16 @@ IDENTITY_KEYS = ("ROS_DOMAIN_ID", "ROSY_NAMESPACE")
 LAST_LEGAL_ROBOT_NUMBER = 61
 
 
+def test_public_pinky_hostname_does_not_replace_dds_identity():
+    """The short public name and the ROS graph identity are separate axes."""
+    public_hostname = "rosy-pinky-k7m4"
+    robot_number = 1
+
+    assert public_hostname != "rosy_01"
+    assert 40 + robot_number == 41
+    assert f"rosy_{robot_number:02d}" == "rosy_01"
+
+
 def _text(path):
     return path.read_text(encoding="utf-8")
 

@@ -2,6 +2,11 @@
 # Compose mounts capabilities.${ROSY_RUNTIME_MODE}.yaml and profile.${ROSY_RUNTIME_MODE}.yaml.
 board: pinky_pro
 host: raspberry-pi-5
+identity:
+  platform: rosy
+  model_family: pinky
+  device_name_prefix: rosy-pinky
+  short_code_length: 4
 slices:
   required: [core]
   available: [motor, io, nav, vision, omx, ai]
