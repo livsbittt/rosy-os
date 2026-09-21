@@ -169,5 +169,5 @@
 | D-159 | State Summary Visibility: Management by Exception (Law 0) | Proposed |
 | D-160 | Games Domain Strict Decoupling (AST Validation) | Accepted |
 | D-161 | Ubuntu Server 24.04 + ROS 2 Jazzy 네이티브 제품 런타임으로 즉시 전환 | Accepted (supersedes D-22 runtime mechanism) |
-
+| D-162 | 학습된 장면은 설정이지 권한이 아니다 — 장면 상황 프로파일은 등록·리비전·보수 폴백으로만 적용한다 | Proposed |
 ---
