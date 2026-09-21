@@ -27,12 +27,14 @@ base_image:
   publisher: Canonical
   product: ubuntu-server
   variant: preinstalled-server-arm64+raspi
-  url: null
-  sha256: null
+  url: https://cdimage.ubuntu.com/ubuntu/releases/24.04/release/ubuntu-24.04.5-preinstalled-server-arm64+raspi.img.xz
+  sha256: b23371a5c8d02f612c26e7c18cacb81c5a48f968c7c66a2645391320aa94351e
+  minimum_size_bytes: 1000000000
   verified: false
   note: >-
-    Record the exact official Ubuntu image URL and published SHA-256 before a
-    release artifact may be built.
+    URL and SHA-256 were read from Canonical's 24.04 release index on
+    2026-09-22. Keep verified false until the file is downloaded and checked
+    on the native ARM64 release host.
 
 os:
   family: ubuntu-server

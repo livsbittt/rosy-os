@@ -14,6 +14,7 @@ provenance cannot be stated — which is the one thing 7.2 asks for.
 from __future__ import annotations
 
 import subprocess
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -22,7 +23,12 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE_DIR = ROOT / "deploy" / "image"
 LOCK = IMAGE_DIR / "inputs.lock.yaml"
-SCRIPTS = ("build-image.sh", "verify-inputs.sh", "verify-artifacts.sh")
+SCRIPTS = (
+    "build-image.sh",
+    "fetch-base-image.sh",
+    "verify-inputs.sh",
+    "verify-artifacts.sh",
+)
 
 
 def _bash_is_usable() -> bool:
@@ -96,6 +102,7 @@ def test_the_lock_names_pinky_pro_as_the_first_board(lock):
         ("image_tool", "commit"),
         ("base_image", "url"),
         ("base_image", "sha256"),
+        ("base_image", "minimum_size_bytes"),
         ("os", "suite"),
         ("os", "architecture"),
         ("os", "apt_sources"),
@@ -151,6 +158,90 @@ def test_the_risky_assumptions_explain_themselves(lock):
     for section in ("image_tool", "base_image"):
         if lock[section]["verified"] is False:
             assert lock[section].get("note"), f"{section} is unverified with no explanation"
+
+
+def _fetch_fixture(tmp_path: Path, content: bytes = b"ubuntu-image") -> Path:
+    """Create a tiny pinned lock/cache pair for the real fetch script."""
+    import shutil
+
+    shutil.copy(IMAGE_DIR / "fetch-base-image.sh", tmp_path / "fetch-base-image.sh")
+    lock = {
+        "base_image": {
+            "url": "https://cdimage.ubuntu.com/releases/noble/release/ubuntu.img.xz",
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "minimum_size_bytes": len(content),
+        }
+    }
+    (tmp_path / "inputs.lock.yaml").write_text(
+        yaml.safe_dump(lock), encoding="utf-8"
+    )
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    (cache / "ubuntu.img.xz").write_bytes(content)
+    return cache
+
+
+def test_fetch_base_image_script_exists():
+    assert (IMAGE_DIR / "fetch-base-image.sh").is_file()
+
+
+@bash_only
+def test_fetch_base_image_reuses_a_verified_offline_cache(tmp_path):
+    _fetch_fixture(tmp_path)
+
+    result = _bash([
+        "fetch-base-image.sh", "--lock", "inputs.lock.yaml",
+        "--cache-dir", "cache", "--offline",
+    ], tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert "CACHE_VERIFIED" in result.stdout
+
+
+@bash_only
+def test_fetch_base_image_rejects_checksum_mismatch(tmp_path):
+    cache = _fetch_fixture(tmp_path)
+    (cache / "ubuntu.img.xz").write_bytes(b"tampered-img")
+
+    result = _bash([
+        "fetch-base-image.sh", "--lock", "inputs.lock.yaml",
+        "--cache-dir", "cache", "--offline",
+    ], tmp_path)
+
+    assert result.returncode != 0
+    assert "checksum mismatch" in result.stderr.lower()
+
+
+@bash_only
+def test_fetch_base_image_rejects_latest_or_non_https_urls(tmp_path):
+    _fetch_fixture(tmp_path)
+    lock = yaml.safe_load((tmp_path / "inputs.lock.yaml").read_text(encoding="utf-8"))
+    lock["base_image"]["url"] = "http://cdimage.ubuntu.com/releases/latest/ubuntu.img.xz"
+    (tmp_path / "inputs.lock.yaml").write_text(yaml.safe_dump(lock), encoding="utf-8")
+
+    result = _bash([
+        "fetch-base-image.sh", "--lock", "inputs.lock.yaml",
+        "--cache-dir", "cache", "--offline",
+    ], tmp_path)
+
+    assert result.returncode != 0
+    assert "pinned https" in result.stderr.lower()
+
+
+@bash_only
+def test_fetch_base_image_enforces_minimum_size(tmp_path):
+    _fetch_fixture(tmp_path)
+    lock = yaml.safe_load((tmp_path / "inputs.lock.yaml").read_text(encoding="utf-8"))
+    lock["base_image"]["minimum_size_bytes"] = 1024
+    (tmp_path / "inputs.lock.yaml").write_text(yaml.safe_dump(lock), encoding="utf-8")
+
+    result = _bash([
+        "fetch-base-image.sh", "--lock", "inputs.lock.yaml",
+        "--cache-dir", "cache", "--offline",
+    ], tmp_path)
+
+    assert result.returncode != 0
+    assert "too small" in result.stderr.lower()
 
 
 # --- the scripts refuse to proceed on unpinned inputs ---------------------
