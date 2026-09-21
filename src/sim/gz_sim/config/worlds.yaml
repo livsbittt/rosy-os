@@ -64,3 +64,19 @@ worlds:
     spawn_x: -0.205
     spawn_y: 0.275
     spawn_spacing: 0.0
+  rosy_road.world:
+    map: rosy_road.yaml
+    # 2026-09-22 STL 평면도(260919 MAP FILE.STL)에서 뽑은 1:1 도로 회로다. 방 ->
+    # 로터리 -> 상하 통로 -> S 커브가 하나로 이어진 단일 회로이고 차로가 0.10~0.20 m
+    # 여서 어디서도 두 대가 나란히 못 지나간다 — 교행은 전부 Fleet 양보의 몫이다.
+    # 팽창은 통로 반폭(0.05~0.10)보다 작아야 경로가 나온다. 크게 주면 맵 전체가
+    # 고비용이 되어 아무 미션도 출발하지 못한다(rosy_factory 0.55 실측과 같은 맥락).
+    # robot_radius/footprint 가 0.12 (외접) 로 되어 있으면 0.10 m 급 차로는 플래너가
+    # 거절한다 — 좁은 차로 QA 는 시나리오 문서(docs/plans/2026-09-22-*)의 남은
+    # 과정이다.
+    inflation_radius: 0.05
+    # 방(내부 ~0.47 x 0.81 m) 안에서 둘을 나란히 세운다. 양보 시나리오 배치는
+    # fleet console 목표로 한다.
+    spawn_x: 0.36
+    spawn_y: 0.64
+    spawn_spacing: 0.28

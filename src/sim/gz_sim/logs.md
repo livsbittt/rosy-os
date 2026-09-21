@@ -93,3 +93,11 @@
 - 한계: this WSL host produced about 0.59-0.80 Hz camera and 0.36 Hz preview throughput. Continuous realtime preview, metric distance, physical Pinky Pro, braking, and FIELD acceptance remain HOLD.
 - gate 변화: existing exact-map ROS-SIM GO remains unchanged. The actual Gazebo camera graph moves from untested to PASS, while sustained realtime preview and physical validation remain HOLD.
 - 보존: `docs/validation/semantic-road-2026-09-21/gazebo_runtime_result.json` and `gazebo_camera_frame.jpg`.
+
+
+## 2026-09-22
+
+- 변경: `scripts/stl_to_world.py` 신규 — STL 평면도 선화를 벽 박스 월드로 변환한다. 벽/바닥 표시 구분은 묶음 extent(150 mm 미만 표시) + 뼈대에 붙은 짧은 선분 공간 묶음(입구 X자) + 명시적 영역(문 사다리)이다. `worlds/rosy_road.world` 신규 — 260919 MAP FILE.STL 1:1, 벽 박스 1102 개, 높이 0.30 m.
+- 증거: 선분 1081 = 벽 1131 / 표시 492; world_to_map 로 free=7199 단일 덩어리 확인, 렌더 이미지로 도면 대조. 시도하고 버린 판정: 이중선 병합(오정합으로 프레임 붕괴), 둑 면적 시험(갈라놓기 벽을 전부 표시로 버림), 선분 탐침(자기 밴드 오염).
+- 한계: 외곽 프레임 누수 152 셀, 관절 핀홀. 배율/두께는 --scale, WALL_HALF_MM 옵션.
+- gate 변화: 월드 자체는 ROS-SIM 미실행 — launch 실측 전까지 HOLD 유지.

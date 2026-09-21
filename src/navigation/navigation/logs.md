@@ -55,3 +55,10 @@
 - gate 변화: SOURCE/LOCAL refreshed only. ROS-SIM and DEVICE remain HOLD until their actual runtimes are exercised.
 - 결정: D-144.
 - 교훈: mapping is a navigation backend, not a new runtime mode; this keeps motor/LiDAR ownership unchanged while making persistence and readiness backend-specific.
+
+## 2026-09-22
+
+- 변경: `map/rosy_road.pgm` + `map/rosy_road.yaml` 추가 — `260919 MAP FILE.STL`(도로 회로 평면도)을 `gz_sim/scripts/stl_to_world.py` 로 벽 박스 월드로 바꾸고 `world_to_map.py --resolution 0.02 --seed 0.48,0.64` 로 만든 정답 맵이다. 사이트 2.81 x 1.27 m, 방-로터리-상하 통로-S 커브 단일 회로, 자유 면적 2.89 m2 단일 덩어리.
+- 증거: 맵 덩어리 수 1(방/통로/링 전부 연결), `world_to_map.py` 출력 free=7199 occupied=1663. 플로우 검증 이미지로 도면과 대조.
+- 한계: 외곽 프레임 밖 누수 free 152 셀(0.06 m2), 벽 관절 핀홀 — inflation 이 흡수하지만 SLAM 정합 비교용으로는 보강 필요. 차로 0.10~0.20 m 는 nav2 footprint QA 전에는 미션 보증 못 한다.
+- gate 변화: ROS-SIM 새 맵 입력으로는 HOLD 유지(실측 런치 전). 시나리오 문서 `docs/plans/2026-09-22-rosy-road-yield-scenarios.md`.
