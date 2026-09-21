@@ -43,7 +43,7 @@ class GroundPlane:
         """Image row where the ground plane escapes to infinity. Below it is floor."""
         return self.principal_y - self.focal_px * math.tan(self.pitch_rad)
 
-    def distance(self, row):
+    def distance(self, row, column=None):
         """Metres ahead of the camera for an image row, or None when unknowable."""
         try:
             row = float(row)
@@ -134,6 +134,40 @@ def focal_from_hfov(width_px, hfov_rad):
     if not _finite(width_px, hfov_rad) or width_px <= 0 or not 0 < hfov_rad < math.pi:
         return None
     return (width_px / 2.0) / math.tan(hfov_rad / 2.0)
+
+
+def simulation_ground_plane(*, source, simulation_enabled, use_sim_time,
+                            width_px, height_px, height_m, pitch_rad,
+                            hfov_rad, max_range_m):
+    """Build a plane from declared Gazebo geometry, never physical imagery.
+
+    Gazebo owns exact sensor pose and projection values, so using those values
+    is deterministic simulation geometry rather than camera calibration.  The
+    source guard prevents this shortcut from becoming an accidental fallback
+    for a Pinky camera that still requires an independently validated profile.
+    """
+    if (str(source).strip().upper() != 'GAZEBO'
+            or not simulation_enabled
+            or not use_sim_time):
+        return None
+    try:
+        width = float(width_px)
+        height = float(height_px)
+    except (TypeError, ValueError):
+        return None
+    if not _finite(width, height) or width <= 0.0 or height <= 0.0:
+        return None
+    focal = focal_from_hfov(width, hfov_rad)
+    if focal is None:
+        return None
+    return ground_plane(
+        height_m=height_m,
+        pitch_rad=pitch_rad,
+        focal_px=focal,
+        principal_x=width / 2.0,
+        principal_y=height / 2.0,
+        max_range_m=max_range_m,
+    )
 
 
 def _finite(*values):

@@ -6,9 +6,15 @@
     <xacro:arg name="is_sim" default="false"/>
     <xacro:arg name="cam_tilt_deg" default="8"/>
     <xacro:arg name="screen_tilt_deg" default="-25"/>
+    <xacro:arg name="camera_width" default="1280"/>
+    <xacro:arg name="camera_height" default="720"/>
+    <xacro:arg name="camera_update_rate" default="10"/>
 
     <xacro:insert_robot namespace="$(arg namespace)"
                         is_sim="$(arg is_sim)"
                         cam_tilt_deg="$(arg cam_tilt_deg)"
-                        screen_tilt_deg="$(arg screen_tilt_deg)"/>
+                        screen_tilt_deg="$(arg screen_tilt_deg)"
+                        camera_width="$(arg camera_width)"
+                        camera_height="$(arg camera_height)"
+                        camera_update_rate="$(arg camera_update_rate)"/>
 </robot>

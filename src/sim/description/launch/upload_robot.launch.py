@@ -14,6 +14,10 @@ def generate_launch_description():
     namespace_arg = DeclareLaunchArgument("namespace", default_value="")
     is_sim = DeclareLaunchArgument("is_sim", default_value="false")
     cam_tilt_deg = DeclareLaunchArgument("cam_tilt_deg", default_value="0")
+    camera_width = DeclareLaunchArgument("camera_width", default_value="1280")
+    camera_height = DeclareLaunchArgument("camera_height", default_value="720")
+    camera_update_rate = DeclareLaunchArgument(
+        "camera_update_rate", default_value="10")
 
     namespace = PythonExpression([
         "'", LaunchConfiguration('namespace'), "' + ('/' if '", LaunchConfiguration('namespace'), "' != '' else '')"
@@ -38,7 +42,11 @@ def generate_launch_description():
                     '"',
                     ' namespace:=', namespace,
                     ' is_sim:=', LaunchConfiguration('is_sim'),
-                    ' cam_tilt_deg:=', LaunchConfiguration('cam_tilt_deg')
+                    ' cam_tilt_deg:=', LaunchConfiguration('cam_tilt_deg'),
+                    ' camera_width:=', LaunchConfiguration('camera_width'),
+                    ' camera_height:=', LaunchConfiguration('camera_height'),
+                    ' camera_update_rate:=', LaunchConfiguration(
+                        'camera_update_rate')
                 ]),
             'frame_prefix': [namespace],
         }]
@@ -63,6 +71,9 @@ def generate_launch_description():
     ld.add_action(namespace_arg)
     ld.add_action(is_sim)
     ld.add_action(cam_tilt_deg)
+    ld.add_action(camera_width)
+    ld.add_action(camera_height)
+    ld.add_action(camera_update_rate)
     ld.add_action(rsp_node)
     ld.add_action(jsp_node)
 

@@ -96,3 +96,18 @@ def test_sim_slam_uses_model_pose_odom_and_keeps_wheel_odom_for_diagnostics():
     assert "<odom_frame>${namespace}odom</odom_frame>" in truth_odom
     assert "<robot_base_frame>${namespace}base_footprint</robot_base_frame>" in truth_odom
     assert "<dimensions>2</dimensions>" in truth_odom
+
+
+def test_sim_camera_render_profile_is_tunable_with_existing_defaults():
+    robot = ROBOT_XACRO.read_text(encoding="utf-8")
+    model = (ROOT / "urdf" / "rosy.urdf.xacro").read_text(encoding="utf-8")
+    gazebo = (ROOT / "urdf" / "rosy_gz.urdf.xacro").read_text(
+        encoding="utf-8")
+
+    assert '<xacro:arg name="camera_width" default="1280"/>' in robot
+    assert '<xacro:arg name="camera_height" default="720"/>' in robot
+    assert '<xacro:arg name="camera_update_rate" default="10"/>' in robot
+    assert "camera_width:=1280 camera_height:=720 camera_update_rate:=10" in model
+    assert "<width>${camera_width}</width>" in gazebo
+    assert "<height>${camera_height}</height>" in gazebo
+    assert "<update_rate>${camera_update_rate}</update_rate>" in gazebo

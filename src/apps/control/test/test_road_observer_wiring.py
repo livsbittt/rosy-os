@@ -29,6 +29,8 @@ def test_road_observer_binds_map_scene_and_fail_closed_ground_profile():
     assert params["scene_revision"] == "road-scene-v1"
     assert params["camera_homography_enabled"] is False
     assert params["camera_homography_path"] == ""
+    assert params["camera_ground_mode"] == "homography"
+    assert params["allow_simulation_ground"] is False
     assert 1 <= params["bright_threshold"] <= 254
     assert 0.0 < params["horizontal_min_fraction"] < 1.0
     assert params["dashboard_preview_fps"] == 2.0
@@ -57,3 +59,17 @@ def test_road_observer_uses_source_header_stamp_and_validated_homography():
     assert "time.monotonic()" in source
     assert "RoadPreviewConfig" in source
     assert "depth=1, reliability=ReliabilityPolicy.BEST_EFFORT" in source
+
+
+def test_road_observer_has_an_explicit_gazebo_only_ground_mode():
+    source = (ROOT / "control/road_observer_node.py").read_text(
+        encoding="utf-8")
+    assert "simulation_ground_plane" in source
+    assert "camera_ground_mode" in source
+    assert "gazebo_camera_height_m" in source
+    assert "gazebo_camera_pitch_rad" in source
+    assert "gazebo_camera_hfov_rad" in source
+    assert "source=self._preview_config.source" in source
+    assert "allow_simulation_ground" in source
+    assert "self.get_parameter('use_sim_time').value" in source
+    assert "use_sim_time=use_sim_time" in source

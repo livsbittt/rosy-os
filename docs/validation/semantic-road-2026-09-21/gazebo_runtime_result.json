@@ -1,10 +1,10 @@
 {
-  "schema_version": 1,
-  "captured_at": "2026-09-21T16:21:00+09:00",
+  "schema_version": 3,
+  "captured_at": "2026-09-21T17:59:05+09:00",
   "runtime": {
-    "environment": "WSL2 Ubuntu 24.04",
+    "environment": "WSL2 Ubuntu 24.04.4 LTS",
     "ros_distribution": "Jazzy",
-    "gazebo_version": "8.11.0",
+    "gazebo_server_version": "8.11.0",
     "launch": "ros2 launch gz_sim semantic_road_dashboard.launch.py gazebo_gui:=false",
     "world": "map_260905_traffic.world",
     "world_sha256": "af70bbd26d1b3fbe3812af2008403bcfbab42df1b6d4dc6a07d660737ba87373",
@@ -15,51 +15,118 @@
     "topic": "/camera/front",
     "source": "GAZEBO",
     "frame_id": "front_camera_link",
-    "width": 640,
-    "height": 360,
-    "sequence": 74,
-    "captured_at_sim_s": 78.9,
-    "capture_age_ms": 289,
-    "overlay": "semantic-road-v1",
+    "width": 320,
+    "height": 180,
+    "configured_update_rate_hz": 5.0,
+    "semantic_bright_threshold": 220,
     "artifact": "gazebo_camera_frame.jpg",
-    "artifact_sha256": "849163f149ef5736f45aef5816d78b444d501f1615f12365fa964095fb41bc87",
+    "artifact_sequence": 202,
+    "artifact_captured_at_sim_s": 98.2,
+    "artifact_capture_age_ms": 299,
+    "artifact_sha256": "0f0f5b4e977fb6dc37f7b5cb27c415f31799b8f9b6d6a32d197f6dc311442328",
+    "overlay": "semantic-road-v1",
     "observed_wall_rate_hz": {
-      "software_rendering_range": [0.59, 0.80],
-      "wsl_gpu_attempt": 0.37,
-      "dashboard_preview": 0.36
+      "raw_ros_range": [4.111, 4.36],
+      "dashboard_preview_sample": 1.63
     },
-    "freshness": "intermittent_on_this_wsl_host"
+    "tunable_launch_arguments": [
+      "camera_width",
+      "camera_height",
+      "camera_update_rate"
+    ]
   },
-  "road_observation": {
+  "camera_ground": {
+    "mode": "gazebo_pinhole",
+    "allow_simulation_ground": true,
+    "use_sim_time": true,
+    "source_guard": "GAZEBO",
+    "physical_profile_activated": false,
+    "height_m": 0.06019440185074605,
+    "forward_offset_m": 0.028480935838487282,
+    "pitch_deg": 25.0,
+    "horizontal_fov_rad": 1.1519,
+    "max_range_m": 0.6,
+    "boundary": "requires explicit opt-in, simulated clock, and GAZEBO source"
+  },
+  "semantic_pose_validation": {
+    "spawn_pose": {"x": -0.2, "y": -0.15, "yaw": 0.0},
+    "stop_line_world_x_m": -0.01,
+    "initial": {
+      "ground_truth_forward_m": 0.16151906416151273,
+      "detected_forward_m": 0.16735881757296805,
+      "absolute_error_m": 0.00583975341145532,
+      "image_row": 67.5,
+      "confidence": 0.986328125
+    },
+    "stopped": {
+      "robot_pose": {
+        "x": -0.1523229900711095,
+        "y": -0.14994332844164313,
+        "yaw": 0.00386106635665599
+      },
+      "ground_truth_forward_m": 0.11384311510292515,
+      "detected_forward_m": 0.11826047235896134,
+      "absolute_error_m": 0.004417357256036189,
+      "relative_error": 0.03880214672659363,
+      "image_row": 98.5,
+      "confidence": 0.97578125
+    }
+  },
+  "road_observation_at_stop": {
     "source": "CAMERA_ROAD",
     "map_id": "map_260905_update_v2",
     "scene_revision": "road-scene-v1",
-    "stop_line_visible": true,
-    "stop_line_confidence": 0.8141533745659723,
-    "stop_line_image_row": 431.5,
-    "stop_line_distance_m": null,
-    "lane_visible": false,
-    "crosswalk_visible": false,
-    "signal_visible": false
+    "lane": {
+      "visible": true,
+      "confidence": 1.0,
+      "error": 0.0043052475979305175
+    },
+    "stop_line": {
+      "visible": true,
+      "confidence": 0.97578125,
+      "image_row": 98.5,
+      "distance_m": 0.11826047235896134
+    },
+    "crosswalk": {
+      "visible": true,
+      "confidence": 0.75859375,
+      "image_row": 60.5,
+      "distance_m": 0.18337930290835225
+    },
+    "signal": {
+      "visible": false,
+      "reason": "outside the current downward camera view"
+    }
   },
-  "core_readback": {
+  "enforced_control_readback": {
     "line_follow_mode": "CAMERA_LINE",
-    "line_follow_state": "HOLD",
-    "line_follow_reason": "line_not_visible",
-    "traffic_policy_mode": "MONITOR_ONLY",
-    "traffic_policy_state": "HOLD",
-    "traffic_policy_reason": "stop_distance_unavailable",
-    "linear_scale": 0.0,
-    "robot_linear_velocity_mps": 0.0,
-    "robot_angular_velocity_rps": 0.0,
-    "estop": false
+    "line_follow_state": "TRACKING",
+    "candidate_linear_mps": 0.07981955901015228,
+    "candidate_angular_rps": -0.002776015228426445,
+    "traffic_policy_mode": "ENFORCED",
+    "traffic_policy_state": "WAIT_SIGNAL",
+    "traffic_policy_reason": "signal_unknown",
+    "traffic_linear_scale": 0.0,
+    "final_linear_velocity_mps": 0.0,
+    "final_angular_velocity_rps": 0.0,
+    "estop": false,
+    "approach_observed": {
+      "initial_scale": 0.19680967974285427,
+      "minimum_approach_scale": 0.15,
+      "robot_forward_travel_m": 0.0476770099288905
+    }
   },
   "gates": {
     "actual_gazebo_camera_graph": "PASS",
     "map_scene_identity": "PASS",
-    "detector_to_core_policy": "PASS_FAIL_CLOSED",
-    "continuous_realtime_preview_on_this_host": "HOLD",
-    "metric_stop_distance": "HOLD_REQUIRES_VALIDATED_HOMOGRAPHY",
+    "semantic_pose_distance_error_under_1cm": "PASS",
+    "actual_lane_stop_crosswalk_detection": "PASS",
+    "actual_camera_signal_detection": "HOLD_SIGNAL_OUTSIDE_CURRENT_VIEW",
+    "detector_to_core_policy": "PASS",
+    "enforced_candidate_to_final_stop": "PASS",
+    "dashboard_preview_freshness_on_this_host": "PASS",
+    "dashboard_browser_capture": "HOLD_NO_BROWSER_BACKEND",
+    "physical_camera_homography": "HOLD_REQUIRES_PHYSICAL_VALIDATION",
     "physical_pinky_pro": "NOT_TESTED"
   }
 }

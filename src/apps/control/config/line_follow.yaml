@@ -29,6 +29,8 @@
     height: 240
     rotate_deg: 180
     camera_profile_revision: camera-profile-v1
+    camera_ground_mode: homography
+    allow_simulation_ground: false
     bright_threshold: 180
     lane_roi_top_fraction: 0.30
     horizontal_min_fraction: 0.40
@@ -57,3 +59,9 @@
     camera_homography_min_validation_frames: 2
     camera_homography_min_validation_span_cm: 10.0
     camera_homography_max_range_m: 0.6
+    # Gazebo-only declared projection. Zero geometry keeps it fail-closed in
+    # every physical/default launch; the semantic simulation overrides it.
+    gazebo_camera_height_m: 0.0
+    gazebo_camera_pitch_rad: 0.0
+    gazebo_camera_hfov_rad: 0.0
+    gazebo_camera_max_range_m: 0.6

@@ -1,5 +1,6 @@
 """ROS-free Gazebo sim package surface (D-73). Launch tests stay skippable."""
 
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,6 +39,78 @@ def test_single_robot_gazebo_gui_is_optional():
 
     assert '<arg name="gui" default="true"/>' in launch
     assert 'if="$(var gui)"' in launch
+
+
+def test_single_robot_camera_render_profile_reaches_the_description():
+    launch = (ROOT / "launch" / "launch_sim.launch.xml").read_text(
+        encoding="utf-8")
+
+    for name, default in (
+        ("camera_width", "1280"),
+        ("camera_height", "720"),
+        ("camera_update_rate", "10"),
+    ):
+        assert f'<arg name="{name}" default="{default}"/>' in launch
+        assert f"<arg name='{name}' value='$(var {name})'/>" in launch
+
+
+def test_single_robot_spawn_pose_is_tunable_with_existing_defaults():
+    launch = (ROOT / "launch" / "launch_sim.launch.xml").read_text(
+        encoding="utf-8")
+
+    for name, default, option in (
+        ("spawn_x", "0.0", "x"),
+        ("spawn_y", "0.0", "y"),
+        ("spawn_z", "0.1", "z"),
+        ("spawn_yaw", "0.0", "Y"),
+    ):
+        assert f'<arg name="{name}" default="{default}"/>' in launch
+        assert f'-{option} $(var {name})' in launch
+
+
+def test_semantic_road_uses_a_bounded_camera_profile_and_gazebo_range():
+    launch = (ROOT / "launch" / "semantic_road_dashboard.launch.py").read_text(
+        encoding="utf-8")
+
+    assert 'DeclareLaunchArgument("camera_width", default_value="320")' in launch
+    assert 'DeclareLaunchArgument("camera_height", default_value="180")' in launch
+    assert 'DeclareLaunchArgument("camera_update_rate", default_value="5")' in launch
+    assert '"camera_width": LaunchConfiguration("camera_width")' in launch
+    assert '"camera_height": LaunchConfiguration("camera_height")' in launch
+    assert '"camera_update_rate": LaunchConfiguration(' in launch
+    assert '"camera_ground_mode": "gazebo_pinhole"' in launch
+    assert '"gazebo_camera_height_m": 0.060194' in launch
+    assert '"gazebo_camera_pitch_rad": math.radians(25.0)' in launch
+    assert '"gazebo_camera_hfov_rad": 1.1519' in launch
+    assert '"allow_simulation_ground": True' in launch
+    assert '"camera_bright_threshold": 220' in launch
+    assert '"bright_threshold": 220' in launch
+    assert '"spawn_x": "-0.20"' in launch
+    assert '"spawn_y": "-0.15"' in launch
+
+    core = (ROOT / "config" / "semantic_road_core.yaml").read_text(
+        encoding="utf-8")
+    assert "mode: ENFORCED" in core
+
+
+def test_actual_semantic_runtime_evidence_is_pose_checked_and_enforced():
+    evidence_path = (
+        ROOT.parents[2]
+        / "docs"
+        / "validation"
+        / "semantic-road-2026-09-21"
+        / "gazebo_runtime_result.json"
+    )
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    stopped = evidence["semantic_pose_validation"]["stopped"]
+    control = evidence["enforced_control_readback"]
+
+    assert stopped["absolute_error_m"] < 0.01
+    assert control["traffic_policy_mode"] == "ENFORCED"
+    assert control["candidate_linear_mps"] > 0.0
+    assert control["final_linear_velocity_mps"] == 0.0
+    assert evidence["gates"]["actual_camera_signal_detection"].startswith(
+        "HOLD_")
 
 
 def test_gz_multi_uses_ros_gz_bridge_not_domain_bridge():

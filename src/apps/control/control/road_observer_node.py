@@ -21,6 +21,7 @@ from .sensing.camera_homography import (
     CalibrationThresholds,
     load_homography_profile,
 )
+from .sensing.camera_ground import simulation_ground_plane
 from .sensing.road import (
     RoadObservation,
     RoadPerceptionConfig,
@@ -41,6 +42,8 @@ class RoadObserverNode(Node):
         self.declare_parameter('height', 240)
         self.declare_parameter('rotate_deg', 180)
         self.declare_parameter('camera_profile_revision', 'camera-profile-v1')
+        self.declare_parameter('camera_ground_mode', 'homography')
+        self.declare_parameter('allow_simulation_ground', False)
         self.declare_parameter('bright_threshold', 180)
         self.declare_parameter('lane_roi_top_fraction', 0.30)
         self.declare_parameter('horizontal_min_fraction', 0.40)
@@ -67,6 +70,10 @@ class RoadObserverNode(Node):
         self.declare_parameter(
             'camera_homography_min_validation_span_cm', 10.0)
         self.declare_parameter('camera_homography_max_range_m', 0.6)
+        self.declare_parameter('gazebo_camera_height_m', 0.0)
+        self.declare_parameter('gazebo_camera_pitch_rad', 0.0)
+        self.declare_parameter('gazebo_camera_hfov_rad', 0.0)
+        self.declare_parameter('gazebo_camera_max_range_m', 0.6)
 
         self._config = RoadPerceptionConfig(
             bright_threshold=int(self.get_parameter('bright_threshold').value),
@@ -125,6 +132,8 @@ class RoadObserverNode(Node):
         )
         self._homography_enabled = bool(
             self.get_parameter('camera_homography_enabled').value)
+        self._simulation_ground_key = None
+        self._simulation_ground = None
         self._camera_controls_stable = False
         self.observation_pub = self.create_publisher(
             String, 'road/observation', 10)
@@ -148,8 +157,47 @@ class RoadObserverNode(Node):
             + float(msg.header.stamp.nanosec) * 1e-9
         )
 
-    def _ground(self):
-        if self._homography_enabled and self._homography.eligible:
+    def _ground(self, width: int, height: int):
+        mode = str(self.get_parameter('camera_ground_mode').value).strip().lower()
+        if mode == 'gazebo_pinhole':
+            simulation_enabled = bool(
+                self.get_parameter('allow_simulation_ground').value)
+            use_sim_time = bool(self.get_parameter('use_sim_time').value)
+            height_m = float(self.get_parameter(
+                'gazebo_camera_height_m').value)
+            pitch_rad = float(self.get_parameter(
+                'gazebo_camera_pitch_rad').value)
+            hfov_rad = float(self.get_parameter(
+                'gazebo_camera_hfov_rad').value)
+            max_range_m = float(self.get_parameter(
+                'gazebo_camera_max_range_m').value)
+            key = (
+                self._preview_config.source,
+                simulation_enabled,
+                use_sim_time,
+                int(width),
+                int(height),
+                height_m,
+                pitch_rad,
+                hfov_rad,
+                max_range_m,
+            )
+            if key != self._simulation_ground_key:
+                self._simulation_ground = simulation_ground_plane(
+                    source=self._preview_config.source,
+                    simulation_enabled=simulation_enabled,
+                    use_sim_time=use_sim_time,
+                    width_px=width,
+                    height_px=height,
+                    height_m=height_m,
+                    pitch_rad=pitch_rad,
+                    hfov_rad=hfov_rad,
+                    max_range_m=max_range_m,
+                )
+                self._simulation_ground_key = key
+            return self._simulation_ground
+        if (mode == 'homography' and self._homography_enabled
+                and self._homography.eligible):
             return self._homography.model
         return None
 
@@ -181,7 +229,10 @@ class RoadObserverNode(Node):
             if (self._camera_controls_stable or not bool(self.get_parameter(
                     'require_camera_controls_stable').value)):
                 observation = detect_road_observation(
-                    frame, ground=self._ground(), config=self._config)
+                    frame,
+                    ground=self._ground(frame.shape[1], frame.shape[0]),
+                    config=self._config,
+                )
         except ValueError as exc:
             self.get_logger().warning(
                 f'invalid semantic road frame: {exc}')
