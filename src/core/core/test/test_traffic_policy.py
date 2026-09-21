@@ -36,7 +36,9 @@ def evidence(*, stamp=10.0, map_id="map_260905_update_v2",
              scene_revision="road-scene-v1", stop_visible=False,
              stop_distance_m=None, stop_confidence=0.0,
              crosswalk_visible=False, signal_colour=None,
-             signal_confidence=0.0, signal_conflict=False):
+             signal_confidence=0.0, signal_conflict=False,
+             context_id=None, context_confidence=None,
+             context_profile_revision=None):
     return RoadEvidence(
         source="CAMERA_ROAD",
         stamp=stamp,
@@ -49,6 +51,9 @@ def evidence(*, stamp=10.0, map_id="map_260905_update_v2",
         signal_colour=signal_colour,
         signal_confidence=signal_confidence,
         signal_conflict=signal_conflict,
+        context_id=context_id,
+        context_confidence=context_confidence,
+        context_profile_revision=context_profile_revision,
     )
 
 
@@ -287,3 +292,60 @@ def test_simulation_signal_control_requires_explicit_capability():
     assert result == {"available": True, "colour": "GREEN"}
     with pytest.raises(ValueError):
         enabled.set_simulation_signal("BLUE", actor="operator:test")
+
+
+def test_road_evidence_context_fields_are_all_or_none():
+    with pytest.raises(ValueError):
+        evidence(context_id="crosswalk")
+    with pytest.raises(ValueError):
+        evidence(context_id="crosswalk", context_confidence=0.8)
+
+    plain = evidence()
+    assert plain.context_id is None
+    assert plain.context_confidence is None
+    assert plain.context_profile_revision is None
+
+
+def test_road_evidence_context_confidence_is_bounded():
+    with pytest.raises(ValueError):
+        evidence(
+            context_id="crosswalk",
+            context_confidence=1.5,
+            context_profile_revision="ctx-crosswalk-v1")
+    with pytest.raises(ValueError):
+        evidence(
+            context_id=" ",
+            context_confidence=0.8,
+            context_profile_revision="ctx-crosswalk-v1")
+
+
+def test_road_evidence_accepts_complete_context():
+    contextual = evidence(
+        context_id="crosswalk",
+        context_confidence=0.8,
+        context_profile_revision="ctx-crosswalk-v1")
+
+    assert contextual.context_id == "crosswalk"
+    assert contextual.context_confidence == pytest.approx(0.8)
+    assert contextual.context_profile_revision == "ctx-crosswalk-v1"
+
+
+def test_scene_context_evidence_does_not_change_the_verdict(rig):
+    now, manager = rig
+    stopped = dict(
+        stop_visible=True, stop_distance_m=0.08, stop_confidence=0.9)
+    plain = evidence(**stopped)
+    contextual = evidence(
+        context_id="crosswalk",
+        context_confidence=0.8,
+        context_profile_revision="ctx-crosswalk-v1",
+        **stopped)
+
+    manager.observe(plain, received_at=now[0], source_now=plain.stamp)
+    assert manager.gate(0.08, 0.0, now=now[0]).linear == 0.0
+    assert manager.status().state == "STOP_REQUIRED"
+
+    manager.observe(contextual, received_at=now[0],
+                    source_now=contextual.stamp)
+    assert manager.gate(0.08, 0.0, now=now[0]).linear == 0.0
+    assert manager.status().state == "STOP_REQUIRED"

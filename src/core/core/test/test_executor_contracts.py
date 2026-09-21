@@ -113,3 +113,45 @@ def test_diagnostics_provider_set_matches_the_recorded_baseline():
         "stops carrying the key. Update AGENTS.md and this literal together, or "
         "put the provider back."
     )
+
+
+def _bridge_json_usage() -> tuple[set[str], bool]:
+    """`json.<attr>` calls in the bridge and whether `import json` exists.
+
+    Read statically for the same reason as everything else here: host pytest
+    cannot import `ros_bridge.py`, so a missing import surfaces only as
+    NameError inside a live ROS callback — on the robot, never here. The
+    2026-09-22 road/observation defect (`json.loads` and
+    `json.JSONDecodeError` with no `import json`) is what this pins shut.
+    """
+    tree = ast.parse((PACKAGE / "bridge/ros_bridge.py").read_text(encoding="utf-8"))
+    imported = {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    }
+    used = {
+        node.func.attr
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "json"
+    }
+    return used, "json" in imported
+
+
+def test_bridge_json_calls_are_backed_by_a_module_import():
+    used, imported = _bridge_json_usage()
+
+    assert used, (
+        "ros_bridge.py no longer calls json; if the usage is really gone, "
+        "update this contract too."
+    )
+    assert imported, (
+        f"ros_bridge.py calls json.{', '.join(f'json.{name}' for name in sorted(used))} "
+        "without `import json`. NameError from this is invisible to host pytest "
+        "and fires only inside a live ROS callback — the 2026-09-22 "
+        "road/observation defect. Import json at module top, or drop the use."
+    )

@@ -2,7 +2,7 @@
 module: core
 logical_modules: [M03, M04, M06, M07, M11, M12, M13]
 owner: CORE
-last_verified: { commit: "uncommitted", date: 2026-09-21 }
+last_verified: { commit: "uncommitted", date: 2026-09-22 }
 gates:
   SOURCE:
     state: GO
@@ -10,12 +10,12 @@ gates:
     cmd: "python3 -m pytest src/core/test/test_module_criteria.py test/test_control_absorption_package.py -q"
   LOCAL:
     state: GO
-    evidence: "1026 passed, 12 skipped (2026-09-21 Windows, 통합 main 병합 상태). D-137 PersonAdvisoryFeed, D-151 traffic policy, D-152 sequence-bound bounded camera preview 포함; Chromium camera/map panel은 별도 browser suite로 검증"
+    evidence: "1054 passed, 12 skipped (2026-09-22 Windows). D-162 scene context additive 수용(translate road_evidence, RoadEvidence 선택 필드, ros_bridge sensor snapshot) 포함 — D-137/D-151/D-152 회귀 없음"
     cmd: "PYTHONPATH=src/core:src python3 -m pytest src/core/test -q"
   ROS-SIM:
-    state: GO
-    evidence: "2026-09-21 WSL2 ROS 2 Jazzy 현재 트리 부트 스모크 — /core 노드, /cmd_vel 단일 발행자(topic info count=1), /api/v1 200, /dashboard 200, 종료 정상. docs/validation/ros-sim-core-2026-09-21/result.md"
-    cmd: "colcon build --symlink-install --packages-up-to core && ros2 run core core (identity env; docs/validation/ros-sim-core-2026-09-21 재현 절차)"
+    state: HOLD
+    blocker: "2026-09-22 D-162 T5가 ros_bridge/translate(road evidence 경로)를 변경했다. 2026-09-21 부트 스모크(docs/validation/ros-sim-core-2026-09-21)는 이전 트리 증거다. docs/validation/ros-sim-core-2026-09-22/README.md 절차 실행 후 복원"
+    cmd: "docs/validation/ros-sim-core-2026-09-22/README.md — colcon build --packages-up-to core && ros2 run core core + road/observation 유효/malformed 프로브"
   ARTIFACT:
     state: HOLD
     blocker: "ARM64 개발 후보만 존재. 서명 manifest와 immutable digest 발행 전"
@@ -24,7 +24,7 @@ gates:
     blocker: "Pi bench Device 설치와 device-readback.sh --json 증거 없음. G4 viewport·보정 상태기계 미실행"
   FIELD:
     state: PARKED
-adrs: [D-1, D-2, D-8, D-18, D-23, D-32, D-38, D-42, D-47, D-58, D-60, D-72, D-75, D-77, D-82, D-119, D-121, D-122, D-123, D-124, D-144, D-151, D-152, D-155, D-156, D-157, D-158, D-159]
+adrs: [D-1, D-2, D-8, D-18, D-23, D-32, D-38, D-42, D-47, D-58, D-60, D-72, D-75, D-77, D-82, D-119, D-121, D-122, D-123, D-124, D-144, D-151, D-152, D-155, D-156, D-157, D-158, D-159, D-162]
 plans:
   - docs/plans/2026-09-06-module-split-criteria.md
   - docs/plans/2026-09-13-control-safety-boundary.md
@@ -38,6 +38,8 @@ plans:
   - docs/plans/2026-09-21-semantic-road-control.md
   - docs/plans/2026-09-21-camera-preview-dashboard-design.md
   - docs/plans/2026-09-21-camera-preview-dashboard.md
+  - docs/plans/2026-09-22-scene-context-road-design.md
+  - docs/plans/2026-09-22-scene-context-road.md
 ---
 ## 지금 상태
 
@@ -48,7 +50,7 @@ plans:
 
 ## 다음 gate
 
-1. ~~ROS Jazzy container에서 ROS 출력 시험을 재실행해 ROS-SIM을 되돌린다.~~ 완료(2026-09-21, docs/validation/ros-sim-core-2026-09-21).
+1. ROS Jazzy에서 부트 스모크를 재실행해 ROS-SIM을 복원한다. 2026-09-21 완료 이력이 있으나 2026-09-22 D-162 T5(ros_bridge/translate road 경로 변경)가 이후 트리에 포함되어 재검증이 필요하다(절차: docs/validation/ros-sim-core-2026-09-21).
 2. 서명된 native ARM64 artifact 발행 후 Pi readback(ARTIFACT → DEVICE).
 
 ## 현재 유효한 금지사항

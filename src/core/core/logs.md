@@ -244,3 +244,18 @@
 - 증거: `/core` 노드 발견, `ros_bridge ready (cmd_vel sole publisher @50Hz)`, `/cmd_vel` publisher count=1(`/nav_cmd_vel`은 publisher 0/구독 1 — Nav2 출력은 CORE 구독으로 귀속), `/api/v1` 200, `/dashboard` 200, `/robot/state` 401(토큰 계약 정상), SIGTERM 후 깨끗한 종료. `docs/validation/ros-sim-core-2026-09-21/result.md` + evidence 14파일.
 - gate 변화: ROS-SIM HOLD→GO. 2026-09-20 `AttributeError(self.core_common)` 부팅 결함(9b77daa 유입, 6ff2cb8 수정)이 현재 트리에서 미재현 확인. ARTIFACT/DEVICE는 HOLD 유지.
 - 결정: core ROS-SIM은 부트 스모크+ROS 출력+API로 판정한다. Gazebo 리그·Nav2 스택 실행은 gz_sim·navigation 게이트 범위다.
+
+## 2026-09-22 · uncommitted · feat(core): D-162 T5 scene context additive 수용 (observability 전용)
+
+- 변경: `RoadEvidence`에 선택 `context_id`/`context_confidence`/`context_profile_revision` 필드(all-or-none 검증, [0,1] 경계), `translate.road_evidence`가 additive `context` 매핑을 엄격 디코딩(부재 시 전부 None, `null`/부분 키는 거부), `ros_bridge._on_road_observation`이 sensor snapshot에 `context_id`/`context_profile_revision`을 표시. 정책 판정(`_verdict`)은 변경 없음 — 장면은 설정이지 권한이 아니다(D-162).
+- 증거: `core/core/test` 1054 passed, 12 skipped (2026-09-22 Windows). traffic policy/bridge contract/traffic api/bridge translate/bridge timers 집중 시험 78 passed.
+- gate 변화: LOCAL GO 유지(evidence 갱신). ROS-SIM GO→HOLD — 본 변경이 ros_bridge를 만졌으므로 2026-09-21 부트 스모크는 현재 트리 증거가 아니다. 동일 절차 재실행 필요.
+- 결정: 프로토콜 스키마(`TrafficPolicyStatus`)는 건드리지 않고 sensor snapshot observability로만 노출했다. 상태 스키마 확장은 별도 슬라이스에서 D-18과 함께.
+- 발견(미수정, 본 변경 스코프 밖): `ros_bridge.py`에 `import json`이 없다 — road/observation 콜백의 `json.loads`와 except 절의 `json.JSONDecodeError`가 첫 메시지에서 NameError를 낸다. 별도 결함 처리 필요.
+
+## 2026-09-22 · uncommitted · fix(bridge): import json 결함 수정 + AST 계약 시험, ROS-SIM 재실행 절차문
+
+- 변경: `ros_bridge.py`에 `import json` 추가 — 전 항 발견 결함(road/observation 콜백의 `json.loads`와 except 절 `json.JSONDecodeError`가 임포트 없이 사용됨)을 수정한다. `test_executor_contracts.py`에 `test_bridge_json_calls_are_backed_by_a_module_import` 추가 — 정적 AST로 json 사용↔임포트를 결합해 재발을 막는다(host pytest는 이 모듈을 임포트할 수 없으므로 NameError는 실기 콜백에서만 터진다). `docs/validation/ros-sim-core-2026-09-22/README.md` 재실행 절차 작성 — 2026-09-21 방식에 road/observation 유효+malformed 프로브 2건을 추가했다. malformed 발행이 except 절의 `json.JSONDecodeError` 평가를 강제하므로 이 결함의 재발을 ROS-SIM에서 잡는다.
+- 증거: `python -m pytest core/core/test/test_executor_contracts.py -q` 4 passed. flake8 F821(`json` undefined) 소거 확인.
+- gate 변화: 없음(ROS-SIM HOLD 유지 — 절차문은 실행 전). ROS-SIM gate에 절차문 경로를 cmd로 기록.
+- 결정: 계약 시험은 test_executor_contracts.py의 기존 정적 AST 패턴을 따르고, 구조 전용 stub인 test_bridge_timers.py에는 넣지 않는다(bridge/AGENTS.md 규칙).

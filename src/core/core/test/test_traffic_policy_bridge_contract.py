@@ -19,8 +19,15 @@ from core_features.traffic_policy import (
 )
 
 
-def payload(*, colour="RED", conflict=False, distance=0.08):
-    return {
+CONTEXT = {
+    "id": "crosswalk",
+    "confidence": 0.8,
+    "profile_revision": "ctx-crosswalk-v1",
+}
+
+
+def payload(*, colour="RED", conflict=False, distance=0.08, context=None):
+    value = {
         "source": "CAMERA_ROAD",
         "stamp": 10.0,
         "map_id": "map_260905_update_v2",
@@ -45,6 +52,10 @@ def payload(*, colour="RED", conflict=False, distance=0.08):
             "conflict": conflict,
         },
     }
+    if context is not None:
+        # Copy: callers and mutate-lambdas must not share one dict.
+        value["context"] = dict(context)
+    return value
 
 
 def managers(now):
@@ -77,6 +88,57 @@ def test_nested_wire_payload_is_strictly_decoded():
     assert sample.stop_line_distance_m == pytest.approx(0.08)
     assert sample.crosswalk_visible is True
     assert sample.signal_colour == "RED"
+
+
+def test_scene_context_decodes_when_present_and_stays_none_when_absent():
+    absent = road_evidence(payload())
+    assert absent.context_id is None
+    assert absent.context_confidence is None
+    assert absent.context_profile_revision is None
+
+    present = road_evidence(payload(context=CONTEXT))
+    assert present.context_id == "crosswalk"
+    assert present.context_confidence == pytest.approx(0.8)
+    assert present.context_profile_revision == "ctx-crosswalk-v1"
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda value: value["context"].pop("id"),
+    lambda value: value["context"].pop("confidence"),
+    lambda value: value["context"].pop("profile_revision"),
+    lambda value: value["context"].update(confidence=1.5),
+    lambda value: value["context"].update(confidence="0.8"),
+    lambda value: value["context"].update(profile_revision=""),
+    lambda value: value.update(context={"id": "crosswalk"}),
+    lambda value: value.update(context=None),
+])
+def test_malformed_scene_context_is_rejected(mutate):
+    value = payload(context=CONTEXT)
+    mutate(value)
+
+    with pytest.raises((KeyError, TypeError, ValueError)):
+        road_evidence(value)
+
+
+def test_scene_context_does_not_change_gating_outcomes():
+    now = [100.0]
+    line, traffic = managers(now)
+    with_context = road_evidence(payload(context=CONTEXT))
+    traffic.observe(with_context, received_at=now[0],
+                    source_now=with_context.stamp)
+    command = SimpleNamespace(applied=[])
+    command.set_nav_twist = (
+        lambda twist, now=None: command.applied.append(twist))
+
+    assert apply_line_candidate(
+        line, traffic, command, line.tick(), now[0]) is True
+    assert command.applied[-1].linear == 0.0
+    assert traffic.status().state == "STOP_REQUIRED"
+
+    without_context = road_evidence(payload())
+    traffic.observe(without_context, received_at=now[0],
+                    source_now=without_context.stamp)
+    assert traffic.status().state == "STOP_REQUIRED"
 
 
 @pytest.mark.parametrize(

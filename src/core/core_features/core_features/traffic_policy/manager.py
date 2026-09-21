@@ -39,6 +39,11 @@ class RoadEvidence:
     signal_colour: Optional[str] = None
     signal_confidence: float = 0.0
     signal_conflict: bool = False
+    # Scene context (D-162) is observability only: it never changes a
+    # verdict. All three fields arrive together or not at all.
+    context_id: Optional[str] = None
+    context_confidence: Optional[float] = None
+    context_profile_revision: Optional[str] = None
 
     def __post_init__(self) -> None:
         if self.source != "CAMERA_ROAD":
@@ -61,6 +66,22 @@ class RoadEvidence:
                 raise ValueError("invisible stop line cannot carry distance")
         if self.signal_colour not in (None, "RED", "YELLOW", "GREEN"):
             raise ValueError("unsupported traffic signal colour")
+        provided = (
+            self.context_id is not None,
+            self.context_confidence is not None,
+            self.context_profile_revision is not None,
+        )
+        if any(provided) and not all(provided):
+            raise ValueError(
+                "road evidence context requires id, confidence and revision")
+        if self.context_id is not None:
+            if not self.context_id.strip() \
+                    or not self.context_profile_revision.strip():
+                raise ValueError("road evidence context fields are required")
+            if (not _finite(self.context_confidence)
+                    or not 0.0 <= float(self.context_confidence) <= 1.0):
+                raise ValueError(
+                    "road evidence context confidence must be in [0, 1]")
 
 
 @dataclass(frozen=True)

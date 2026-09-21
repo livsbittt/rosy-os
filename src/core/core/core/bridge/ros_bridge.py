@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import os
 import threading
@@ -280,6 +281,11 @@ class RosBridge:
                 "source": observation.source,
                 "map_id": observation.map_id,
                 "scene_revision": observation.scene_revision,
+                # Scene context is display-only observability (D-162);
+                # it never changes a verdict.
+                "context_id": observation.context_id,
+                "context_profile_revision": (
+                    observation.context_profile_revision),
             })
         except (KeyError, TypeError, ValueError,
                 json.JSONDecodeError) as exc:

@@ -37,6 +37,7 @@
 | D-157 | Shared Headless UI Package (Monorepo Web Decoupling) |
 | D-158 | UI Component Consistency: Strict Outline Borders (Law 2) |
 | D-159 | State Summary Visibility: Management by Exception (Law 0) |
+| D-162 | 학습된 장면은 설정이지 권한이 아니다 — 장면 상황 프로파일은 등록·리비전·보수 폴백으로만 적용한다 |
 
 ## 계획·결과 문서
 
@@ -52,6 +53,8 @@
 - [2026-09-21-hardware-mapping-g5.md](../../../docs/plans/2026-09-21-hardware-mapping-g5.md)
 - [2026-09-21-semantic-road-control-design.md](../../../docs/plans/2026-09-21-semantic-road-control-design.md)
 - [2026-09-21-semantic-road-control.md](../../../docs/plans/2026-09-21-semantic-road-control.md)
+- [2026-09-22-scene-context-road-design.md](../../../docs/plans/2026-09-22-scene-context-road-design.md)
+- [2026-09-22-scene-context-road.md](../../../docs/plans/2026-09-22-scene-context-road.md)
 
 ## 교훈 (docs/solutions)
 
@@ -63,8 +66,8 @@
 
 ## 최근 기록
 
+- 2026-09-22 · uncommitted · fix(bridge): import json 결함 수정 + AST 계약 시험, ROS-SIM 재실행 절차문
+- 2026-09-22 · uncommitted · feat(core): D-162 T5 scene context additive 수용 (observability 전용)
 - 2026-09-21 · 3747199 · test(core): ROS-SIM boot smoke 재실행 — ROS-SIM HOLD 해소
 - 2026-09-21 · uncommitted · feat(core): consume server-judged evidence and expose HITL handoff
 - 2026-09-21 · uncommitted · fix(web): inspect order follows §7.2 bring-up order (D-153 session 10, F-10)
-- 2026-09-21 · uncommitted · fix(web): graph topics no longer spend the warning colour (D-153 session 8, F-08)
-- 2026-09-21 · uncommitted · test(safety): D-137 T4 fault-injection composition (metric stop + broken vision)

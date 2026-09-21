@@ -196,6 +196,26 @@ def road_evidence(data: Any) -> RoadEvidence:
     signal_confidence = _wire_number(
         signal["confidence"], "signal.confidence")
 
+    # Scene context (D-162) is optional additive observability. A present
+    # key must decode strictly; absence decodes to all-None fields.
+    context_id = None
+    context_confidence = None
+    context_profile_revision = None
+    if "context" in root:
+        context = _wire_mapping(root["context"], "context")
+        context_id = context["id"]
+        if not isinstance(context_id, str) or not context_id.strip():
+            raise TypeError("context.id must be a non-empty string")
+        context_confidence = _wire_number(
+            context["confidence"], "context.confidence")
+        if not 0.0 <= context_confidence <= 1.0:
+            raise ValueError("context.confidence must be in [0, 1]")
+        context_profile_revision = context["profile_revision"]
+        if (not isinstance(context_profile_revision, str)
+                or not context_profile_revision.strip()):
+            raise TypeError(
+                "context.profile_revision must be a non-empty string")
+
     return RoadEvidence(
         source=root["source"],
         stamp=_wire_number(root["stamp"], "stamp"),
@@ -208,4 +228,7 @@ def road_evidence(data: Any) -> RoadEvidence:
         signal_colour=signal_colour,
         signal_confidence=signal_confidence,
         signal_conflict=signal_conflict,
+        context_id=context_id,
+        context_confidence=context_confidence,
+        context_profile_revision=context_profile_revision,
     )
