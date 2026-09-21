@@ -8,8 +8,7 @@ from __future__ import annotations
 
 from core_api_web.api.deps import AuthContext, require_role, CoreServicesLike
 from core_api_web.api.errors import ApiError
-from core_features.command.arbitration import Mode
-from core_features.navigation.manager import NavigationError
+from core_api_web.api.deps import Mode, NavigationError
 from core_common.protocol.schemas import RobotMode
 
 viewer = require_role("viewer")

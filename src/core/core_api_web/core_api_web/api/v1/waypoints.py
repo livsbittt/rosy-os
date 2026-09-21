@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 
 from core_api_web.api.v1.common import operator, viewer
 from core_api_web.api.deps import AuthContext, get_services, CoreServicesLike
-from core_features.waypoints.manager import Waypoint
+from core_api_web.api.deps import Waypoint
 
 
 waypoints_router = APIRouter(prefix="/api/v1/waypoints", tags=["waypoints"])

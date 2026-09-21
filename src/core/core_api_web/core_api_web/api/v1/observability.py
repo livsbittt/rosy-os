@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from core_api_web.api.v1.common import admin, viewer
 from core_api_web.api.deps import AuthContext, get_services, CoreServicesLike
 from core_api_web.api.errors import ApiError
-from core_features.diagnostics.collector import worst
+from core_api_web.api.deps import worst
 
 
 events_router = APIRouter(prefix="/api/v1/events", tags=["events"])
@@ -30,6 +30,7 @@ def list_audit_logs(
 ):
     events = svc.audit.history(since_seq=since_seq, limit=min(limit, 2000))
     return {"events": [e.model_dump() for e in events]}
+
 
 diagnostics_router = APIRouter(prefix="/api/v1/diagnostics", tags=["diagnostics"])
 

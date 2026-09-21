@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from core_api_web.api.v1.common import viewer
 from core_api_web.api.deps import AuthContext, get_services, CoreServicesLike
 from core_api_web.api.errors import ApiError
-from core_features.maps import valid_costmap_scope
+from core_api_web.api.deps import valid_costmap_scope
 
 
 map_router = APIRouter(prefix="/api/v1/map", tags=["map"])

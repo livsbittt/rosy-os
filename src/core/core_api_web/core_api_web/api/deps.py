@@ -19,6 +19,33 @@ from fastapi import Depends, Header, Request
 from core_api_web.api.errors import ApiError
 from typing import Protocol
 
+# --- 라우터용 도메인 타입 (결합도 평가 2026-09-19 §7-5) ----------------------
+# v1 라우터는 core_features 를 직접 import 하지 않고 이 면만 본다.
+# features 를 재조정할 때 전파 반경이 이 파일에서 멈춘다. 이 규칙은
+# core/core/test/test_v1_import_boundary.py 가 고정한다.
+from core_features.command.arbitration import Mode
+from core_features.diagnostics.collector import worst
+from core_features.docking.database import DockError, DockInstance, DockType
+from core_features.line_follow import LineFollowMode
+from core_features.maps import valid_costmap_scope
+from core_features.navigation.manager import NavigationError
+from core_features.swarm import SwarmError
+from core_features.waypoints.manager import Waypoint
+
+#: 라우터용 재수출 면. __all__ 선언으로 재수출임을 명시한다(F401 진정).
+__all__ = [
+    "Mode",
+    "NavigationError",
+    "DockError",
+    "DockInstance",
+    "DockType",
+    "LineFollowMode",
+    "valid_costmap_scope",
+    "worst",
+    "SwarmError",
+    "Waypoint",
+]
+
 
 class CoreServicesLike(Protocol):
     """Structural port for the DI container (D-126 S5).
@@ -51,6 +78,7 @@ class CoreServicesLike(Protocol):
     state: Any
     swarm: Any
     waypoints: Any
+
 
 ROLE_RANK = {"viewer": 0, "operator": 1, "administrator": 2}
 

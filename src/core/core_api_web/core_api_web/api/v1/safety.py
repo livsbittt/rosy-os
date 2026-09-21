@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 from core_api_web.api.v1.common import admin, viewer
 from core_api_web.api.deps import AuthContext, get_services, CoreServicesLike
 from core_api_web.api.errors import ApiError
-from core_features.command.arbitration import Mode
+from core_api_web.api.deps import Mode
 from core_common.config import ConfigError, patch_local_config
 
 

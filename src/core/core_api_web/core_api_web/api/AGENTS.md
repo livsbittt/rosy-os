@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-21 -->
 
 # api
 
@@ -13,7 +13,7 @@ FastAPI surface for ROSY-API-REF-001. Factory builds the app, serves `/dashboard
 |------|-------------|
 | `__init__.py` | Package marker |
 | `app.py` | `create_app`; routers; static dashboard; CSP on HTML |
-| `deps.py` | SEC-101 token auth (sha256 at rest, opaque ids); `require_role`; `get_services` |
+| `deps.py` | SEC-101 token auth (sha256 at rest, opaque ids); `require_role`; `get_services`; re-exports router-facing `core_features` types so v1 fan-out stops here |
 | `errors.py` | ERR-101 `ApiError` + domain exception mapping |
 | `ws.py` | `/ws/state` (10 Hz), `/ws/events` glob filters, `/ws/swarm/pose` (SWM-003) and `/ws/swarm/reference` (SWM-007 ingest, operator) |
 

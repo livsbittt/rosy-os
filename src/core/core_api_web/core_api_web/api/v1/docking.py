@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from core_api_web.api.v1.common import admin, operator, viewer
 from core_api_web.api.deps import AuthContext, get_services, CoreServicesLike
 from core_api_web.api.errors import ApiError
-from core_features.docking.database import DockError, DockInstance, DockType
+from core_api_web.api.deps import DockError, DockInstance, DockType
 from core_common.domain.tasks import TaskKind
 
 

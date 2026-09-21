@@ -10,8 +10,8 @@ from core_api_web.api.errors import ApiError
 from core_api_web.api.v1.common import enter_navigation_mode, operator, viewer
 from core_common.domain.tasks import TaskKind
 from core_common.protocol.schemas import RobotMode
-from core_features.command.arbitration import Mode
-from core_features.line_follow import LineFollowMode
+from core_api_web.api.deps import Mode
+from core_api_web.api.deps import LineFollowMode
 
 
 line_follow_router = APIRouter(prefix="/api/v1/line-follow", tags=["line-follow"])

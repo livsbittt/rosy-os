@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends
 from core_api_web.api.v1.common import enter_navigation_mode, operator, viewer
 from core_api_web.api.deps import AuthContext, get_services, CoreServicesLike
 from core_api_web.api.errors import ApiError
-from core_features.command.arbitration import Mode
-from core_features.swarm import SwarmError
+from core_api_web.api.deps import Mode
+from core_api_web.api.deps import SwarmError
 from core_common.protocol.schemas import SwarmFollowParams
 
 swarm_router = APIRouter(prefix="/api/v1/swarm", tags=["swarm"])

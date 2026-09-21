@@ -46,6 +46,7 @@ None.
   `docs/plans/2026-09-06-module-split-criteria.md`. Router count is not the test — `robot.py` has three routers and one owner.
 - `slam_router` lives in `navigation.py` because there is no `mapping` service to own it, not because `nav` is its owner.
 - SLAM save names are safe basenames only; do not allow callers to choose an arbitrary filesystem path.
+- **Router-facing domain types come from `api.deps`.** `Mode`, `NavigationError`, `Dock*`, `LineFollowMode`, `valid_costmap_scope`, `worst`, `SwarmError`, `Waypoint` are re-exported there — v1 modules must not import `core_features` directly (결합도 평가 2026-09-19 §7-5; pinned by `src/core/core/test/test_v1_import_boundary.py`).
 - Tests that patch a route helper must name the domain module (`core.api.v1.host._agent`); patching the aggregator re-export has no effect.
 
 ### Testing Requirements
@@ -60,7 +61,7 @@ None.
 
 ### Internal
 
-- `api.deps`, `command.arbitration.Mode`, docking DB types, `HostAgentClient`
+- `api.deps` (auth + re-exported domain types), `HostAgentClient`
 
 ### External
 
