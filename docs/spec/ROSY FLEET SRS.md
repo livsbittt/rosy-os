@@ -34,7 +34,7 @@ ROSY FLEET은 여러 로봇(각각 ROSY CORE 탑재)을 하나의 시스템에�
 Fleet은 다음 원칙을 준수한다.
 
 1. **계약만 사용** — 로봇 내부 ROS Node·Topic·Service를 직접 알거나 접근하지 않는다. ROSY API Ref에 정의된 인터페이스만 사용한다.
-2. **모터 직접 제어 금지** — 일반 이동을 위해 로봇에 `/cmd_vel` 스트림을 전송하지 않는다. Goal 기반 명령만 내린다. (Teleop 중계는 사용자 명시 요청 시에만 예외적으로 지원할 수 있다.)
+2. **모터 직접 제어 금지 (HITL 예외)** — 일반 이동을 위해 로봇에 `/cmd_vel` 스트림을 전송하지 않는다. Goal 기반 명령만 내린다. 단, 로봇이 스스로 해결할 수 없는 장애 상황(`Requiring_Assistance` 상태)으로 판단하여 사람의 개입(HITL)을 요청한 경우에 한정하여, 관제사가 수동으로 원격 조종(Teleop)을 할 수 있도록 예외적인 제어 중계를 허용한다.
 3. **로봇 독립성 보존** — Fleet 장애가 개별 로봇의 기본 운용 불능으로 전파되어서는 안 된다. Fleet은 "부재 시에도 로봇이 동작"하는 것을 깨는 어떤 설계도 해서는 안 된다.
 4. **로봇 간 통신 경유** — 로봇 간 직접 통신(ROS DDS 포함)을 요구하지 않는다. 필요한 모든 조정은 Fleet이 수행한다.
 
@@ -116,9 +116,11 @@ Fleet은 네트워크에 연결된 로봇을 검색·등록할 수 있어야 한
 
 연속 3회(기본, 설정 가능) heartbeat 미수신 시 해당 로봇을 `OFFLINE` 또는 `COMM_ERROR` 상태로 표시해야 한다.
 
-### MON-002 상태 알림
+### MON-002 상태 알림 및 큐(Queue) 분류
 
-로봇 상태 전이(ONLINE↔OFFLINE, 배터리 임계, E-Stop 발생 등)는 Fleet UI에 즉시 반영하고 이벤트로 기록해야 한다.
+로봇 상태 전이(ONLINE↔OFFLINE, 배터리 임계, E-Stop 발생 등) 및 **모듈 단위의 상태 변화**는 Fleet UI에 즉시 반영하고 이벤트로 기록해야 한다. Fleet은 수신된 상태를 기반으로 다음 두 가지 큐(Queue)를 관리한다.
+- **경고 큐 (Degraded Fallback):** `capabilities_degraded` 상태 보고 시. 임무는 계속되나 로컬 센서 대체 등으로 성능 저하가 발생했음을 조용히 알림.
+- **최우선 개입 큐 (Requiring Assistance):** `hitl_requested: true` 수신 시. 미션 진행이 불가능하여 사람의 개입이 필요한 상태로, 화면 최상단 및 중앙 맵에 시각/청각 알람과 함께 팝업 노출.
 
 ---
 
@@ -233,9 +235,9 @@ PENDING → RUNNING → COMPLETED
 
 동일 `idempotency_key` 재제출 시 미션을 새로 생성하지 않고 기존 미션을 반환해야 한다.
 
-### MSN-004 이벤트 기반 진행
+### MSN-004 이벤트 기반 진행 및 동적 재배정(Re-routing)
 
-미션 진행 판단은 로봇 이벤트(`nav.completed`, `nav.failed`, `nav.stuck` 등) 기반으로 수행하며, 로봇 상태 폴링에 의존하지 않는다.
+미션 진행 판단은 로봇 이벤트(`nav.completed`, `nav.failed`, `nav.stuck` 등) 기반으로 수행하며, 로봇 상태 폴링에 의존하지 않는다. 만약 임무를 수행 중인 로봇의 특정 모듈이 `degraded_fallback` 상태로 전환되어 원래 배정된 미션(예: 정밀 픽업)을 온전히 수행하기 어렵다고 판단될 경우, Mission Manager는 해당 로봇의 미션을 취소하고 정상 작동하는 대체 로봇에게 미션을 동적으로 재배정할 수 있어야 한다.
 
 ### MSN-005 예약 미션 (Outline)
 
@@ -267,9 +269,10 @@ Formation Parameter: Center Position / Orientation / Robot Spacing / Robot Selec
 - **하이브리드 구조(D-20):** Fleet은 Leader pose 스트림(SWM-003, ≥10 Hz 수신)을 Follower들에게 WS로 릴레이(≥5 Hz)하고, Follower에는 `swarm/follow` 명령을 1회 전달한다. **폐루프 추종 계산은 로봇 탑재(SWM-002)** — Fleet은 목표를 반복 계산·전송하지 않는다.
 - 로봇 간 직접 통신은 발생하지 않는다.
 
-### FOR-004 Formation 안전
+### FOR-004 Formation 안전 및 동적 속도 조절
 
-Formation 실행 중 로봇별 Navigation 상태를 감시하고, 로봇 1대라도 `BLOCKED`/`FAILED`/`nav.stuck` 발생 시 설정 정책(기본: 형성 중단 + 전체 HOLD)을 수행해야 한다. Fleet 단절 시 각 로봇은 SWM-004(로컬 HOLD)로 자보하고, Fleet은 재접속 후 형성 상태를 재평가한다.
+Formation 실행 중 로봇별 Navigation 상태를 감시하고, 로봇 1대라도 `BLOCKED`/`FAILED`/`nav.stuck` 발생 시 설정 정책(기본: 형성 중단 + 전체 HOLD)을 수행해야 한다. 
+만약 편대 중 일부 로봇이 모듈 고장 등으로 `degraded_fallback` 상태가 되어 구동 속도가 저하된 경우, Fleet은 대형 유지를 위해 **전체 편대의 이동 속도(Speed Limit)를 느려진 로봇의 최대 가용 속도에 맞추어 하향 동기화**해야 한다. Fleet 단절 시 각 로봇은 SWM-004(로컬 HOLD)로 자보하고, Fleet은 재접속 후 형성 상태를 재평가한다.
 
 ---
 

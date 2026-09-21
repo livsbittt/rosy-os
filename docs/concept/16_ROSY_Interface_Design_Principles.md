@@ -91,6 +91,12 @@ not recompute it (G4, D-72 S3/S4).
 `delayed` is not `disconnected`, and neither is `unavailable`. Fleet must never
 draw an unreachable robot as healthy: loss of contact is its own state.
 
+The robot face translates this law in its own grammar rather than the four
+rendering rules: the wake card expires (`hold_s`) and the face returns to the
+intent display, so a stale value is erased, not aged (D-153 session 3, F-04).
+A value with no source still never renders as a measurement — missing battery
+draws `--`, never `0%` (Law 0).
+
 **Known overlap with §8:** `unavailable` here and capability `not_provided` can
 name the same fact ("this robot has no lidar"). They stay two tokens. A concept
 view reads inventory; a value binding reads `evidence`. Do not merge the
@@ -129,6 +135,7 @@ surfaces are deliberately unlike each other.
 | Device runtime | ~30 s, seated | pointer | procedural |
 | Fleet | ambient, while doing other work | keyboard-first | exception |
 | Robot face | ~0.5 s, walking past | none | intent |
+| Game host | one match, standing at the laptop | keyboard | focal |
 
 ### 7.1 Console — spatial grammar
 
@@ -161,6 +168,19 @@ Legible at about 1.5 m within about 0.5 s, without reading text. It shows
 intent, not state: the direction it is about to take, not a mode name. This is
 the one surface where a second typeface is justified, chosen for small-size
 low-resolution rendering.
+
+The PWR-003 wake card is the one state-bearing exception: on wake it shows a
+state snapshot (battery margin, E-stop) for a fixed `hold_s`, then the face
+returns to the intent display (D-153 session 3, F-04). Its evidence semantics
+are §5's face paragraph — expiry, not ageing.
+
+### 7.5 Game host — focal grammar
+
+The match board has no thresholds, so it has no status colours to spend. Its
+one warm accent is the ball — the focal object the match is about. Team
+identity stays cool-tone, and loss/HOLD is named in text, never only in colour.
+This surface is off the shared tokens by design (D-101); this paragraph fixes
+its colour law (codified D-153 session 11 from existing practice).
 
 ## 8. Capability Presentation
 

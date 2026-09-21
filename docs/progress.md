@@ -2,15 +2,15 @@
 module: docs
 logical_modules: []
 owner: 거버넌스
-last_verified: { commit: "ab8bf1b", date: 2026-09-20 }
+last_verified: { commit: "uncommitted", date: 2026-09-21 }
 gates:
   SOURCE:
     state: GO
-    evidence: "D-61 Accepted, D-72/D-77 본문·색인 일치. lint 0 errors, 16 warnings — 경고는 last_verified uncommitted 모듈이며 docs 오류가 아니다 (2026-09-17 Windows, python 3.14.5)"
+    evidence: "D-61 Accepted, D-72/D-77/D-153 본문·색인 일치. lint 0 errors, 6 warnings — 경고는 last_verified uncommitted 모듈이며 docs 오류가 아니다 (2026-09-21 Windows)"
     cmd: "python tools/harness/rosy_harness.py lint"
   LOCAL:
     state: GO
-    evidence: "75 passed, 16 warnings (2026-09-17 Windows). test_network_topology_contracts + test_harness_contracts + test_control_launch_boundary"
+    evidence: "70 passed, 6 warnings (2026-09-21 Windows). test_network_topology_contracts + test_harness_contracts"
     cmd: "python -m pytest test/test_network_topology_contracts.py test/test_harness_contracts.py -q"
   ROS-SIM:
     state: N/A
@@ -20,7 +20,7 @@ gates:
     state: N/A
   FIELD:
     state: N/A
-adrs: [D-17, D-18, D-45, D-61, D-72, D-75, D-77, D-78, D-79, D-80, D-81, D-82, D-83, D-84, D-85, D-86, D-87, D-88, D-89, D-90, D-91, D-92, D-93, D-94, D-95, D-96, D-97, D-98, D-99, D-100, D-101, D-102, D-103, D-104, D-105, D-106, D-107, D-108, D-109, D-110, D-111, D-112, D-113, D-114, D-115, D-116, D-117, D-118, D-119, D-120, D-121, D-122, D-123, D-124, D-129, D-130, D-131, D-132, D-133, D-141, D-144, D-145, D-151, D-152]
+adrs: [D-17, D-18, D-45, D-61, D-72, D-75, D-77, D-78, D-79, D-80, D-81, D-82, D-83, D-84, D-85, D-86, D-87, D-88, D-89, D-90, D-91, D-92, D-93, D-94, D-95, D-96, D-97, D-98, D-99, D-100, D-101, D-102, D-103, D-104, D-105, D-106, D-107, D-108, D-109, D-110, D-111, D-112, D-113, D-114, D-115, D-116, D-117, D-118, D-119, D-120, D-121, D-122, D-123, D-124, D-129, D-130, D-131, D-132, D-133, D-141, D-144, D-145, D-151, D-152, D-153]
 plans:
   - docs/plans/2026-09-15-module-harness-design.md
   - docs/plans/2026-09-17-interface-design-implementation-design.md
@@ -42,6 +42,7 @@ plans:
 - ROS-SIM/ARTIFACT/DEVICE/FIELD는 docs가 문서 모듈이라 N/A다.
 - D-61 Accepted. 모듈 progress/logs와 생성 index/STATUS가 계약 시험으로 산다.
 - concept 16과 D-72 L1·증거·capability 계약이 live다. 운용자 콘솔은 CORE `/dashboard` 하나(D-77). G4 DEVICE는 HOLD (D-80).
+- UI/UX 평가 기준은 D-153(세 계층 G1/G2/G3, 판정 단위 표면)이다. 첫 회차(`docs/validation/uiux-surfaces-<date>/`) 전에는 표면 UI/UX 판정을 GO로 쓰지 않는다.
 - 남은 게이트는 D-78–D-81이 가른다. ARTIFACT는 네이티브 Pi(D-78). 옛 ROS-SIM GO는 무효(D-79). Fleet 콘솔 v1 gather는 REST(D-81).
 - ADR 로그 분리(개별 `docs/adr/D-NNN-*.md`)는 보류한다.
 

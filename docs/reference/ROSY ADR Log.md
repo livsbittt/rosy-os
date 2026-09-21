@@ -160,6 +160,7 @@
 | D-150 | web_node는 control 디버그 서피스로 잔류하고 맵의 단일 홈은 navigation/map이다 | Accepted |
 | D-151 | 도로 의미 인식·정책·최종 명령을 분리하고 관제 변경은 정지 상태에서만 적용한다 | Accepted |
 | D-152 | CORE 관제의 카메라 표시는 저주기 최신 1장 preview 예외다 | Accepted |
+| D-153 | UI/UX 평가는 세 계층이고 판정 단위는 표면이다 | Accepted |
 
 ---
 
@@ -4999,3 +5000,140 @@ a regressed capture timestamp only after the prior local receipt lease expired
 tab transitions abort in-flight fetches and revoke the previous blob.
 
 **References:** D-23, D-34, D-47, D-77, D-118, D-136, D-150, D-151.
+
+---
+
+## D-153 UI/UX 평가는 세 계층이고 판정 단위는 표면이다
+
+**Status:** Accepted (2026-09-21, 기준). 이 ADR은 평가 방법을 고정한다. 첫 평가
+회차가 열리기 전까지 어떤 표면의 UI/UX 판정도 GO로 쓰지 않는다.
+
+**Context:** 값과 문법에는 게이트가 있는데 화면에는 없다. D-82가 팔레트를 수치로,
+D-129가 토큰을 단일 파일로, D-130이 문법 분리를 모듈 게이트로 잠갔다. 그러나
+"이 화면이 그 표면 청중의 질문에 답하는가"를 보는 절차는 정의된 적이 없다.
+D-131이 실측으로 드러낸 결함 — 콘솔 맵이 응답에 있는 assignment·relay를 그리지
+않아 시연용 데모로 읽힌 것 — 은 우연한 목격이지 기준의 산물이 아니며, 같은
+종류의 발견은 재현 가능해야 한다. D-130이 기록했듯 여러 에이전트 세션이 같은
+트리를 쓰고 에이전트의 기본 동작은 기존 콘솔 CSS의 복제다. 무엇이 "개선"이고
+무엇이 위반인지는 논쟁 뒤가 아니라 앞에 있어야 한다. 증거 서열도 제각각이다 —
+D-152는 "Windows HOST-SIM 스크린샷은 브라우저 경로 증거일 뿐"이라고 그 자리에서
+규정해야 했다. 화면 평가가 모듈 게이트(D-61·D-79)와 같은 증거 언어를 쓰도록
+미리 정한다.
+
+**Decision:**
+
+1. **판정 단위는 표면이고 축은 concept 16 §2의 질문이다.** 여섯 표면(운용자
+   콘솔, 장비 런타임, Fleet, 로봇 얼굴, control 레거시 진단, 게임 호스트)이
+   각자 평가 카드를 가진다. 운용자 콘솔과 장비 런타임은 `/dashboard` 하나가
+   같이 서빙하지만 청중이 달라 카드는 둘이다. 카드의 첫 판정 문장은 "이 표면이
+   선언된 모든 상태에서 자기 질문에 답하는가"다.
+2. **평가는 세 계층이다.**
+   - **G1 값과 문법 (기계).** 기존 게이트가 그대로 재심판이다 —
+     `test_palette_gates.py`, `test_ui_token_contracts.py`,
+     `test_grammar_separation.py`, `test_evidence.py`, `test_styleguide.py`.
+     하나라도 빨간 표면은 즉시 HOLD다. 이 ADR은 새 기계 게이트를 만들지
+     않는다.
+   - **G2 상태 매트릭스 (캡처).** 표면 × 선언된 뷰포트 × 최소 상태 집합의
+     캡처 행렬. 최소 상태 집합은 이 ADR이 고정한다: 증거 4상태
+     (`fresh`/`delayed`/`disconnected`/`unavailable` — concept 16 §5)에 빈
+     목록·미등록, 최초 기동, 오류·거부(501·권한), `SAFE_STOP`, 그리고 입력이
+     있는 표면은 불가역 확인 대화상자. 뷰포트 목록은 각 표면 카드가 회차
+     시작에 선언한다(예: 콘솔은 로봇 AP에 붙은 전화·노트북, Fleet은 사이트
+     PC, 얼굴은 LCD 실물, 게임은 노트북). 선언한 셀을 찍지 못하면 그 상태는
+     평가되지 않은 것이고 그 표면은 HOLD다.
+   - **G3 법 체크리스트 (사람).** 여덟 항을 이 ADR이 고정한다. 각 항목의
+     판정은 근거 셀(또는 코드 위치)을 지적해야 하고 취향을 말하지 않는다.
+     1. 정직(Law 0) — 소스 없는 값이 0이나 빈 문자열로 렌더되지 않는다.
+        로봇이 수행하지 못하는 조작이 활성 버튼으로 존재하지 않는다.
+     2. 증거 상태 — 네 상태가 값별로 갈리고 `delayed`는 나이를,
+        `disconnected`는 결측을 말한다. 한 placeholder로 뭉갠 것은 위반이다.
+     3. 색(Law 1) — 경보 밖에 따뜻한 색이 없다. 장식 그라디언트·지표별 색이
+        없다. 예외형 표면(Fleet)에서 정상은 색을 쓰지 않는다.
+     4. 위계(Law 2) — 보고하는 것은 평평하고 세계를 바꾸는 것은 올라가 있다.
+        같은 외곽선 카드의 남발로 위계가 사라진 화면은 위반이다.
+     5. 불가역(Law 3) — 비상정지·롤백·맵 리셋·언독은 종류가 다른 시각
+        범주이며 2단계 확인을 지난다(D-92 (a)).
+     6. 어휘(Law 4) — 그 표면 청중의 평문이다. 운용자에게 한국어 평문,
+        설치자에게 `DOMAIN ID`·`DDS ISOLATION`는 평문으로 남는다.
+     7. 표면 질문(§2) — 선언된 전 상태의 캡처에서 그 표면의 질문에 답이
+        선다.
+     8. 표면 문법(§7) — 콘솔=공간(스크롤 없음), 장비=절차(스크롤이 절차),
+        Fleet=예외(정상은 안 보임), 얼굴=의도(입력 없음), 게임=가시성.
+3. **판정과 증거 어휘는 모듈 게이트를 잇는다.** 표면마다 회차 단위로
+   GO/HOLD/PARKED/N/A. GO는 G1 현재 트리 재실행 통과(D-79) + G2 선언 셀 전부
+   캡처 + G3 위반 0의 셋이다. 하나라도 없으면 blocker를 이름 붙인 HOLD다.
+   캡처의 증거 계층: 개발 호스트 브라우저(픽스처 응답 포함) = LOCAL이며
+   브라우저 경로 증거다. 실제 로봇 스택 위 캡처(Gazebo `source=GAZEBO`) =
+   SIM. 실물 장치 화면(`source=PINKY`, 로봇 AP에 붙은 단말) = BENCH/DEVICE.
+   LCD 사진 = BENCH 이상. 현장 = FIELD. LOCAL 스크린샷은 어떤
+   DEVICE/FIELD 주장으로도 승격되지 않는다(D-91 정신, D-152 선례).
+4. **기록은 회차 폴더에 산다.** `docs/validation/uiux-surfaces-<date>/`에
+   README(표면별 카드: 판정·blocker·셀 링크)와 캡처를 남긴다. ADR 로그는
+   기준만 소유하고 회차 결과를 다시 쓰지 않는다. 레거시 control 진단(D-77)은
+   PARKED 카드로 존재만 유지한다.
+5. **재평가 트리거.** `tokens.css` 값·이름 변경 → 전 표면. 어휘 표·문법 게이트
+   목록 변경 → 해당 표면. 새 패널·새 불가역 조작·증거 상태 렌더 변경 → 해당
+   표면 전체. 새 표면 등장 → 카드 신설. 뷰포트·입력 장치 변화 → 뷰포트
+   재선언. 릴리스마다 → 직전 회차 이후 변경이 있는 표면. 장치 게이트 통과 →
+   실물 뷰포트 회차(얼굴·콘솔).
+
+**Alternatives:** 기계 게이트만으로 버티는 안은 값·문법은 지키면서 "답이 서는가"를
+영원히 아무도 보지 않는다 — D-131의 결함이 그 모양이었다. UI 관행의 심각도
+척도(S0~S3)를 신설하는 안은 모듈 게이트와 어휘가 갈라져 증거 언어 재사용을
+잃는다. ADR 없이 회차 문서만 남기는 안은 기준이 회차마다 변해 비교가 불가능하고,
+다중 에이전트 환경에서 리뷰 의존 규율은 D-130이 이미 반증했다.
+
+**Consequences:** 첫 회차가 열리기 전까지 여섯 표면의 정직한 UI/UX 판정은 전부
+HOLD(평가 회차 없음)다 — 옛 화면이 나빠서가 아니라 아무도 기준대로 보지
+않았기 때문이다(D-79와 같은 논리). UI 변경을 주장하는 커밋·문서는 이제 회차
+폴더를 가리킬 수 있다. 로봇 얼굴은 브라우저가 없는 표면이라 캡처 수단이 사진뿐이고
+그 계층(BENCH)이 다른 표면보다 늦게 채워지는 것을 부정하지 않는다. G3은
+사람(또는 에이전트) 판단이지만 항목과 근거 셀 지적을 강제하므로 회차 간 비교가
+가능하다. 항목 여덟이 옳은지는 회차가 쌓여야 아나 — 회차 셋 안에 다듬을
+필요가 생기면 amendment로 기록한다.
+
+**Validation / Transition:** 첫 회차 폴더가 이 ADR의 착지 증거다(위치는
+`docs/validation/uiux-surfaces-<date>/`). G1은 이미 계약 시험으로 존재하며 이
+ADR이 새 시험을 추가하지 않는다. 회차 종료 시 `docs/logs.md` 항목과 `index.md`
+재생성. 호스트 회차는 어떤 DEVICE/FIELD 게이트도 승격하지 않는다.
+
+**References:** [concept 16](../concept/16_ROSY_Interface_Design_Principles.md)
+§2·§5·§7, D-23, D-61, D-72, D-75, D-77, D-79, D-82, D-88, D-91, D-92, D-101,
+D-129, D-130, D-131, D-152.
+
+---
+
+## [ADR-999] Interface Philosophy Refinements: Core State Abstraction & Fallback Patterns
+
+**Date:** 2026-09-21
+**Status:** Proposed
+**Context:** 16_ROSY_Interface_Design_Principles.md lacks headless state abstraction to prevent duplicate logic across surfaces, missing degraded AI fallback capabilities, and lacks cross-surface HITL handoff standards.
+**Decision:** 
+1. Introduce Headless State Primitives (L1.5 Layer) for Law 0 logic without forcing shared visual components.
+2. Add `degraded_fallback` capability state.
+3. Standardize HITL escalation across all four UI surfaces.
+**References:** docs/plans/2026-09-21-interface-philosophy-refinement-design.md, [concept 16](../concept/16_ROSY_Interface_Design_Principles.md).
+
+---
+
+## [ADR-1000] Fleet Orchestration for Module Degraded & HITL States
+
+**Date:** 2026-09-21
+**Status:** Accepted
+**Context:** The degraded_fallback and hitl_requested states defined in ADR-999 need explicit handling in the Fleet SRS to prevent the Fleet from mistakenly treating them as standard OFFLINE errors, and to utilize them for mission re-routing.
+**Decision:** 
+1. **Exceptional Teleop Handoff (PRT-1.2):** Allow Fleet to unlock WebRTC teleop control only when hitl_requested is true (overriding the strict no-motor-control rule).
+2. **State Queues (MON-002):** Implement a 'Degraded' warning queue and a 'Requiring Assistance' critical popup queue.
+3. **Mission Re-routing (MSN-004):** Fleet dynamically re-assigns tasks if a robot's capability degrades.
+4. **Formation Speed Adjustment (FOR-004):** Down-sync swarm speed to the slowest degraded robot.
+**References:** ROSY FLEET SRS.md (PRT-1.2, MON-002, MSN-004, FOR-004).
+## [ADR-1001] Fleet UI/UX Exception-Based Queue Adherence & Token System Convergence
+
+**Date:** 2026-09-21
+**Status:** Accepted
+**Context:** During the implementation of the Degraded and HITL Monitoring Queues in the Fleet Console, an initial design showed empty alarm boxes during normal operation. This violated ROSY's 'Management by Exception' principles (Law 8) and zero-alarm-color normal state rule (Law 1, g3-checklist.md). Additionally, the queues used hardcoded colors instead of the central /ui/tokens.css.
+**Decision:** 
+1. **DOM Display Toggling:** The Monitoring Queues container will have its display property set to 
+one dynamically via console.js if there are no robots with hitl_requested or capabilities_degraded. This strictly enforces zero alarm colors in the Fleet Console during nominal states.
+2. **Token Compliance:** CSS was rewritten to solely use variables mapped from 	okens.css (e.g., --status-warn, --status-crit, --ground-card, --ground-raise, --paper).
+**References:** docs/validation/uiux-surfaces-2026-09-21/g3-checklist.md, ADR-1000.

@@ -13,7 +13,7 @@
 | [gz_sim](src/sim/gz_sim/progress.md) | SIM | uncommitted (2026-09-21) | GO | GO | GO | N/A | N/A | N/A |
 | [navigation](src/navigation/navigation/progress.md) | NAV | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [bringup](src/hardware/bringup/progress.md) | BRINGUP | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
-| [emotion](src/apps/emotion/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
+| [emotion](src/apps/emotion/progress.md) | 장치 | uncommitted (2026-09-21) | GO | GO | HOLD | HOLD | PARKED | PARKED |
 | [led](src/hardware/led/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
 | [imu_bno055](src/hardware/imu_bno055/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
 | [sensor_adc](src/hardware/sensor_adc/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | PARKED | PARKED |
@@ -21,7 +21,7 @@
 | [interfaces](src/core/interfaces/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | N/A | HOLD | HOLD | PARKED |
 | [description](src/sim/description/progress.md) | 로봇 통합 | uncommitted (2026-09-21) | GO | GO | GO | HOLD | HOLD | PARKED |
 | [dock](dock/progress.md) | 도킹 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
-| [docs](docs/progress.md) | 거버넌스 | ab8bf1b (2026-09-20) | GO | GO | N/A | N/A | N/A | N/A |
+| [docs](docs/progress.md) | 거버넌스 | uncommitted (2026-09-21) | GO | GO | N/A | N/A | N/A | N/A |
 
 ## HOLD blockers
 

@@ -530,6 +530,7 @@ close code: `4401` 은 토큰이 없거나 틀린 것(`/ws/state` 와 동일), `
 | `nav.failed` | error | 로봇 | `{error_code}` |
 | `nav.canceled` | info | 로봇 | `{source}` |
 | `nav.stuck` | error | 로봇 | `{timeout_ms}` |
+| `nav.lane_lost` | error | 로봇 | `{lost_ms}` (NAV-007 차선 상실 — 유예 초과 시 정지, 자동 재탐색 없음) |
 | `nav.blocked` | warning | 로봇 | `{}` |
 | `safety.estop` | critical | 로봇 | `{source}` |
 | `safety.estop_released` | warning | 로봇 | `{by}` |
