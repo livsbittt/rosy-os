@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 IMAGE_DIR = ROOT / "deploy" / "image"
 FINALIZE = IMAGE_DIR / "finalize-image.sh"
 MANIFEST = IMAGE_DIR / "create-image-manifest.py"
+WORKFLOW = ROOT / ".github/workflows/build-pinky-image.yml"
 
 
 def test_finalizer_checks_filesystem_before_deterministic_compression():
@@ -69,3 +70,13 @@ def test_manifest_builder_emits_exact_signed_handoff(tmp_path):
     listed = [line.split("  ", 1)[1] for line in sums]
     assert listed == sorted(required - {"SHA256SUMS"})
     assert "PENDING_OFFLINE" in (dist / "artifact-report.md").read_text(encoding="utf-8")
+
+
+def test_native_arm64_workflow_builds_only_an_unsigned_handoff():
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert "workflow_dispatch:" in text
+    assert "runs-on: ubuntu-24.04-arm" in text
+    assert "deploy/image/build-image.sh" in text
+    assert "SHA256SUMS.sig" in text and "test ! -e" in text
+    assert "private" not in text.lower()
+    assert "actions/upload-artifact@v4" in text

@@ -164,7 +164,9 @@ sign offline; personalize only after writing each card.
 - Task 7 writer preflight: source-complete ahead of Tasks 4-6. The Windows writer
   now verifies the Ed25519-signed checksum set and exact image manifest identity
   before its first disk probe; offline key ceremony and real artifact remain pending.
-- Task 8: blocked until a native ARM64 run verifies the real Canonical inputs and
-  produces the actual signed `.img.xz`; `base_image.verified` therefore remains false.
+- Task 8 workflow: source-complete and ready to dispatch on `ubuntu-24.04-arm`.
+  The committed lock remains conservative while the run-specific lock records the
+  exact revision and verified inputs. ARTIFACT remains blocked until that run
+  succeeds and its downloaded handoff is signed offline.
 - Tasks 9-10: physical and destructive; connected media remains untouched until the
   signed artifact and explicit operator confirmation exist.

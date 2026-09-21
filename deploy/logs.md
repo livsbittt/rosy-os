@@ -204,3 +204,13 @@
 - 증거: finalization/handoff와 기존 image 계약 `64 passed`; shell syntax 통과.
 - gate 변화: SOURCE만 갱신. ARM64 실물과 offline signature 전 ARTIFACT HOLD.
 - 결정: D-164 Tasks 5-6 source-complete.
+
+## 2026-09-22 · uncommitted · ci(image): build Pinky image on native ARM64
+
+- 변경: manual `ubuntu-24.04-arm` workflow가 정확한 revision의 resolved lock을 만들고
+  Canonical provenance 검증부터 native payload/chroot/finalization까지 실행한 뒤 unsigned
+  `.img.xz` handoff만 3일 artifact로 업로드한다. private key와 publication은 포함하지 않는다.
+- 증거: image/workspace/customization/handoff/writer 전체 집중 계약 `102 passed`, workflow
+  YAML parse와 `git diff --check` 통과.
+- gate 변화: SOURCE만 갱신. workflow 실실행 전 ARTIFACT HOLD.
+- 결정: D-164 Task 8 실행 경로 준비 완료.
