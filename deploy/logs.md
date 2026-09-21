@@ -97,3 +97,15 @@
 - 변경: test/test_control_launch_boundary.py 에 코어 쪽 가드 추가 — src/core/core/launch 의 모든 launch 파일이 control 패키지 참조(package='control', apps/control)를 가지지 않는다. launch 파일 개명(rosy_core→core)에도 견디도록 디렉터리 glob 방식.
 - 증거: 변이 증명 완료 — rosy_core.launch.py 말미에 package='control' 주석 삽입 시 적색, 복원 후 초록. python -m pytest test/test_control_launch_boundary.py -q 5 passed.
 - gate 변화: 없음
+
+## 2026-09-21 · uncommitted · feat(deploy): add operator stationary validation bundle
+
+- 변경: added a one-command Windows collector that binds peer reachability,
+  device readback, expected robot identity, and exact release revision into
+  no-overwrite GO/HOLD evidence with SHA-256 hashes.
+- Safety: the result always carries `motion_authorized: false`; it never changes
+  runtime mode or sends a motor command, and GO advances only to G3 sensor-only.
+- 증거: focused Python and real PowerShell fake-SSH/loopback tests cover both
+  GO and unreachable-device HOLD paths.
+- gate 변화: none. DEVICE remains HOLD until the physical Pinky produces the
+  same evidence from an installed signed ARM64 release.
