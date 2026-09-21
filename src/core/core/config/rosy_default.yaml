@@ -108,6 +108,7 @@ traffic_policy:                    # D-147 semantic road evidence gate
   stale_after_s: 0.40
   min_confidence: 0.50
   proceed_speed_scale: 0.50
+  simulation_signal_control: false  # simulation runtime에서만 true 허용
 
 navigation:
   max_linear_velocity: 0.20       # HWA-001에서 주입 (여기值은 폴백)

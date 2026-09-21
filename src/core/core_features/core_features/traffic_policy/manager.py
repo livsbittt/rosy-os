@@ -122,7 +122,8 @@ class TrafficDecision:
 
 class TrafficPolicyManager:
     def __init__(self, events, *, config: Optional[TrafficPolicyConfig] = None,
-                 clock: Callable[[], float] = time.monotonic) -> None:
+                 clock: Callable[[], float] = time.monotonic,
+                 simulation_signal_control: bool = False) -> None:
         self._events = events
         self._config = config or TrafficPolicyConfig()
         self._clock = clock
@@ -132,6 +133,9 @@ class TrafficPolicyManager:
         self._observation: Optional[RoadEvidence] = None
         self._received_at: Optional[float] = None
         self._stopped_at: Optional[float] = None
+        self._staged_config: Optional[TrafficPolicyConfig] = None
+        self._simulation_signal_control = bool(simulation_signal_control)
+        self._simulation_signal_colour = "RED"
         self._status = TrafficPolicyStatus(
             mode=self._config.mode.value,
             state=(
@@ -170,6 +174,107 @@ class TrafficPolicyManager:
                 self._set_status(
                     "HOLD", "no_road_evidence", None, 0.0)
             return self._status.model_copy()
+
+    @staticmethod
+    def _config_dict(config: TrafficPolicyConfig) -> dict:
+        return {
+            "mode": config.mode.value,
+            "map_id": config.map_id,
+            "scene_revision": config.scene_revision,
+            "policy_revision": config.policy_revision,
+            "approach_distance_m": config.approach_distance_m,
+            "stop_distance_m": config.stop_distance_m,
+            "stop_dwell_s": config.stop_dwell_s,
+            "stale_after_s": config.stale_after_s,
+            "min_confidence": config.min_confidence,
+            "proceed_speed_scale": config.proceed_speed_scale,
+        }
+
+    def configuration(self) -> dict:
+        with self._lock:
+            return {
+                "active": self._config_dict(self._config),
+                "staged": (
+                    None
+                    if self._staged_config is None
+                    else self._config_dict(self._staged_config)
+                ),
+                "simulation_signal": {
+                    "available": self._simulation_signal_control,
+                    "colour": self._simulation_signal_colour,
+                },
+            }
+
+    def stage(self, patch: dict, *, actor: str) -> dict:
+        if type(patch) is not dict or not patch:
+            raise ValueError("traffic policy patch is required")
+        if not isinstance(actor, str) or not actor:
+            raise ValueError("traffic policy actor is required")
+        allowed = set(self._config_dict(self._config))
+        unknown = set(patch) - allowed
+        if unknown:
+            raise ValueError(
+                "unsupported traffic policy fields: "
+                + ", ".join(sorted(unknown)))
+        with self._lock:
+            values = {**self._config_dict(self._config), **patch}
+            candidate = TrafficPolicyConfig(**values)
+            self._staged_config = candidate
+            self._events.publish(
+                "nav.traffic_policy_staged",
+                source="traffic_policy_manager",
+                data={
+                    "actor": actor,
+                    "policy_revision": candidate.policy_revision,
+                },
+            )
+            return self.configuration()
+
+    def apply_staged(self, *, actor: str) -> dict:
+        if not isinstance(actor, str) or not actor:
+            raise ValueError("traffic policy actor is required")
+        with self._lock:
+            if self._staged_config is None:
+                raise ValueError("no staged traffic policy")
+            self._config = self._staged_config
+            self._staged_config = None
+            self._observation = None
+            self._received_at = None
+            self._stopped_at = None
+            self._generation += 1
+            self._evidence_revision += 1
+            if self._config.mode is TrafficPolicyMode.DISABLED:
+                self._set_status(
+                    "DISABLED", "policy_disabled", None, 1.0)
+            else:
+                self._set_status(
+                    "HOLD", "no_road_evidence", None, 0.0)
+            self._events.publish(
+                "nav.traffic_policy_applied",
+                source="traffic_policy_manager",
+                data={
+                    "actor": actor,
+                    "policy_revision": self._config.policy_revision,
+                    "mode": self._config.mode.value,
+                },
+            )
+            return self.configuration()
+
+    def set_simulation_signal(self, colour: str, *, actor: str) -> dict:
+        if not self._simulation_signal_control:
+            raise RuntimeError("simulation signal control unavailable")
+        if colour not in ("RED", "YELLOW", "GREEN"):
+            raise ValueError("unsupported simulation signal colour")
+        if not isinstance(actor, str) or not actor:
+            raise ValueError("simulation signal actor is required")
+        with self._lock:
+            self._simulation_signal_colour = colour
+            self._events.publish(
+                "sim.traffic_signal_changed",
+                source="traffic_policy_manager",
+                data={"actor": actor, "colour": colour},
+            )
+            return {"available": True, "colour": colour}
 
     def observe(self, observation: RoadEvidence,
                 received_at: Optional[float] = None,

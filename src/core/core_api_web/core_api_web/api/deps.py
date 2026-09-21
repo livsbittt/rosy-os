@@ -77,6 +77,7 @@ class CoreServicesLike(Protocol):
     started_at: Any
     state: Any
     swarm: Any
+    traffic_policy: Any
     waypoints: Any
 
 

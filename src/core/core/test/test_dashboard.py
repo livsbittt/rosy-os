@@ -124,6 +124,30 @@ def test_dashboard_exposes_exclusive_ir_and_camera_line_follow_modes():
     assert "lineFollowPending" in script
 
 
+def test_dashboard_exposes_traffic_evidence_and_staged_policy_controls():
+    html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+    script = dashboard_js()
+
+    for element_id in (
+        "traffic-policy-state", "traffic-policy-reason",
+        "traffic-policy-signal", "traffic-policy-stop-distance",
+        "traffic-policy-scene", "traffic-policy-revision",
+        "traffic-policy-mode", "traffic-approach-distance",
+        "traffic-policy-revision-input",
+        "traffic-stop-distance", "traffic-stop-dwell",
+        "traffic-min-confidence", "traffic-policy-stage",
+        "traffic-policy-apply", "traffic-policy-message",
+    ):
+        assert f'id="{element_id}"' in html
+    for colour in ("RED", "YELLOW", "GREEN"):
+        assert f'data-simulation-signal="{colour}"' in html
+    assert "/api/v1/traffic" in script
+    assert "/api/v1/traffic/policy/stage" in script
+    assert "/api/v1/traffic/policy/apply" in script
+    assert "/api/v1/traffic/simulation/signal" in script
+    assert "trafficPolicyPending" in script
+
+
 def test_dashboard_html_cannot_bypass_security_headers_through_assets(dashboard_client):
     response = dashboard_client.get("/dashboard/assets/index.html")
 

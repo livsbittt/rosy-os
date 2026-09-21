@@ -189,6 +189,45 @@
             </dl>
             <p id="line-follow-reason" class="line-follow-message">mode_off</p>
           </div>
+          <div class="traffic-policy-control" aria-labelledby="traffic-policy-heading">
+            <div class="traffic-policy-copy">
+              <h3 id="traffic-policy-heading">교통 인식 · 주행 정책</h3>
+              <span>카메라 증거와 최종 명령을 분리해 확인</span>
+            </div>
+            <dl class="traffic-policy-facts">
+              <div><dt>판정</dt><dd id="traffic-policy-state">DISABLED</dd></div>
+              <div><dt>신호</dt><dd id="traffic-policy-signal">—</dd></div>
+              <div><dt>정지선</dt><dd id="traffic-policy-stop-distance">—</dd></div>
+              <div><dt>scene</dt><dd id="traffic-policy-scene">—</dd></div>
+              <div><dt>policy</dt><dd id="traffic-policy-revision">—</dd></div>
+              <div><dt>판정 사유</dt><dd id="traffic-policy-reason">policy_disabled</dd></div>
+            </dl>
+            <div class="traffic-policy-grid">
+              <label>운영 모드
+                <select id="traffic-policy-mode">
+                  <option value="DISABLED">DISABLED</option>
+                  <option value="MONITOR_ONLY">MONITOR_ONLY</option>
+                  <option value="ENFORCED">ENFORCED</option>
+                </select>
+              </label>
+              <label>정책 revision<input id="traffic-policy-revision-input" type="text" maxlength="80"></label>
+              <label>접근 거리 (m)<input id="traffic-approach-distance" type="number" min="0.13" max="3" step="0.01"></label>
+              <label>정지 거리 (m)<input id="traffic-stop-distance" type="number" min="0.01" max="2.9" step="0.01"></label>
+              <label>정지 dwell (s)<input id="traffic-stop-dwell" type="number" min="0.1" max="10" step="0.1"></label>
+              <label>최소 신뢰도<input id="traffic-min-confidence" type="number" min="0.01" max="1" step="0.01"></label>
+            </div>
+            <div class="traffic-policy-actions">
+              <button type="button" id="traffic-policy-stage">정책 검토본 저장</button>
+              <button type="button" id="traffic-policy-apply" class="primary-button">정지 상태에서 적용</button>
+            </div>
+            <div class="simulation-signal-controls" role="group" aria-label="시뮬레이션 신호등 제어">
+              <span>SIM 신호</span>
+              <button type="button" data-simulation-signal="RED" disabled>RED</button>
+              <button type="button" data-simulation-signal="YELLOW" disabled>YELLOW</button>
+              <button type="button" data-simulation-signal="GREEN" disabled>GREEN</button>
+            </div>
+            <p id="traffic-policy-message" class="line-follow-message" role="status" aria-live="polite">정책 readback 대기</p>
+          </div>
           <div class="teleop-commissioning" aria-labelledby="teleop-heading">
             <div class="teleop-copy">
               <div>

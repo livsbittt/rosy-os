@@ -87,6 +87,7 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 | code | HTTP | 의미 | 발신 |
 |---|---|---|---|
 | `VALIDATION_ERROR` | 400 | 요청 스키마 위반 | 로봇/Fleet |
+| `ROBOT_MUST_BE_STOPPED` | 409 | staged 주행 정책 적용 전에 IDLE/EMERGENCY, 0 속도, line-follow OFF 조건이 충족되지 않음 | 로봇 |
 | `UNAUTHORIZED` | 401 | 토큰 없음/무효 | 로봇/Fleet |
 | `FORBIDDEN` | 403 | 권한 부족 | 로봇/Fleet |
 | `NOT_FOUND` | 404 | 리소스 없음 | 로봇/Fleet |
@@ -174,6 +175,10 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 | GET | `/api/v1/navigation/path` | Viewer | MAP-003 |
 | GET | `/api/v1/line-follow` | Viewer | D-143 — 선택 모드, 상태, 증거 신뢰도·나이, 최종 선속도·각속도와 사유 |
 | PUT | `/api/v1/line-follow/mode` | Operator | D-143 — `{mode: OFF\|IR_LINE\|CAMERA_LINE}`. 소스는 상호 배타적이며 변경 즉시 이전 증거와 명령을 폐기 |
+| GET | `/api/v1/traffic` | Viewer | D-147 — 교통 인식 증거, 정책 판정, active/staged 설정과 simulation signal capability readback |
+| POST | `/api/v1/traffic/policy/stage` | Operator | D-147 — 정책 모드·revision·거리·dwell·신뢰도 기준을 검증해 검토본으로 저장. 활성 정책은 바꾸지 않음 |
+| POST | `/api/v1/traffic/policy/apply` | Operator | D-147 — IDLE/EMERGENCY이고 line-follow가 꺼져 있으며, fresh 0 속도 또는 E-stop으로 정지가 증명된 경우에만 staged 정책을 원자 적용 |
+| PUT | `/api/v1/traffic/simulation/signal` | Operator | D-147 — 명시적 simulation capability에서만 `{colour: RED\|YELLOW\|GREEN}` 허용. 실제 장치에서는 501 |
 | POST | `/api/v1/localization/initialpose` | Operator | AMCL 초기화 |
 | POST | `/api/v1/slam/start` | Operator | NAV-005 — 추종 세션이 주행을 쥐고 있으면 409 `NAVIGATION_ACTIVE` |
 | POST | `/api/v1/slam/stop` | Operator | NAV-005 |

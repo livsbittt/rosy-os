@@ -274,6 +274,11 @@ class CoreServices:
             events,
             config=_traffic_policy_config(
                 config.get("traffic_policy", {}) or {}),
+            simulation_signal_control=bool(
+                (config.get("runtime") or {}).get("mode") == "simulation"
+                and (config.get("traffic_policy") or {}).get(
+                    "simulation_signal_control", False)
+            ),
         )
         power = PowerManager(_power_config(config.get("power", {})), events=events)
         battery = BatteryMonitor(

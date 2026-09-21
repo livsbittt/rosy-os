@@ -236,3 +236,54 @@ def test_core_services_wires_policy_and_estop_resets_evidence(core_client):
     snapshot = services.state.snapshot()
     assert snapshot.traffic_policy.policy_revision == "traffic-policy-v1"
     assert snapshot.traffic_policy.reason == "no_road_evidence"
+
+
+def test_policy_configuration_is_staged_then_applied_atomically(rig):
+    now, manager = rig
+    observe(manager, now, evidence())
+    old_decision = manager.gate(0.05, 0.0)
+
+    staged = manager.stage({
+        "mode": "MONITOR_ONLY",
+        "policy_revision": "traffic-policy-v2",
+        "approach_distance_m": 0.40,
+    }, actor="operator:test")
+
+    assert manager.mode is TrafficPolicyMode.ENFORCED
+    assert staged["staged"]["mode"] == "MONITOR_ONLY"
+    assert staged["active"]["policy_revision"] == "traffic-policy-v1"
+
+    applied = manager.apply_staged(actor="operator:test")
+
+    assert manager.mode is TrafficPolicyMode.MONITOR_ONLY
+    assert applied["active"]["policy_revision"] == "traffic-policy-v2"
+    assert applied["staged"] is None
+    assert manager.apply_if_current(old_decision, lambda _: None) is False
+    assert manager.status().reason == "no_road_evidence"
+
+
+def test_invalid_staged_configuration_does_not_replace_active_policy(rig):
+    _now, manager = rig
+
+    with pytest.raises(ValueError):
+        manager.stage({
+            "stop_distance_m": 0.50,
+            "approach_distance_m": 0.20,
+        }, actor="operator:test")
+
+    assert manager.configuration()["active"]["stop_distance_m"] == 0.12
+    assert manager.configuration()["staged"] is None
+
+
+def test_simulation_signal_control_requires_explicit_capability():
+    disabled = TrafficPolicyManager(EventBus("rosy_01"))
+    with pytest.raises(RuntimeError, match="unavailable"):
+        disabled.set_simulation_signal("GREEN", actor="operator:test")
+
+    enabled = TrafficPolicyManager(
+        EventBus("rosy_01"), simulation_signal_control=True)
+    result = enabled.set_simulation_signal("GREEN", actor="operator:test")
+
+    assert result == {"available": True, "colour": "GREEN"}
+    with pytest.raises(ValueError):
+        enabled.set_simulation_signal("BLUE", actor="operator:test")

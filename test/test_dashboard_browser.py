@@ -44,6 +44,11 @@ window.fetch = async (input, options = {}) => {
       robot_id: 'rosy_01', online: true, mode: 'MANUAL', navigation: 'IDLE',
       pose: {x: 1.25, y: -0.5, yaw: 0.3}, velocity: {linear: 0, angular: 0},
       battery: {percent: 90, voltage: 7.5}, safety: {estop: false}, seq: 1,
+      traffic_policy: {
+        mode: 'MONITOR_ONLY', state: 'FOLLOW', reason: 'clear_road',
+        signal_colour: 'GREEN', stop_line_distance_m: null,
+        scene_revision: 'road-scene-v1', policy_revision: 'traffic-policy-v1',
+      },
     },
     '/api/v1/system/runtime': {
       os: {}, cpu: {}, memory: {}, storage: {},
@@ -66,6 +71,22 @@ window.fetch = async (input, options = {}) => {
       battery: {warning_percent: 20, critical_percent: 10, deep_percent: 5, critical_policy: 'RETURN_HOME'},
     },
     '/api/v1/events': {events: []},
+    '/api/v1/traffic': {
+      status: {
+        mode: 'MONITOR_ONLY', state: 'FOLLOW', reason: 'clear_road',
+        signal_colour: 'GREEN', stop_line_distance_m: null,
+        scene_revision: 'road-scene-v1', policy_revision: 'traffic-policy-v1',
+      },
+      active: {
+        mode: 'MONITOR_ONLY', map_id: 'map_260905_update_v2',
+        scene_revision: 'road-scene-v1', policy_revision: 'traffic-policy-v1',
+        approach_distance_m: 0.35, stop_distance_m: 0.12,
+        stop_dwell_s: 0.5, stale_after_s: 0.4,
+        min_confidence: 0.5, proceed_speed_scale: 0.5,
+      },
+      staged: null,
+      simulation_signal: {available: true, colour: 'GREEN'},
+    },
     '/api/v1/waypoints': {waypoints: []},
     '/api/v1/docking/status': {state: 'UNDOCKED', dock_id: null, supported: false},
     '/api/v1/docking/docks': {docks: []},
@@ -87,6 +108,29 @@ window.fetch = async (input, options = {}) => {
     return new Response(JSON.stringify(parsed), {
       status: 201, headers: {'Content-Type': 'application/json'},
     });
+  }
+  if (method === 'POST' && path === '/api/v1/traffic/policy/stage') {
+    const current = bodies['/api/v1/traffic'];
+    current.staged = {...current.active, ...parsed};
+    return new Response(JSON.stringify(current), {
+      status: 200, headers: {'Content-Type': 'application/json'},
+    });
+  }
+  if (method === 'POST' && path === '/api/v1/traffic/policy/apply') {
+    const current = bodies['/api/v1/traffic'];
+    current.active = current.staged;
+    current.staged = null;
+    current.status = {...current.status, mode: current.active.mode,
+      policy_revision: current.active.policy_revision};
+    return new Response(JSON.stringify(current), {
+      status: 200, headers: {'Content-Type': 'application/json'},
+    });
+  }
+  if (method === 'PUT' && path === '/api/v1/traffic/simulation/signal') {
+    bodies['/api/v1/traffic'].simulation_signal.colour = parsed.colour;
+    return new Response(JSON.stringify(
+      bodies['/api/v1/traffic'].simulation_signal
+    ), {status: 200, headers: {'Content-Type': 'application/json'}});
   }
   if (method === 'PUT' && path === '/api/v1/safety/limits') {
     return new Response(JSON.stringify({
@@ -249,3 +293,44 @@ def test_field_settings_save_limits_waypoint_and_dock_without_navigation():
     dock = next(call for call in calls if call["path"] == "/api/v1/docking/docks" and call["method"] == "POST")
     assert dock["body"]["id"] == "dock_1"
     assert dock["body"]["type"] == "rosy_v1"
+
+
+def test_traffic_policy_is_staged_before_stopped_only_apply():
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        try:
+            browser, page = _launch_page(playwright)
+        except Exception as error:
+            pytest.skip(f"Playwright Chromium unavailable: {error}")
+        page.goto(
+            "http://rosy.test/dashboard",
+            wait_until="domcontentloaded",
+            timeout=5_000,
+        )
+        page.locator("#traffic-policy-revision-input").fill(
+            "traffic-policy-v2")
+        page.locator("#traffic-policy-mode").select_option("ENFORCED")
+        page.locator("#traffic-policy-stage").click()
+        page.wait_for_function(
+            "document.getElementById('traffic-policy-apply')"
+            " && !document.getElementById('traffic-policy-apply').disabled"
+        )
+        page.locator("#traffic-policy-apply").click()
+        page.wait_for_function(
+            "document.getElementById('traffic-policy-message')"
+            "?.textContent?.includes('적용')"
+        )
+        calls = page.evaluate("window.__apiCalls")
+        browser.close()
+
+    mutations = [
+        (call["method"], call["path"])
+        for call in calls
+        if call["path"].startswith("/api/v1/traffic/policy/")
+    ]
+    assert mutations == [
+        ("POST", "/api/v1/traffic/policy/stage"),
+        ("POST", "/api/v1/traffic/policy/apply"),
+    ]
