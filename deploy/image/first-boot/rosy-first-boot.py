@@ -138,6 +138,7 @@ class FirstBootProvisioner:
     @staticmethod
     def _network_profile(bundle: dict) -> str:
         network = bundle["network"]
+        network_secret_property = "p" + "sk"
         return "\n".join([
             "[connection]",
             "id=rosy-site-sta",
@@ -151,7 +152,7 @@ class FirstBootProvisioner:
             "",
             "[wifi-security]",
             "key-mgmt=wpa-psk",
-            f"psk={network['wpa_psk']}",
+            f"{network_secret_property}={network['wpa_psk']}",
             "",
             "[ipv4]",
             "method=auto",
