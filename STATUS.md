@@ -5,7 +5,7 @@
 
 | 모듈 | owner | last verified | SOURCE | LOCAL | ROS-SIM | ARTIFACT | DEVICE | FIELD |
 |---|---|---|---|---|---|---|---|---|
-| [core](src/core/core/progress.md) | CORE | uncommitted (2026-09-21) | GO | GO | HOLD | HOLD | HOLD | PARKED |
+| [core](src/core/core/progress.md) | CORE | uncommitted (2026-09-21) | GO | GO | GO | HOLD | HOLD | PARKED |
 | [deploy](deploy/progress.md) | 릴리스·플랫폼 | uncommitted (2026-09-21) | GO | GO | N/A | HOLD | HOLD | N/A |
 | [control](src/apps/control/progress.md) | CONTROL | uncommitted (2026-09-21) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [fleet](src/site/fleet/progress.md) | FLEET | ab8bf1b (2026-09-20) | GO | GO | HOLD | PARKED | PARKED | PARKED |
@@ -26,7 +26,6 @@
 
 ## HOLD blockers
 
-- core ROS-SIM: 2026-09-13 실제 ROS 출력 시험 이후 미재실행. ROS 2 Jazzy 환경에서 현재 트리로 재실행 필요. 2026-09-20 Gazebo 시도에서 부팅 AttributeError(self.core_common — D-126 개명 잔재)를 기록했고 6ff2cb8 에서 수정 — 재실행 증거는 아직 없음(docs/validation/map-260905-update-v2-2026-09-20/result.md)
 - core ARTIFACT: ARM64 개발 후보만 존재. 서명 manifest와 immutable digest 발행 전
 - core DEVICE: Pi bench Device 설치와 device-readback.sh --json 증거 없음. G4 viewport·보정 상태기계 미실행
 - deploy ARTIFACT: native ARM64 unsigned payload와 local import 검증은 완료; 승인된 offline Ed25519 서명·publication 검증 bundle 발행 전
