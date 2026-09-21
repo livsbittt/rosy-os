@@ -1224,3 +1224,11 @@
 - gate 변화: Signal SOURCE GO. LOCAL은 Fleet client 부재로 HOLD, ARTIFACT·DEVICE는 compile/flash/물리 relay 증거 부재로 HOLD다.
 - 결정: ROSY-SIGNAL-001 reference implementation. Fleet가 순서를 소유하며 Signal은 로봇 안전 판단을 대체하지 않는다.
 - 교훈: source 문자열 계약은 컴파일을 대신하지 못한다. helper 정의와 입력 분리는 잡아도 Arduino 툴체인과 실제 relay 출력은 별도 gate다.
+
+## 2026-09-21 · 5dd076c · test(core): ROS-SIM 재실행으로 HOLD 해소 + vendor 카드 A 베이스라인 절차 추가
+
+- 변경: ① WSL2 ROS 2 Jazzy에서 현재 트리를 빌드(colcon --packages-up-to core, 7패키지)하고 `ros2 run core core` 부트 스모크를 재실행해 core ROS-SIM HOLD를 해소했다 ② deploy/robot/capture-vendor-baseline.sh(읽기 전용 vendor 이미지 캡처)와 계약 시험을 신설하고, commissioning 설계 §7(카드 A/B 2장 운용)을 추가했으며, pinky-pro-os 연구 문서에 UNKNOWN 폐쇄 경로를 연결했다
+- 증거: docs/validation/ros-sim-core-2026-09-21/result.md + evidence 14파일 — `/core` 노드, `/cmd_vel` publisher count=1(D-2), `/api/v1` 200, `/dashboard` 200, SIGTERM 후 정상 종료. 계약 시험 5 passed(변이 증명 포함). 2026-09-20 `AttributeError(self.core_common)` 부팅 결함이 현재 트리에서 미재현 확인.
+- gate 변화: core ROS-SIM HOLD→GO(2026-09-21 현재 트리 재실행, D-79). ARTIFACT·DEVICE는 HOLD 유지 — G0–G5 전까지 실물 주장 없음.
+- 결정: core ROS-SIM은 "부트 스모크+ROS 출력+API"로 판정한다. Gazebo 리그는 gz_sim, Nav2 스택 실행은 navigation 게이트의 범위로 갈라 둔다.
+- 교훈: HOLD 해소 주장은 그 HOLD이 기록한 원래 결함(09-20 부팅 AttributeError)을 직접 재시험해야 닫힌다 — 빌드 성공만으로 부팅 증거를 대신하지 않는다.

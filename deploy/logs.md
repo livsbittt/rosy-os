@@ -97,3 +97,11 @@
 - 변경: test/test_control_launch_boundary.py 에 코어 쪽 가드 추가 — src/core/core/launch 의 모든 launch 파일이 control 패키지 참조(package='control', apps/control)를 가지지 않는다. launch 파일 개명(rosy_core→core)에도 견디도록 디렉터리 glob 방식.
 - 증거: 변이 증명 완료 — rosy_core.launch.py 말미에 package='control' 주석 삽입 시 적색, 복원 후 초록. python -m pytest test/test_control_launch_boundary.py -q 5 passed.
 - gate 변화: 없음
+
+## 2026-09-21 · 5dd076c · feat(robot): vendor stock image read-only baseline capture (pre-G0)
+
+- 변경: deploy/robot/capture-vendor-baseline.sh 신규 — vendor 출하 이미지(카드 A)에서 배포판·부트 설정·udev·systemd 자동실행·장치노드·netplan/AP·pinkylib·wifi_setup.sh를 읽기 전용으로 캡처한다. 유일한 쓰기 대상은 증거 OUTDIR이고, i2cdetect 버스 프로브는 PROBE_I2C=1 옵트인이다. 캡처 무결성은 SHA256SUMS.txt로 남긴다.
+- 증거: test/test_capture_vendor_baseline.py 5 passed — 변이 증명 완료(OUTDIR 밖 redirect 삽입 시 적색, 복원 후 초록), WSL bash -n 통과. docs/plans/2026-09-21-pinky-device-commissioning-design.md §7이 절차를 소유한다.
+- gate 변화: 없음 — 캡처 결과는 pre-G0 참조 평가이며 어떤 gate도 GO로 만들지 않는다. ARTIFACT·DEVICE는 HOLD 유지.
+- 결정: 카드 A(vendor 원본 보존) + 카드 B(Rosy OS) 2장 운용을 G0–G5 절차에 명시한다. 캡처 결과는 비밀정보 검토와 scanner 통과 후 필요한 증거만 docs/validation/vendor-baseline-<date>/에 착지한다.
+- 교훈: 조사 문서의 UNKNOWN은 실물에서 읽을 수 있는 항목과 그렇지 않은 항목을 갈라 둬야 한다 — 읽기 가능 항목은 절차와 가드로 고정하면 실기 세션 비용이 줄어든다.

@@ -74,3 +74,34 @@ G0 digest/signature, G2 readback, G3 stationary/E-stop/publisher, G4 위험 확�
 G5 최종 zero를 고정한다. CLI 시험은 canonical file 저장, status/next gate,
 실패 시 무변경, secret-like field 거절을 확인한다. 기존 deploy/readback/runtime
 시험과 전체 저장소 시험을 재실행한다.
+
+## 7. 카드 A vendor 베이스라인 캡처 (pre-G0)
+
+장비 연결 시 SD 카드는 두 장으로 운용한다. **카드 A는 vendor 출하 이미지 그대로
+보존**(플래시 대상 아님), **카드 B에 Rosy OS 서명 이미지를 굽는다.** 카드 A는
+아래 세 가지 역할을 가진다.
+
+1. **UNKNOWN 폐쇄**: `docs/plans/2026-09-21-pinky-pro-os-research.md` §11의 11건
+   (배포판 문자열, 부트 설정, udev, systemd 자동실행, 핀매핑, pinkylib 위치,
+   wifi_setup.sh 본체 등)을 실물에서 읽어 닫는다.
+2. **기준값 제공**: G0–G5의 readback 참값과 대체(parity) 체크리스트의 비교 기준.
+3. **고장 분리**: G4/G5 실패 시 하드웨어 불량과 Rosy OS 결함을 가르는 control 그룹.
+
+### 절차
+
+- 카드 A를 처음 다루기 전 블록 단위 백업 이미지 + SHA-256을 확보한다(실수 방지 보험).
+- 카드 A로 부팅 → SSH(`pinky@192.168.4.1`) → `deploy/robot/capture-vendor-baseline.sh`
+  실행 → OUTDIR을 로봇 밖으로 회수한다. ext4를 Windows에서 마운트하지 않는다.
+- 스크립트는 **읽기 전용**이며 유일한 쓰기 대상은 증거 디렉터리다. 버스 프로브
+  (`i2cdetect`)는 `PROBE_I2C=1` 옵트인이다. 읽기 전용 계약은
+  `test/test_capture_vendor_baseline.py`가 고정하고 mutation-proven이다.
+- 회수한 원본은 저장소 밖에서 보관한다. site/device 비밀정보 검토와 repository secret
+  scanner를 통과한 필요한 증거만 `docs/validation/vendor-baseline-<date>/`에
+  SHA256SUMS.txt와 함께 선택적으로 착지한다.
+
+### 판정 연결
+
+- 캡처 결과가 G0 이전 참조 평가(pre-G0 reference)로 남고, 자체로는 어떤 gate도 GO로
+  만들지 않는다. vendor 이미지의 동작은 Rosy OS의 증거가 아니다.
+- G4/G5에서 카드 B 실패 시, 같은 하드웨어에서 카드 A가 동작하면 Rosy OS 결함,
+  카드 A도 실패하면 하드웨어 결함으로 분류한다. 판정 기록은 세션 JSON에 남긴다.

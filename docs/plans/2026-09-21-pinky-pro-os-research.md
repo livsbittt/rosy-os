@@ -312,3 +312,7 @@ TF 트리: `map → odom → base_footprint → base_link → 바퀴/센서 링�
 - **pinkylib 소스 확보 실패**: org 목록·웹검색에서 공개 저장소를 찾지 못했다(§11 UNKNOWN 3).
 - **실기·시뮬레이션 실행 검증 없음**: 이 문서의 모든 동작 서술은 소스 코드와 문서 해석이며, 부팅·주행 실측이 아니다. Pinky Pro G0–G5 실기 검증 게이트는 [2026-09-21-pinky-device-commissioning-design.md](2026-09-21-pinky-device-commissioning-design.md)가 다룬다.
 - 분석용 해제본(`X:\DevTemp\opencode\pinky-pro-research\`)은 요청에 따라 삭제하지 않고 남겨 둔다.
+- **UNKNOWN 폐쇄 경로(후속)**: 실물 vendor 이미지(카드 A)에서
+  `deploy/robot/capture-vendor-baseline.sh`(읽기 전용 캡처)를 실행해 §11 대부분을
+  닫는 절차가 [commissioning 설계 §7](2026-09-21-pinky-device-commissioning-design.md)에
+  추가됐다.
