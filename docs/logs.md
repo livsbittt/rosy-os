@@ -889,3 +889,8 @@
 - gate 변화: none. 자문 전용 계약 변경 없음 — additive 필드뿐이다.
 - 결정: D-137, PRT-006 additive.
 - 교훈: 와이어 스키마가 이미 `detections.py` 서브모듈로 착지해 있으면 그 모듈이 진실이다 — 진실이 둘로 쪼개지기 전에 기존 착지물부터 찾는다.
+
+## 2026-09-21 · uncommitted · docs(adr): promote D-149 to Accepted on structural composition evidence
+- 변경: D-149 Status Proposed→Accepted. 승격 근거를 구성 증거로 대체 기록 — core 이미지는 control 미복사(Dockerfile optional-slices 단계), 배포 launch 폐쇄(compose→bringup/hardware.launch→line_follow.launch)의 control 실행파일은 ir_adc_node·camera_detect_node·line_observer_node뿐(D-143 증거 생산), 최종 발행자 safety_node는 deploy 미참조 레거시 launch 3개에만 존재. 운영 프로파일 remap 요구는 기각(격리가 구조적이라 요구할 대상 없음). 최초 기기 가동 시 device_readback ROS 그래프는 승격 조건이 아니라 상시 DEVICE 게이트 확인 항목으로 기록.
+- 증거: 근거 사실 전부 트리에서 직접 검증 + 계약 테스트 6종 변이 증명 완료. ADR 로그 계약 테스트 통과(아래 명령). 로봇 부재(rosy-01.local 미해석, 8080/22 불통)로 실물 readback은 상시 게이트로 이연.
+- gate 변화: 없음

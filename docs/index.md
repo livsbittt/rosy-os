@@ -96,8 +96,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · docs(adr): promote D-149 to Accepted on structural composition evidence
 - 2026-09-21 · uncommitted · docs(api-ref): vision DetectionEvidence 지연 메타 (v1.11 additive)
 - 2026-09-21 · uncommitted · docs(adr): formalize domain regroup and boundary contracts (D-147..D-150)
 - 2026-09-21 · uncommitted · docs(adr): keep native artifact building separate from offline signing (D-145)
 - 2026-09-21 · uncommitted · docs(adr): define physical hardware mapping as D-144
-- 2026-09-20 · uncommitted · docs(adr): the formation-driving measurement bundle is locked as four ordered gates (D-141)
