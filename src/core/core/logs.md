@@ -192,3 +192,10 @@
 - 증거: CORE 전체 회귀와 실제 Chromium dashboard 흐름을 통합 main 병합 상태에서 재검증했다.
 - gate 변화: SOURCE/LOCAL 증거만 추가. Windows HOST-SIM frame은 실제 Gazebo/Pinky frame이 아니므로 ROS-SIM/DEVICE/FIELD는 승격하지 않는다.
 - 결정: D-152. 이 예외는 MJPEG/녹화/raw/Fleet/상태 WebSocket으로 확장하지 않는다.
+
+## 2026-09-21 · uncommitted · feat(bridge): detection_evidence subscription + ROS graph injection test (D-137 T4)
+
+- 변경: `ros_bridge.py`에 `detection_evidence` 구독(String JSON, D-136 §2 분리 채널) + `_on_detection_evidence` 한 줄 콜백(파싱 실패는 None으로 피드 위임) + 노드 시계 `bind_clock`. `services.py`가 `PersonAdvisoryFeed`를 소유(advisory_feed 필드). `test_bridge_timers.py` 핀 갱신(구독 20건) + RecordingNode 시계에 nanoseconds. `test_advisory_feed_ros.py` 신규 — rclpy 그래프 주입 시험(ROS 없는 호스트는 모듈 스킵): 발행→좌석 캡, 깨진 패킷→프로필 복귀, e-stop 불변
+- 발견·수정(WSL 그래프 시험이 잡은 실결함): 좌석 `observed_at`이 ROS epoch인데 `clip()`은 monotonic으로 판정 — 기준 어긋남으로 자문이 한 번도 살지 못했다. `PersonAdvisoryFeed`에 `seat_clock`을 두고 캡처 시 **나이만** 좌석 시계로 옮기는 TrackedEvidence 패턴으로 수정. DDS 매칭 전 발행 유실도 재발행 루프로 방어
+- 증거: Windows core 1026 passed·12 skipped. WSL Jazzy 실 rclpy 그래프 10 passed(주입 1 + 브리지 구조 핀 9) — 러너 `interfaces` 패키지 colcon 빌드 + `LD_LIBRARY_PATH`/`AMENT_PREFIX_PATH` 직결(오버레이 setup이 PYTHONPATH를 덮어쓰는 문제 우회). 병합 충돌 12파일은 병렬 세션이 내용 해결 중 — 본 변경은 그 위에 미커밋
+- gate 변화: 없음. T4의 와이어 구간은 닫힘 — 남은 것은 Gazebo 상 주입 실측(ROS-SIM), FP 폭주율 수치 합의, T5 DEVICE

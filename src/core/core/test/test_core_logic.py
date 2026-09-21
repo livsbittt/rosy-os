@@ -429,18 +429,22 @@ class TestPersonAdvisoryFeed:
                           confidence=0.8)] if detections is None else detections,
         }
 
-    def _feed(self, safety, now=1000.1):
+    def _feed(self, safety):
+        """패킷 시계(1000.x, ROS epoch 대응물)와 좌석 시계(10.x, monotonic
+        대응물)를 분리해 둔다 — 실제 배선이 그렇다(브리지가 노드 시계를
+        꽂고, clip은 monotonic으로 판정한다)."""
         from core_features.safety.manager import PersonAdvisoryFeed
-        return PersonAdvisoryFeed(safety, clock=lambda: now), now
+        return PersonAdvisoryFeed(safety, clock=lambda: 1000.1,
+                                  seat_clock=lambda: 10.0)
 
     def test_fresh_person_packet_sets_the_advisory(self, safety):
-        feed, now = self._feed(safety)
+        feed = self._feed(safety)
         verdict = feed.ingest(self._packet())
         assert verdict == {'advisory': True, 'reason': 'person_advisory_set'}
-        assert safety.clip(0.20, 0.50, now=now)[0] == pytest.approx(0.05)
+        assert safety.clip(0.20, 0.50, now=10.01)[0] == pytest.approx(0.05)
 
     def test_broken_stale_and_gap_packets_clear_the_advisory(self, safety):
-        feed, now = self._feed(safety)
+        feed = self._feed(safety)
         assert feed.ingest(self._packet())['advisory'] is True
         assert feed.ingest("not a packet") == {'advisory': False,
                                                'reason': 'invalid_packet'}
@@ -457,8 +461,8 @@ class TestPersonAdvisoryFeed:
         assert feed.ingest(self._packet(observed_at=999.0)) == \
             {'advisory': False, 'reason': 'no_fresh_advisory'}
         assert feed.ingest(self._packet(detections=[]))['reason'] == 'no_fresh_advisory'
-        assert safety.clip(0.20, 0.50, now=now) == (pytest.approx(0.20),
-                                                    pytest.approx(0.50))
+        assert safety.clip(0.20, 0.50, now=10.01) == (pytest.approx(0.20),
+                                                      pytest.approx(0.50))
 
     def test_unknown_revision_through_registry_clears(self, safety):
         from core_features.safety.manager import ModelRegistry, PersonAdvisoryFeed
@@ -472,7 +476,7 @@ class TestPersonAdvisoryFeed:
                                      'reason': 'no_fresh_advisory'}
 
     def test_feed_never_touches_estop(self, safety):
-        feed, _ = self._feed(safety)
+        feed = self._feed(safety)
         safety.trigger_estop("lidar")
         feed.ingest(self._packet())
         assert safety.estop is True

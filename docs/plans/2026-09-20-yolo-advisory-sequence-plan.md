@@ -51,4 +51,5 @@
 - 2026-09-21: T2 보강 — control 생산 측 스냅샷(`control.control.detection_evidence`), `inference_ms`(API Ref v1.11 additive), D-18 동기·박스 규칙 일치 시험
 - 2026-09-21: T1 완료 — 서열 계약 4건(`TestD137SequenceContract`): advisory 상한 전용·estop 불가·해금 무 vision·`vision/detections` 무발행 게이트. 변이 증명 3건
 - 2026-09-21: T4 순수 조각 — 버스트 게이트(`control.control.burst_gate`: operator 또는 corroboration만 허용, vision 단독 거절, 변이 증명), 주입 시임(`core_features.safety.manager.PersonAdvisoryFeed`: broken/stale/gap 패킷 → 자문 해제, 어떤 입력에도 예외 없음, e-stop 무관, 변이 증명). 회귀: Windows core 980 passed, WSL Jazzy 979 passed(cv2 4.6 `generateImageMarker` 환경 실패 1건 — 본 변경 무관)
-- 남음: T4 ROS-SIM fault-injection — 구독 배선이 rosy-vision 착지와 함께 필요하고 `PersonAdvisoryFeed.ingest`가 호출점이다. FP 폭주율 수치 합의(분당 FP — 안전 담당), T5 DEVICE 실츱(Hailo). D-137 Status 전환은 종료 조건 충족 후
+- 2026-09-21: T4 와이어 구간 — `ros_bridge`에 `detection_evidence` 구독(D-136 §2 분리 채널) + `services`가 `PersonAdvisoryFeed` 소유 + **WSL Jazzy 실 rclpy 그래프 주입 시험 통과**(발행→좌석 캡·깨진 패킷→프로필 복귀·e-stop 불변, 브리지 구조 핀 9건 포함 10 passed). 그래프 시험이 시계 기준 실결함 발견: 좌석 stamp는 ROS epoch, `clip` 판정은 monotonic — `PersonAdvisoryFeed`가 캡처 시 나이만 좌석 시계로 옮기는 TrackedEvidence 패턴으로 수정
+- 남음: T4 Gazebo 상 fault-injection 실측(깨진 영상 + LiDAR 장애물 → 정지 유지 — 순수/그래프 계약은 모두 녹색, SIM 종단만 남음), FP 폭주율 수치 합의(분당 FP — 안전 담당), T5 DEVICE 실츱(Hailo). D-137 Status 전환은 종료 조건 충족 후

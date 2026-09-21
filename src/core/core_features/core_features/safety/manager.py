@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 import math
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable, Optional
 
 from core_common.protocol.detections import DETECTION_MAX_AGE_S, DetectionEvidence
@@ -193,14 +193,18 @@ class PersonAdvisoryFeed:
     절대 건드리지 않는다(D-137 §5)."""
 
     def __init__(self, safety: SafetyManager, registry: Optional[ModelRegistry] = None,
-                 clock: Optional[Callable[[], float]] = None) -> None:
+                 clock: Optional[Callable[[], float]] = None,
+                 seat_clock: Optional[Callable[[], float]] = None) -> None:
         if not isinstance(safety, SafetyManager):
             raise ValueError("advisory feed requires a SafetyManager")
         if registry is not None and not isinstance(registry, ModelRegistry):
             raise ValueError("registry must be a ModelRegistry or None")
         self._safety = safety
         self._registry = registry
+        #: 패킷 시계 — ROS 구독자는 노드 시계(epoch)를 꽂는다.
         self._clock = clock if clock is not None else time.monotonic
+        #: 자문 좌석의 시계 — SafetyManager.clip이 판정에 쓰는 기준(monotonic).
+        self._seat_clock = seat_clock if seat_clock is not None else time.monotonic
 
     def bind_clock(self, clock: Callable[[], float]) -> None:
         """패킷 타임스탬프와 같은 시간 기준으로 시계를 맞춘다.
@@ -217,7 +221,8 @@ class PersonAdvisoryFeed:
             return self._clear('invalid_packet')
         try:
             evidence = DetectionEvidence.model_validate(packet)
-            advisory = person_advisory_from(evidence, self._clock(),
+            packet_now = self._clock()
+            advisory = person_advisory_from(evidence, packet_now,
                                             registry=self._registry)
         except Exception:
             # 검증 텍스트에는 경로·시크릿이 섞일 수 있다 — 밖으로는 사유만.
@@ -225,6 +230,11 @@ class PersonAdvisoryFeed:
             return self._clear('invalid_packet')
         if advisory is None:
             return self._clear('no_fresh_advisory')
+        # TrackedEvidence 패턴: 패킷 시계 기준의 나이만 좌석 시계로 옮긴다.
+        # stamp를 그대로 두면 clip의 monotonic now와 기준이 어긋나 자문이 한
+        # 번도 살지 못한다 — WSL 그래프 시험이 잡은 실결함이다.
+        age = max(0.0, packet_now - evidence.observed_at)
+        advisory = replace(advisory, observed_at=self._seat_clock() - age)
         self._safety.set_person_advisory(advisory)
         return {'advisory': True, 'reason': 'person_advisory_set'}
 
