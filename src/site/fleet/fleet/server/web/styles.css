@@ -43,6 +43,29 @@ button, input, select { font: inherit; color: inherit; }
 .pill.good { color: var(--nominal); border-color: var(--surface-line); }
 .pill.bad { color: var(--status-crit); border-color: var(--status-crit-a45); }
 
+/* 관제 토큰 입력 — 루프백 밖 바인드에서는 서버가 토큰을 강제한다(cli.run_console).
+   색·배치는 클래스로만 준다 (CSP `style-src 'self'`). */
+.token {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--line-14);
+  background: var(--ground-soft);
+  color: var(--paper);
+  width: 11rem;
+}
+.token.locked { border-color: var(--status-crit-a45); }
+#token-save {
+  font-size: 0.78rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 0.45rem;
+  border: 1px solid var(--line-14);
+  background: var(--sheen-04);
+  cursor: pointer;
+}
+#token-save:hover { border-color: var(--focus-ring); }
+
 .estop {
   padding: 0.55rem 1.3rem;
   border-radius: 0.5rem;
@@ -233,3 +256,51 @@ main {
 .member-list { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .member-list label { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 12px; color: var(--paper); }
 .member-list input:disabled + * { opacity: 0.45; }
+/* ADR-1000: Warning / Critical Queues */
+.queues-container {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.queue {
+  flex: 1;
+  padding: 1rem;
+  border-radius: 4px;
+  background: var(--ground-card);
+  border: 1px solid var(--line-10);
+}
+.warning-queue {
+  border-left: 4px solid var(--status-warn);
+}
+.critical-queue {
+  border-left: 4px solid var(--status-crit);
+}
+.queue h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.issue-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.issue-list li {
+  padding: 0.5rem;
+  background: var(--ground-raise);
+  margin-bottom: 0.5rem;
+  border-radius: 2px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--paper);
+}
+.issue-list button {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  background: var(--status-crit);
+  color: var(--paper);
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+}

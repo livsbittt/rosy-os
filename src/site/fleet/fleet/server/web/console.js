@@ -16,6 +16,28 @@ const TRACK_WARN_M = 0.3;     // 기본 간격(0.6 m)의 절반을 넘으면 주
 const el = (id) => document.getElementById(id);
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
+// 관제 토큰 — 서버가 루프백 밖으로 열리면 모든 /api/fleet/* 이 401 로 막힌다
+// (cli.run_console 강제, app.authorize). 토큰은 세션 스토리지에만 둔다 —
+// localStorage 에 두면 공유 관제PC 의 다음 근무자가 그대로 물려받는다.
+const auth = {
+  token: sessionStorage.getItem("rosy-console-token") || "",
+};
+
+function authHeaders() {
+  return auth.token ? { "Authorization": `Bearer ${auth.token}` } : {};
+}
+
+function markLocked() {
+  const pill = el("online-pill");
+  pill.textContent = "토큰 필요";
+  pill.className = "pill bad";
+  el("console-token").classList.add("locked");
+}
+
+function markUnlocked() {
+  el("console-token").classList.remove("locked");
+}
+
 const view = {
   map: null,
   robots: [],
@@ -34,18 +56,26 @@ function log(text, kind) {
   while (box.childElementCount > LOG_MAX) box.lastElementChild.remove();
 }
 
-async function call(path, options) {
-  const resp = await fetch(path, options);
+async function call(path, options = {}) {
+  const headers = { ...(options.headers || {}), ...authHeaders() };
+  const resp = await fetch(path, { ...options, headers });
   let body = null;
   try {
     body = await resp.json();
   } catch (err) {
     body = null;
   }
+  if (resp.status === 401) {
+    // 토큰 없이(또는 틀린 토큰으로) 왔다 — 폴링이 계속 401 을 두드리기 전에
+    // 화면에 이유를 남긴다. 다음 refreshState 가 성공하면 markUnlocked 로 풀린다.
+    markLocked();
+    throw new Error("관제 토큰이 필요합니다 — 상단에 입력하고 접속을 누르세요");
+  }
   if (!resp.ok) {
     const detail = body && body.detail ? body.detail : {};
     throw new Error(detail.message || detail.code || `HTTP ${resp.status}`);
   }
+  markUnlocked();
   return body;
 }
 
@@ -469,6 +499,40 @@ function card(robot, index) {
 function render() {
   const roster = el("roster");
   roster.replaceChildren(...view.robots.map(card));
+  
+  // ADR-1000: Populate Queues
+  const warnList = el("warning-list");
+  const critList = el("critical-list");
+  warnList.innerHTML = "";
+  critList.innerHTML = "";
+  
+  let warningCount = 0;
+  let criticalCount = 0;
+  
+  for (const r of view.robots) {
+    if (!r.state) continue;
+    if (r.state.hitl_requested) {
+      const li = document.createElement("li");
+      li.innerHTML = `<b>${r.robot_id}</b>: 개입 필요`;
+      const btn = document.createElement("button");
+      btn.textContent = "조종 (WebRTC)";
+      btn.onclick = () => alert(`${r.robot_id} 원격 조종 연결됨 (Mock)`);
+      li.appendChild(btn);
+      critList.appendChild(li);
+      criticalCount++;
+    } else if (r.state.capabilities_degraded && r.state.capabilities_degraded.length > 0) {
+      const li = document.createElement("li");
+      li.innerHTML = `<b>${r.robot_id}</b>: 성능 저하 [${r.state.capabilities_degraded.join(", ")}]`;
+      warnList.appendChild(li);
+      warningCount++;
+    }
+  }
+
+  // ADR-1000 & UX Law 1: Hide empty queues to prevent alarm colors in normal state
+  warnList.parentElement.style.display = warningCount > 0 ? "block" : "none";
+  critList.parentElement.style.display = criticalCount > 0 ? "block" : "none";
+  document.querySelector(".queues-panel").style.display = (warningCount + criticalCount) > 0 ? "block" : "none";
+
   fillLeaders();
   drawOverlay();
   const hint = el("hint");
@@ -661,6 +725,23 @@ el("formation-stop").addEventListener("click", () =>
 function tickClock() {
   el("clock").textContent = new Date().toTimeString().slice(0, 8);
 }
+
+// 토큰 입력 — Enter 와 버튼 모두 저장한다 (form 이 아니라 keydown 이다).
+el("console-token").value = auth.token;
+function saveToken() {
+  auth.token = el("console-token").value.trim();
+  if (auth.token) {
+    sessionStorage.setItem("rosy-console-token", auth.token);
+  } else {
+    sessionStorage.removeItem("rosy-console-token");
+  }
+  refreshState();
+  refreshFormation();
+}
+el("token-save").addEventListener("click", saveToken);
+el("console-token").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") saveToken();
+});
 
 view.colors = [css("--robot-1"), css("--robot-2"), css("--robot-3")];
 tickClock();
