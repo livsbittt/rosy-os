@@ -1277,8 +1277,6 @@
 
 ## 2026-09-22 · uncommitted · feat(fleet): Implement Pinky-to-Fleet WebSocket communication path
 
-- feat(fleet): Implement Pinky-to-Fleet WebSocket communication path (Task 7)
-  - Extended HelloPayload with device_uid, model, hardware_serial
-  - Created fleet hub --listen WebSocket server wrapper around SiteHub
-  - Implemented FleetAgent outbound connection, exponential backoff, and event buffering
-  - Fed Hub registry snapshots into FleetConsole
+- 변경: Fleet 통신 기능(Hub Listen 경로) 구현 (Task 7). schemas.py의 HelloPayload 확장, fleet hub --listen WebSocket 서버 구축, FleetAgent 아웃바운드 연결 및 이벤트 버퍼링 추가, FleetConsole에 Hub Snapshot 연동.
+- 증거: test_hub_server.py, test_fleet_agent.py, test_fleet_enrollment_contracts.py 통과.
+- gate 변화: 없음

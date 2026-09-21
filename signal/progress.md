@@ -20,14 +20,15 @@ gates:
     blocker: "ESP32 Arduino 펌웨어 빌드·플래시 증거 없음. 이 호스트에는 ESP32 toolchain이 없어 실행하지 않았다"
   DEVICE:
     state: HOLD
-    blocker: "물리 벤치(G-S1) 미실행: 신호등 제품 미확정(전압/배선/소비전류), 릴레이 모듈 3.3V 트리거 실측, 부팅 글리치로 접점 닫힘 여부 실측 없음"
+    blocker: "물리 벤치(G-S1) 미실행 — 수용 기준·절차는 docs/plans/2026-09-22-signals-acceptance-plan.md 로 고정했다. 최초 관문은 B0 신호등 입고 특성화(전압/배선/색당 전류), 이후 B2 부팅 글리치 10회(AC-02), B3 침묵→점멸 12 s(AC-11), B4 공유기 재시작 자기 복귀(AC-12, W1 위험)"
   FIELD:
     state: PARKED
-adrs: []
+adrs: [D-163]
 plans:
   - docs/plans/2026-09-21-traffic-light-controller-research.md
   - docs/plans/2026-09-21-fleet-signals-integration-design.md
   - docs/plans/2026-09-22-fleet-signals-integration.md
+  - docs/plans/2026-09-22-signals-acceptance-plan.md
 ---
 ## 지금 상태
 
