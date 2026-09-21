@@ -1,0 +1,28 @@
+[WARN] [1790013878.162885939] [rcl]: ROS_LOCALHOST_ONLY is deprecated but still honored if it is enabled. Use ROS_AUTOMATIC_DISCOVERY_RANGE and ROS_STATIC_PEERS instead.
+[WARN] [1790013878.162959155] [rcl]: 'localhost_only' is enabled, 'automatic_discovery_range' and 'static_peers' will be ignored.
+{
+ "total_received": 85,
+ "first_frame_index_per_context": {
+  "generic": 0,
+  "lane_follow": 2,
+  "stop_line": 7,
+  "crosswalk": 37
+ },
+ "profile_revisions": {
+  "generic": "ctx-generic-v1",
+  "lane_follow": "ctx-lane-v1",
+  "stop_line": "ctx-stop-v1",
+  "crosswalk": "ctx-crosswalk-v1"
+ },
+ "checks": {
+  "received_ge_30": true,
+  "context_key_always_present": true,
+  "saw_lane_follow": true,
+  "saw_stop_line": true,
+  "saw_crosswalk": true,
+  "transitions_ordered": true,
+  "revisions_bound": true
+ }
+}
+VERDICT: PASS
+terminate called without an active exception

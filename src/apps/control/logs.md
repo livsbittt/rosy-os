@@ -163,3 +163,11 @@
 - 증거: `python -m pytest test -q` 1179 passed, 28 skipped (2026-09-22 Windows, 패키지 cwd). road/scene 관련 집중 시험 68 passed.
 - gate 변화: 없음. SOURCE/LOCAL GO 유지, LOCAL evidence 문자열 갱신. CORE 수용(T5)과 ROS-SIM은 core 모듈 게이트다.
 - 결정: context 전환은 검출 파라미터만 바꾼다 — 노드는 motion topic을 여전히 발행하지 않는다(wiring 시험 유지).
+
+## 2026-09-22 · uncommitted · test(control): D-162 노드 그래프 ROS-SIM PASS (scene context 슬라이스)
+
+- 변경: 없음(검증과 기록만). WSL2 Jazzy에서 control 패키지를 빌드하고 `road_observer_node`를 `scene_context_enabled:=true`로 기동, 합성 카메라 3페이스(lane→lane+stop line→lane+crosswalk, 10 Hz)를 발행하며 `/road/observation` 110건을 수집했다.
+- 증거: `docs/validation/scene-context-control-node-2026-09-22/` — generic→lane_follow→stop_line→crosswalk 순서 전환, 리비전 결합(ctx-*-v1), payload `context` 필드 상시 존재, 그래프 내 twist 토픽 0, `/road/observation` publisher 1. VERDICT PASS(7/7).
+- gate 변화: ROS-SIM HOLD 유지(전체 그래프+물리 센서는 여전히 미검증) — blocker에 D-162 슬라이스 통과를 명시.
+- 결정: 합성 crosswalk 신뢰도가 0.5 근처라 프로브 파라미터는 `scene_context_min_confidence:=0.4`를 썼다. 운영 기본값(0.5) 변경이 아니라 시험 하네스 파라미터다.
+- 교훈: 소스 문자열 검사(wiring 시험)는 "파라미터가 있다"만 증명한다. 실제 전환이 그래프에서 일어나는지는 20줄짜리 합성 퍼블리셔로도 증명된다 — 노드 레벨 ROS-SIM은 가볍게라도 돌릴 만하다.

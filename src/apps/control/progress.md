@@ -14,7 +14,7 @@ gates:
     cmd: "cd src/apps/control && python -m pytest test -q"
   ROS-SIM:
     state: HOLD
-    blocker: "정확한 v2 mapping/CORE/Fleet 슬라이스는 2026-09-21 GO(52/52, 접근 가능 unknown 0%, 충돌 없음). 그러나 Control 전체 gate에는 sensing/camera/calibration/planning/safety-policy 노드 그래프 재실행과 물리 센서가 남아 있다. 레거시 전체 스택은 CORE와 병행 기동하지 않는다(D-38)."
+    blocker: "정확한 v2 mapping/CORE/Fleet 슬라이스는 2026-09-21 GO(52/52, 접근 가능 unknown 0%, 충돌 없음). 그러나 Control 전체 gate에는 sensing/camera/calibration/planning/safety-policy 노드 그래프 재실행과 물리 센서가 남아 있다. 레거시 전체 스택은 CORE와 병행 기동하지 않는다(D-38). 단, D-162 슬라이스(road_observer_node+scene context)는 2026-09-22 노드 그래프 검증을 통과했다(docs/validation/scene-context-control-node-2026-09-22)."
   ARTIFACT:
     state: HOLD
     blocker: "서명된 ARM64 manifest·immutable digest 발행 전. 흡수된 코드는 deploy가 소유하는 OS 이미지에 번들된다"
@@ -70,6 +70,7 @@ plans:
 ## 2026-09-22 scene context status
 
 - D-162(Proposed): 학습된 장면은 설정이지 권한이 아니다. `sensing/scene_context.py`(프로파일/스토어/매처)와 `road_observer_node` wiring(T3)이 착지했다. 비활성이 기본이며, 활성 시 payload에 additive `context` 필드를 실고 보정 명령 시 matcher 세션을 폐기한다. CORE 수용(T5)은 `core` 모듈 게이트 참조.
+- **2026-09-22 노드 그래프 검증 PASS**: WSL2 Jazzy에서 road_observer_node를 scene_context_enabled로 기동, 합성 카메라 3페이스에서 generic→lane_follow→stop_line→crosswalk 순서 전환·리비전 결합·twist 토픽 0을 확인했다(docs/validation/scene-context-control-node-2026-09-22). D-162 슬라이스의 ROS-SIM 증거는 담겼고, 전체 그래프·물리 센서는 기존 HOLD 유지다.
 - context는 인지 파라미터만 바꾼다. 정지·명령 결정은 여전히 LiDAR/IR 메트릭과 CORE가 소유하며(D-137/D-151), 프로파일 값 튜닝은 DEVICE gate 전까지 제네릭과 동일하게 둔다.
 - LOCAL: `1179 passed, 28 skipped` (2026-09-22).
 
