@@ -16,13 +16,13 @@ gates:
     state: N/A
   ARTIFACT:
     state: HOLD
-    blocker: "native ARM64 unsigned payload와 local import 검증은 완료; 승인된 offline Ed25519 서명·publication 검증 bundle 발행 전"
+    blocker: "Ubuntu 24.04.5 raspi base URL/SHA는 고정했으나 native ARM64 host 다운로드 검증, native Jazzy/ROSY payload 실행, 완성 이미지·SBOM·서명 전"
   DEVICE:
     state: HOLD
-    blocker: "Pi OS Lite bench Device의 install-pi.sh 설치, verify-pi.sh, device-readback.sh --json 증거 없음"
+    blocker: "Ubuntu native product image의 SD write/readback, Pi 5 boot, ROS graph, 장치 ACL, deadman 실기 증거 없음"
   FIELD:
     state: N/A
-adrs: [D-22, D-26, D-30, D-33, D-36, D-46, D-53, D-124, D-144, D-145, D-146]
+adrs: [D-22, D-26, D-30, D-33, D-36, D-46, D-53, D-124, D-144, D-145, D-146, D-161]
 plans:
   - docs/plans/2026-09-01-rosy-os-v1-image-release-design.md
   - docs/plans/2026-09-08-release-delivery-design.md
@@ -37,10 +37,14 @@ plans:
   - docs/plans/2026-09-21-hardware-mapping-g5.md
   - docs/plans/2026-09-21-unsigned-handoff-import-design.md
   - docs/plans/2026-09-21-unsigned-handoff-import.md
+  - docs/plans/2026-09-21-ubuntu-native-ros-runtime-design.md
+  - docs/plans/2026-09-21-ubuntu-native-ros-runtime.md
 ---
 ## 지금 상태
 
-- Compose 기준선은 `core`/`motor`/`hardware` 프로필이다. vision·arm 프로필은 해당 Device 증거 전까지 추가하지 않는다.
+- D-161 제품 기준선은 Ubuntu Server 24.04 arm64 + native ROS 2 Jazzy다.
+  `rosy-runtime.target`은 CORE만 기본 시작하고 I/O/navigation은 승인 후 명시적으로 시작한다.
+  Compose는 개발·CI 호환 경로일 뿐 제품 이미지 의존성이 아니다.
 - Device readback은 identity, activation/manifest digest, 서명 상태, core health, `cmd_vel` publisher 수를 secret 없는 JSON으로 수집하고 불일치 시 `device_runtime=HOLD`다.
 - Pinky 커미셔닝 세션은 G0-G5 순서를 강제한다. G0-G2는 서명 stage/manifest,
   install/readback 원문에서 유도하며 G3-G5는 물리 측정 전 템플릿 상태로는 통과하지 않는다.
@@ -52,12 +56,14 @@ plans:
 
 ## 다음 gate
 
-1. 검증된 unsigned handoff를 승인된 offline signer로 옮겨 Ed25519 서명·publication 검증하고 matching public key와 immutable bundle을 발행한다(ARTIFACT).
-2. [첫 장치 런북](../docs/deployment/pinky-pro-first-device-runbook.md)의 G0-G5를
-   SSH 또는 console에서 실행하고 session/raw evidence를 보존한다(DEVICE).
+1. native ARM64 Ubuntu 24.04 host에서 고정 base image를 내려받아 SHA-256을 확인하고 native ROSY payload를 실제 빌드한다(ARTIFACT).
+2. native release activation/rollback과 Ubuntu first-boot 개인화를 연결하고 완성 이미지의 SBOM·서명을 검증한다(ARTIFACT).
+3. [첫 장치 런북](../docs/deployment/pinky-pro-first-device-runbook.md)의 G0-G5를
+   Ubuntu SD에서 실행하고 session/raw evidence를 보존한다(DEVICE).
 
 ## 현재 유효한 금지사항
 
-- `rosy_core` 안에 `nmcli`, `reboot`, compose 제어를 넣지 않는다. 호스트 권한은 Host Agent만 가진다(D-22).
+- CORE 안에 `nmcli`, `reboot`, systemd/compose 제어를 넣지 않는다. 호스트 권한은 Host Agent만 가진다(D-161).
+- D-161 제품 이미지에 Docker/Compose를 설치하거나 제품 boot dependency로 두지 않는다.
 - release 이미지는 x86 QEMU 결과로 발행하지 않는다.
 - 로봇 identity에 기본값을 두지 않는다(D-33).

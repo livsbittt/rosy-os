@@ -20,6 +20,7 @@
 | D-144 | 하드웨어 맵 생성은 runtime mode가 아니라 검증된 navigation backend다 |
 | D-145 | 네이티브 ARM64 빌드는 unsigned artifact까지만 자동화한다 |
 | D-146 | unsigned ARM64 handoff는 검증 후에만 오프라인 서명 입력이 된다 |
+| D-161 | Ubuntu Server 24.04 + ROS 2 Jazzy 네이티브 제품 런타임으로 즉시 전환 |
 
 ## 계획·결과 문서
 
@@ -34,6 +35,8 @@
 - [2026-09-21-pinky-connection-evidence-design.md](../docs/plans/2026-09-21-pinky-connection-evidence-design.md)
 - [2026-09-21-pinky-connection-evidence.md](../docs/plans/2026-09-21-pinky-connection-evidence.md)
 - [2026-09-21-pinky-device-commissioning-design.md](../docs/plans/2026-09-21-pinky-device-commissioning-design.md)
+- [2026-09-21-ubuntu-native-ros-runtime-design.md](../docs/plans/2026-09-21-ubuntu-native-ros-runtime-design.md)
+- [2026-09-21-ubuntu-native-ros-runtime.md](../docs/plans/2026-09-21-ubuntu-native-ros-runtime.md)
 - [2026-09-21-unsigned-handoff-import-design.md](../docs/plans/2026-09-21-unsigned-handoff-import-design.md)
 - [2026-09-21-unsigned-handoff-import.md](../docs/plans/2026-09-21-unsigned-handoff-import.md)
 
@@ -47,8 +50,8 @@
 
 ## 최근 기록
 
+- 2026-09-22 · uncommitted · feat(runtime): begin D-161 Ubuntu-native transition
 - 2026-09-21 · 5dd076c · feat(robot): vendor stock image read-only baseline capture (pre-G0)
 - 2026-09-21 · uncommitted · test(deploy): core launches never reference the control stack (D-149)
 - 2026-09-21 · uncommitted · test(deploy): keep control debug ports out of deploy configs (D-150)
 - 2026-09-21 · uncommitted · feat(release): verify unsigned ARM64 handoffs (D-146)
-- 2026-09-21 · uncommitted · feat(release): export native ARM64 unsigned payloads (D-145)

@@ -40,6 +40,11 @@ RELEASE_ROOT="$(cd "$RELEASE_ROOT" && pwd -P)"
 INSTALL_ROOT="$RELEASE_ROOT/install"
 INVENTORY="$RELEASE_ROOT/rosy-packages.txt"
 DEB_INVENTORY="$RELEASE_ROOT/deb-packages.txt"
+NATIVE_RUNTIME_SOURCE="$WORKSPACE/deploy/robot/native"
+[[ -d "$NATIVE_RUNTIME_SOURCE" ]] \
+    || fail "native runtime support is missing: deploy/robot/native"
+[[ ! -e "$RELEASE_ROOT/deploy/robot/native" ]] \
+    || fail "release root already contains native runtime support"
 
 # shellcheck disable=SC1091
 source /opt/ros/jazzy/setup.bash
@@ -58,6 +63,8 @@ dpkg-query -W -f='${Package}\t${Version}\n' | LC_ALL=C sort > "$DEB_INVENTORY.tm
 mv -f -- "$DEB_INVENTORY.tmp" "$DEB_INVENTORY"
 printf '%s\n' "$SOURCE_REVISION" > "$RELEASE_ROOT/source-revision.txt"
 cp "$SCRIPT_DIR/required-ros-packages.txt" "$RELEASE_ROOT/required-ros-packages.txt"
+mkdir -p "$RELEASE_ROOT/deploy/robot"
+cp -a "$NATIVE_RUNTIME_SOURCE" "$RELEASE_ROOT/deploy/robot/native"
 
 # shellcheck disable=SC1090
 source "$INSTALL_ROOT/setup.bash"

@@ -1,11 +1,14 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-15 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-22 -->
 
 # deploy
 
 ## Purpose
 
-Robot-host delivery: build a signed ROSY OS image, store/activate releases, and run CORE/motor/IO as Docker Compose services on Raspberry Pi 5. Host privilege (network, reboot, release activate) lives in Host Agent, never in `core` (D-22).
+Robot-host delivery: build a signed Ubuntu Server 24.04 arm64 ROSY OS image,
+store/activate native ROS 2 Jazzy releases, and run CORE/I/O under least-privilege
+systemd services on Raspberry Pi 5 (D-161). Host privilege stays in Host Agent,
+never in CORE. Docker Compose is development/CI-only.
 
 ## Key Files
 
@@ -23,7 +26,7 @@ Three sibling pipelines below; at this level only the harness records.
 |-----------|---------|
 | `image/` | Native aarch64 image build + input/artifact verification (see `image/AGENTS.md`) |
 | `release/` | Manifest, signing, storage, updater, Host Agent (see `release/AGENTS.md`) |
-| `robot/` | Dockerfile, compose, systemd, Pi install/verify scripts (see `robot/AGENTS.md`) |
+| `robot/` | Native product systemd runtime plus development-only Docker/Compose compatibility tools (see `robot/AGENTS.md`) |
 
 ## For AI Agents
 
@@ -31,7 +34,8 @@ Three sibling pipelines below; at this level only the harness records.
 
 - Harness (D-61 Proposed): read `progress.md` and `index.md` first. After a change, append `logs.md`, overwrite `progress.md` if a gate moved, then run `python tools/harness/rosy_harness.py generate` from the repo root.
 - CORE is internet-facing and unprivileged. Do not add `nmcli`, `reboot`, or docker-compose control inside `core`.
-- Compose services: `rosy-core` (always), `rosy-motor` (profile `motor`), hardware/LiDAR (profile `hardware`). `runtime-mode.sh` modes are `core` | `motor` | `hardware`.
+- Product runtime: `robot/native/rosy-runtime.target` starts CORE only. I/O and navigation are explicit, mutually exclusive hardware modes.
+- Compose services remain test/development compatibility only; do not install Docker in a D-161 product image.
 - Release images must be built on native arm64, not x86 QEMU (`deploy/image/build-image.sh`).
 - `test/` at repo root is the contract suite for this tree; `test/conftest.py` puts `deploy/release` on `sys.path`.
 
@@ -46,18 +50,20 @@ python3 -m pytest test/ -v
 
 ### Common Patterns
 
-- Read-only containers, `cap_drop: ALL`, `no-new-privileges`, host network, CycloneDDS.
+- Native units use separate `rosy-core`/`rosy-io` users, closed device policy,
+  `no-new-privileges`, hardened filesystems and CycloneDDS.
 - Secrets and Wi-Fi credentials stay on the host (`/etc/rosy`), not in the image.
 
 ## Dependencies
 
 ### Internal
 
-- Image/Dockerfile build context is the repo root (`src/` packages).
+- Native payload build context is the repo root (`src/` packages).
 - Contract: `docs/reference/rosy-host-agent-contract.md`
 
 ### External
 
-- Docker Compose, systemd, OpenSSL 3 (Ed25519), Raspberry Pi OS Lite 64-bit
+- systemd, OpenSSL 3 (Ed25519), Ubuntu Server 24.04 arm64, ROS 2 Jazzy.
+  Docker Compose is optional development/CI tooling.
 
 <!-- MANUAL: -->

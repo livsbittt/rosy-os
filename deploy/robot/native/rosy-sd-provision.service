@@ -1,0 +1,13 @@
+[Unit]
+Description=ROSY device personalization completion gate
+AssertPathExists=/var/lib/rosy/provisioning/complete.json
+Before=rosy-core.service rosy-runtime.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/test -s /var/lib/rosy/provisioning/complete.json
+RemainAfterExit=yes
+NoNewPrivileges=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true

@@ -5,14 +5,18 @@
 
 ## Purpose
 
-On-device runtime: multi-stage Dockerfile (`core` / `io` targets), Compose `rosy-runtime`, systemd units, Pi install and Windows deploy/verify scripts. `rosy-core` is FastAPI/rclpy only; motors and LiDAR are separate services (D-22). Slice catalog (`config/board.yaml`): **CORE required**; motor/io/nav install as existing modes; vision/omx/ai are catalog-only and stay dark.
+On-device runtime for Ubuntu Server 24.04 arm64 + native ROS 2 Jazzy (D-161).
+Product services live under `native/`: CORE starts by default without device access;
+I/O and navigation are explicit hardware modes. Dockerfile/Compose remain only for
+development and CI compatibility and are not installed in the product image.
 
 ## Key Files
 
 | File | Description |
 |------|-------------|
-| `Dockerfile` | Multi-stage: `core` image vs `rosy-io` |
-| `compose.yaml` | `rosy-core` (always), `rosy-motor` (profile `motor`), hardware/LiDAR/Nav2 (profile `hardware`); host network, read-only, cap_drop ALL |
+| `native/` | Product systemd target/services, non-secret environment template, provisioning gate and readiness probe |
+| `Dockerfile` | Development/CI-only legacy container build |
+| `compose.yaml` | Development/CI-only legacy slice runner; never a product-image dependency |
 | `runtime-mode.sh` | Modes: `core` \| `motor` \| `hardware` (not `io`); hardware selects `ROSY_NAVIGATION_BACKEND=localization|slam` |
 | `entrypoint.sh` | Container entry |
 | `install-pi.sh` | First-boot install on Pi. `--preset` (mode/alias) or `--slices` (must match a preset, include `core`); both map to `ROSY_RUNTIME_MODE`. vision/omx/ai: not installable yet |
@@ -24,7 +28,7 @@ On-device runtime: multi-stage Dockerfile (`core` / `io` targets), Compose `rosy
 | `capture-vendor-baseline.sh` | Pre-G0 vendor stock image (card A) passive, secret-redacted evidence capture; closes upstream research UNKNOWNs and gives G0–G5 reference values. Contract pinned + mutation-proven by `test/test_capture_vendor_baseline.py`; I2C probing is opt-in and raw output requires review before repository admission |
 | `commission-pinky.py` / `commissioning_session.py` | Ordered G0-G5 evidence recorder; G5 binds MCAP telemetry and generated map hashes; operator procedure is `docs/deployment/pinky-pro-first-device-runbook.md` |
 | `measure-dds-baseline.sh` | Phase 0 DDS baseline (D-34). Requires `hardware` mode; records each topic's pre-attach subscriber count because attaching `ros2 topic bw` creates the traffic it measures |
-| `rosy-runtime.service` | systemd unit for compose runtime |
+| `rosy-runtime.service` | Legacy Compose unit retained for development compatibility; product images enable `native/rosy-runtime.target` |
 | `rosy-lowbatt-shutdown.service` / `.path` / `.sh` | D-27: host watches CORE sentinel file and halts |
 | `rosy-release-recover.service` / `release-recover.sh` | Failed-release recovery |
 | `requirements-core.txt` / `requirements-io.txt` | pip constraints per image |
@@ -35,12 +39,15 @@ On-device runtime: multi-stage Dockerfile (`core` / `io` targets), Compose `rosy
 | Directory | Purpose |
 |-----------|---------|
 | `config/` | Pi 5 lite profile, capabilities, example rosy.yaml (see `config/AGENTS.md`) |
+| `native/` | D-161 native systemd product runtime (see `native/AGENTS.md`) |
 
 ## For AI Agents
 
 ### Working In This Directory
 
 - Healthcheck: `GET http://127.0.0.1:8080/api/v1`.
+- D-161 product paths must not call Docker or Compose. Do not wire the legacy
+  `rosy-runtime.service` into a product image.
 - CORE is the only required slice. vision/omx/ai are catalogued with `enabled: false` and no compose service; do not start them.
 - `rosy-core` has **no** `/dev` devices and no Docker socket. Do not add them.
 - Host proc/sys bind-mounts are read-only for dashboard telemetry (`ROSY_HOST_ROOT=/host`).
@@ -58,12 +65,14 @@ D-144 keeps mapping orthogonal to the runtime slice: `slam` is valid only in
 the maps mount writable. Localization keeps the maps mount read-only.
 
 ```bash
-python3 -m pytest test/test_robot_runtime.py test/test_release_boundary_guards.py -v
+python3 -m pytest test/test_native_systemd_contract.py test/test_robot_runtime.py test/test_release_boundary_guards.py -v
 ```
 
 ### Common Patterns
 
-Compose YAML anchors `x-ros-environment` and `x-runtime-defaults`. Namespace `__ns:=/${ROSY_NAMESPACE}`.
+Native services source `/opt/ros/jazzy/setup.bash` and
+`/opt/rosy/current/install/setup.bash`. Namespace remains
+`__ns:=/${ROSY_NAMESPACE}`. Compose YAML anchors apply only to development/CI.
 
 ## Dependencies
 
@@ -74,6 +83,6 @@ Compose YAML anchors `x-ros-environment` and `x-runtime-defaults`. Namespace `__
 
 ### External
 
-- Docker Compose, systemd, Raspberry Pi OS
+- systemd, Ubuntu Server 24.04 arm64, native ROS 2 Jazzy. Docker Compose is optional development/CI tooling.
 
 <!-- MANUAL: -->

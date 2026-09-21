@@ -1,0 +1,9 @@
+[Unit]
+Description=ROSY native product runtime (CORE-only default)
+Requires=rosy-release-recover.service rosy-sd-provision.service
+Requires=rosy-core.service
+After=rosy-release-recover.service rosy-sd-provision.service rosy-core.service
+AllowIsolate=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -105,3 +105,16 @@
 - gate 변화: 없음 — 캡처 결과는 pre-G0 참조 평가이며 어떤 gate도 GO로 만들지 않는다. ARTIFACT·DEVICE는 HOLD 유지.
 - 결정: 카드 A(vendor 원본 보존) + 카드 B(Rosy OS) 2장 운용을 G0–G5 절차에 명시한다. 캡처 결과는 비밀정보 검토와 scanner 통과 후 필요한 증거만 docs/validation/vendor-baseline-<date>/에 착지한다.
 - 교훈: 조사 문서의 UNKNOWN은 실물에서 읽을 수 있는 항목과 그렇지 않은 항목을 갈라 둬야 한다 — 읽기 가능 항목은 절차와 가드로 고정하면 실기 세션 비용이 줄어든다.
+
+## 2026-09-22 · uncommitted · feat(runtime): begin D-161 Ubuntu-native transition
+
+- 변경: Canonical Ubuntu 24.04.5 Raspberry Pi arm64 base URL/SHA-256을 lock에
+  고정하고 fail-closed fetch/cache 검증기를 추가했다. native ARM64-only ROSY
+  colcon payload builder, 결정적 deb/ROS package inventory와 `ros2 pkg prefix`
+  verifier를 추가했다. 제품 runtime은 별도 `rosy-core`/`rosy-io` systemd 사용자,
+  closed device policy, CORE-only default target, provisioning/approval gate로 구성했다.
+- 증거: fetch 변조/크기/HTTPS/offline cache 계약, payload inventory 계약,
+  native systemd 계약과 Ubuntu 24.04 `systemd-analyze verify`를 실행한다. 실제
+  ARM64 build와 Pi 실행은 아직 수행하지 않았다.
+- gate 변화: SOURCE 계약만 갱신. ARTIFACT, DEVICE, FLEET은 계속 HOLD다.
+- 결정: D-161. Docker/Compose는 개발·CI 전용이며 제품 runtime 의존성이 아니다.

@@ -55,6 +55,7 @@ def test_native_builder_is_arm64_only_and_builds_a_merged_offline_install():
         "rosdep install", "--from-paths", "--ignore-src",
         "colcon build", "--merge-install", "--install-base",
         "dpkg-query", "LC_ALL=C sort", "verify-package-inventory.sh",
+        "deploy/robot/native",
     ):
         assert fragment in script
     assert "curl" not in script and "wget" not in script

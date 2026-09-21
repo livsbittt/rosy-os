@@ -1,0 +1,40 @@
+[Unit]
+Description=ROSY native CORE runtime
+Requires=rosy-release-recover.service rosy-sd-provision.service
+After=network-online.target rosy-release-recover.service rosy-sd-provision.service
+Wants=network-online.target
+PartOf=rosy-runtime.target
+
+[Service]
+Type=simple
+User=rosy-core
+Group=rosy-core
+EnvironmentFile=/etc/rosy/runtime.env
+WorkingDirectory=/opt/rosy/current
+ExecStart=/usr/bin/bash -lc 'source /opt/ros/jazzy/setup.bash && source /opt/rosy/current/install/setup.bash && exec ros2 run core core --ros-args -r __ns:=/${ROSY_NAMESPACE}'
+ExecStartPost=/usr/bin/python3 /opt/rosy/current/deploy/robot/native/wait-core-ready.py
+Restart=on-failure
+RestartSec=2
+TimeoutStartSec=60
+TimeoutStopSec=15
+KillSignal=SIGINT
+StateDirectory=rosy
+RuntimeDirectory=rosy
+UMask=0027
+
+NoNewPrivileges=true
+PrivateDevices=true
+DevicePolicy=closed
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+ReadWritePaths=/var/lib/rosy /run/rosy
+
+[Install]
+WantedBy=rosy-runtime.target
