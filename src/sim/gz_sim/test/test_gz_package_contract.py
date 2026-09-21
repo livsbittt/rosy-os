@@ -21,6 +21,25 @@ def test_package_and_multi_robot_launch_exist():
     assert "config" in cmake
 
 
+def test_single_robot_launch_declares_description_runtime_dependency():
+    """The installed launch must bring every package it resolves at runtime."""
+    package = (ROOT / "package.xml").read_text(encoding="utf-8")
+    launch = (ROOT / "launch" / "launch_sim.launch.xml").read_text(
+        encoding="utf-8")
+
+    assert "$(find-pkg-share description)" in launch
+    assert "<exec_depend>description</exec_depend>" in package
+
+
+def test_single_robot_gazebo_gui_is_optional():
+    """Headless sensor validation must not require a Gazebo GUI process."""
+    launch = (ROOT / "launch" / "launch_sim.launch.xml").read_text(
+        encoding="utf-8")
+
+    assert '<arg name="gui" default="true"/>' in launch
+    assert 'if="$(var gui)"' in launch
+
+
 def test_gz_multi_uses_ros_gz_bridge_not_domain_bridge():
     """D-114: 시뮬은 네임스페이스 + ros_gz_bridge. domain_bridge / ROS_DOMAIN_ID 없음."""
     launch = (ROOT / "launch" / "gz_multi.launch.py").read_text(encoding="utf-8")

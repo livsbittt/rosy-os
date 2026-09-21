@@ -5,8 +5,9 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, LogInfo
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo
 from launch.launch_description_sources import AnyLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
@@ -27,6 +28,7 @@ def generate_launch_description():
             "world": world,
             "bridge_image": "true",
             "cam_tilt_deg": "25",
+            "gui": LaunchConfiguration("gazebo_gui"),
         }.items(),
     )
     simulation_camera = {
@@ -35,6 +37,7 @@ def generate_launch_description():
     }
 
     return LaunchDescription([
+        DeclareLaunchArgument("gazebo_gui", default_value="false"),
         simulation,
         Node(
             package="control",
