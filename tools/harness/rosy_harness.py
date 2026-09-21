@@ -273,8 +273,11 @@ class AdrLog:
     duplicates: tuple[str, ...] = ()
 
 
-def parse_adr_log(text: str) -> AdrLog:
+def parse_adr_log(text: str, adr_dir: Path | None = None) -> AdrLog:
     text = _normalize(text)
+    if adr_dir and adr_dir.is_dir():
+        for p in adr_dir.glob("*.md"):
+            text += "\n\n" + _normalize(p.read_text(encoding="utf-8"))
     first_body = ADR_BODY_HEADING.search(text)
     index_text = text[: first_body.start()] if first_body else text
     index = {m.group(1): (m.group(2).strip(), m.group(3).strip()) for m in ADR_INDEX_ROW.finditer(index_text)}
@@ -453,7 +456,7 @@ def render_brief(repo: Path) -> str:
 def generated_targets(repo: Path) -> dict[Path, str]:
     config = load_config(repo)
     adr_path = repo / config["adr_log"]
-    adr = parse_adr_log(adr_path.read_text(encoding="utf-8"))
+    adr = parse_adr_log(adr_path.read_text(encoding="utf-8"), repo / "docs" / "adr")
     targets = {
         repo / m["path"] / "index.md": render_module_index(repo, m, adr, adr_path) for m in config["modules"]
     }
@@ -536,7 +539,7 @@ def lint(repo: Path) -> tuple[list[str], list[str]]:
     warnings: list[str] = []
 
     adr_text = (repo / config["adr_log"]).read_text(encoding="utf-8")
-    adr = parse_adr_log(adr_text)
+    adr = parse_adr_log(adr_text, repo / "docs" / "adr")
     errors += [f"ADR log: {e}" for e in validate_adr_log(adr, config.get("adr_gaps") or {})]
     governed = [(config["adr_log"], adr_text)]
     for module in config["modules"]:

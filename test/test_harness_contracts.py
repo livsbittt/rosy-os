@@ -259,7 +259,7 @@ def config() -> dict:
 
 @pytest.fixture(scope="module")
 def adr_log(config):
-    return harness.parse_adr_log((ROOT / config["adr_log"]).read_text(encoding="utf-8"))
+    return harness.parse_adr_log((ROOT / config["adr_log"]).read_text(encoding="utf-8"), ROOT / "docs" / "adr")
 
 
 def test_config_names_existing_modules(config):
