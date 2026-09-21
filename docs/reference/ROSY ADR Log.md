@@ -4835,7 +4835,7 @@ release/revision/key ID, 17개 payload hash, CORE/IO `linux/arm64`를 확인하�
 
 **Decision:**
 
-1. **fleet이 벤치용 공개면 `fleet.bench`를 소유한다.** Formation/slot_world_position/load_robots/FormationSession/FormationSpec/SessionState/HttpRobotClient/RobotApiError를 재수출하는 단일 모듈이다.
+1. **fleet이 벤치용 공개면 `fleet.bench`를 소유한다.** `Formation`, `slot_world_position`, `load_robots`, `FormationSession`, `FormationSpec`, `SessionState`, `HttpRobotClient`, `RobotApiError`를 재수출하는 단일 모듈이다.
 2. **gz_sim은 `fleet.bench`만 import한다.** `fleet.swarm.*`/`fleet.formation.*` 직접 import 금지를 gz_sim 구조 테스트(`test_bench_boundary.py`)로 고정한다.
 3. **fleet 내부 재조정은 이 면의 시그니처만 지키면 된다.** 벤치가 쓰는 이름이 바뀌면 `fleet.bench`에서 별칭으로 흡수한다.
 
