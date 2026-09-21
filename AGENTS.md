@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-20 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-21 -->
 
 # ROSY
 
@@ -45,7 +45,7 @@ ROSY is a robot middleware and fleet-control platform (ROS 2 Jazzy, first hardwa
 - Config merge order: `src/core/core/config/rosy_default.yaml` → `~/.rosy/rosy.yaml` → `ROSY_CONFIG`.
 - Do not commit colcon `build/`, `install/`, `log/`, or `__pycache__/`.
 - Hardware profile is YAML. In-tree Pinky full spec is `src/core/core/config/profile.pinky_pro.yaml`. The robot advertises `deploy/robot/config/{profile,capabilities}.${ROSY_RUNTIME_MODE}.yaml` (`core` / `motor` / `hardware`).
-- Package names are grouped by domain: `src/{core,apps,hardware,navigation,sim,site}`. Do not reintroduce `rosy_*` or `pinky_*` package names. As of 2026-09-20, `.github/workflows/ci.yml` and the repo README still reference pre-regroup `rosy_*` paths and are pending realignment.
+- Package names are grouped by domain: `src/{core,apps,hardware,navigation,sim,site}` (D-147). Do not reintroduce `rosy_*` or `pinky_*` package names. ci.yml was realigned to the domain tree (verified 2026-09-21); the CORE launch file still carries its legacy filename `rosy_core.launch.py` — README matches that file name.
 - Dashboard is FastAPI static files under `core_api_web` (`src/core/core_api_web/core_api_web/web/`), not a Node server (D-23). D-7 (React+Vite) is not the current dashboard.
 
 ### Testing Requirements
@@ -67,7 +67,7 @@ python3 -m pytest test/ -v
 # CI also: flake8 (max 120), boot smoke without slam_toolbox
 ```
 
-CI (`.github/workflows/ci.yml`) on `main` / PRs: colcon build in `ros:jazzy-ros-base`, pytest, boot smoke, SaveMap type guard. Note: ci.yml still targets pre-regroup paths (`src/rosy_core/test`, `src/rosy_fleet/test`, `ros2 run rosy_core rosy_core`) and needs realignment to the domain tree.
+CI (`.github/workflows/ci.yml`) on `main` / PRs: colcon build in `ros:jazzy-ros-base`, pytest, boot smoke, SaveMap type guard — all on domain-tree paths. Note: the repository currently has no git remote, so CI events do not fire; treat CI-run verification as pending until a remote exists.
 
 ### Common Patterns
 

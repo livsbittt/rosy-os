@@ -36,7 +36,7 @@ Comments in `ci.yml` document why extra steps exist (root `test/` used to be ski
 
 ### Internal
 
-- Builds `src/`, tests the core package tests (`src/core/core/test` — ci.yml still names the legacy `src/rosy_core/test` path) and repo-root `test/`
+- Builds `src/`, tests the core package tests (`src/core/core/test`) and repo-root `test/`
 
 ### External
 

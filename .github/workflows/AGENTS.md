@@ -11,7 +11,7 @@ CI job definitions for this repository.
 
 | File | Description |
 |------|-------------|
-| `ci.yml` | `ci` workflow: colcon build, flake8 (max 120, non-gating), pytest `src/rosy_core/test`, `src/rosy_fleet/test`, `src/rosy_gz_sim/test`, repo `test/`, `rosy_core` boot smoke, slam_toolbox SaveMap type guard — still on pre-regroup `rosy_*` paths; pending realignment to the domain tree (executable is now `core`) |
+| `ci.yml` | `ci` workflow: colcon build (domain-tree paths), flake8 (max 120, non-gating), pytest `src/core/core/test`, `src/site/fleet/test`, `src/sim/gz_sim/test`, repo `test/`, `core` boot smoke, slam_toolbox SaveMap type guard. D-134 rehearsal workflows re-run the same procedure on other runners |
 | `build-arm64-payload.yml` | Manual native arm64 build of the unsigned core/io OCI payload; uploads a checksum-bound artifact for offline signing, never a release |
 
 ## Subdirectories
@@ -23,7 +23,7 @@ None.
 ### Working In This Directory
 
 - Triggers: push to `main`, all pull requests.
-- Boot smoke: `timeout 60 ros2 run rosy_core rosy_core`; must log `rosy_core up` **and** `slam_toolbox unavailable`. (Legacy names — the package/executable is now `core`; fix this step when ci.yml is realigned.)
+- Boot smoke: `timeout 60 ros2 run core core`; must log `core up` **and** `slam_toolbox unavailable`.
 - SaveMap guard unpacks the slam_toolbox deb and asserts `SaveMap.Request.name` is `std_msgs/String` and `RESULT_SUCCESS == 0`.
 - pip installs: flake8, pydantic, fastapi, uvicorn, httpx, websockets, pyyaml.
 - D-145: the ARM64 payload workflow must stay manual, native, read-only, and unsigned. Never add a private key or publication step to it.
@@ -40,7 +40,7 @@ Edit `ci.yml` only with a matching local command. Do not drop the root `test/` s
 
 ### Internal
 
-- `src/`, `src/core/core/test/` (legacy `src/rosy_core/test/`), `src/site/fleet/test/`, `src/sim/gz_sim/test/`, `test/`
+- `src/`, `src/core/core/test/`, `src/site/fleet/test/`, `src/sim/gz_sim/test/`, `test/`
 
 ### External
 

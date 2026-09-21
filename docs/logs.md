@@ -876,3 +876,16 @@
 - gate 변화: none. A successful workflow artifact will advance build evidence but ARTIFACT remains HOLD until offline Ed25519 signing and verification.
 - 결정: D-145.
 - 교훈: making the native build reproducible must not silently move the private signing key into an online runner.
+
+## 2026-09-21 · uncommitted · docs(adr): formalize domain regroup and boundary contracts (D-147..D-150)
+- 변경: ADR 로그에 D-147(src 도메인 그룹 소급 공식화), D-148(fleet.bench 공개면), D-149(control 단독 모드 최종 발행 계약, Proposed), D-150(web_node 디버그 서피스 잔류 + 맵 단일 홈) 추가, 색인 행 동반. ci.yml/AGENTS.md 문서 드리프트 정리는 D-147의 완료 조건으로 반영(ci.yml 자체는 2026-09-21 기준 이미 도메인 경로).
+- 증거: python -m pytest test/test_harness_contracts.py::test_repository_adr_log_is_contiguous_and_indexed test/test_network_topology_contracts.py::test_adr_index_lists_every_decision_section -q → 2 passed (2026-09-21 Windows).
+- gate 변화: 없음
+
+## 2026-09-21 · uncommitted · docs(api-ref): vision DetectionEvidence 지연 메타 (v1.11 additive)
+
+- 변경: API Ref §6.1.1 예시와 불릿에 `inference_ms`(선택, 추론 지연 ms) 추가, Version 헤더·이력표 v1.11. 같은 변경으로 스키마 진실 `core_common/protocol/detections.py`에 필드+검증기 추가 (D-18).
+- 증거: core `test_protocol_schemas.py` 1건(선택성·음수/NaN 거절·왕복) + control `test_detection_evidence.py` 동기 시험(model_dump == wire, 박스 규칙 양측 게이트 일치). core 972 passed·11 skipped.
+- gate 변화: none. 자문 전용 계약 변경 없음 — additive 필드뿐이다.
+- 결정: D-137, PRT-006 additive.
+- 교훈: 와이어 스키마가 이미 `detections.py` 서브모듈로 착지해 있으면 그 모듈이 진실이다 — 진실이 둘로 쪼개지기 전에 기존 착지물부터 찾는다.

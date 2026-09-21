@@ -154,6 +154,10 @@
 | D-144 | 하드웨어 맵 생성은 runtime mode가 아니라 검증된 navigation backend다 | Accepted |
 | D-145 | 네이티브 ARM64 빌드는 unsigned artifact까지만 자동화한다 | Accepted |
 | D-146 | unsigned ARM64 handoff는 검증 후에만 오프라인 서명 입력이 된다 | Accepted |
+| D-147 | src 패키지를 6개 도메인 그룹으로 재편한다 — 소급 공식화 | Accepted |
+| D-148 | 벤치는 fleet이 소유한 공개면(fleet.bench)만 소비한다 | Accepted |
+| D-149 | control 단독 모드의 최종 발행 토픽은 계약된 예외다 | Proposed |
+| D-150 | web_node는 control 디버그 서피스로 잔류하고 맵의 단일 홈은 navigation/map이다 | Accepted |
 
 ---
 
@@ -4797,3 +4801,92 @@ release/revision/key ID, 17개 payload hash, CORE/IO `linux/arm64`를 확인하�
 
 **References:** D-53, D-66, D-140, D-145,
 `import_unsigned_payload.py`, `pinky-pro-first-device-runbook.md`.
+
+---
+
+## D-147 src 패키지를 6개 도메인 그룹으로 재편한다 — 소급 공식화
+
+**Status:** Accepted (2026-09-21).
+
+**Context:** 2026-09 재그룹이 `src` 아래 평면 `rosy_*` 디렉터리를 6개 도메인 그룹으로 옮겼다. 그러나 그 결정은 D-16(개명)에 흡수된 채 "왜 도메인 그룹인가"는 AGENTS.md와 작업 로그에만 남아 있었다. CI 경로 정렬, "`rosy_*` 재도입 금지" 규칙, 그리고 결합도 평가(2026-09-19)의 판정 기준이 모두 기록 밖의 구조를 전제로 한다. 구조를 바꾼 결정은 결정 로그에 있어야 다음 재편이 이유 없이 일어나지 않는다.
+
+**Decision:**
+
+1. **그룹은 6개로 확정한다.** `src/core`(게이트웨이+계약), `src/apps`(CORE 위 애플리케이션), `src/hardware`(물리 장치), `src/navigation`(Nav2/SLAM), `src/sim`(시뮬레이션), `src/site`(현장/함대).
+2. **패키지 이름은 도메인 접두 없이 그대로 둔다.** `core_features`이지 `core_core_features`가 아니다. 도메인은 디렉터리가 말한다. `rosy_*`/`pinky_*` 패키지명 재도입 금지의 근거가 이 결정이다.
+3. **도메인 간 방향은 계약 소유 방향을 따른다.** `core_common`/`interfaces`가 공유 계약을 소유하고, apps/hardware/sim/site는 그 계약으로 core에 수렴한다. 반대 방향의 내부 import(예: sim → site 내부 모듈)는 공개면 경유나 계약 테스트로 정리한다(D-148).
+4. **CI·문서는 이 트리를 기준으로 정렬한다.** 재그룹 직후 남아 있던 `rosy_*` 경로 참조(ci.yml, AGENTS.md, README)는 이 결정의 완료 조건이지 독립 결정이 아니다. ci.yml은 2026-09-21 기준 이미 도메인 경로로 정렬돼 있다.
+
+**Alternatives:** 메타패키지 계층 도입 — colcon 빌드 복잡도만 추가되고 그룹이 이미 하는 일을 이중화한다. 패키지명에 도메인 접두 부활 — D-16 개명 비용을 다시 치르며 이름 길이만 늘린다.
+
+**Consequences:** 디렉터리 구조가 곧 의존 방향의 어휘가 된다. 패키지의 도메인 간 이동은 ADR 없이 금지다. 남은 문서 드리프트(AGENTS.md의 낡은 ci.yml 서술 등)는 이 ADR의 후속 수정 대상이다.
+
+**Validation / Transition:** 도메인 경로에서 colcon build + CI 통과. ADR 로그 계약 테스트(`test_repository_adr_log_is_contiguous_and_indexed`)가 새 항목 색인을 검증한다.
+
+**References:** D-16 (개명), D-18 (스키마 단일 소스), `module-coupling-report.md` (2026-09-19, 저장소 상위 폴더), 흡수/정리 실행 로그(`task_plan.md`).
+
+---
+
+## D-148 벤치는 fleet이 소유한 공개면(fleet.bench)만 소비한다
+
+**Status:** Accepted (2026-09-21).
+
+**Context:** `gz_sim/scripts/swarm_bench.py`가 `fleet.formation.geometry`와 `fleet.swarm.{robots,session,transport}` 내부 모듈을 직접 import했다. 선언(`gz_sim` package.xml의 `fleet` exec_depend)은 있었으나 실제 결합은 내용 결합이라 fleet 내부 재조정이 시뮬 벤치를 깨뜨릴 수 있었다(결합도 평가 2026-09-19 §6 C등급). 벤치는 "rclpy 없이 fleet만 쓰는" 계측 도구다 — sim → site 방향으로 흐르는 유일한 코드 경로였다.
+
+**Decision:**
+
+1. **fleet이 벤치용 공개면 `fleet.bench`를 소유한다.** Formation/slot_world_position/load_robots/FormationSession/FormationSpec/SessionState/HttpRobotClient/RobotApiError를 재수출하는 단일 모듈이다.
+2. **gz_sim은 `fleet.bench`만 import한다.** `fleet.swarm.*`/`fleet.formation.*` 직접 import 금지를 gz_sim 구조 테스트(`test_bench_boundary.py`)로 고정한다.
+3. **fleet 내부 재조정은 이 면의 시그니처만 지키면 된다.** 벤치가 쓰는 이름이 바뀌면 `fleet.bench`에서 별칭으로 흡수한다.
+
+**Alternatives:** 벤치 스크립트를 fleet 패키지로 이전 — Gazebo 자산(장애물 SDF 스폰) 의존이 남아 완전 분리가 되지 않고 시뮬 계측 주기가 함대 릴리스 주기에 묶인다. 시뮬 전용 스텁 격리 — 계측 대상 로직과 스텁이 어긋나면 벤치가 거짓을 계측한다. 현상 유지 — 선언은 있으나 내용 결합이라 fleet 리팩터링이 깨진다.
+
+**Consequences:** 결합은 스탬프(데이터) 수준으로 내려간다. fleet의 공개 API가 하나 늘고, 그 면은 함대 내부 재조정과 무관하게 안정돼야 한다.
+
+**Validation / Transition:** gz_sim 구조 테스트가 scripts/ 전체에서 `fleet.swarm`/`fleet.formation` 직접 import를 금지하고, fleet 테스트가 `fleet.bench` 재수출의 import 가능성을 검증한다. `python3 -m pytest src/sim/gz_sim/test/test_bench_boundary.py src/site/fleet/test/test_bench_facade.py -q`.
+
+**References:** 결합도 평가 §7-4 (2026-09-19), `docs/plans/2026-09-08-swarm-formation-slice-design.md` §8.2, D-147.
+
+---
+
+## D-149 control 단독 모드의 최종 발행 토픽은 계약된 예외다
+
+**Status:** Proposed (2026-09-21, Accepted 승격은 device validation 게이트에서).
+
+**Context:** `control`의 `safety_node`는 `cmd_out` 파라미터 기본값이 `cmd_vel`이고 `sensor_only`가 아니면 이 토픽에 발행자를 만든다(`control/safety/node.py`). control 단독(standalone) 구동에서는 의도적이지만, 파라미터 기본값만으로 CORE 단일 발행자 원칙(D-2, D-38)과 충돌할 수 있는 구조다. `robot.launch.py` 상단 문서는 이미 "core 옆에서 launch하지 마라"고 경고한다. device validation이 HOLD인 지금 운영 구성 실증이 없다.
+
+**Decision (제안):**
+
+1. **`cmd_out=cmd_vel`은 control 단독 모드에서만 유효한 계약된 예외로 명문화한다.** 단독 모드에서 control은 여전히 자체 게이트에서 최종 명령을 발행한다.
+2. **CORE와 control 레거시 최종 발행의 동시 구성을 금지하고, launch 계약 테스트로 고정한다.** control에서 `safety_node`를 시작하는 모든 launch 파일은 "core 옆에서 실행 금지" 마커를 문서로 가져야 한다.
+3. **기본값 자체는 유지한다.** 단독 모드가 이 패키지의 남은 사용례(패리티 검증, 캘리브레이션)이므로 기본값 분리는 그 사용례의 문서·런북을 파손한다. 운영 프로파일에서의 명시적 remap 요구는 승격 심사 때 재논의한다.
+
+**Alternatives:** 기본값을 `cmd_vel_legacy`로 분리 — 충돌을 원천 제거하지만 단독 사용례의 기존 문서·스크립트가 전부 파손된다. `sensor_only` 강제 — 레거시 단독 구동 자체가 불가능해진다. 문서만 보강 — 계약 테스트 없이는 드리프트가 재발한다(`web_node`/`wander`의 `cmd_vel` 구독 개명 전례).
+
+**Consequences:** 예외가 눈에 보이는 계약이 된다. 승격 전에는 운영 구성이 이 예외를 우연히 발견하는 일이 없어야 한다.
+
+**Validation / Transition:** control launch 계약 테스트(`test_launch_contracts.py`): `safety_node`를 시작하는 launch 파일의 마커 검사. Accepted 승격 조건: device validation에서 CORE 동시 구성 부재를 readback으로 확인.
+
+**References:** D-2 (자체 cmd_vel 멀렉서), D-38 (CORE의 최종 cmd_vel 소유), D-126 (센서 전용 주입), D-143.
+
+---
+
+## D-150 web_node는 control 디버그 서피스로 잔류하고 맵의 단일 홈은 navigation/map이다
+
+**Status:** Accepted (2026-09-21).
+
+**Context:** `web_node`(포트 28161/28162 + `web/dashboard.html`)는 CORE 대시보드(D-23)와 병존하는 2번째 웹 서피스다. 카메라 JPEG, 실시간 scan, wander 세션 릴레이를 보여 주는 관측 뷰지만 `POST /teleop` 같은 명령 릴레이도 있어 운영 서피스로 오인될 여지가 있다. 또한 맵 번들이 `control/map`과 `navigation/map`에 이중 소재다.
+
+**Decision:**
+
+1. **web_node는 control 개발·디버그 전용 서피스로 잔류한다.** 운영 launch·deploy 구성에 포함되지 않는다. 외부 클라이언트 계약은 D-23의 CORE 대시보드가 유일하다.
+2. **병존 규칙: web_node는 control 노드 관측과 수동 조작(`cmd_vel_raw`)만 다룬다.** 프로토콜·인증·이벤트 계약의 소스가 되지 않으며 CORE API를 대체하지 않는다.
+3. **운영 맵의 단일 홈은 `navigation/map`이다.** `control/map`의 Gazebo/검증 자산은 캘리브레이션 기준 자산으로 명시적으로 격하한다 — 이동이 필요하면 별도 커밋에서 한다.
+
+**Alternatives:** core_api_web 흡수 후 삭제 — 카메라 JPEG/실시간 scan 뷰는 CORE 계약 밖 기능이라 흡수 비용이 서비스보다 크다. 현상 유지 — 운영 서피스 오인 위험이 남는다.
+
+**Consequences:** 외부 서피스 소유는 D-23 그대로 단일하다. web_node 문서·포트·launch는 디버그 용도로 명시된다. 맵 이중 소재 해소의 근거가 생긴다.
+
+**Validation / Transition:** deploy 구성(compose/설치 스크립트)에 28161/28162 포트 부재 검사는 후속 커밋. `robot.launch.py`의 web 브랜치는 디버그 launch 안에만 존재한다.
+
+**References:** D-23 (FastAPI 내장 대시보드), D-38, 결합도 평가 §4 (2026-09-19).

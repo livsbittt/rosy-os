@@ -24,7 +24,7 @@ Robot middleware (ROSY-CORE-SRS-001). One process: rclpy node `core` + uvicorn F
 |-----------|---------|
 | `core/` | Python package (see `core/AGENTS.md`) |
 | `config/` | Default YAML, Pinky Pro profile, capabilities (see `config/AGENTS.md`) |
-| `launch/` | `core.launch.py` (see `launch/AGENTS.md`) |
+| `launch/` | `rosy_core.launch.py` (see `launch/AGENTS.md`) |
 | `test/` | pytest for API, power, battery, docking, protocol, dashboard (see `test/AGENTS.md`) |
 | `deploy/` | Legacy unit file / install.sh (Pi runtime now under repo `deploy/robot`) |
 | `resource/` | ament index marker `core` |
