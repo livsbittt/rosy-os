@@ -1,0 +1,43 @@
+schema_version: 1
+map_id: map_260905_update_v2
+frame_id: map
+source_world: worlds/map_260905.world
+source_world_sha256: 11ec992501af7027c4f6fc1effd6c3a54ed185759a57e4ca135e5f3f96875a72
+
+lanes:
+  - id: lane_main
+    color: white
+    width_m: 0.015
+    centerline:
+      - [-0.40, 0.20]
+      - [-0.10, -0.15]
+      - [0.30, -0.15]
+      - [0.30, 0.15]
+      - [0.60, 0.15]
+      - [0.60, 0.45]
+      - [0.90, 0.45]
+
+crosswalks:
+  - id: crosswalk_main
+    center: [0.10, -0.15]
+    heading_rad: 0.0
+    travel_length_m: 0.12
+    crossing_width_m: 0.22
+    stripe_count: 5
+    stripe_width_m: 0.014
+
+stop_lines:
+  - id: stop_line_main
+    center: [-0.01, -0.15]
+    heading_rad: 0.0
+    length_m: 0.22
+    width_m: 0.018
+    signal_id: signal_main
+
+traffic_signals:
+  - id: signal_main
+    pose: [0.18, -0.02, 0.0, 0.0, 0.0, 3.141592653589793]
+    default_state: RED
+    controlled_stop_line_id: stop_line_main
+    controlled_lane_id: lane_main
+
