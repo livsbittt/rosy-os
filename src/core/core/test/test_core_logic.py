@@ -1,6 +1,7 @@
 """순수 로직 단위 테스트 — 중재/워치독/안전/웨이포인트/이벤트/네비 (ROS 무의존)."""
 
 import time
+from pathlib import Path
 
 import pytest
 
@@ -11,6 +12,9 @@ from core_features.navigation.manager import NavigationManager, NavGoalSpec
 from core_features.safety.manager import BatteryPolicy, SafetyManager, SpeedLimits
 from core_features.state.manager import StateManager
 from core_features.waypoints.manager import Waypoint, WaypointManager
+
+#: src/ 트리 루트 — 이 파일은 <root>/src/core/core/test/ 에 있다.
+SRC_ROOT = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture
@@ -301,6 +305,179 @@ class TestModelRegistry:
             registry.register("", input_width=640, input_height=640, input_fps=10.0)
         with pytest.raises(ValueError):
             registry.register("r1", input_width=0, input_height=640, input_fps=10.0)
+
+
+class TestD137SequenceContract:
+    """D-137 T1 서열 계약 — LiDAR/IR metric > YOLO advisory, 호스트 pytest 4건.
+
+    (1) 자문은 상한만 낮춘다 — 단독 정지 경로 없음.
+    (2) 자문은 e-stop 플래그를 만지지 못한다.
+    (3) e-stop 해금 경로에 vision 없음 — 연산자 action만.
+    (4) `vision/detections` 발행자는 트리에 아직 없다 — rosy-vision 단일 예정.
+    """
+
+    NOW = 1000.0
+
+    def _fresh_advisory(self, safety):
+        from core_common.protocol.detections import Detection, DetectionEvidence
+        from core_features.safety.manager import person_advisory_from
+        evidence = DetectionEvidence(
+            model_revision="yolo11n-r1", observed_at=self.NOW, seq=41,
+            input_width=640, input_height=640, input_fps=10.0,
+            detections=[Detection(label="person", x=0.4, y=0.3, w=0.2, h=0.4,
+                                  confidence=0.8)])
+        advisory = person_advisory_from(evidence, now=self.NOW + 0.1)
+        assert advisory is not None and advisory.present
+        safety.set_person_advisory(advisory)
+        return advisory
+
+    def test_advisory_only_caps_and_never_stops(self, safety):
+        """(1) 자문이 있어도 움직임은 남는다 — (0,0)으로 바꾸지 못한다."""
+        self._fresh_advisory(safety)
+        now = self.NOW + 0.1
+        l, a = safety.clip(0.20, 0.50, now=now)
+        assert 0.0 < l <= 0.05 and a == pytest.approx(0.50)
+        for linear, angular in ((0.20, 0.0), (0.10, 0.60), (0.20, 0.80),
+                                (-0.20, 0.0), (0.15, -0.60)):
+            assert safety.clip(linear, angular, now=now) != (0.0, 0.0), \
+                (linear, angular)
+        # 자문을 떼면(없음·stale 포함) 프로필로 돌아갈 뿐, 새 정지도 없다.
+        safety.set_person_advisory(None)
+        assert safety.clip(0.20, 0.50, now=now) == (pytest.approx(0.20),
+                                                    pytest.approx(0.50))
+
+    def test_advisory_cannot_create_or_clear_estop(self, safety):
+        """(2) estop은 trigger_estop/release만이 만진다 — vision 입력은
+        set_person_advisory 하나뿐이고 양쪽 다 플래그를 못 바꾼다."""
+        assert safety.estop is False and safety.estop_source == ""
+        self._fresh_advisory(safety)
+        assert safety.estop is False
+        safety.trigger_estop("operator")
+        assert safety.estop is True
+        self._fresh_advisory(safety)        # 자문을 다시 건다 — 해금 아님
+        assert safety.estop is True
+        safety.set_person_advisory(None)    # 자문을 떼는 것도 해금 아님
+        assert safety.estop is True
+        assert safety.release("operator") is True
+        assert safety.estop is False
+
+    def test_estop_release_path_has_no_vision(self, safety):
+        """(3) 해금은 fresh LiDAR/IR + operator action이다(D-137 §5).
+
+        release()는 person 자문을 읽지 않는다 — 자문이 살아 있어도 연산자는
+        해금할 수 있고, 사람이 사라졌다는 vision "clear"는 해금을 못 만든다.
+        소스 스캔은 e-stop 진입·해금 두 함수 몸통에 vision 토큰이 없음을 핀다.
+        """
+        self._fresh_advisory(safety)
+        safety.trigger_estop("lidar")
+        assert safety.release("operator") is True   # 자문이 막지 못한다
+        import core_features.safety.manager as safety_module
+        text = Path(safety_module.__file__).read_text(encoding="utf-8")
+        for name in ("trigger_estop", "release"):
+            body = _function_body(text, name)
+            for token in ("person", "advisory", "Detection", "vision"):
+                assert token not in body, (name, token)
+
+    def test_vision_detections_has_no_publisher_yet(self):
+        """(4) 단일 발행자 고정(D-137 §Consequences): 지금은 발행자 0.
+
+        rosy-vision 노드가 착지하면(T5, Hailo 실측 뒤) 이 스캔은 실패하고,
+        그때 아래 화이트리스트에 그 파일 하나를 유일 항목으로 넣는다 — CORE는
+        구독만 하고 발행 없음(vision-accelerator 설계 OQ4, must-be-1).
+        """
+        allowed = {}   # 상대 경로 -> 사유. 착지 전에는 비어 있어야 한다.
+        offenders = {}
+        for path in SRC_ROOT.rglob("*.py"):
+            parts = {p.lower() for p in path.parts}
+            if "test" in parts or "__pycache__" in parts:
+                continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+            if "vision/detections" in text:
+                offenders[str(path.relative_to(SRC_ROOT))] = text
+        unexpected = sorted(set(offenders) - set(allowed))
+        assert not unexpected, f"vision/detections 발행 후보 발견: {unexpected}"
+
+
+def _function_body(text: str, name: str) -> str:
+    """한 함수(메서드) 몸통: `def <name>(` 줄부터 다음 동일 들여쓰기 정의까지."""
+    lines = text.splitlines()
+    start = next(i for i, line in enumerate(lines) if f"def {name}(" in line)
+    indent = len(lines[start]) - len(lines[start].lstrip())
+    body = [lines[start]]
+    for line in lines[start + 1:]:
+        if line.strip() and (len(line) - len(line.lstrip())) <= indent \
+                and line.lstrip().startswith(("def ", "class ", "@")):
+            break
+        body.append(line)
+    return "\n".join(body)
+
+
+class TestPersonAdvisoryFeed:
+    """D-137 T4 주입 시임: 와이어 패킷 1건이 자문 좌석에 닿는 유일한 길.
+
+    broken·stale·gap 패킷은 전부 자문 해제다 — "못 본 것"으로 상한을 유지하는
+    쪽이 자문의 방향이 아니고, e-stop은 어느 경로로도 안 건드린다."""
+
+    def _packet(self, observed_at=1000.0, detections=None):
+        from core_common.protocol.detections import Detection
+        return {
+            "model_revision": "yolo11n-r1", "observed_at": observed_at,
+            "seq": 41, "input_width": 640, "input_height": 640,
+            "input_fps": 10.0, "inference_ms": 12.0,
+            "detections": [
+                Detection(label="person", x=0.4, y=0.3, w=0.2, h=0.4,
+                          confidence=0.8)] if detections is None else detections,
+        }
+
+    def _feed(self, safety, now=1000.1):
+        from core_features.safety.manager import PersonAdvisoryFeed
+        return PersonAdvisoryFeed(safety, clock=lambda: now), now
+
+    def test_fresh_person_packet_sets_the_advisory(self, safety):
+        feed, now = self._feed(safety)
+        verdict = feed.ingest(self._packet())
+        assert verdict == {'advisory': True, 'reason': 'person_advisory_set'}
+        assert safety.clip(0.20, 0.50, now=now)[0] == pytest.approx(0.05)
+
+    def test_broken_stale_and_gap_packets_clear_the_advisory(self, safety):
+        feed, now = self._feed(safety)
+        assert feed.ingest(self._packet())['advisory'] is True
+        assert feed.ingest("not a packet") == {'advisory': False,
+                                               'reason': 'invalid_packet'}
+        # 검증 실패: confidence 1.5, 필드 누락 — 와이어(dict) 진실이 거절하는 패킷.
+        bad_confidence = self._packet()
+        bad_confidence["detections"] = [
+            {"label": "person", "x": 0.4, "y": 0.3, "w": 0.2, "h": 0.4,
+             "confidence": 1.5}]
+        assert feed.ingest(bad_confidence)['reason'] == 'invalid_packet'
+        missing_seq = self._packet()
+        missing_seq.pop("seq")
+        assert feed.ingest(missing_seq)['reason'] == 'invalid_packet'
+        # 깨진 영상 + metric 장애물 시나리오의 자문 절반: 못 본 것은 해제다.
+        assert feed.ingest(self._packet(observed_at=999.0)) == \
+            {'advisory': False, 'reason': 'no_fresh_advisory'}
+        assert feed.ingest(self._packet(detections=[]))['reason'] == 'no_fresh_advisory'
+        assert safety.clip(0.20, 0.50, now=now) == (pytest.approx(0.20),
+                                                    pytest.approx(0.50))
+
+    def test_unknown_revision_through_registry_clears(self, safety):
+        from core_features.safety.manager import ModelRegistry, PersonAdvisoryFeed
+        registry = ModelRegistry()
+        registry.register("yolo11n-r1", input_width=640, input_height=640,
+                          input_fps=10.0)
+        feed = PersonAdvisoryFeed(safety, registry=registry, clock=lambda: 1000.1)
+        evil = self._packet()
+        evil["model_revision"] = "evil-v9"
+        assert feed.ingest(evil) == {'advisory': False,
+                                     'reason': 'no_fresh_advisory'}
+
+    def test_feed_never_touches_estop(self, safety):
+        feed, _ = self._feed(safety)
+        safety.trigger_estop("lidar")
+        feed.ingest(self._packet())
+        assert safety.estop is True
+        feed.ingest(self._packet(detections=[]))
+        assert safety.estop is True
 
 
 class TestEventBus:

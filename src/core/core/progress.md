@@ -10,7 +10,7 @@ gates:
     cmd: "python3 -m pytest src/core/test/test_module_criteria.py test/test_control_absorption_package.py -q"
   LOCAL:
     state: GO
-    evidence: "826 passed, 10 skipped (2026-09-17 Windows, 미커밋 WIP 포함 작업 트리). D-72 S0–S7과 D-82 팔레트 게이트 포함 — evidence 바인딩, tokens, dashboard G4, inventory 4상태, test_palette_gates.py 10건. 이 호스트 python3에는 PyYAML이 없어 `python` 3.14.5로 실행했고, skip 수는 선택 의존성(httpx/playwright) 설치 여부에 따라 달라진다"
+    evidence: "976 passed, 11 skipped (2026-09-21 Windows, 미커밋 WIP 포함 작업 트리). D-72 S0–S7과 D-82 팔레트 게이트, D-137 T1 서열 계약 4건(advisory 상한 전용·estop 불가·해금 무 vision·vision/detections 무발행) 포함. 이 호스트 python3에는 PyYAML이 없어 `python` 3.14.5로 실행했고, skip 수는 선택 의존성(httpx/playwright) 설치 여부에 따라 달라진다"
     cmd: "PYTHONPATH=src/core:src python3 -m pytest src/core/test -q"
   ROS-SIM:
     state: HOLD

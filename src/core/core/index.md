@@ -52,8 +52,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · test(safety): D-137 T1 sequence contracts, host pytest 4
 - 2026-09-21 · uncommitted · refactor(core_api_web): route v1 domain types through api.deps
 - 2026-09-21 · uncommitted · test(core): make ROS-installed native ARM64 tests deterministic
 - 2026-09-21 · uncommitted · feat(core): gate SLAM mapping and persist maps safely (D-144)
 - 2026-09-20 · uncommitted · feat(vision): D-136 T1 boundary contracts
-- 2026-09-20 · uncommitted · feat(core): known-model registry gates revisions (D-137 T3)
