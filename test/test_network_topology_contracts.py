@@ -28,6 +28,16 @@ def _text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _adr_text() -> str:
+    """Read the ADR index and all split ADR bodies as one logical contract."""
+    bodies = sorted((ROOT / "docs" / "adr").glob("*.md"))
+    return "\n\n".join([_text(ADR), *(_text(path) for path in bodies)])
+
+
+def _contract_text(path: Path) -> str:
+    return _adr_text() if path == ADR else _text(path)
+
+
 def _section(text: str, heading: str, level: str = "## ") -> str:
     """The body of one heading, ending at the next heading of the same level.
 
@@ -43,7 +53,7 @@ def _section(text: str, heading: str, level: str = "## ") -> str:
 
 @pytest.fixture(scope="module")
 def adr() -> str:
-    return _text(ADR)
+    return _adr_text()
 
 
 @pytest.fixture(scope="module")
@@ -170,7 +180,7 @@ def test_relay_is_in_v1_scope_everywhere():
         "v1 기본 요구에서 제외한다",
     )
     for path in CONTRACT_DOCS:
-        text = _text(path)
+        text = _contract_text(path)
         for phrase in deferrals:
             assert phrase not in text, (
                 f"{path.relative_to(ROOT)} still defers the relay out of v1: {phrase!r}"
@@ -209,7 +219,7 @@ def test_the_srs_does_not_declare_relay_the_default(srs):
 
 def test_both_modes_named_in_every_contract_document():
     for path in CONTRACT_DOCS:
-        text = _text(path)
+        text = _contract_text(path)
         assert SITE_STA in text, f"{path.relative_to(ROOT)} does not name {SITE_STA}"
         assert RELAY in text, f"{path.relative_to(ROOT)} does not name {RELAY}"
 

@@ -6,9 +6,9 @@
 
 **Architecture:** Keep the signed base image device-agnostic. A Windows PowerShell orchestrator verifies the physical target and delegates deterministic identity/manifest work to a ROS-free Python module; a one-shot Pi service consumes the per-card bundle before networking and runtime startup. Human device names, immutable UUIDs, hardware serials, and DDS identities remain separate.
 
-**Tech Stack:** PowerShell 7, Python 3.12 standard library, JSON Schema, systemd, NetworkManager, Raspberry Pi `rpi-image-gen`, Raspberry Pi Imager CLI, pytest.
+**Tech Stack:** PowerShell 7, Python 3.12 standard library, JSON Schema, systemd, NetworkManager, official Ubuntu Server 24.04 arm64 Raspberry Pi image, native ARM64 customization, Raspberry Pi Imager CLI, pytest.
 
-**Decision prerequisite:** D-154 is Accepted. Implementation must preserve its common-image, public/device/DDS identity separation, secret-handling, core-only first boot, Fleet bootstrap/DDS-isolation boundary, and evidence-tier boundaries.
+**Decision prerequisite:** D-154 and D-161 are Accepted. Implementation must preserve the common-image, public/device/DDS identity separation, secret-handling, core-only first boot, Fleet bootstrap/DDS-isolation boundary, and evidence-tier boundaries. Task 5's former Raspberry Pi OS/container mechanism is superseded by `2026-09-21-ubuntu-native-ros-runtime.md`; the personalization tasks remain active.
 
 ---
 
@@ -273,6 +273,10 @@ git commit -m "feat(deploy): consume SD provisioning on first boot"
 ```
 
 ### Task 5: Build the common bootable image
+
+> **Superseded by D-161:** Execute Tasks 2-7 of
+> `2026-09-21-ubuntu-native-ros-runtime.md` instead of the former
+> Raspberry Pi OS/container steps below. The text below is retained only for traceability.
 
 **Files:**
 - Create: `deploy/image/rpi-image-gen/config/rosy-pinky.yaml`

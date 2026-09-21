@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build a ROSY OS release image on a native ARM64 Raspberry Pi OS host.
+# Build a ROSY OS release image from the pinned Ubuntu Server 24.04 LTS arm64
+# Raspberry Pi base image on a native ARM64 host.
 #
 # This has never been run. Every input it depends on is in inputs.lock.yaml,
 # and the ones marked `verified: false` there are assumptions nobody has
@@ -42,7 +43,8 @@ OUT="$DIST/$RELEASE_ID"
 mkdir -p "$OUT"
 
 echo "==> building $RELEASE_ID into $OUT"
-echo "    rpi-image-gen and the layer/hook invocation are added when the"
-echo "    assumptions in $LOCK have been verified on hardware."
+echo "    Ubuntu base-image customization, native ROS 2 Jazzy installation,"
+echo "    and the offline ROSY package payload are added when the assumptions"
+echo "    in $LOCK have been verified on hardware."
 fail "not implemented: no image has been built yet, and this script will not \
 pretend otherwise. See docs/deployment/pi5-acceptance-checklist.md section 2."

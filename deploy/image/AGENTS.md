@@ -1,11 +1,11 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-02 | Updated: 2026-09-02 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-21 -->
 
 # image
 
 ## Purpose
 
-Build a signed ROSY OS release image on **native aarch64**. The scripts refuse x86/QEMU hosts. Inputs must be pinned in `inputs.lock.yaml`; producing a file is not enough — `verify-artifacts.sh` is the go/no-go.
+Build a signed Ubuntu Server 24.04 LTS arm64 ROSY OS release image with native ROS 2 Jazzy on **native aarch64**. The scripts refuse x86/QEMU release hosts. Inputs must be pinned in `inputs.lock.yaml`; producing a file is not enough — `verify-artifacts.sh` is the go/no-go.
 
 ## Key Files
 
@@ -25,13 +25,15 @@ None.
 ### Working In This Directory
 
 - Do not add an x86 "release" path. Dev QEMU images are not shippable (design 7.1).
+- D-161 supersedes the Raspberry Pi OS/container product mechanism. Docker remains development/CI-only and must not be introduced as an on-device product dependency.
+- Required Pinky Pro ROS packages are an offline image payload; first boot must not download them.
 - The pipeline is not implemented: after `verify-inputs.sh`, `build-image.sh` still fails (“no image has been built yet”). `inputs.lock.yaml` still has `verified: false` / unset commits. Do not pretend a shippable image exists.
-- Tests: `test/test_image_pipeline.py`, `test/test_image_checks.py`.
+- Tests: `test/test_ubuntu_native_runtime_contract.py`, `test/test_image_pipeline.py`, `test/test_image_checks.py`.
 
 ### Testing Requirements
 
 ```bash
-python3 -m pytest test/test_image_pipeline.py test/test_image_checks.py -v
+python3 -m pytest test/test_ubuntu_native_runtime_contract.py test/test_image_pipeline.py test/test_image_checks.py -v
 ```
 
 ### Common Patterns
@@ -42,11 +44,11 @@ python3 -m pytest test/test_image_pipeline.py test/test_image_checks.py -v
 
 ### Internal
 
-- Design: `docs/plans/2026-09-01-rosy-os-v1-image-release-design.md`
+- Design: `docs/plans/2026-09-21-ubuntu-native-ros-runtime-design.md`
 - Signing/storage in `deploy/release/`
 
 ### External
 
-- Native aarch64 Raspberry Pi OS host, OpenSSL
+- Native aarch64 Ubuntu 24.04 build host, official Ubuntu Raspberry Pi image, ROS 2 Jazzy apt repository, OpenSSL
 
 <!-- MANUAL: -->

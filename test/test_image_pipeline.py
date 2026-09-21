@@ -93,16 +93,17 @@ def test_the_lock_names_pinky_pro_as_the_first_board(lock):
 @pytest.mark.parametrize(
     "path",
     [
-        ("image_tool", "tag"),
         ("image_tool", "commit"),
+        ("base_image", "url"),
+        ("base_image", "sha256"),
         ("os", "suite"),
         ("os", "architecture"),
         ("os", "apt_sources"),
-        ("container_runtime", "engine_version"),
-        ("container_runtime", "compose_plugin_version"),
-        ("ros", "base_image_digest"),
-        ("containers", "rosy_core_digest"),
-        ("containers", "rosy_io_digest"),
+        ("runtime", "model"),
+        ("runtime", "container_runtime_required"),
+        ("ros", "apt_repository"),
+        ("ros", "apt_key_fingerprint"),
+        ("rosy_packages", "required"),
         ("sources", "rosy_revision"),
     ],
 )
@@ -118,7 +119,8 @@ def test_the_lock_records_the_core_account_precondition(lock):
     """The Host Agent contract's precondition lives or dies in the image."""
     accounts = lock["accounts"]
 
-    assert accounts["core_user"] == "rosy"
+    assert accounts["core_user"] == "rosy-core"
+    assert accounts["io_user"] == "rosy-io"
     assert accounts["login_uid_must_differ"] is True
     assert accounts["core_uid"] != 1000, "uid 1000 is the Pi's login account"
 
@@ -133,10 +135,10 @@ def test_the_lock_preserves_build_provenance(lock):
 
 def test_the_unverified_assumptions_are_marked_as_such(lock):
     """These are exactly the ones the checklist says to settle first."""
-    for section in ("image_tool", "os", "container_runtime", "ros", "containers"):
+    for section in ("image_tool", "base_image", "os", "ros"):
         assert "verified" in lock[section], f"{section} does not say whether it was verified"
 
-    unverified = [name for name in ("image_tool", "os", "container_runtime")
+    unverified = [name for name in ("image_tool", "base_image", "os", "ros")
                   if lock[name]["verified"] is False]
     assert unverified, (
         "every assumption is marked verified; if that is true, the acceptance "
@@ -146,7 +148,7 @@ def test_the_unverified_assumptions_are_marked_as_such(lock):
 
 def test_the_risky_assumptions_explain_themselves(lock):
     """A bare `verified: false` tells the next person nothing."""
-    for section in ("image_tool", "os", "container_runtime"):
+    for section in ("image_tool", "base_image"):
         if lock[section]["verified"] is False:
             assert lock[section].get("note"), f"{section} is unverified with no explanation"
 

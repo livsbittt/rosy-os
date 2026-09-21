@@ -1,6 +1,7 @@
 ﻿## D-22 Raspberry Pi OS 런타임: Core/I/O 컨테이너 분리 + 드라이버 deadman
 
-**Status:** Accepted (2026-08-31)
+**Status:** Superseded by D-161 (2026-09-21). CORE/I/O 분리와 driver deadman의
+안전 의도는 유지한다.
 
 **Context:** 제품의 1차 장치는 Raspberry Pi 5 8GB와 Raspberry Pi OS Lite
 64-bit다. ROS 2 Jazzy의 기존 네이티브 배포안은 Ubuntu 24.04를 전제로

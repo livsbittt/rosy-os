@@ -31,7 +31,7 @@
 | D-19 | 접속 토폴로지: 로봇 WiFi 릴레이(AP+STA) 지원 | Superseded by D-26 |
 | D-20 | Swarm 하이브리드: 오케스트레이션 Fleet / 폐루프 추종 로봇 탑재 | Accepted (D-12 확장) |
 | D-21 | 군집 제어: 계층형 마스터-슬레이브 확정 + 분산 진화 훅 | Accepted (D-20 보강) |
-| D-22 | Raspberry Pi OS 런타임: Core/I/O 컨테이너 분리 + 드라이버 deadman | Accepted |
+| D-22 | Raspberry Pi OS 런타임: Core/I/O 컨테이너 분리 + 드라이버 deadman | Superseded by D-161 (safety intent retained) |
 | D-23 | Rosy OS 화면: FastAPI 내장 대시보드 + 읽기 전용 호스트 텔레메트리 | Accepted |
 | D-24 | 절전: 센서 듀티 사이클링 + 초음파 웨이크 트리거 | Accepted |
 | D-25 | 절전 계층은 STANDBY에서 끝난다 — Pi 5 하이버네이트 미채택 | Accepted |
@@ -168,5 +168,6 @@
 | D-158 | UI Component Consistency: Strict Outline Borders (Law 2) | Accepted |
 | D-159 | State Summary Visibility: Management by Exception (Law 0) | Proposed |
 | D-160 | Games Domain Strict Decoupling (AST Validation) | Accepted |
+| D-161 | Ubuntu Server 24.04 + ROS 2 Jazzy 네이티브 제품 런타임으로 즉시 전환 | Accepted (supersedes D-22 runtime mechanism) |
 
 ---

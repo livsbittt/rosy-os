@@ -1,6 +1,11 @@
 # ROSY OS v1 이미지·프로비저닝·릴리스 설계
 
-- **Status:** Approved for implementation
+> **Superseded product baseline (2026-09-21):** D-161이 제품 OS/runtime 방식을
+> Ubuntu Server 24.04 arm64 + native ROS 2 Jazzy로 즉시 전환했다. 이 문서의
+> Raspberry Pi OS/OCI 구현 세부는 역사 기록이며, 유지되는 안전·서명·검증 의도는
+> `2026-09-21-ubuntu-native-ros-runtime-design.md`에서 이어받는다.
+
+- **Status:** Superseded by D-161 for product OS/runtime mechanism
 - **Date:** 2026-09-01
 - **Target:** Raspberry Pi 5 8 GB / Raspberry Pi OS Lite 64-bit / ROS 2 Jazzy
 - **Audience:** ROSY 런타임, 배포, 운영 UI, 현장 시운전 담당자

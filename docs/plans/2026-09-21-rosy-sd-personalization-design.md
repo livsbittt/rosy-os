@@ -2,8 +2,12 @@
 
 - 작성일: 2026-09-21
 - 상태: 구현 승인
-- 관련 결정: D-15, D-22, D-26, D-33, D-36, D-66, D-154
+- 관련 결정: D-15, D-22, D-26, D-33, D-36, D-66, D-154, D-161
 - 결정 근거: D-154 Accepted
+
+> D-161에 따라 공통 제품 이미지는 Ubuntu Server 24.04 arm64 + native ROS 2
+> Jazzy로 즉시 전환한다. 이 문서의 신원·비밀정보·SD write/readback 계약은 그대로
+> 유지하며 이미지 생성 방식은 Ubuntu native runtime 설계가 우선한다.
 
 ## 1. 목표
 
@@ -165,7 +169,7 @@ passphrase, API token과 전체 NetworkManager profile은 감사 로그에 넣�
 - `deploy/robot/apply-sd-provision.py`: Pi 첫 부팅 소비자
 - `deploy/robot/rosy-sd-provision.service`: network/runtime보다 먼저 실행하는 unit
 - `deploy/robot/config/board.yaml`: Pinky 계열 identity prefix 선언
-- `deploy/image/`: 공통 이미지에 소비자와 unit만 포함하는 rpi-image-gen layer
+- `deploy/image/`: 공통 Ubuntu 이미지에 소비자, unit, native ROSY payload 포함
 - `test/test_sd_personalization.py`: ROS-free 생성/검증/비밀정보 계약
 - `test/test_sd_writer_contract.py`: Windows 비파괴/파괴 경계 계약
 - `test/test_first_boot_provisioning.py`: Pi root fixture와 상태 전이 계약
@@ -211,5 +215,6 @@ FLEET은 HOLD이며, 두 경로 구현과 서로 다른 Pinky 두 대의 실기 
 
 ## 11. 도구 근거
 
-- Raspberry Pi `rpi-image-gen`: 공통 이미지 생성과 외부 config/layer 통합
+- Official Ubuntu preinstalled server arm64 image: digest-pinned 공통 이미지 기반
+- Native ARM64 image customizer: native ROS 2 Jazzy와 ROSY offline payload 통합
 - Raspberry Pi Imager CLI: `--cli --sha256 <hash> <image> <device>` 기록과 검증
