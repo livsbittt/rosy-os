@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 import json
+import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
@@ -23,6 +25,7 @@ from deploy.sd.personalization import (
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "deploy" / "sd" / "provision.schema.json"
+BUNDLE_CLI = ROOT / "deploy" / "sd" / "create-provision-bundle.py"
 
 
 class DeterministicRng:
@@ -174,3 +177,36 @@ def test_receipt_omits_every_transient_secret():
     assert "fixture-pass-9384" not in rendered
     assert "fixture-one-time-pairing-credential" not in rendered
     assert receipt["network"] == {"ssid": "fixture-lab", "country_code": "KR"}
+
+
+def test_bundle_cli_reads_secret_from_stdin_and_emits_only_redacted_receipt(tmp_path):
+    output = tmp_path / "provision.json"
+    receipt = tmp_path / "provision-receipt.json"
+    request = {
+        "device_uid": "9d40feaa-871f-4fd3-975a-a704e82d3af9",
+        "device_name": "rosy-pinky-k7m4",
+        "model": "pinky_pro",
+        "release_id": "2026.09.22-001",
+        "robot_number": 1,
+        "requested_preset": "hardware",
+        "country_code": "KR",
+        "ssid": "fixture-ssid",
+        "wifi_passphrase": "fixture-private-passphrase",
+        "fleet_endpoint": "https://fleet.fixture.invalid:8443",
+        "fleet_trust_profile": "site-ca-2026",
+        "pairing_required": False,
+    }
+
+    completed = subprocess.run(
+        [sys.executable, str(BUNDLE_CLI), "--output", str(output), "--receipt", str(receipt)],
+        input=json.dumps(request), capture_output=True, text=True, check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    bundle = json.loads(output.read_text(encoding="utf-8"))
+    redacted = json.loads(receipt.read_text(encoding="utf-8"))
+    assert bundle["network"]["ssid"] == "fixture-ssid"
+    assert re.fullmatch(r"[0-9a-f]{64}", bundle["network"]["wpa_psk"])
+    rendered = completed.stdout + completed.stderr + json.dumps(redacted)
+    assert "fixture-private-passphrase" not in rendered
+    assert "wpa_psk" not in json.dumps(redacted)

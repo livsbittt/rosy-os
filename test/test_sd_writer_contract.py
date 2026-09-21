@@ -211,6 +211,34 @@ def test_wrong_confirmation_never_invokes_writer(writer_case):
     assert not writer_case["marker"].exists()
 
 
+@pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is required")
+def test_successful_write_stages_one_time_bundle_and_updates_registry(writer_case, tmp_path):
+    boot = tmp_path / "boot"
+    boot.mkdir()
+    completed = _run(
+        writer_case,
+        "-Confirmation", "ERASE DISK 7 rosy-pinky-k7m4",
+        "-BootMountPath", boot,
+        plan_only=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert writer_case["marker"].exists()
+    bundle_path = boot / "rosy-provision" / "provision.json"
+    bundle = json.loads(bundle_path.read_text(encoding="utf-8-sig"))
+    assert bundle["device_identity"]["device_name"] == "rosy-pinky-k7m4"
+    assert bundle["network"]["ssid"] == "fixture-ssid"
+    assert len(bundle["network"]["wpa_psk"]) == 64
+    receipt = json.loads(writer_case["receipt"].read_text(encoding="utf-8-sig"))
+    registry = json.loads(writer_case["registry"].read_text(encoding="utf-8-sig"))
+    rendered = completed.stdout + completed.stderr + json.dumps(receipt)
+    assert "fixture-writer-pass" not in rendered
+    assert "wpa_psk" not in json.dumps(receipt)
+    assert registry["robot_numbers"] == [1]
+    assert registry["device_names"] == ["rosy-pinky-k7m4"]
+    assert registry["device_uids"] == ["9d40feaa-871f-4fd3-975a-a704e82d3af9"]
+
+
 def test_script_has_no_plain_password_or_shell_string_escape_hatch():
     text = SCRIPT.read_text(encoding="utf-8")
 
@@ -222,3 +250,6 @@ def test_script_has_no_plain_password_or_shell_string_escape_hatch():
     assert "cmd /c" not in text.lower()
     assert '"ERASE DISK $DiskNumber $DeviceName"' in text
     assert "& $RpiImager" in text
+    assert "create-provision-bundle.py" in text
+    assert "BootMountPath" in text
+    assert "GetNetworkCredential().Password" in text

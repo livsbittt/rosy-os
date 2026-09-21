@@ -50,8 +50,8 @@
 
 ## 최근 기록
 
+- 2026-09-22 · uncommitted · feat(provisioning): connect native rollback and Ubuntu first boot
 - 2026-09-22 · uncommitted · feat(runtime): begin D-161 Ubuntu-native transition
 - 2026-09-21 · 5dd076c · feat(robot): vendor stock image read-only baseline capture (pre-G0)
 - 2026-09-21 · uncommitted · test(deploy): core launches never reference the control stack (D-149)
 - 2026-09-21 · uncommitted · test(deploy): keep control debug ports out of deploy configs (D-150)
-- 2026-09-21 · uncommitted · feat(release): verify unsigned ARM64 handoffs (D-146)

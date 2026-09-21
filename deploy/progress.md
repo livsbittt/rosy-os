@@ -2,7 +2,7 @@
 module: deploy
 logical_modules: [M01, M13, M14]
 owner: 릴리스·플랫폼
-last_verified: { commit: "uncommitted", date: 2026-09-21 }
+last_verified: { commit: "uncommitted", date: 2026-09-22 }
 gates:
   SOURCE:
     state: GO
@@ -53,11 +53,19 @@ plans:
 - `verify-from-windows.ps1`는 exact host의 bounded SSH와 API/dashboard를 확인하고 성공·실패 모두 no-overwrite JSON evidence로 남긴다. 이 증거는 연결성만 증명하며 G0나 DEVICE를 승격하지 않는다.
 - `import_unsigned_payload.py`는 D-145 archive를 서명 전에 checksum, 안전한 archive 경계, release identity, payload hash, CORE/IO `linux/arm64`까지 검증하고 `signed: false` handoff만 원자적으로 노출한다.
 - `6f6c515`의 전체 host 회귀가 통과했다. 이 증거는 장치/물리 인수를 대신하지 않는다.
+- 서명된 native release는 manifest와 payload를 검증한 뒤 `current`를 원자 교체하고,
+  health 실패나 전원 중단 journal이 남으면 `previous`로 복구한다. 이 경로는 network와
+  Docker를 요구하지 않는다.
+- Windows SD writer는 검증된 기록 뒤 DPAPI Wi-Fi 자격을 stdin으로 bundle 생성기에
+  전달하고 선택한 물리 디스크의 boot 파티션에만 one-shot bundle을 원자 복사한다.
+  Ubuntu first boot는 hostname, DDS 신원, mode 0600 NetworkManager/Fleet bootstrap과
+  hardware serial binding을 적용한 뒤에만 CORE gate를 연다.
 
 ## 다음 gate
 
 1. native ARM64 Ubuntu 24.04 host에서 고정 base image를 내려받아 SHA-256을 확인하고 native ROSY payload를 실제 빌드한다(ARTIFACT).
-2. native release activation/rollback과 Ubuntu first-boot 개인화를 연결하고 완성 이미지의 SBOM·서명을 검증한다(ARTIFACT).
+2. full Ubuntu image customizer로 검증된 payload와 immutable first-boot overlay를
+   base image에 설치하고 SBOM·서명·read-only mount 검증을 완료한다(ARTIFACT).
 3. [첫 장치 런북](../docs/deployment/pinky-pro-first-device-runbook.md)의 G0-G5를
    Ubuntu SD에서 실행하고 session/raw evidence를 보존한다(DEVICE).
 

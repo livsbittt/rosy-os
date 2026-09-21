@@ -45,8 +45,14 @@ INSTALL_ROOT="$RELEASE_ROOT/install"
 INVENTORY="$RELEASE_ROOT/rosy-packages.txt"
 DEB_INVENTORY="$RELEASE_ROOT/deb-packages.txt"
 NATIVE_RUNTIME_SOURCE="$WORKSPACE/deploy/robot/native"
+FIRST_BOOT_SOURCE="$WORKSPACE/deploy/image/first-boot"
+SD_TOOLS_SOURCE="$WORKSPACE/deploy/sd"
 [[ -d "$NATIVE_RUNTIME_SOURCE" ]] \
     || fail "native runtime support is missing: deploy/robot/native"
+[[ -d "$FIRST_BOOT_SOURCE" ]] \
+    || fail "Ubuntu first-boot support is missing: deploy/image/first-boot"
+[[ -d "$SD_TOOLS_SOURCE" ]] \
+    || fail "SD personalization support is missing: deploy/sd"
 [[ ! -e "$RELEASE_ROOT/deploy/robot/native" ]] \
     || fail "release root already contains native runtime support"
 
@@ -70,6 +76,20 @@ printf '%s\n' "$RELEASE_ID" > "$INSTALL_ROOT/.rosy-release"
 cp "$SCRIPT_DIR/required-ros-packages.txt" "$RELEASE_ROOT/required-ros-packages.txt"
 mkdir -p "$RELEASE_ROOT/deploy/robot"
 cp -a "$NATIVE_RUNTIME_SOURCE" "$RELEASE_ROOT/deploy/robot/native"
+
+# Stage the immutable image-owned bootstrap tools separately from the
+# switchable release.  Recovery cannot live below /opt/rosy/current because
+# it must run precisely when that link was interrupted.
+OVERLAY="$RELEASE_ROOT/image-overlay"
+mkdir -p "$OVERLAY/opt/rosy" "$OVERLAY/opt/rosy/deploy" "$OVERLAY/etc/systemd/system"
+cp -a "$NATIVE_RUNTIME_SOURCE" "$OVERLAY/opt/rosy/native-runtime"
+cp -a "$FIRST_BOOT_SOURCE" "$OVERLAY/opt/rosy/first-boot"
+cp -a "$SD_TOOLS_SOURCE" "$OVERLAY/opt/rosy/deploy/sd"
+cp "$FIRST_BOOT_SOURCE/rosy-first-boot.service" "$OVERLAY/etc/systemd/system/"
+cp "$NATIVE_RUNTIME_SOURCE/rosy-release-recover.service" "$OVERLAY/etc/systemd/system/"
+cp "$NATIVE_RUNTIME_SOURCE/rosy-sd-provision.service" "$OVERLAY/etc/systemd/system/"
+cp "$NATIVE_RUNTIME_SOURCE/rosy-core.service" "$OVERLAY/etc/systemd/system/"
+cp "$NATIVE_RUNTIME_SOURCE/rosy-runtime.target" "$OVERLAY/etc/systemd/system/"
 
 # shellcheck disable=SC1090
 source "$INSTALL_ROOT/setup.bash"

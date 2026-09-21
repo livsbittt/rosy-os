@@ -17,6 +17,9 @@ one-time per-card provisioning bundle.
 - Disk selection is by a freshly re-probed physical disk number, serial, size,
   and bus type. A drive letter is never sufficient.
 - Tests and `-PlanOnly` must not invoke an image writer or alter physical media.
+- After a verified writer exit, `prepare-rosy-sd.ps1` creates the one-time bundle
+  through stdin and copies it atomically to `rosy-provision/provision.json` on the
+  selected disk's FAT32 boot partition. Registry and receipt are updated only then.
 - An image write is MEDIA evidence only; it is not BOOT, DEVICE, or FLEET proof.
 
 ## Testing

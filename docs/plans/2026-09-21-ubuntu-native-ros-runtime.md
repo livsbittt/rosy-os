@@ -197,3 +197,15 @@ python3 -m pytest src/core/core/test/ src/apps/control/test/ src/site/fleet/test
 
 Host tests do not replace native ARM64 build, SD readback, Raspberry Pi boot or physical
 motor safety evidence. Report each gate separately.
+
+## 2026-09-22 implementation checkpoint
+
+- Task 5 is source-complete: signed native releases are verified before runtime stop,
+  activated with atomic `current`/`previous` links, health-checked, rolled back without
+  network or Docker, and recovered from an interrupted switch before CORE starts.
+- Task 6 is source-complete: the Windows writer creates the per-card one-time bundle
+  from a DPAPI-protected Wi-Fi credential over stdin, copies it only to the selected
+  SD boot partition, and Ubuntu first boot binds it to the Pi serial before CORE.
+- Task 7 remains HOLD. The immutable overlay is staged in the native payload, but a
+  native ARM64 host must still install it into the pinned Ubuntu image, produce the
+  SBOM/signature, and pass read-only artifact verification before any SD is erased.

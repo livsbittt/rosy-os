@@ -16,13 +16,15 @@ Build a signed Ubuntu Server 24.04 LTS arm64 ROSY OS release image with native R
 | `build-native-payload.sh` | Native ARM64 rosdep/colcon build and deterministic inventory export |
 | `verify-package-inventory.sh` | Required-package and `ros2 pkg prefix` release-root readback |
 | `required-ros-packages.txt` | Mandatory offline Pinky Pro ROS package set |
+| `first-boot/` | Ubuntu one-shot identity, NetworkManager and Fleet-bootstrap applicator |
 | `inputs.lock.yaml` | Pinned inputs; entries with `verified: false` block the build |
 | `verify-inputs.sh` | Fails if lock entries are unverified or missing |
 | `verify-artifacts.sh` | Post-build artifact checks (`BUILD_GO`) |
 
 ## Subdirectories
 
-None.
+- `first-boot/` is staged in the immutable image overlay, outside the switchable
+  application release, so an interrupted activation cannot remove recovery.
 
 ## For AI Agents
 
@@ -31,11 +33,13 @@ None.
 - Do not add an x86 "release" path. Dev QEMU images are not shippable (design 7.1).
 - D-161 supersedes the Raspberry Pi OS/container product mechanism. Docker remains development/CI-only and must not be introduced as an on-device product dependency.
 - Required Pinky Pro ROS packages are an offline image payload; first boot must not download them.
-- Base-image fetch and native payload stages are implemented. Full Ubuntu image
-  customization is still fail-closed in `build-image.sh`; `inputs.lock.yaml` retains
-  unverified native-host inputs. Do not pretend a shippable image exists.
+- Base-image fetch, native payload, release rollback and first-boot overlay staging
+  are implemented. Full Ubuntu image customization is still fail-closed in
+  `build-image.sh`; `inputs.lock.yaml` retains unverified native-host inputs. Do not
+  pretend a shippable image exists.
 - Tests: `test/test_ubuntu_native_runtime_contract.py`, `test/test_image_pipeline.py`,
   `test/test_native_ros_payload.py`, `test/test_native_systemd_contract.py`,
+  `test/test_native_release_activation.py`, `test/test_first_boot_provisioning.py`,
   `test/test_image_checks.py`.
 
 ### Testing Requirements

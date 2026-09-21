@@ -118,3 +118,18 @@
   ARM64 build와 Pi 실행은 아직 수행하지 않았다.
 - gate 변화: SOURCE 계약만 갱신. ARTIFACT, DEVICE, FLEET은 계속 HOLD다.
 - 결정: D-161. Docker/Compose는 개발·CI 전용이며 제품 runtime 의존성이 아니다.
+
+## 2026-09-22 · uncommitted · feat(provisioning): connect native rollback and Ubuntu first boot
+
+- 변경: 서명 manifest와 exact payload를 먼저 검사하는 native release activation,
+  `current`/`previous` 원자 전환, health 실패 rollback, boot-time journal recovery를
+  추가했다. Windows SD writer는 DPAPI Wi-Fi 자격을 명령행에 노출하지 않고 stdin으로
+  one-shot bundle을 만들며, 기록한 카드의 FAT32 boot 파티션에만 원자 복사한다.
+  Ubuntu first boot는 `rosy-pinky-xxxx`, UUID, DDS 번호, Pi serial, NetworkManager와
+  Fleet bootstrap을 적용한 뒤 CORE gate를 연다.
+- 증거: native activation/systemd/payload/image 계약 76 passed; SD writer,
+  personalization, first-boot, activation/systemd/payload 집중 계약 62 passed.
+- gate 변화: SOURCE 구현만 갱신. full Ubuntu image customizer, native ARM64 artifact,
+  SBOM·서명·readback 전까지 ARTIFACT/MEDIA/BOOT/DEVICE/FLEET은 HOLD다.
+- 결정: D-154와 D-161. 공통 서명 이미지는 device-neutral로 유지하고 장치별 비밀과
+  신원은 카드별 bundle 및 첫 부팅 serial binding에서만 적용한다.

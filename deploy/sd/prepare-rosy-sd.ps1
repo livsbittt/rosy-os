@@ -12,6 +12,7 @@ param(
     [string]$ReleaseId,
     [string]$FleetEndpoint,
     [string]$FleetTrustProfile,
+    [string]$CountryCode = "KR",
     [string]$DeviceName,
     [string]$DeviceUid,
     [string]$RegistryJson,
@@ -20,6 +21,7 @@ param(
     [string]$PythonExe = "python",
     [string]$DiskInventoryJson,
     [string]$SecondDiskInventoryJson,
+    [string]$BootMountPath,
     [string]$Confirmation,
     [switch]$SetWifiCredential,
     [switch]$PlanOnly
@@ -96,6 +98,42 @@ function Get-DiskFingerprint([object]$Disk) {
         IsOffline = [bool]$Disk.IsOffline
         IsReadOnly = [bool]$Disk.IsReadOnly
     } | ConvertTo-Json -Compress
+}
+
+function Resolve-BootMount([int]$Number, [string]$ExplicitPath, [bool]$FixtureMode) {
+    if ($ExplicitPath) {
+        if (-not (Test-Path -LiteralPath $ExplicitPath -PathType Container)) {
+            Fail "boot mount path is unavailable"
+        }
+        $resolved = (Resolve-Path -LiteralPath $ExplicitPath).Path
+        if (-not $FixtureMode) {
+            $qualifier = Split-Path -Qualifier $resolved
+            if (-not $qualifier) { Fail "boot mount path must be a mounted volume" }
+            $letter = $qualifier.TrimEnd('\').TrimEnd(':')
+            $partition = Get-Partition -DriveLetter $letter -ErrorAction Stop
+            if ([int]$partition.DiskNumber -ne $Number) {
+                Fail "boot mount does not belong to the selected physical disk"
+            }
+        }
+        return $resolved
+    }
+
+    Update-HostStorageCache
+    foreach ($partition in @(Get-Partition -DiskNumber $Number -ErrorAction Stop)) {
+        $volume = Get-Volume -Partition $partition -ErrorAction SilentlyContinue
+        if ($null -eq $volume -or [string]$volume.FileSystem -ne "FAT32") { continue }
+        if (-not $partition.DriveLetter) {
+            $used = @((Get-Volume).DriveLetter | Where-Object { $_ })
+            $letter = [char[]]([char]'Z'..[char]'D') | Where-Object { $used -notcontains $_ } | Select-Object -First 1
+            if (-not $letter) { Fail "no drive letter is available for the SD boot partition" }
+            Add-PartitionAccessPath -DiskNumber $Number -PartitionNumber $partition.PartitionNumber -DriveLetter $letter
+        }
+        else {
+            $letter = $partition.DriveLetter
+        }
+        return "${letter}:\"
+    }
+    Fail "the flashed SD boot partition was not found"
 }
 
 function New-PinkyIdentity {
@@ -216,6 +254,73 @@ if (-not $DiskInventoryJson) {
 $writerExitCode = $LASTEXITCODE
 if ($writerExitCode -ne 0) { Fail "image writer failed with exit code $writerExitCode" }
 
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$bundleTool = Join-Path $PSScriptRoot "create-provision-bundle.py"
+if (-not (Test-Path -LiteralPath $bundleTool -PathType Leaf)) { Fail "bundle creator is missing" }
+$temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) ("rosy-provision-" + [guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
+$bundleTemp = Join-Path $temporaryRoot "provision.json"
+$bundleReceiptTemp = Join-Path $temporaryRoot "receipt.json"
+$bundleReceipt = $null
+try {
+    $networkValue = $wifiCredential.GetNetworkCredential().Password
+    try {
+        $bundleRequest = [ordered]@{
+            device_uid = $DeviceUid
+            device_name = $DeviceName
+            model = $Model
+            release_id = $ReleaseId
+            robot_number = $RobotNumber
+            requested_preset = $Preset
+            country_code = $CountryCode
+            ssid = $wifiCredential.UserName
+            wifi_passphrase = $networkValue
+            fleet_endpoint = $FleetEndpoint
+            fleet_trust_profile = $FleetTrustProfile
+            pairing_required = $false
+        }
+        $previousOutputEncoding = $OutputEncoding
+        $previousPythonUtf8 = $env:PYTHONUTF8
+        try {
+            $OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+            $env:PYTHONUTF8 = "1"
+            $bundleRequest | ConvertTo-Json -Compress | & $PythonExe $bundleTool --output $bundleTemp --receipt $bundleReceiptTemp
+            if ($LASTEXITCODE -ne 0) { Fail "provisioning bundle creation failed" }
+        }
+        finally {
+            $OutputEncoding = $previousOutputEncoding
+            $env:PYTHONUTF8 = $previousPythonUtf8
+        }
+    }
+    finally {
+        $networkValue = $null
+        $bundleRequest = $null
+    }
+
+    $bootRoot = Resolve-BootMount $DiskNumber $BootMountPath ([bool]$DiskInventoryJson)
+    $bundleDirectory = Join-Path $bootRoot "rosy-provision"
+    New-Item -ItemType Directory -Path $bundleDirectory -Force | Out-Null
+    $bundleTarget = Join-Path $bundleDirectory "provision.json"
+    if (Test-Path -LiteralPath $bundleTarget) { Fail "provisioning bundle already exists on the card" }
+    $bundleTargetTemp = Join-Path $bundleDirectory ".provision.json.tmp"
+    Copy-Item -LiteralPath $bundleTemp -Destination $bundleTargetTemp
+    Move-Item -LiteralPath $bundleTargetTemp -Destination $bundleTarget
+    $bundleReceipt = Get-Content -LiteralPath $bundleReceiptTemp -Raw | ConvertFrom-Json
+}
+finally {
+    foreach ($temporaryFile in @($bundleTemp, $bundleReceiptTemp)) {
+        if (Test-Path -LiteralPath $temporaryFile) { Remove-Item -LiteralPath $temporaryFile -Force }
+    }
+    if (Test-Path -LiteralPath $temporaryRoot) { Remove-Item -LiteralPath $temporaryRoot -Force }
+}
+
+$registry.robot_numbers = @(@($registry.robot_numbers) + $RobotNumber | Sort-Object -Unique)
+$registry.device_names = @(@($registry.device_names) + $DeviceName | Sort-Object -Unique)
+$registry.device_uids = @(@($registry.device_uids) + $DeviceUid | Sort-Object -Unique)
+$registryTemp = "$RegistryJson.tmp-$([guid]::NewGuid().ToString('N'))"
+$registry | ConvertTo-Json | Set-Content -LiteralPath $registryTemp -Encoding UTF8
+Move-Item -LiteralPath $registryTemp -Destination $RegistryJson -Force
+
 $receipt = [ordered]@{
     device_uid = $DeviceUid
     device_name = $DeviceName
@@ -226,6 +331,7 @@ $receipt = [ordered]@{
     image_sha256 = $actualHash
     writer = [IO.Path]::GetFileName($RpiImager)
     writer_exit_code = $writerExitCode
+    personalization = $bundleReceipt
     created_at = [DateTimeOffset]::UtcNow.ToString("o")
 }
 $receipt | ConvertTo-Json | Set-Content -LiteralPath $ReceiptPath -Encoding UTF8
