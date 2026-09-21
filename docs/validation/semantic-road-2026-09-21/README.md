@@ -1,4 +1,29 @@
-# Semantic road control host simulation (2026-09-21)
+# Semantic road control validation (2026-09-21)
+
+## Actual Gazebo runtime result
+
+`GAZEBO_CAMERA_GRAPH_PASS` / `CONTINUOUS_REALTIME_PREVIEW_HOLD`
+
+WSL2 Ubuntu 24.04, ROS 2 Jazzy, Gazebo Harmonic 8.11.0에서 실제
+`semantic_road_dashboard.launch.py gazebo_gui:=false`를 실행했다. Gazebo가
+설치된 `map_260905_traffic.world`를 로드했고, 소스와 설치본의 SHA-256이
+일치했다. 전체 digest는 `gazebo_runtime_result.json`에 기록했다.
+`description`은 이제 `gz_sim` 런타임 의존성으로 자동 빌드된다.
+
+실제 `/camera/front` 프레임은 `GAZEBO`, `front_camera_link`, 640x360으로
+수신됐다. production road detector가 정지선을 confidence
+`0.8141533745659723`로 검출했고, observation은
+`map_260905_update_v2` / `road-scene-v1`을 보고했다. CORE는 검증된
+homography가 없어 거리 산출을 하지 않고 `stop_distance_unavailable`,
+`linear_scale=0.0`, 실제 속도 0으로 fail-closed 했다.
+
+![Actual Gazebo front camera frame](gazebo_camera_frame.jpg)
+
+이 PC의 WSL 렌더링에서는 실제 카메라 wall rate가 약 0.59~0.80 Hz,
+dashboard preview가 약 0.36 Hz라 프레임이 간헐적으로 stale이 되었다.
+안전 타임아웃을 느슨하게 만들지 않았으며, 실시간 연속 주행과 실제 Pinky Pro
+카메라/모터 검증은 여전히 HOLD다. 전체 수치와 gate는
+`gazebo_runtime_result.json`에 기록했다.
 
 ## Result
 
@@ -27,6 +52,10 @@ to the detector. `result.json` records
 ## Evidence
 
 - `result.json`: machine-readable policy and command samples.
+- `gazebo_runtime_result.json`: actual Gazebo camera, detector, and CORE
+  readback with explicit remaining HOLD gates.
+- `gazebo_camera_frame.jpg`: actual Gazebo `/camera/front` frame pulled from
+  the authenticated CORE preview endpoint; this is not a HOST-SIM fixture.
 - `semantic_road_simulation.svg`: state/command timeline.
 - `camera_detection_montage.png`: the synthetic camera inputs used by the
   production detector.
@@ -60,8 +89,11 @@ python -m pytest `
 On a ROS 2 Jazzy host with Gazebo installed, run the real simulated camera path:
 
 ```bash
-ros2 launch gz_sim semantic_road_dashboard.launch.py
+ros2 launch gz_sim semantic_road_dashboard.launch.py gazebo_gui:=false
 ```
+
+Gazebo 창도 함께 보려면 `gazebo_gui:=true`로 바꾼다. 대시보드 검증에는
+headless가 기본값이므로 GUI 창 종료가 전체 시뮬레이션을 끝내지 않는다.
 
 Then open `http://127.0.0.1:8080/dashboard`, enter the Viewer token, and check
 that the camera source reads `GAZEBO`. The checked-in screenshot is deliberately
@@ -74,8 +106,10 @@ failed reauthentication clears the old frame and stops camera polling.
 
 ## Acceptance boundary
 
-This is a deterministic Windows host simulation. It proves the semantic map
-asset and the ROS-free perception-policy-command chain. It does not prove a
-running Gazebo camera/ROS graph, Pi/ARM64 artifact, physical Pinky Pro camera
-mount or homography, braking distance, motor response, or unattended field
-acceptance. Those remain ROS-SIM, DEVICE, and FIELD gates respectively.
+The host fixtures still prove the deterministic ROS-free chain. The additional
+runtime evidence now proves the actual Gazebo camera/ROS graph, the exact
+installed semantic world identity, and fail-closed detector-to-CORE policy
+readback. It does not prove sustained realtime camera throughput, Pi/ARM64
+artifact behavior, physical Pinky Pro camera mount or homography, braking
+distance, motor response, or unattended field acceptance. Those remain
+separate performance, DEVICE, and FIELD gates.

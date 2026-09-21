@@ -18,6 +18,7 @@
        시뮬 런치가 내비 헬퍼를 쓰는 것은 하향 의존이라 허용, 선언으로 고정한다. -->
   <exec_depend>navigation</exec_depend>
   <!-- Exact simulation benches may be installed assets owned by Control. -->
+  <exec_depend>description</exec_depend>
   <exec_depend>control</exec_depend>
   <exec_depend>core</exec_depend>
   <exec_depend>rclpy</exec_depend>

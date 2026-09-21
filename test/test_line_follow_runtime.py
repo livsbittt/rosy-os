@@ -85,6 +85,8 @@ def test_semantic_road_launch_connects_real_gazebo_camera_to_dashboard():
     assert 'executable="road_observer_node"' in launch
     assert '"require_camera_controls_stable": False' in launch
     assert '"dashboard_source": "GAZEBO"' in launch
+    assert 'DeclareLaunchArgument("gazebo_gui", default_value="false")' in launch
+    assert '"gui": LaunchConfiguration("gazebo_gui")' in launch
     assert "<exec_depend>core</exec_depend>" in package
     for dependency in (
         "ament_index_python", "launch", "launch_ros", "ros_gz_image",

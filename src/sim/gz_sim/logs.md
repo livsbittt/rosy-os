@@ -85,3 +85,11 @@
 - 증거: launch/package/bridge 계약과 Chromium dashboard `17 passed`; HOST-SIM screenshot과 6-frame GIF 보존.
 - gate 변화: 기존 exact-map ROS-SIM GO는 유지한다. 새 semantic camera launch는 이 Windows 세션에서 실제 Gazebo로 실행하지 않았으므로 해당 프레임 gate는 HOLD다.
 - 결정: D-152의 bounded preview 예외와 D-118의 기본 image-off를 함께 유지한다.
+
+## 2026-09-21 · uncommitted · fix(sim): validate the actual Gazebo camera path headlessly (D-152)
+
+- 변경: `description`을 명시적 런타임 의존성으로 선언하고 semantic dashboard의 Gazebo GUI를 선택 인자로 분리했다. 기본은 `gazebo_gui:=false`이며 `true`로 튜닝할 수 있다.
+- 증거: clean dependency closure에서 12 packages build PASS. Actual Gazebo 8.11.0 loaded the installed `map_260905_traffic.world`; source/install SHA-256 matched. `/camera/front` produced a 640x360 `GAZEBO` frame and the production detector reported the stop line at confidence 0.814153. CORE held zero velocity with `stop_distance_unavailable` because no physically validated homography was active.
+- 한계: this WSL host produced about 0.59-0.80 Hz camera and 0.36 Hz preview throughput. Continuous realtime preview, metric distance, physical Pinky Pro, braking, and FIELD acceptance remain HOLD.
+- gate 변화: existing exact-map ROS-SIM GO remains unchanged. The actual Gazebo camera graph moves from untested to PASS, while sustained realtime preview and physical validation remain HOLD.
+- 보존: `docs/validation/semantic-road-2026-09-21/gazebo_runtime_result.json` and `gazebo_camera_frame.jpg`.
