@@ -47,6 +47,7 @@ def _valid_root(tmp_path: Path) -> Path:
         release / "install",
         root / "etc/systemd/system",
         root / "etc/rosy",
+        root / "etc/rosy/trusted-release-keys",
         root / "opt/rosy/first-boot",
     ):
         path.mkdir(parents=True, exist_ok=True)
@@ -57,6 +58,10 @@ def _valid_root(tmp_path: Path) -> Path:
     (release / "rosy-packages.txt").write_text("control\ncore\n", encoding="utf-8")
     (root / "etc/rosy/motion_profiles.yaml").write_text("profiles: {}\n", encoding="utf-8")
     (root / "etc/rosy/cyclonedds.xml").write_text("<CycloneDDS/>\n", encoding="utf-8")
+    (root / "etc/rosy/trusted-release-keys/rosy-release-2026-01.pem").write_text(
+        "-----BEGIN PUBLIC KEY-----\nfixture\n-----END PUBLIC KEY-----\n",
+        encoding="utf-8",
+    )
     for unit in (
         "rosy-first-boot.service",
         "rosy-release-recover.service",
