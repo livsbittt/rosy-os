@@ -78,6 +78,9 @@ class DetectionEvidence(BaseModel):
     input_width: int = Field(gt=0)
     input_height: int = Field(gt=0)
     input_fps: float = Field(gt=0)
+    #: v1.11 additive: producer-side inference latency when reported.  The
+    #: packet stays valid without it (plan 2026-09-20-yolo-advisory-sequence T2).
+    inference_ms: float | None = Field(default=None, ge=0.0)
     detections: list[Detection] = Field(default_factory=list)
 
     @field_validator("model_revision")
@@ -93,6 +96,15 @@ class DetectionEvidence(BaseModel):
         if not isinstance(value, (int, float)) or isinstance(value, bool) \
                 or not math.isfinite(value):
             raise ValueError("observed_at must be finite")
+        return value
+
+    @field_validator("inference_ms")
+    @classmethod
+    def _latency_non_negative(cls, value: float | None) -> float | None:
+        if value is not None and (not isinstance(value, (int, float))
+                                  or isinstance(value, bool) or value < 0
+                                  or not math.isfinite(value)):
+            raise ValueError("inference_ms must be a non-negative number")
         return value
 
     def fresh(self, now: float, max_age_s: float = DETECTION_MAX_AGE_S) -> bool:

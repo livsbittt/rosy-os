@@ -144,6 +144,21 @@ def test_evidence_revision_and_seq_are_required():
         _evidence(input_width=0)
 
 
+def test_inference_latency_meta_is_additive_and_optional():
+    """v1.11 additive: 지연 메타 없는 구 패킷도 여전히 유효하다 (plan T2)."""
+    import pydantic
+    from core_common.protocol.detections import DetectionEvidence
+    ev = _evidence()
+    assert ev.inference_ms is None
+    assert DetectionEvidence.model_validate(ev.model_dump()) == ev
+    with pytest.raises(pydantic.ValidationError):
+        _evidence(inference_ms=-1.0)
+    with pytest.raises(pydantic.ValidationError):
+        _evidence(inference_ms=float("nan"))
+    timed = _evidence(inference_ms=12.3)
+    assert DetectionEvidence.model_validate(timed.model_dump()).inference_ms == 12.3
+
+
 def test_freshness_boundary_is_300ms():
     """D-136: 신선도 >300ms면 INVALID — 깨진 영상의 clear가 제일 위험하다."""
     ev = _evidence(observed_at=1000.0)

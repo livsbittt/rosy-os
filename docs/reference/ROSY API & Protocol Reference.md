@@ -2,7 +2,7 @@
 ## 공유 인터페이스 계약서
 
 **Document ID:** ROSY-API-REF-001
-**Version:** v1.10
+**Version:** v1.11
 **Status:** Approved
 **대상 독자:** rosy_core 개발자, rosy_fleet 개발자, 외부 SDK·AI·연동 시스템
 
@@ -312,6 +312,7 @@ HOLD | LOST` 이며 `LOST` 는 모드를 `OFF` 로 바꾼 뒤 다시 선택하�
 ```json
 { "model_revision": "yolo11n-r1", "observed_at": 1000.0, "seq": 41,
   "input_width": 640, "input_height": 640, "input_fps": 10.0,
+  "inference_ms": 12.3,
   "detections": [
     { "label": "person", "x": 0.4, "y": 0.3, "w": 0.2, "h": 0.4,
       "confidence": 0.8, "track_id": 3 }
@@ -322,6 +323,8 @@ HOLD | LOST` 이며 `LOST` 는 모드를 `OFF` 로 바꾼 뒤 다시 선택하�
   묶는다(D-47 패턴) — 모르는 revision은 fail-closed.
 - 신선도 상한 300 ms(D-136). 빈 `detections` + 전진 `seq`는 "없음"이고,
   `seq` 점프는 "놓침"이다 — 둘을 혼동하지 않는다.
+- `inference_ms` 는 생산 측이 report하는 추론 지연(ms)다 — 선택 필드이고
+  없어도 패킷은 유효하다 (v1.11 additive).
 - 자문 전용이다. 이 증거 하나로 정지·해금을 만들지 않는다(SAF-006, D-137).
 
 클라이언트→서버 선택 메시지(WS Teleop, Operator 권한):
@@ -608,6 +611,7 @@ Fleet(rosy_fleet)이 제공하는 엔드포인트. Base: `http://<fleet-host>:80
 
 | 버전 | 일자 | 내용 |
 |---|---|---|
+| v1.11 | 2026-09-21 | Additive: §6.1.1 vision `DetectionEvidence` 에 `inference_ms` (선택) — 추론 지연 메타(plan 2026-09-20-yolo-advisory-sequence T2). 스키마 진실 `core_common.protocol.detections` 와 control 생산 측 스냅샷(`control.control.detection_evidence`)을 동기 시험으로 묶는다 (D-18, D-137). envelope `protocol_version` 은 1.0 유지 |
 | v1.10 | 2026-09-21 | Additive: D-143 `line-follow` 조회·모드 선택 API와 상태 스냅샷 `line_follow`. IR/카메라 소스는 상호 배타적이며 stale·저신뢰·형식 오류는 0 명령, 3초 손실은 재선택 전까지 `LOST` latch |
 | v1.9 | 2026-09-20 | Additive: §6.1.1 vision `DetectionEvidence` — 박스 정규화 좌표, `model_revision` 바인딩(D-47), 신선도 300 ms(D-136), 빈 detections/seq 점프 구분, 자문 전용(SAF-006, D-137). envelope `protocol_version` 은 1.0 유지 |
 | v1.8 | 2026-09-17 | Additive: §6.1 스냅샷에 채널별 `evidence` — 서버가 `fresh`/`delayed`/`disconnected`/`unavailable` 과 그 판정의 `stale_after_s` 를 계산해 싣는다. 타임스탬프만 주고 클라이언트가 임계값을 하드코딩하는 경로는 계약이 아니다(D-18, D-72 S3). `GET /api/v1/robot/state` 와 `/ws/state` 가 동일 필드다. envelope `protocol_version` 은 1.0 유지(PRT-006 additive / MINOR 는 문서 쪽) |
