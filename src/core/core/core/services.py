@@ -15,6 +15,7 @@ from core_features.docking.agent import DockAgent
 from core_features.docking.database import DockDatabase
 from core_features.docking.detector import select_detector
 from core_features.docking.manager import DockingConfig, DockingManager
+from core_features.fleet_agent.agent import FleetAgent
 from core_common.domain.adapters import AdapterRegistry
 
 from core_common.domain.model import inventory_from_config, slices_from_config

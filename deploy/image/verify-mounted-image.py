@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""Inspect a mounted ROSY OS root without executing it."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+import re
+import sys
+
+
+REQUIRED_UNITS = (
+    "rosy-first-boot.service",
+    "rosy-release-recover.service",
+    "rosy-sd-provision.service",
+    "rosy-core.service",
+    "rosy-runtime.target",
+)
+
+
+def inspect(root: Path, release_id: str) -> list[str]:
+    root = root.resolve()
+    findings: list[str] = []
+    release = root / "opt/rosy/releases" / release_id
+    required_paths = (
+        root / "opt/ros/jazzy/setup.bash",
+        release / "install/setup.bash",
+        root / "etc/rosy/motion_profiles.yaml",
+        root / "etc/rosy/cyclonedds.xml",
+        root / "opt/rosy/first-boot/rosy-first-boot.py",
+    )
+    for path in required_paths:
+        if not path.is_file():
+            findings.append(f"missing required image path: {path.relative_to(root)}")
+    for unit in REQUIRED_UNITS:
+        if not (root / "etc/systemd/system" / unit).is_file():
+            findings.append(f"missing systemd unit: {unit}")
+
+    required_file = release / "required-ros-packages.txt"
+    inventory_file = release / "rosy-packages.txt"
+    required = set(required_file.read_text(encoding="utf-8").split()) if required_file.is_file() else set()
+    inventory = set(inventory_file.read_text(encoding="utf-8").split()) if inventory_file.is_file() else set()
+    for package in sorted(required - inventory):
+        findings.append(f"required ROS package missing from inventory: {package}")
+
+    if (root / "usr/bin/docker").exists() or (root / "usr/bin/dockerd").exists():
+        findings.append("docker must not be installed in the product image")
+    runtime = root / "etc/rosy/runtime.env"
+    if runtime.exists():
+        content = runtime.read_text(encoding="utf-8", errors="replace")
+        if re.search(r"(?m)^(ROSY_NAMESPACE|ROSY_ROBOT_NUMBER|ROS_DOMAIN_ID)=.+$", content):
+            findings.append("common image is not device-neutral: runtime identity is populated")
+    complete = root / "var/lib/rosy/provisioning/complete.json"
+    if complete.exists():
+        findings.append(f"common image contains device-specific state: {complete.relative_to(root)}")
+    connections = root / "etc/NetworkManager/system-connections"
+    if connections.is_dir() and any(connections.iterdir()):
+        findings.append(f"common image contains device-specific state: {connections.relative_to(root)}")
+    return findings
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--release-id", required=True)
+    args = parser.parse_args()
+    findings = inspect(args.root, args.release_id)
+    if findings:
+        for finding in findings:
+            print(finding, file=sys.stderr)
+        return 1
+    print(json.dumps({"ok": True, "release_id": args.release_id}, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

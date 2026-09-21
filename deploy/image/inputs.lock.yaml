@@ -14,6 +14,39 @@ board:
     First ROSY OS board support. Runtime overlays live in
     deploy/robot/config/capabilities.{core,motor,hardware}.yaml.
 
+product_artifact:
+  format: raw-disk-image
+  compression: xz
+  filename_template: rosy-os-pinky-pro-{release_id}-arm64.img.xz
+  intermediate_suffix: .img
+  rootfs_expansion_mib: 4096
+  raspberry_pi_imager_compatible: true
+  contains_partition_table: true
+  device_neutral: true
+  forbidden_formats: [iso]
+  required_files:
+    - manifest.json
+    - SHA256SUMS
+    - SHA256SUMS.sig
+    - sbom.spdx.json
+    - deb-packages.txt
+    - rosy-packages.txt
+    - required-ros-packages.txt
+    - source-revision.txt
+    - base-image-provenance.json
+    - build-provenance.json
+    - artifact-report.md
+  excluded_device_fields:
+    - hostname
+    - device_uid
+    - robot_number
+    - wifi_credentials
+    - fleet_pairing_credential
+    - ssh_private_key
+  note: >-
+    D-164 product output. The common signed image remains device-neutral;
+    per-card identity and credentials enter only through deploy/sd after write.
+
 image_tool:
   name: rosy-ubuntu-image-builder
   repository: in-tree:deploy/image
@@ -30,11 +63,16 @@ base_image:
   url: https://cdimage.ubuntu.com/ubuntu/releases/24.04/release/ubuntu-24.04.5-preinstalled-server-arm64+raspi.img.xz
   sha256: b23371a5c8d02f612c26e7c18cacb81c5a48f968c7c66a2645391320aa94351e
   minimum_size_bytes: 1000000000
+  checksum_url: https://cdimage.ubuntu.com/ubuntu/releases/24.04/release/SHA256SUMS
+  checksum_signature_url: https://cdimage.ubuntu.com/ubuntu/releases/24.04/release/SHA256SUMS.gpg
+  checksum_signing_key_fingerprint: 843938DF228D22F7B3742BC0D94AA3F0EFE21092
+  checksum_keyring: /usr/share/keyrings/ubuntu-archive-keyring.gpg
   verified: false
   note: >-
-    URL and SHA-256 were read from Canonical's 24.04 release index on
-    2026-09-22. Keep verified false until the file is downloaded and checked
-    on the native ARM64 release host.
+    URL, SHA-256, signed checksum URLs, and Canonical image-signing key were
+    pinned from Canonical's 24.04 release material on 2026-09-22. Keep verified
+    false until the signed checksum and image are checked on the native ARM64
+    release host.
 
 os:
   family: ubuntu-server
@@ -58,8 +96,11 @@ ros:
   distribution: jazzy
   installation: native-deb
   architecture: arm64
-  apt_repository: http://packages.ros.org/ros2/ubuntu
-  apt_key_fingerprint: null
+  apt_repository: https://packages.ros.org/ros2/ubuntu
+  apt_source_version: 1.2.0
+  apt_source_url: https://github.com/ros-infrastructure/ros-apt-source/releases/download/1.2.0/ros2-apt-source_1.2.0.noble_all.deb
+  apt_source_sha256: 0804d9b13db770eb87019be414cd78378835228ad5fa801fc88758596dd8f7e5
+  apt_key_fingerprint: embedded-in-sha256-pinned-ros2-apt-source-package
   verified: false
 
 containers:

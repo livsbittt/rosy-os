@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -13,6 +14,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "deploy" / "sd" / "prepare-rosy-sd.ps1"
 POWERSHELL = shutil.which("powershell") or shutil.which("pwsh")
+sys.path.insert(0, str(ROOT / "deploy" / "release"))
+from signing import build_sha256sums, sign_checksums  # noqa: E402
 
 
 def _disk(**overrides):
@@ -33,10 +36,36 @@ def _disk(**overrides):
 
 @pytest.fixture
 def writer_case(tmp_path: Path):
-    image = tmp_path / "rosy.img"
+    release = tmp_path / "release"
+    release.mkdir()
+    image = release / "rosy-os-pinky-pro-2026.09.21-001-arm64.img.xz"
     image.write_bytes(b"fixture rosy image\n")
-    signature = tmp_path / "rosy.img.sig"
-    signature.write_text("fixture detached signature\n", encoding="utf-8")
+    manifest = release / "manifest.json"
+    manifest.write_text(json.dumps({
+        "schema_version": 1,
+        "release_id": "2026.09.21-001",
+        "product": "rosy-os",
+        "board": "pinky_pro",
+        "architecture": "arm64",
+        "image": {
+            "filename": image.name,
+            "sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
+        },
+    }, sort_keys=True), encoding="utf-8")
+    private_key = tmp_path / "release-private.pem"
+    public_key = tmp_path / "release-public.pem"
+    subprocess.run(
+        ["openssl", "genpkey", "-algorithm", "ED25519", "-out", str(private_key)],
+        check=True,
+    )
+    subprocess.run(
+        ["openssl", "pkey", "-in", str(private_key), "-pubout", "-out", str(public_key)],
+        check=True,
+    )
+    sums = build_sha256sums(release, ["manifest.json", image.name])
+    (release / "SHA256SUMS").write_bytes(sums)
+    signature = release / "SHA256SUMS.sig"
+    signature.write_text(sign_checksums(sums, private_key), encoding="utf-8")
     inventory = tmp_path / "disks.json"
     inventory.write_text(json.dumps([_disk()]), encoding="utf-8")
     registry = tmp_path / "registry.json"
@@ -63,6 +92,8 @@ def writer_case(tmp_path: Path):
     return {
         "image": image,
         "signature": signature,
+        "public_key": public_key,
+        "private_key": private_key,
         "inventory": inventory,
         "registry": registry,
         "marker": marker,
@@ -86,6 +117,7 @@ def _run(case, *extra, plan_only=True):
         "-ImagePath", str(case["image"]),
         "-ImageSha256", hashlib.sha256(case["image"].read_bytes()).hexdigest(),
         "-ImageSignaturePath", str(case["signature"]),
+        "-ReleasePublicKey", str(case["public_key"]),
         "-ReleaseId", "2026.09.21-001",
         "-FleetEndpoint", "https://fleet.fixture.invalid:8443",
         "-FleetTrustProfile", "site-ca-2026",
@@ -212,6 +244,35 @@ def test_wrong_confirmation_never_invokes_writer(writer_case):
 
 
 @pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is required")
+def test_invalid_release_signature_is_rejected_before_disk_discovery(writer_case):
+    writer_case["signature"].write_text("invalid-signature\n", encoding="utf-8")
+
+    completed = _run(writer_case)
+
+    assert completed.returncode != 0
+    assert "signed image release verification failed" in completed.stderr.lower()
+    assert not writer_case["marker"].exists()
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is required")
+def test_manifest_identity_mismatch_is_rejected_before_writer(writer_case):
+    manifest = writer_case["image"].parent / "manifest.json"
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    data["board"] = "not-pinky"
+    manifest.write_text(json.dumps(data, sort_keys=True), encoding="utf-8")
+    sums = build_sha256sums(manifest.parent, ["manifest.json", writer_case["image"].name])
+    (manifest.parent / "SHA256SUMS").write_bytes(sums)
+    writer_case["signature"].write_text(
+        sign_checksums(sums, writer_case["private_key"]), encoding="utf-8"
+    )
+
+    completed = _run(writer_case)
+
+    assert completed.returncode != 0
+    assert not writer_case["marker"].exists()
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is required")
 def test_successful_write_stages_one_time_bundle_and_updates_registry(writer_case, tmp_path):
     boot = tmp_path / "boot"
     boot.mkdir()
@@ -253,3 +314,7 @@ def test_script_has_no_plain_password_or_shell_string_escape_hatch():
     assert "create-provision-bundle.py" in text
     assert "BootMountPath" in text
     assert "GetNetworkCredential().Password" in text
+    verify_call = text.index("verify-image-release.py")
+    disk_probe = text.index("$firstDisk = Select-SafeDisk")
+    assert verify_call < disk_probe
+    assert "ReleasePublicKey" in text

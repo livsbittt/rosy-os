@@ -9,6 +9,7 @@ param(
     [string]$ImagePath,
     [string]$ImageSha256,
     [string]$ImageSignaturePath,
+    [string]$ReleasePublicKey,
     [string]$ReleaseId,
     [string]$FleetEndpoint,
     [string]$FleetTrustProfile,
@@ -155,7 +156,7 @@ if ($SetWifiCredential) {
     if (-not $PSBoundParameters.ContainsKey("DiskNumber")) { exit 0 }
 }
 
-foreach ($required in @("DiskNumber", "RobotNumber", "WifiProfile", "ImagePath", "ImageSha256", "ImageSignaturePath", "ReleaseId", "FleetEndpoint", "FleetTrustProfile", "RegistryJson", "ReceiptPath")) {
+foreach ($required in @("DiskNumber", "RobotNumber", "WifiProfile", "ImagePath", "ImageSha256", "ImageSignaturePath", "ReleasePublicKey", "ReleaseId", "FleetEndpoint", "FleetTrustProfile", "RegistryJson", "ReceiptPath")) {
     if (-not $PSBoundParameters.ContainsKey($required)) { Fail "-$required is required" }
 }
 if ($Model -ne "pinky_pro") { Fail "only pinky_pro is supported" }
@@ -179,11 +180,23 @@ if ($ImageSha256 -notmatch '^[0-9a-fA-F]{64}$') { Fail "image SHA-256 is invalid
 $actualHash = (Get-FileHash -LiteralPath $ImagePath -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actualHash -ne $ImageSha256.ToLowerInvariant()) { Fail "image SHA-256 does not match" }
 if (-not (Test-Path -LiteralPath $ImageSignaturePath -PathType Leaf)) { Fail "image signature is missing" }
+if (-not (Test-Path -LiteralPath $ReleasePublicKey -PathType Leaf)) { Fail "trusted release public key is missing" }
 if (Test-Path -LiteralPath $ReceiptPath) { Fail "receipt already exists and will not be overwritten" }
 if (-not (Test-Path -LiteralPath $RegistryJson -PathType Leaf)) { Fail "identity registry is missing" }
 if (-not (Test-Path -LiteralPath $RpiImager -PathType Leaf) -and -not (Get-Command $RpiImager -ErrorAction SilentlyContinue)) {
     Fail "Raspberry Pi Imager CLI is unavailable"
 }
+
+$releaseRoot = Split-Path -Parent $ImageSignaturePath
+$releaseVerifier = Join-Path $PSScriptRoot "verify-image-release.py"
+if (-not (Test-Path -LiteralPath $releaseVerifier -PathType Leaf)) { Fail "signed image release verifier is missing" }
+$verification = & $PythonExe $releaseVerifier `
+    --release-root $releaseRoot `
+    --public-key $ReleasePublicKey `
+    --image $ImagePath `
+    --release-id $ReleaseId
+if ($LASTEXITCODE -ne 0) { Fail "signed image release verification failed" }
+$verification = $null
 
 $registry = Get-Content -LiteralPath $RegistryJson -Raw | ConvertFrom-Json
 if ($DeviceName -or $DeviceUid) {

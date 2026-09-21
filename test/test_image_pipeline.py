@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import subprocess
 import hashlib
+import os
 from pathlib import Path
 
 import pytest
@@ -58,7 +59,9 @@ bash_only = pytest.mark.skipif(
 )
 
 
-def _bash(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
+def _bash(
+    args: list[str], cwd: Path, *, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess:
     """Run bash from the directory holding the script, with relative names.
 
     The bash on PATH here resolves neither a Windows drive path nor its MSYS
@@ -66,9 +69,18 @@ def _bash(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
     reports a script problem that is really a path problem. Relative names
     from an explicit cwd work in Git Bash and on Linux alike.
     """
+    process_env = os.environ.copy()
+    if env:
+        process_env.update(env)
+        if os.name == "nt":
+            forwarded = [item for item in process_env.get("WSLENV", "").split(":") if item]
+            forwarded_names = {item.split("/")[0] for item in forwarded}
+            forwarded.extend(name for name in env if name not in forwarded_names)
+            process_env["WSLENV"] = ":".join(forwarded)
     return subprocess.run(
         ["bash", *args],
         cwd=str(cwd),
+        env=process_env,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -165,11 +177,16 @@ def _fetch_fixture(tmp_path: Path, content: bytes = b"ubuntu-image") -> Path:
     import shutil
 
     shutil.copy(IMAGE_DIR / "fetch-base-image.sh", tmp_path / "fetch-base-image.sh")
+    fingerprint = "843938DF228D22F7B3742BC0D94AA3F0EFE21092"
     lock = {
         "base_image": {
             "url": "https://cdimage.ubuntu.com/releases/noble/release/ubuntu.img.xz",
             "sha256": hashlib.sha256(content).hexdigest(),
             "minimum_size_bytes": len(content),
+            "checksum_url": "https://cdimage.ubuntu.com/releases/noble/release/SHA256SUMS",
+            "checksum_signature_url": "https://cdimage.ubuntu.com/releases/noble/release/SHA256SUMS.gpg",
+            "checksum_signing_key_fingerprint": fingerprint,
+            "checksum_keyring": "ubuntu-image-signing.gpg",
         }
     }
     (tmp_path / "inputs.lock.yaml").write_text(
@@ -178,7 +195,43 @@ def _fetch_fixture(tmp_path: Path, content: bytes = b"ubuntu-image") -> Path:
     cache = tmp_path / "cache"
     cache.mkdir()
     (cache / "ubuntu.img.xz").write_bytes(content)
+    (cache / "SHA256SUMS").write_text(
+        f"{hashlib.sha256(content).hexdigest()} *ubuntu.img.xz\n",
+        encoding="utf-8",
+    )
+    (cache / "SHA256SUMS.gpg").write_bytes(b"fixture-signature")
+    (tmp_path / "ubuntu-image-signing.gpg").write_bytes(b"fixture-keyring")
+    verifier = tmp_path / "fake-gpgv.sh"
+    verifier.write_text(
+        "#!/usr/bin/env bash\n"
+        "[[ ${ROSY_FAKE_GPGV_FAIL:-0} == 0 ]] || exit 1\n"
+        "printf '[GNUPG:] VALIDSIG %s 2026-09-22 0 4 0 1 10 00 %s\\n' "
+        '"${ROSY_FAKE_FINGERPRINT}" "${ROSY_FAKE_FINGERPRINT}"\n',
+        encoding="utf-8",
+        newline="\n",
+    )
+    verifier.chmod(0o755)
     return cache
+
+
+def _provenance_env(**overrides: str) -> dict[str, str]:
+    values = {
+        "ROSY_GPGV": "./fake-gpgv.sh",
+        "ROSY_FAKE_FINGERPRINT": "843938DF228D22F7B3742BC0D94AA3F0EFE21092",
+    }
+    values.update(overrides)
+    return values
+
+
+def test_lock_pins_canonical_checksum_signature_and_image_signing_key(lock):
+    base = lock["base_image"]
+
+    assert base["checksum_url"].endswith("/24.04/release/SHA256SUMS")
+    assert base["checksum_signature_url"].endswith("/24.04/release/SHA256SUMS.gpg")
+    assert base["checksum_signing_key_fingerprint"] == (
+        "843938DF228D22F7B3742BC0D94AA3F0EFE21092"
+    )
+    assert base["checksum_keyring"] == "/usr/share/keyrings/ubuntu-archive-keyring.gpg"
 
 
 def test_fetch_base_image_script_exists():
@@ -192,10 +245,53 @@ def test_fetch_base_image_reuses_a_verified_offline_cache(tmp_path):
     result = _bash([
         "fetch-base-image.sh", "--lock", "inputs.lock.yaml",
         "--cache-dir", "cache", "--offline",
-    ], tmp_path)
+    ], tmp_path, env=_provenance_env())
 
     assert result.returncode == 0, result.stderr
     assert "CACHE_VERIFIED" in result.stdout
+    assert "PROVENANCE_VERIFIED" in result.stdout
+
+
+@bash_only
+def test_fetch_base_image_rejects_an_invalid_canonical_signature(tmp_path):
+    _fetch_fixture(tmp_path)
+
+    result = _bash([
+        "fetch-base-image.sh", "--lock", "inputs.lock.yaml",
+        "--cache-dir", "cache", "--offline",
+    ], tmp_path, env=_provenance_env(ROSY_FAKE_GPGV_FAIL="1"))
+
+    assert result.returncode != 0
+    assert "signature" in result.stderr.lower()
+
+
+@bash_only
+def test_fetch_base_image_rejects_a_signature_from_the_wrong_fingerprint(tmp_path):
+    _fetch_fixture(tmp_path)
+
+    result = _bash([
+        "fetch-base-image.sh", "--lock", "inputs.lock.yaml",
+        "--cache-dir", "cache", "--offline",
+    ], tmp_path, env=_provenance_env(ROSY_FAKE_FINGERPRINT="0" * 40))
+
+    assert result.returncode != 0
+    assert "fingerprint" in result.stderr.lower()
+
+
+@bash_only
+def test_fetch_base_image_rejects_a_signed_checksum_without_the_exact_image(tmp_path):
+    cache = _fetch_fixture(tmp_path)
+    (cache / "SHA256SUMS").write_text(
+        f"{'0' * 64} *other.img.xz\n", encoding="utf-8"
+    )
+
+    result = _bash([
+        "fetch-base-image.sh", "--lock", "inputs.lock.yaml",
+        "--cache-dir", "cache", "--offline",
+    ], tmp_path, env=_provenance_env())
+
+    assert result.returncode != 0
+    assert "signed checksum" in result.stderr.lower()
 
 
 @bash_only
@@ -206,7 +302,7 @@ def test_fetch_base_image_rejects_checksum_mismatch(tmp_path):
     result = _bash([
         "fetch-base-image.sh", "--lock", "inputs.lock.yaml",
         "--cache-dir", "cache", "--offline",
-    ], tmp_path)
+    ], tmp_path, env=_provenance_env())
 
     assert result.returncode != 0
     assert "checksum mismatch" in result.stderr.lower()
@@ -222,7 +318,7 @@ def test_fetch_base_image_rejects_latest_or_non_https_urls(tmp_path):
     result = _bash([
         "fetch-base-image.sh", "--lock", "inputs.lock.yaml",
         "--cache-dir", "cache", "--offline",
-    ], tmp_path)
+    ], tmp_path, env=_provenance_env())
 
     assert result.returncode != 0
     assert "pinned https" in result.stderr.lower()
@@ -238,7 +334,7 @@ def test_fetch_base_image_enforces_minimum_size(tmp_path):
     result = _bash([
         "fetch-base-image.sh", "--lock", "inputs.lock.yaml",
         "--cache-dir", "cache", "--offline",
-    ], tmp_path)
+    ], tmp_path, env=_provenance_env())
 
     assert result.returncode != 0
     assert "too small" in result.stderr.lower()

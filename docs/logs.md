@@ -1296,3 +1296,19 @@
 - 변경: Fleet 통신 기능(Hub Listen 경로) 구현 (Task 7). schemas.py의 HelloPayload 확장, fleet hub --listen WebSocket 서버 구축, FleetAgent 아웃바운드 연결 및 이벤트 버퍼링 추가, FleetConsole에 Hub Snapshot 연동.
 - 증거: test_hub_server.py, test_fleet_agent.py, test_fleet_enrollment_contracts.py 통과.
 - gate 변화: 없음
+
+## 2026-09-22 · uncommitted · docs(image): choose a flashable Pinky Pro disk image (D-164)
+
+- 변경: Pinky Pro 제품 산출물을 일반 installer ISO가 아니라 Canonical Raspberry Pi
+  preinstalled image에서 파생한 서명 `.img.xz`로 고정했다. raw image workspace,
+  native chroot customization, offline signing, Windows pre-write verification, full-media
+  readback과 Pinky 인수까지 설계·10단계 실행 계획을 추가했다.
+- 증거: Canonical Raspberry Pi 설치 문서와 24.04 release index가 Pi용 Ubuntu Server를
+  `preinstalled-server-arm64+raspi.img.xz`로 배포하고 SD/USB/NVMe에 직접 기록하도록
+  안내함을 2026-09-22 확인했다. Raspberry Pi Imager custom repository도 compressed
+  `.img.xz`를 image URL로 사용한다.
+- gate 변화: 없음. 문서가 SOURCE 방향을 고정했을 뿐 실제 `.img.xz`, signature,
+  readback과 Pi boot가 없으므로 ARTIFACT/MEDIA/BOOT/DEVICE/FLEET은 HOLD다.
+- 결정: D-164.
+- 교훈: 운영자가 말하는 “ISO”는 단일 설치 파일이라는 UX 요구일 수 있지만, Pi 제품
+  계약은 installer media가 아니라 직접 기록 가능한 전체 disk image로 번역해야 한다.

@@ -133,3 +133,84 @@
   SBOM·서명·readback 전까지 ARTIFACT/MEDIA/BOOT/DEVICE/FLEET은 HOLD다.
 - 결정: D-154와 D-161. 공통 서명 이미지는 device-neutral로 유지하고 장치별 비밀과
   신원은 카드별 bundle 및 첫 부팅 serial binding에서만 적용한다.
+
+## 2026-09-22 · uncommitted · docs(image): plan the flashable `.img.xz` pipeline (D-164)
+
+- 변경: Canonical Pi preinstalled image에서 native ARM64 loop/mount/chroot 방식으로
+  ROSY를 설치하고 `.img.xz`를 생성하는 설계와 TDD 실행 계획을 추가했다. offline
+  signature를 Windows disk discovery 전에 검증하고 전체 media readback 뒤에만
+  MEDIA를 승격하도록 경계를 고정했다.
+- 증거: 공식 Canonical/Raspberry Pi 문서 확인과 ADR/plan 계약. 실제 native build는
+  아직 실행하지 않았다.
+- gate 변화: 없음. ARTIFACT와 DEVICE는 HOLD 유지.
+- 결정: D-164. ISO는 제품 artifact가 아니다.
+
+## 2026-09-22 · uncommitted · test(image): freeze the Pinky flashable image contract
+
+- 변경: `inputs.lock.yaml`에 exact `.img.xz` filename, raw disk/partition 계약,
+  Raspberry Pi Imager 호환성, 11개 signed sidecar, device-neutral 제외 필드와 ISO 금지를
+  추가하고 `test_pinky_flashable_image_contract.py`로 고정했다.
+- 증거: D-164 계약과 기존 Ubuntu-native/image pipeline 집중 시험 63 passed;
+  `git diff --check` 통과.
+- gate 변화: SOURCE 계약만 갱신. 실제 image가 없으므로 ARTIFACT/MEDIA는 HOLD다.
+- 결정: D-164 Task 1 완료.
+
+## 2026-09-22 · uncommitted · feat(image): verify Canonical Pi image provenance
+
+- 변경: Canonical `SHA256SUMS`, `SHA256SUMS.gpg`, Ubuntu CD Image Signing 키 지문과
+  신뢰 키링을 고정했다. fetcher는 분리 서명과 signer를 먼저 검증하고 정확한 파일명과
+  SHA-256 항목을 신뢰한 뒤 cache/download 이미지 바이트를 검증한다.
+- 증거: image-pipeline, flashable-image, Ubuntu-native 집중 계약 `67 passed` 및
+  `git diff --check` 통과.
+- gate 변화: SOURCE만 갱신. 실제 native ARM64 host 검증 전이므로
+  `base_image.verified: false`와 ARTIFACT HOLD를 유지한다.
+- 결정: D-164 Task 2 source-complete.
+
+## 2026-09-22 · uncommitted · feat(image): add fail-closed Pi image workspace
+
+- 변경: native arm64/root/tool preflight 뒤 Canonical `.img.xz`를 고유한 임시
+  workspace에만 풀고, root partition 확장, loop partition 탐색, root→boot mount,
+  customizer 실행과 boot→root→loop 역순 정리를 수행한다. 성공할 때만 raw `.img`를
+  원자적으로 내보내며 cache 원본은 수정하지 않는다.
+- 증거: 가짜 block/mount 도구를 이용한 workspace 계약 `7 passed`; native-host가
+  없어 실제 loop device에는 아직 실행하지 않았다.
+- gate 변화: SOURCE만 갱신. Task 4 customizer가 없으면 `build-image.sh`가 계속
+  fail-closed하므로 ARTIFACT는 HOLD다.
+- 결정: D-164 Task 3 source-complete.
+
+## 2026-09-22 · uncommitted · feat(sd): verify signed image before media selection
+
+- 변경: Windows writer가 디스크 조회 전에 Ed25519 `SHA256SUMS` 서명, 전체 파일
+  checksum, release/product/board/architecture, 정확한 `.img.xz` 이름과 hash를 검증한다.
+- 증거: 실제 임시 Ed25519 key로 정상·변조·identity mismatch를 실행한 writer 계약
+  `20 passed`.
+- gate 변화: SOURCE만 갱신. 실제 signed image와 물리 write가 없으므로 MEDIA HOLD.
+- 결정: D-164 Task 7 writer preflight source-complete.
+
+## 2026-09-22 · uncommitted · feat(image): install native ROSY into Ubuntu Pi image
+
+- 변경: SHA-pinned 공식 `ros2-apt-source` deb를 검증하고 native ARM64 chroot에서
+  ROS 2 Jazzy, CycloneDDS, rosdep 의존성, ROSY payload, CORE-only systemd와 first-boot
+  overlay를 설치하며 machine identity와 device credentials는 제거한다.
+- 증거: customization, payload, systemd, first-boot 집중 계약 `27 passed`; shell syntax 통과.
+- gate 변화: SOURCE만 갱신. 실제 ARM64 chroot 실행 전 ARTIFACT HOLD.
+- 결정: D-164 Task 4 source-complete.
+
+## 2026-09-22 · uncommitted · feat(image): emit verifiable Pinky image handoff
+
+- 변경: raw image를 분리한 상태에서 ext filesystem 검사 후 bmap과 deterministic
+  `.img.xz`를 만들고 raw intermediate를 제거한다. exact image manifest, SPDX SBOM,
+  deb/ROS inventory, base/build provenance, report와 unsigned `SHA256SUMS`를 생성한다.
+- 증거: finalization/handoff와 기존 image 계약 `64 passed`; shell syntax 통과.
+- gate 변화: SOURCE만 갱신. ARM64 실물과 offline signature 전 ARTIFACT HOLD.
+- 결정: D-164 Tasks 5-6 source-complete.
+
+## 2026-09-22 · uncommitted · ci(image): build Pinky image on native ARM64
+
+- 변경: manual `ubuntu-24.04-arm` workflow가 정확한 revision의 resolved lock을 만들고
+  Canonical provenance 검증부터 native payload/chroot/finalization까지 실행한 뒤 unsigned
+  `.img.xz` handoff만 3일 artifact로 업로드한다. private key와 publication은 포함하지 않는다.
+- 증거: image/workspace/customization/handoff/writer 전체 집중 계약 `102 passed`, workflow
+  YAML parse와 `git diff --check` 통과.
+- gate 변화: SOURCE만 갱신. workflow 실실행 전 ARTIFACT HOLD.
+- 결정: D-164 Task 8 실행 경로 준비 완료.
