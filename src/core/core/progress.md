@@ -13,8 +13,9 @@ gates:
     evidence: "1026 passed, 12 skipped (2026-09-21 Windows, 통합 main 병합 상태). D-137 PersonAdvisoryFeed, D-151 traffic policy, D-152 sequence-bound bounded camera preview 포함; Chromium camera/map panel은 별도 browser suite로 검증"
     cmd: "PYTHONPATH=src/core:src python3 -m pytest src/core/test -q"
   ROS-SIM:
-    state: HOLD
-    blocker: "2026-09-13 실제 ROS 출력 시험 이후 미재실행. ROS 2 Jazzy 환경에서 현재 트리로 재실행 필요. 2026-09-20 Gazebo 시도에서 부팅 AttributeError(self.core_common — D-126 개명 잔재)를 기록했고 6ff2cb8 에서 수정 — 재실행 증거는 아직 없음(docs/validation/map-260905-update-v2-2026-09-20/result.md)"
+    state: GO
+    evidence: "2026-09-21 WSL2 ROS 2 Jazzy 현재 트리 부트 스모크 — /core 노드, /cmd_vel 단일 발행자(topic info count=1), /api/v1 200, /dashboard 200, 종료 정상. docs/validation/ros-sim-core-2026-09-21/result.md"
+    cmd: "colcon build --symlink-install --packages-up-to core && ros2 run core core (identity env; docs/validation/ros-sim-core-2026-09-21 재현 절차)"
   ARTIFACT:
     state: HOLD
     blocker: "ARM64 개발 후보만 존재. 서명 manifest와 immutable digest 발행 전"
@@ -47,7 +48,7 @@ plans:
 
 ## 다음 gate
 
-1. ROS Jazzy container에서 ROS 출력 시험을 재실행해 ROS-SIM을 되돌린다.
+1. ~~ROS Jazzy container에서 ROS 출력 시험을 재실행해 ROS-SIM을 되돌린다.~~ 완료(2026-09-21, docs/validation/ros-sim-core-2026-09-21).
 2. 서명된 native ARM64 artifact 발행 후 Pi readback(ARTIFACT → DEVICE).
 
 ## 현재 유효한 금지사항
