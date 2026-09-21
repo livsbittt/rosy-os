@@ -45,8 +45,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · feat(control): DetectionEvidence producer snapshot (D-137 T2)
+- 2026-09-21 · uncommitted · fix(control): legacy launches point at absorbed package names (D-149)
 - 2026-09-21 · uncommitted · feat(control): selectable IR and camera line following (D-143)
 - 2026-09-21 · uncommitted · feat(mapping): complete the exact v2 Gazebo map
 - 2026-09-20 · uncommitted · feat(control): lane error and loss tracker (NAV-007)
-- 2026-09-20 · uncommitted · feat(dock): detector rides the sensor provider port (D-138)
-- 2026-09-20 · uncommitted · feat(control): ArUco detector lifecycle + DockType tag spec (DNC-007)

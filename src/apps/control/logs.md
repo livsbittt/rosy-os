@@ -99,3 +99,13 @@
 - 증거: 폐루프 운동학 simulation에서 3.5 cm 횡오차가 IR -0.03 cm, camera 0.006 cm로 수렴하며 stale/loss 정지 통과. 외부 IR calibration YAML, V4L2 exposure/white-balance 잠금 readback, mode/evidence revision 원자적 handoff를 추가했다. Control `1084 passed, 26 skipped`; CORE `955 passed, 11 skipped`; root `1008 passed, 13 skipped`; Fleet `332 passed, 5 skipped`; OMX `10 passed`; Games `101 passed`. `rosy-io:dev` 빌드와 이미지 내부 3개 line-follow executable, OpenCV 4.6.0, launch argument readback도 통과했다.
 - gate 변화: SOURCE/LOCAL GO. ROS-SIM은 detector/manager 폐루프 증거만 추가되었고 전체 graph gate는 HOLD. ARM64 artifact, Pi camera/I²C readback, 물리 교정과 실제 차선 주행은 ARTIFACT/DEVICE/FIELD HOLD.
 - 결정: D-143. 센서는 motion authority가 아니며 관제는 CORE API만 사용한다.
+
+## 2026-09-21 · uncommitted · fix(control): legacy launches point at absorbed package names (D-149)
+- 변경: robot.launch.py/wander.launch.py 의 pinky_imu_bno055 → imu_bno055(실행파일 main_node 그대로). 존재하지 않는 lcd_control/lcd_node 참조는 안내 로그로 교체( apps/emotion 이 흡수, CORE display/info 구독 노드로 별도 실행). dashboard_control/wander launch 에 "beside core" 금지 마커 추가. test/test_launch_contracts.py 2건 추가.
+- 증거: 개명 이전 이름 참조는 현재 트리에서 깨진 launch 다. D-149: safety_node 를 시작하는 모든 launch 의 마커 계약(최소 1개 존재 검사 포함).
+- gate 변화: 없음
+
+## 2026-09-21 · uncommitted · feat(control): DetectionEvidence producer snapshot (D-137 T2)
+- 변경: `control/control/detection_evidence.py` 신규 — 추론 패킷 1프레임 frozen 스냅샷(`TrackedEvidence` 패턴, 행동 어휘 없음). `capture()` 생산 측 전 필드 검증+ROS→모노톤 시계 변환, `evaluate()` 상태 판정만(fresh/empty/missed/stale/invalid — "없음"과 "놓침" 구분, 300ms D-136), `to_wire()` §6.1.1 재구성. 박스 규칙(원점 [0,1]·크기 (0,1]·프레임 수납)은 와이어 진실 `core_common.protocol.detections`와 동일 표현식. `inference_ms`(v1.11 additive)를 detections.py+API Ref §6.1.1에 추가. D-18 동기 시험이 스냅샷↔스키마를 묶음(시험 전용 import, D-64 생산 경계 유지). 중간에 schemas.py에 넣었다가 기존 detections.py 서브모듈 발견 후 되돌린 중복 정의 1건 있음
+- 증거: `test_detection_evidence.py` 10건 신규 녹색 + core `test_protocol_schemas.py` 1건(inference_ms 선택성·음수/NaN 거절·왕복) 신규 녹색. control 전체 1094 passed·26 skipped, core 전체 972 passed·11 skipped (2026-09-21 Windows, PYTHONPATH)
+- gate 변화: 없음. T1(CORE 정책 스냅샷 advisory 자리·단일 발행자·e-stop 해금 경로 계약)과 ROS-SIM 주입이 다음 순서 — 노드 기동은 T5까지 금지

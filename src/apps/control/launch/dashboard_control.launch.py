@@ -1,4 +1,7 @@
-"""Mapping/control application over an already running hardware sensor stack."""
+"""Mapping/control application over an already running hardware sensor stack.
+
+Do not launch this file beside core — CORE owns the final cmd_vel publisher (D-38/D-149).
+"""
 import os
 
 from ament_index_python.packages import get_package_share_directory

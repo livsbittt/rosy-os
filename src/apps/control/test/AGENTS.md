@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-06 | Updated: 2026-09-14 -->
+<!-- Generated: 2026-09-06 | Updated: 2026-09-21 -->
 
 # test/ (pure-logic suite)
 

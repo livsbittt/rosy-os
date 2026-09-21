@@ -37,7 +37,7 @@ def _processing_actions(context):
         f"; calibration_sensing_only={selected['calibration_sensing_only']}. " +
         'Delays order startup only; sensor and calibration gates determine readiness.')]
     if enabled['imu']:
-        actions.append(node('main_node', [], package='pinky_imu_bno055', name='pinky_imu_bno055'))
+        actions.append(node('main_node', [], package='imu_bno055', name='imu_bno055'))
     if enabled['camera']:
         actions.append(node('camera_detect_node', [robot, os.path.join(cfg, 'camera.yaml')]))
     safety = node('safety_node', [robot, os.path.join(cfg, 'safety.yaml'),
@@ -49,8 +49,10 @@ def _processing_actions(context):
             node('wander_node', [robot, os.path.join(cfg, 'wander.yaml')])]))
     displays = []
     if enabled['lcd']:
-        displays.append(node('lcd_node', [robot, _share('lcd_control', 'config', 'lcd.yaml')],
-                             package='lcd_control'))
+        # lcd_control 은 흡수되어 apps/emotion(emotion/emotion_server)이 됐다.
+        # 감정 표시 노드는 CORE 의 display/info 를 구독하는 별도 프로세스로
+        # 실행한다 — 여기서 대신 시작하지 않는다.
+        displays.append(LogInfo(msg='lcd_control was absorbed as apps/emotion; launch it separately'))
     if enabled['web']:
         web_params = [robot, os.path.join(cfg, 'web.yaml')]
         web_port = LaunchConfiguration('web_port').perform(context)

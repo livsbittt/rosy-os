@@ -1,3 +1,4 @@
+"""Legacy wander stack. Do not launch this file beside core — CORE owns the final cmd_vel publisher (D-38/D-149)."""
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -10,9 +11,9 @@ def generate_launch_description():
     robot = os.path.join(cfg, 'robot.yaml')
     return LaunchDescription([
         Node(
-            package='pinky_imu_bno055',
+            package='imu_bno055',
             executable='main_node',
-            name='pinky_imu_bno055',
+            name='imu_bno055',
             output='screen',
             respawn=True,
             respawn_delay=1.0,
