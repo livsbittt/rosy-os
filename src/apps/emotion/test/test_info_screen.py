@@ -4,7 +4,7 @@ import pytest
 
 from pathlib import Path
 
-from emotion.info_screen import DEFAULT_SIZE, battery_color, render
+from emotion.info_screen import DEFAULT_SIZE, _CRIT, battery_color, render
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -60,6 +60,19 @@ class TestRender:
 
     def test_missing_voltage_is_tolerated(self):
         assert render(self._payload(battery_voltage=None)).size == DEFAULT_SIZE
+
+    def test_missing_battery_percent_is_not_a_critical_alarm(self):
+        # 결측 배터리가 0% 위경보(crit 색)로 보이면 없는 위험을 만든다(Law 0,
+        # D-153 회차3 F-04). 전압 '--' 폴백과 같은 규약이어야 한다.
+        image = render(self._payload(battery_percent=None))
+        assert image.size == DEFAULT_SIZE
+        colors = {
+            image.getpixel((x, y))
+            for y in range(image.height)
+            for x in range(0, image.width, 2)
+        }
+        assert _CRIT not in colors
+        assert battery_color(0.0) == _CRIT  # 실측 0%는 여전히 위험색이다
 
     @pytest.mark.parametrize("percent", [-20.0, 0.0, 100.0, 150.0])
     def test_gauge_clamps_out_of_range_percent(self, percent):

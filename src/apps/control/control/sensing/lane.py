@@ -157,6 +157,24 @@ def line_observation_payload(source: str, stamp: float,
     }
 
 
+def steer_correction(error: float, *, gain: float = 1.0,
+                     max_angular: float = 0.4) -> float:
+    """Lane error to angular velocity (ROS CCW+). Positive error (lane right
+    of centre) steers right, i.e. negative. Saturated, never NaN — a steering
+    function that throws mid-drive is a stop by accident."""
+    if (isinstance(error, bool) or not isinstance(error, (int, float))
+            or not math.isfinite(float(error))):
+        raise ValueError("lane error must be a finite number")
+    if (isinstance(gain, bool) or not isinstance(gain, (int, float))
+            or not math.isfinite(float(gain)) or not float(gain) > 0):
+        raise ValueError("steering gain must be positive")
+    if (isinstance(max_angular, bool) or not isinstance(max_angular, (int, float))
+            or not math.isfinite(float(max_angular)) or not float(max_angular) > 0):
+        raise ValueError("max angular velocity must be positive")
+    raw = -float(gain) * max(-1.0, min(1.0, float(error)))
+    return max(-float(max_angular), min(float(max_angular), raw))
+
+
 class LaneTracker:
     """Loss accounting. `update` feeds observations (None = missed frame);
     `stop_demanded` fires once the gap outlasts the grace period."""

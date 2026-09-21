@@ -60,14 +60,21 @@ def render(payload: dict, size: tuple[int, int] = DEFAULT_SIZE) -> Image.Image:
     image = Image.new("RGB", size, _BG)
     draw = ImageDraw.Draw(image)
 
-    percent = float(payload.get("battery_percent") or 0.0)
+    raw_percent = payload.get("battery_percent")
     voltage = payload.get("battery_voltage")
-    color = battery_color(percent)
+    has_percent = raw_percent is not None
+    # 결측은 0%가 아니다 — 결측을 crit 색 경보로 그리면 없는 위험을 만든다
+    # (Law 0). 전압의 '--' 폴백과 같은 규약을 쓴다.
+    percent = float(raw_percent) if has_percent else 0.0
+    color = battery_color(percent) if has_percent else _MUTED
 
     draw.text((16, 10), str(payload.get("robot_id") or "rosy"),
               font=_font(18), fill=_MUTED)
 
-    draw.text((16, 36), f"{percent:.0f}%", font=_font(56), fill=color)
+    if has_percent:
+        draw.text((16, 36), f"{percent:.0f}%", font=_font(56), fill=color)
+    else:
+        draw.text((16, 36), "--", font=_font(56), fill=_MUTED)
     draw.text((width - 16, 60), "--" if voltage is None else f"{float(voltage):.2f} V",
               font=_font(20), fill=_MUTED, anchor="rs")
 

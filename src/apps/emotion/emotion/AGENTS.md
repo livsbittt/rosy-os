@@ -1,24 +1,24 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-14 | Updated: 2026-09-14 -->
+<!-- Generated: 2026-09-02 | Updated: 2026-09-21 -->
 
-# emotion
+# emotion (Python package)
 
 ## Purpose
 
-LCD emotion GIFs installed to the `emotion` share directory. Looked up at runtime via `get_package_share_directory('emotion')/emotion`.
+LCD node, GIF playback, ROS-free info-card drawing, and the GIF assets themselves.
+Installed to `share/emotion/emotion`; runtime lookup is
+`get_package_share_directory('emotion')/emotion`.
 
 ## Key Files
 
 | File | Description |
 |------|-------------|
-| `hello.gif` | Greeting |
-| `basic.gif` | Idle / default |
-| `angry.gif` | Angry |
-| `bored.gif` | Bored |
-| `fun.gif` | Fun |
-| `happy.gif` | Happy |
-| `interest.gif` | Interest |
-| `sad.gif` | Sad |
+| `__init__.py` | Package marker |
+| `emotion.py` | `RosyEmotion` node; `set_emotion` → GIF (`emotion=emotion.emotion:main`) |
+| `emotion_server.py` | Alternate/entry service wrapper (`emotion_server=emotion.emotion_server:main`) |
+| `rosy_lcd.py` | Hardware LCD helper (SPI, RPi.GPIO — device only) |
+| `info_screen.py` | PIL renderer for `display/info` JSON (320×240, ROS-free) |
+| `*.gif` | hello, basic, angry, bored, fun, happy, interest, sad |
 
 ## Subdirectories
 
@@ -28,25 +28,33 @@ None.
 
 ### Working In This Directory
 
-- Filenames are the `set_emotion` names. Renaming a GIF without updating the service contract breaks the LCD.
-- Info-screen cards are drawn in PIL (`../emotion/info_screen.py`), not as GIFs here.
+- Known emotions: hello, basic, angry, bored, fun, happy, interest, sad. Unknown
+  names should fail closed. Filenames are the `set_emotion` names — renaming a
+  GIF without updating the service contract breaks the LCD.
+- Info-screen cards are drawn in PIL (`info_screen.py`), not as GIFs here.
+- 2026-09-21 (D-153 회차1 F-01 수정): 재편(9b77daa)이 선언만 `emotion.*`로
+  바꾸고 파일을 `rosy_emotion/`에 두던 불일치를 닫았다 — 파이썐 파일은 이
+  디렉터리에 평평하게 두고 `rosy_emotion.py`는 `emotion.py`로 환원했다.
 
 ### Testing Requirements
 
-None. Binary assets.
+```bash
+PYTHONPATH=src/apps/emotion python3 -m pytest src/apps/emotion/test/test_info_screen.py -v
+```
 
 ### Common Patterns
 
-One GIF per named emotion. Share-dir install via `setup.py`.
+GIF play on a thread so the service callback does not block forever.
 
 ## Dependencies
 
 ### Internal
 
-- `../emotion/` LCD / emotion server
+- `interfaces/Emotion`
+- CORE publishes `display/info` JSON; this package renders it
 
 ### External
 
-None.
+- PIL (renderer), rclpy (node only), hardware LCD via `rosy_lcd.py`
 
 <!-- MANUAL: -->
