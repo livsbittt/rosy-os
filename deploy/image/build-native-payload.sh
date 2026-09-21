@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE=""
 RELEASE_ROOT=""
 SOURCE_REVISION=""
+RELEASE_ID=""
 ROS_DISTRO="jazzy"
 
 while [[ $# -gt 0 ]]; do
@@ -13,6 +14,7 @@ while [[ $# -gt 0 ]]; do
         --workspace) WORKSPACE="${2:-}"; shift 2 ;;
         --release-root) RELEASE_ROOT="${2:-}"; shift 2 ;;
         --source-revision) SOURCE_REVISION="${2:-}"; shift 2 ;;
+        --release-id) RELEASE_ID="${2:-}"; shift 2 ;;
         --ros-distro) ROS_DISTRO="${2:-}"; shift 2 ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
@@ -27,6 +29,8 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 [[ -n "$RELEASE_ROOT" ]] || fail "--release-root is required"
 [[ "$SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]] \
     || fail "--source-revision must be a full lowercase Git commit"
+[[ "$RELEASE_ID" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9]{3}$ ]] \
+    || fail "--release-id must be YYYY.MM.DD-NNN"
 [[ -f "/opt/ros/jazzy/setup.bash" ]] || fail "native ROS 2 Jazzy is not installed"
 
 ACTUAL_REVISION="$(git -C "$WORKSPACE" rev-parse HEAD)"
@@ -62,6 +66,7 @@ mv -f -- "$INVENTORY.tmp" "$INVENTORY"
 dpkg-query -W -f='${Package}\t${Version}\n' | LC_ALL=C sort > "$DEB_INVENTORY.tmp"
 mv -f -- "$DEB_INVENTORY.tmp" "$DEB_INVENTORY"
 printf '%s\n' "$SOURCE_REVISION" > "$RELEASE_ROOT/source-revision.txt"
+printf '%s\n' "$RELEASE_ID" > "$INSTALL_ROOT/.rosy-release"
 cp "$SCRIPT_DIR/required-ros-packages.txt" "$RELEASE_ROOT/required-ros-packages.txt"
 mkdir -p "$RELEASE_ROOT/deploy/robot"
 cp -a "$NATIVE_RUNTIME_SOURCE" "$RELEASE_ROOT/deploy/robot/native"

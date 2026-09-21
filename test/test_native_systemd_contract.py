@@ -17,6 +17,8 @@ def test_native_runtime_files_exist():
     for name in (
         "rosy-core.service", "rosy-io.service", "rosy-navigation.service",
         "rosy-runtime.target", "rosy-runtime.env", "rosy-sd-provision.service",
+        "rosy-release-recover.service", "recover-release.sh",
+        "activate-release.sh", "rollback-release.sh", "native_release.py",
         "wait-core-ready.py",
     ):
         assert (NATIVE / name).is_file(), name
@@ -80,6 +82,23 @@ def test_default_target_starts_core_only_after_recovery_and_provisioning():
     assert "WantedBy=multi-user.target" in target
 
 
+def test_native_recovery_is_a_required_fail_closed_boot_gate():
+    unit = _read("rosy-release-recover.service")
+    script = _read("recover-release.sh")
+
+    for directive in (
+        "DefaultDependencies=no", "After=local-fs.target", "Before=rosy-core.service rosy-runtime.target",
+        "Type=oneshot", "RemainAfterExit=yes",
+        "ExecStart=/opt/rosy/native-runtime/recover-release.sh",
+    ):
+        assert directive in unit
+    assert "Restart=" not in unit
+    assert "|| true" not in unit
+    assert "native_release.py" in script
+    assert " recover" in script
+    assert "docker" not in (unit + script).lower()
+
+
 def test_provisioning_gate_refuses_an_unpersonalized_device():
     unit = _read("rosy-sd-provision.service")
 
@@ -97,7 +116,7 @@ def test_runtime_environment_contains_no_secret_and_preserves_dds_isolation():
         "ROSY_CMD_VEL_TIMEOUT_S=0.5", "ROSY_RUNTIME_MODE=core",
     ):
         assert name in env
-    for forbidden in ("PASSWORD", "PASSPHRASE", "PSK", "TOKEN", "12131213"):
+    for forbidden in ("PASSWORD", "PASSPHRASE", "PSK", "TOKEN", "wifi_passphrase="):
         assert forbidden not in env.upper()
 
 

@@ -61,4 +61,15 @@ else
     exit 1
 fi
 
+NATIVE_RELEASE_ID="${ROSY_NATIVE_RELEASE_ID:-}"
+[[ -n "$NATIVE_RELEASE_ID" ]] \
+    || fail "ROSY_NATIVE_RELEASE_ID is required for the native product artifact"
+NATIVE_PUBLIC_KEY="${ROSY_NATIVE_RELEASE_PUBLIC_KEY:-$ROSY_IMAGE_MOUNT/etc/rosy/trusted-release-keys/rosy-release-2026-01.pem}"
+echo "==> signed native release ($NATIVE_RELEASE_ID)"
+"$PYTHON" "$REPO_ROOT/deploy/robot/native/native_release.py" \
+    --root "$ROSY_IMAGE_MOUNT" \
+    --public-key "$NATIVE_PUBLIC_KEY" \
+    verify --release-id "$NATIVE_RELEASE_ID" \
+    || fail "signed native release rejected"
+
 echo "BUILD_GO checks passed for $DIST"

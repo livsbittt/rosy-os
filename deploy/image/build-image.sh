@@ -63,7 +63,8 @@ mkdir -p "$OUT"
 "$SCRIPT_DIR/build-native-payload.sh" \
     --workspace "$WORKSPACE" \
     --release-root "$OUT/payload" \
-    --source-revision "$SOURCE_REVISION"
+    --source-revision "$SOURCE_REVISION" \
+    --release-id "$RELEASE_ID"
 
 echo "==> building $RELEASE_ID into $OUT"
 echo "    The verified base image and offline native ROSY payload are ready."

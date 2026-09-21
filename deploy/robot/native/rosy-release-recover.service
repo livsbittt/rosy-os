@@ -1,0 +1,19 @@
+[Unit]
+Description=ROSY native release recovery gate
+DefaultDependencies=no
+Requires=local-fs.target
+After=local-fs.target
+Before=rosy-core.service rosy-runtime.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/rosy/native-runtime/recover-release.sh
+TimeoutStartSec=60
+NoNewPrivileges=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
