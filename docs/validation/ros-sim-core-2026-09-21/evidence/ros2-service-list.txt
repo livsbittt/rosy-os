@@ -1,0 +1,11 @@
+/core/describe_parameters
+/core/get_parameter_types
+/core/get_parameters
+/core/get_type_description
+/core/list_parameters
+/core/set_parameters
+/core/set_parameters_atomically
+/set_led
+/slam_toolbox/save_map
+/start_motor
+/stop_motor

@@ -1,0 +1,5 @@
+[WARN] [1789999628.988013874] [rcl]: ROS_LOCALHOST_ONLY is deprecated but still honored if it is enabled. Use ROS_AUTOMATIC_DISCOVERY_RANGE and ROS_STATIC_PEERS instead.
+[WARN] [1789999628.988071054] [rcl]: 'localhost_only' is enabled, 'automatic_discovery_range' and 'static_peers' will be ignored.
+Type: geometry_msgs/msg/Twist
+Publisher count: 1
+Subscription count: 0

@@ -1,0 +1,2 @@
+tree=WSL copy of F:\Dev\Control\Robot\ROS\Rosy\Rosy OS (tar snapshot 2026-09-21)
+build=colcon build --symlink-install --packages-up-to core (7 packages, 22.5s)
