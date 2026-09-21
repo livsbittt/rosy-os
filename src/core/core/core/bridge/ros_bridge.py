@@ -39,6 +39,7 @@ from core.bridge import (
     odometry,
     reconcile,
     save_map,
+    traffic_gate,
     translate,
 )
 from core.bridge.goal_tracker import GoalTracker
@@ -94,6 +95,7 @@ class RosBridge:
         node.create_subscription(Float32, "battery/voltage", self._on_battery, 10)
         node.create_subscription(Twist, "nav_cmd_vel", self._on_nav_cmd_vel, 10)
         node.create_subscription(String, "line/observation", self._on_line_observation, 10)
+        node.create_subscription(String, "road/observation", self._on_road_observation, 10)
         # Nav2 lifecycle nodes announce their authoritative goal state on
         # transition_event.  CORE never infers readiness from node discovery;
         # it requires these active transitions plus the motor adapter lease.
@@ -238,19 +240,54 @@ class RosBridge:
                 "detail": str(exc),
             })
 
+    def _on_road_observation(self, msg: String) -> None:
+        """Decode road evidence; invalid data invalidates an enforced lease."""
+        try:
+            observation = translate.road_evidence(json.loads(msg.data))
+            source_now = self._node.get_clock().now().nanoseconds * 1e-9
+            self._svc.traffic_policy.observe(
+                observation,
+                received_at=time.monotonic(),
+                source_now=source_now,
+            )
+            self._svc.state.set_sensor("traffic_policy", {
+                "valid": True,
+                "source": observation.source,
+                "map_id": observation.map_id,
+                "scene_revision": observation.scene_revision,
+            })
+        except (KeyError, TypeError, ValueError,
+                json.JSONDecodeError) as exc:
+            status = self._svc.traffic_policy.reset(
+                "invalid_road_observation")
+            if self._svc.traffic_policy.mode.value == "ENFORCED":
+                self._svc.command.clear_navigation()
+            self._svc.state.set_traffic_policy(status)
+            self._svc.state.set_sensor("traffic_policy", {
+                "valid": False,
+                "reason": "invalid_observation",
+                "detail": str(exc),
+            })
+
     def _tick_line_follow(self) -> None:
         if not self._svc.line_follow.active:
             return
         now = time.monotonic()
         decision = self._svc.line_follow.tick(now)
-        self._svc.line_follow.apply_if_current(
+        traffic_gate.apply_line_candidate(
+            self._svc.line_follow,
+            self._svc.traffic_policy,
+            self._svc.command,
             decision,
-            lambda current: self._svc.command.set_nav_twist(
-                CoreTwist(linear=current.linear, angular=current.angular), now=now),
+            now,
         )
         status = self._svc.line_follow.status()
         self._svc.state.set_line_follow(status)
         self._svc.state.set_sensor("line_follow", status.model_dump())
+        traffic_status = self._svc.traffic_policy.status()
+        self._svc.state.set_traffic_policy(traffic_status)
+        self._svc.state.set_sensor(
+            "traffic_policy", traffic_status.model_dump())
 
     @staticmethod
     def _lifecycle_active(msg: TransitionEvent) -> bool:

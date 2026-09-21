@@ -197,6 +197,7 @@ EXPECTED_SUBSCRIPTIONS = [
     ("battery/voltage", "_on_battery", 10),
     ("nav_cmd_vel", "_on_nav_cmd_vel", 10),
     ("line/observation", "_on_line_observation", 10),
+    ("road/observation", "_on_road_observation", 10),
     ("amcl/transition_event", "_on_amcl_transition", 10),
     ("map_server/transition_event", "_on_map_server_transition", 10),
     ("slam_toolbox/transition_event", "_on_slam_transition", 10),
