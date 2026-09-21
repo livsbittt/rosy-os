@@ -56,6 +56,7 @@ def test_gz_bridges_do_not_carry_raw_images():
     assert "sensor_msgs/msg/Image" not in yaml_bridge
     assert "bridge_image" in single
     assert single.count("ros_gz_image") == 1
+    assert 'from="/camera/image_raw" to="camera/front"' in single
 
 
 def test_fleet_and_games_do_not_import_sensor_image():

@@ -72,6 +72,136 @@ function renderRobotInfo(info) {
 
 let triageSeen = {};
 let lineFollowPending = false;
+let trafficPolicyPending = false;
+let visionPending = false;
+let visionSequence = null;
+let visionObjectUrl = null;
+let visionTimer = null;
+let visionGeneration = 0;
+let visionAbortController = null;
+
+function releaseVisionObjectUrl() {
+  if (visionObjectUrl) URL.revokeObjectURL(visionObjectUrl);
+  visionObjectUrl = null;
+}
+
+function renderVisionUnavailable(status = {}, message = "카메라 프레임 수신 대기") {
+  const stale = status.stale === true;
+  elements["vision-stage"].dataset.state = stale ? "stale" : "waiting";
+  elements["vision-frame"].hidden = true;
+  elements["vision-empty"].hidden = false;
+  setText("vision-empty", message);
+  setText("vision-status", stale ? "STALE" : "WAITING");
+  setText("vision-source", status.source || "—");
+  setText("vision-resolution", status.width && status.height
+    ? `${status.width}×${status.height}` : "—");
+  setText("vision-age", Number.isFinite(Number(status.age_ms))
+    ? `${Math.round(Number(status.age_ms))} ms` : "—");
+  setText("vision-captured", Number.isFinite(Number(status.captured_at))
+    ? `${Number(status.captured_at).toFixed(3)} s` : "—");
+}
+
+async function refreshVisionPreview() {
+  if (visionPending || !session.token) return;
+  visionPending = true;
+  const generation = visionGeneration;
+  const controller = new AbortController();
+  visionAbortController = controller;
+  try {
+    const status = await api("/api/v1/vision/front/status", {
+      signal: controller.signal, cache: "no-store",
+    });
+    if (generation !== visionGeneration || !session.token) return;
+    if (!status.available) {
+      visionSequence = null;
+      releaseVisionObjectUrl();
+      renderVisionUnavailable(
+        status, status.stale ? "카메라 프레임 만료 · HOLD" : "카메라 프레임 수신 대기");
+      return;
+    }
+    if (visionSequence !== status.sequence) {
+      const response = await fetch(
+        `/api/v1/vision/front/frame?sequence=${encodeURIComponent(status.sequence)}`,
+        {
+          headers: authHeaders(), cache: "no-store", signal: controller.signal,
+        },
+      );
+      if (response.status === 409 || response.status === 429) {
+        visionSequence = null;
+        releaseVisionObjectUrl();
+        renderVisionUnavailable(
+          status,
+          response.status === 429
+            ? "카메라 속도 제한 · 재동기화 대기"
+            : "카메라 프레임 변경 · 재동기화 대기",
+        );
+        return;
+      }
+      if (!response.ok) throw new Error(`camera frame ${response.status}`);
+      if (response.headers.get("X-Rosy-Camera-Sequence") !== String(status.sequence)) {
+        return;
+      }
+      const nextUrl = URL.createObjectURL(await response.blob());
+      const candidate = new Image();
+      candidate.src = nextUrl;
+      try {
+        await candidate.decode();
+      } catch (error) {
+        URL.revokeObjectURL(nextUrl);
+        throw error;
+      }
+      if (generation !== visionGeneration || !session.token) {
+        URL.revokeObjectURL(nextUrl);
+        return;
+      }
+      elements["vision-frame"].src = nextUrl;
+      releaseVisionObjectUrl();
+      visionObjectUrl = nextUrl;
+      visionSequence = status.sequence;
+    }
+    if (generation !== visionGeneration || !session.token) return;
+    setText("vision-source", status.source || "UNKNOWN");
+    setText("vision-resolution", `${status.width || 0}×${status.height || 0}`);
+    setText("vision-age", `${Math.round(Number(status.age_ms) || 0)} ms`);
+    setText("vision-captured", Number.isFinite(Number(status.captured_at))
+      ? `${Number(status.captured_at).toFixed(3)} s` : "—");
+    elements["vision-frame"].hidden = false;
+    elements["vision-empty"].hidden = true;
+    elements["vision-stage"].dataset.state = "live";
+    setText("vision-status", "LIVE");
+  } catch (error) {
+    if (error.name === "AbortError" || generation !== visionGeneration) return;
+    visionSequence = null;
+    releaseVisionObjectUrl();
+    renderVisionUnavailable({}, `카메라 연결 확인 · ${error.message}`);
+  } finally {
+    if (visionAbortController === controller) {
+      visionAbortController = null;
+      visionPending = false;
+    }
+  }
+}
+
+function stopVisionPreview(message = "카메라 인증 대기") {
+  visionGeneration += 1;
+  visionAbortController?.abort();
+  visionAbortController = null;
+  clearInterval(visionTimer);
+  visionTimer = null;
+  visionPending = false;
+  visionSequence = null;
+  releaseVisionObjectUrl();
+  renderVisionUnavailable({}, message);
+}
+
+function startVisionPreview() {
+  stopVisionPreview("카메라 프레임 수신 대기");
+  if (!session.token || document.hidden) return;
+  refreshVisionPreview();
+  visionTimer = setInterval(refreshVisionPreview, 500);
+}
+let trafficPolicyReadback = null;
+let trafficFormDirty = false;
 
 function updateLineFollowButtons() {
   const navigationAvailable = session.capabilities?.navigation?.goal_navigation === true;
@@ -95,6 +225,51 @@ function renderLineFollow(status = {}) {
     button.classList.toggle("active", button.dataset.lineMode === mode);
   });
   updateLineFollowButtons();
+}
+
+function renderTrafficStatus(status = {}) {
+  setText("traffic-policy-state", status.state || "DISABLED");
+  setText("traffic-policy-reason", status.reason || "policy_disabled");
+  setText("traffic-policy-signal", status.signal_conflict ? "CONFLICT" : (status.signal_colour || "—"));
+  setText(
+    "traffic-policy-stop-distance",
+    Number.isFinite(Number(status.stop_line_distance_m))
+      ? `${number(status.stop_line_distance_m, 3)} m`
+      : "—",
+  );
+  setText("traffic-policy-scene", status.scene_revision || "—");
+  setText("traffic-policy-revision", status.policy_revision || "—");
+}
+
+function updateTrafficPolicyControls() {
+  setEnabled("traffic-policy-stage", !trafficPolicyPending);
+  setEnabled("traffic-policy-apply", !trafficPolicyPending && Boolean(trafficPolicyReadback?.staged));
+  const signalAvailable = trafficPolicyReadback?.simulation_signal?.available === true;
+  document.querySelectorAll("[data-simulation-signal]").forEach((button) => {
+    button.disabled = trafficPolicyPending || !signalAvailable;
+    button.dataset.active = String(
+      button.dataset.simulationSignal === trafficPolicyReadback?.simulation_signal?.colour,
+    );
+  });
+}
+
+function renderTrafficPolicy(readback = {}) {
+  trafficPolicyReadback = readback;
+  renderTrafficStatus(readback.status || {});
+  const draft = readback.staged || readback.active || {};
+  if (!trafficFormDirty) {
+    elements["traffic-policy-mode"].value = draft.mode || "DISABLED";
+    elements["traffic-policy-revision-input"].value = draft.policy_revision || "";
+    elements["traffic-approach-distance"].value = draft.approach_distance_m ?? "";
+    elements["traffic-stop-distance"].value = draft.stop_distance_m ?? "";
+    elements["traffic-stop-dwell"].value = draft.stop_dwell_s ?? "";
+    elements["traffic-min-confidence"].value = draft.min_confidence ?? "";
+  }
+  const message = readback.staged
+    ? `검토 대기: ${readback.staged.policy_revision}`
+    : `적용됨: ${readback.active?.policy_revision || "—"}`;
+  setText("traffic-policy-message", message);
+  updateTrafficPolicyControls();
 }
 
 // 두 문법은 한 화면에 섞이지 않는다(concept 16 §4 L2). 운용은 공간이고
@@ -163,6 +338,7 @@ function renderRobotState(state) {
     button.classList.toggle("active", button.dataset.mode === state.mode);
   });
   renderLineFollow(state.line_follow);
+  renderTrafficStatus(state.traffic_policy);
 
   const stopped = Boolean(state.safety?.estop);
   elements["safety-indicator"].className = `hero-safety ${stopped ? "danger" : "safe"}`;
@@ -712,6 +888,7 @@ async function refreshSlowData() {
     [api("/api/v1/system/inventory"), renderInventory],
     [api("/api/v1/safety/state"), renderSafety],
     [api("/api/v1/events?limit=10"), renderEvents],
+    [api("/api/v1/traffic"), renderTrafficPolicy],
     [api("/api/v1/host/network"), renderHostNetwork],
     [api("/api/v1/host/release"), renderHostRelease],
     [api("/api/v1/host/commissioning"), renderCommissioning],
@@ -775,11 +952,13 @@ async function connect() {
   connectStateSocket();
   clearInterval(session.refreshTimer);
   session.refreshTimer = setInterval(() => refreshSlowData().catch(showConnectionError), 5000);
+  startVisionPreview();
   elements["auth-drawer"].classList.remove("open");
 }
 
 elements["auth-form"].addEventListener("submit", async (event) => {
   event.preventDefault();
+  stopVisionPreview("카메라 재인증 중");
   session.token = elements["token-input"].value.trim();
   sessionStorage.setItem("rosy.dashboard.token", session.token);
   setText("auth-message", "연결 확인 중…");
@@ -789,6 +968,7 @@ elements["auth-form"].addEventListener("submit", async (event) => {
   } catch (error) {
     sessionStorage.removeItem("rosy.dashboard.token");
     session.token = "";
+    stopVisionPreview("카메라 인증 실패");
     setText("auth-message", error.message);
     showConnectionError(error);
   }
@@ -844,6 +1024,85 @@ document.querySelectorAll("[data-line-mode]").forEach((button) => {
   });
 });
 
+[
+  "traffic-policy-mode",
+  "traffic-policy-revision-input",
+  "traffic-approach-distance",
+  "traffic-stop-distance",
+  "traffic-stop-dwell",
+  "traffic-min-confidence",
+].forEach((id) => elements[id]?.addEventListener("input", () => {
+  trafficFormDirty = true;
+}));
+
+elements["traffic-policy-stage"]?.addEventListener("click", async () => {
+  if (trafficPolicyPending) return;
+  trafficPolicyPending = true;
+  updateTrafficPolicyControls();
+  const body = {
+    mode: elements["traffic-policy-mode"].value,
+    policy_revision: elements["traffic-policy-revision-input"].value.trim(),
+    approach_distance_m: Number(elements["traffic-approach-distance"].value),
+    stop_distance_m: Number(elements["traffic-stop-distance"].value),
+    stop_dwell_s: Number(elements["traffic-stop-dwell"].value),
+    min_confidence: Number(elements["traffic-min-confidence"].value),
+  };
+  try {
+    const readback = await api("/api/v1/traffic/policy/stage", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    trafficFormDirty = false;
+    renderTrafficPolicy(readback);
+    setText("traffic-policy-message", `검토본 저장됨: ${body.policy_revision}`);
+  } catch (error) {
+    setText("traffic-policy-message", `정책 검증 실패: ${error.message}`);
+  } finally {
+    trafficPolicyPending = false;
+    updateTrafficPolicyControls();
+  }
+});
+
+elements["traffic-policy-apply"]?.addEventListener("click", async () => {
+  if (trafficPolicyPending || !trafficPolicyReadback?.staged) return;
+  if (!window.confirm("로봇이 완전히 정지했습니까? 검토 중인 교통 정책을 적용합니다.")) return;
+  trafficPolicyPending = true;
+  updateTrafficPolicyControls();
+  try {
+    const readback = await api("/api/v1/traffic/policy/apply", {
+      method: "POST",
+    });
+    renderTrafficPolicy(readback);
+    setText("traffic-policy-message", "정지 상태에서 정책을 적용했습니다.");
+  } catch (error) {
+    setText("traffic-policy-message", `정책 적용 실패: ${error.message}`);
+  } finally {
+    trafficPolicyPending = false;
+    updateTrafficPolicyControls();
+  }
+});
+
+document.querySelectorAll("[data-simulation-signal]").forEach((button) => {
+  button.addEventListener("click", async () => {
+    if (button.disabled || trafficPolicyPending) return;
+    trafficPolicyPending = true;
+    updateTrafficPolicyControls();
+    try {
+      await api("/api/v1/traffic/simulation/signal", {
+        method: "PUT",
+        body: JSON.stringify({ colour: button.dataset.simulationSignal }),
+      });
+      const readback = await api("/api/v1/traffic");
+      renderTrafficPolicy(readback);
+    } catch (error) {
+      setText("traffic-policy-message", `SIM 신호 변경 실패: ${error.message}`);
+    } finally {
+      trafficPolicyPending = false;
+      updateTrafficPolicyControls();
+    }
+  });
+});
+
 document.querySelectorAll("[data-teleop]").forEach((button) => {
   button.addEventListener("pointerdown", (event) => startTeleop(button, event));
   button.addEventListener("pointerup", () => stopTeleop());
@@ -859,8 +1118,14 @@ elements["bench-safety-confirmed"].addEventListener("change", () => {
 window.addEventListener("pointerup", () => stopTeleop());
 window.addEventListener("blur", () => stopTeleop("화면 포커스가 해제되어 정지했습니다."));
 window.addEventListener("pagehide", () => stopTeleop("페이지를 벗어나 정지했습니다.", true));
+window.addEventListener("pagehide", () => stopVisionPreview("카메라 연결 종료"));
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) stopTeleop("화면이 숨겨져 정지했습니다.");
+  if (document.hidden) {
+    stopTeleop("화면이 숨겨져 정지했습니다.");
+    stopVisionPreview("숨겨진 탭 · 카메라 일시 중지");
+  } else if (session.token) {
+    startVisionPreview();
+  }
 });
 
 elements["view-operate"].addEventListener("click", () => showView("operate"));

@@ -49,4 +49,9 @@ def generate_launch_description():
             output='screen', respawn=True, respawn_delay=1.0,
             parameters=[line_follow_config],
         ),
+        Node(
+            package='control', executable='road_observer_node', namespace=namespace,
+            output='screen', respawn=True, respawn_delay=1.0,
+            parameters=[line_follow_config],
+        ),
     ])

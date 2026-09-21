@@ -144,7 +144,7 @@
 | D-134 | 릴레이 준비 신호는 실측으로 말한다 | Accepted |
 | D-135 | CI 러너는 Ubuntu 버전을 고정하고, 다음 LTS 이동은 기한 전에 리허설한다 | Accepted |
 | D-140 | ARM64 ?? ??? ?? arm64 ??? ?? ????? ? ARTIFACT ? ?? ?? ??? | Accepted |
-| D-136 | 영상 대역폭은 예산으로 다룬다 — 경로 분리 + 상한 + 자동킬 | Proposed |
+| D-136 | 영상 대역폭은 예산으로 다룬다 — 경로 분리 + 상한 + 자동킬 | Superseded by D-152 |
 | D-137 | YOLO는 자문역이다 — LiDAR/IR가 결정하고 영상은 증거만 낸다 | Proposed |
 | D-138 | 도크 검출기는 센서 provider 포트를 탄다 — 새 정적 간선 없음 | Accepted |
 | D-139 | OS는 자리만 내고, 무엇을 볼지는 제품이 정한다 | Accepted |
@@ -158,6 +158,8 @@
 | D-148 | 벤치는 fleet이 소유한 공개면(fleet.bench)만 소비한다 | Accepted |
 | D-149 | control 단독 모드의 최종 발행 토픽은 계약된 예외다 | Accepted |
 | D-150 | web_node는 control 디버그 서피스로 잔류하고 맵의 단일 홈은 navigation/map이다 | Accepted |
+| D-151 | 도로 의미 인식·정책·최종 명령을 분리하고 관제 변경은 정지 상태에서만 적용한다 | Accepted |
+| D-152 | CORE 관제의 카메라 표시는 저주기 최신 1장 preview 예외다 | Accepted |
 
 ---
 
@@ -4371,7 +4373,9 @@ D-72, D-79, D-81, D-88, D-89, D-91, D-93, D-129, D-130.
 
 ## D-136 영상 대역폭은 예산으로 다룬다 — 경로 분리 + 상한 + 자동킬
 
-**Status:** Proposed (2026-09-20, 4자 토론 합의 — 미착지). CORE·비전·Fleet·안전
+**Status:** Superseded by D-152 (2026-09-21). 아래 예산·분리 원칙은 유지하지만
+CORE 영상 바이트 전면 금지는 인증된 저주기 최신 1장 preview에 한해 대체됐다.
+원래 상태는 Proposed (2026-09-20, 4자 토론 합의 — 미착지)였다. CORE·비전·Fleet·안전
 4역할이 각자 수치로 토론했고 아래 4점에 만장일치했다. 충돌 2건(A. 평시 외부
 송출량, B. 추론 입력 규격)은 타협안으로 봉합하고 실측 과제를 남긴다.
 
@@ -4890,3 +4894,108 @@ release/revision/key ID, 17개 payload hash, CORE/IO `linux/arm64`를 확인하�
 **Validation / Transition:** deploy 구성(compose/설치 스크립트)에 28161/28162 포트 부재 검사는 후속 커밋. `robot.launch.py`의 web 브랜치는 디버그 launch 안에만 존재한다.
 
 **References:** D-23 (FastAPI 내장 대시보드), D-38, 결합도 평가 §4 (2026-09-19).
+
+---
+
+## D-151 도로 의미 인식·정책·최종 명령을 분리하고 관제 변경은 정지 상태에서만 적용한다
+
+**Status:** Accepted (2026-09-21). 설계와 실행 계획:
+`docs/plans/2026-09-21-semantic-road-control-design.md`,
+`docs/plans/2026-09-21-semantic-road-control.md`.
+
+**Context:** `map_260905_update_v2` 주행 공간에 차선·정지선·횡단보도·신호등을
+표현하고 카메라로 인식해 차선 추종의 최종 속도까지 제어해야 한다. 장면 정답을
+인식기에 직접 넣거나, detector가 `cmd_vel`을 발행하거나, 관제 화면이 ROS 토픽을
+직접 조작하면 실제 인식 성능과 안전 정책을 검증할 수 없고 D-2/D-38의 단일 최종
+명령 경계를 깨뜨린다. 또한 현장 튜닝은 필요하지만 주행 중 정책 변경은 같은
+관측에 서로 다른 명령을 만들 수 있다.
+
+**Decision:**
+
+1. `road_scene`은 측정된 16-wall 기본 맵을 바꾸지 않는 파생 semantic YAML과
+   Gazebo world를 만든다. 장면 정답은 렌더링과 평가에만 쓰며 detector 입력으로
+   전달하지 않는다.
+2. Control `road_perception`은 카메라 영상에서 차선, 정지선, 횡단보도, 신호 색과
+   충돌 여부를 evidence로만 발행한다. 거리값은 활성·검증된 ground model이 있을
+   때만 유효하다.
+3. CORE `traffic_policy`는 ROS import가 없는 fail-closed 상태기계다. 운용 모드는
+   `DISABLED`, `MONITOR_ONLY`, `ENFORCED`이며 evidence stale, 신호 충돌, scene
+   revision 불일치에는 `HOLD`와 zero command를 선택한다.
+4. 차선 주행 후보는 유일한 Command Manager 직전에 원자적으로 traffic gate를
+   지난다. detector, policy, dashboard는 최종 `cmd_vel`을 발행하지 않는다.
+5. 관제는 현재 evidence, 정책 상태·사유, scene/policy revision을 읽고 정책을
+   stage한 뒤 정지 증거가 있는 `IDLE` 또는 `EMERGENCY`, line-follow OFF 상태에서만
+   apply한다. 안전상한과 stale/conflict HOLD는 관제에서 우회할 수 없다.
+6. 신호 시뮬레이션 변경은 runtime=`simulation`과 명시적 capability가 모두 있을
+   때만 허용한다. 기본은 비활성이고 물리 장치나 일반 운용에서는 거절한다.
+
+**Alternatives:** 의미 분류와 제어를 하나의 카메라 노드에 넣는 방식은 테스트와
+책임 경계를 흐리므로 기각한다. 장면 YAML을 detector에 주입하는 방식은 인식 검증이
+아니므로 기각한다. 관제 값을 즉시 활성화하거나 신호 상태를 일반 runtime에서
+강제하는 방식은 주행 중 정책 변동과 현장 우회를 만들므로 기각한다.
+
+**Consequences:** detector와 정책은 독립적으로 교체·튜닝할 수 있고 관제는 적용 전
+후보값과 활성값을 구분해 표시한다. 호스트 synthetic-camera PASS는 의미 맵과
+perception-policy-command 계약 증거일 뿐 실제 Gazebo 카메라 ROS graph, Pi/ARM64,
+Pinky Pro 카메라 보정·제동거리·모터응답 또는 FIELD GO를 뜻하지 않는다.
+
+**Validation / Transition:** semantic scene identity와 파생 world 계약, 합성 BGR
+프레임의 실제 detector 통과, red stop/green proceed/stale HOLD, API stage/apply 및
+simulation capability, 브라우저 관제 흐름을 host test로 고정한다. 다음 gate는 ROS
+Jazzy의 실제 camera topic graph와 Pinky Pro의 물리 보정·정지 시험이다.
+
+**References:** D-2, D-18, D-38, D-47, D-77, D-143, NAV-007, SAF-001,
+`docs/validation/semantic-road-2026-09-21/README.md`.
+
+---
+
+## D-152 CORE 관제의 카메라 표시는 저주기 최신 1장 preview 예외다
+
+**Status:** Accepted (2026-09-21). D-136의 CORE 영상 바이트 전면 금지를 이 좁은
+범위에서 대체한다. 대역폭 예산, Fleet 비중계, raw DDS 외부 노출 금지 원칙은
+그대로 유지한다.
+
+**Context:** D-150은 CORE `/dashboard`를 유일한 운영 화면으로 정했지만 D-136
+제안은 CORE가 영상 바이트를 전혀 만지지 못하게 했다. 그 조합으로는 운용자가
+Gazebo 또는 Pinky 카메라가 실제로 보는 차선·횡단보도·정지선·신호 인식 결과를
+지도와 한 화면에서 검증할 수 없다. 별도 디버그 `web_node`를 운영 화면으로
+승격하면 인증·관제 소유권이 다시 둘로 갈라진다.
+
+**Decision:**
+
+1. Control은 `camera/front`를 인식한 뒤 최대 폭 640, JPEG 품질 72, 기본 2 FPS인
+   `camera/preview/compressed`를 만든다. 원본 raw frame은 온보드 내부에 남는다.
+2. CORE는 JPEG를 디코딩·인코딩하지 않는다. 최대 512000 bytes를 검증하고 최신
+   한 장만 덮어쓰며, 수신 lease 2초가 지나면 제공하지 않는다.
+3. Viewer 인증이 필요한 `/api/v1/vision/front/status`와 `/frame`만 추가한다.
+   frame은 `no-store`, `Content-Encoding: identity`이고 대시보드는 500 ms status
+   poll 중 sequence가 바뀐 경우에만 blob을 가져온다.
+4. 이 예외는 MJPEG/WebRTC/RTSP, 녹화, raw image API, 큐, Fleet·Games·상태
+   WebSocket 중계로 확장되지 않는다. 영상은 관측 전용이며 정책이나 최종
+   `cmd_vel` 권한을 갖지 않는다.
+
+**Alternatives:** 별도 vision HTTP 포트는 운영 인증과 외부 surface를 둘로 나누고
+현재 첫 장치 검증에 불필요한 토큰 시그널링을 요구해 기각한다. 디버그 web_node
+재사용은 D-150을 되돌리므로 기각한다. raw 또는 base64를 상태 WebSocket에 넣는
+방식은 DDS/REST보다 더 큰 팬아웃과 지연을 만들어 기각한다.
+
+**Consequences:** 단일 운용 대시보드에서 지도와 실제 카메라 preview를 함께 볼 수
+있다. CORE의 메모리 상한은 한 프레임으로 고정되고 JPEG 재압축 CPU 비용은 없다.
+다만 Windows HOST-SIM 스크린샷은 브라우저 경로 증거일 뿐 실제 Gazebo나 Pinky
+프레임 증거가 아니며 ROS-SIM/DEVICE gate를 승격하지 않는다.
+
+**Validation / Transition:** JPEG 크기·형식·시각·stale·인증 계약, CORE의 허용된
+단일 MIME 예외, Control 2 FPS 압축 wiring, Gazebo opt-in bridge, Chromium의
+HOST-SIM 표시를 자동 시험한다. Linux ROS Jazzy에서 source=`GAZEBO`, 장치에서
+source=`PINKY` readback을 별도 보존해야 한다.
+
+**Hard limits clarified:** The producer rate is measured with the local
+monotonic clock rather than the ROS capture stamp, and both preview DDS ends
+use BEST_EFFORT depth 1. Startup rejects settings above 2 FPS, 640 px, or
+512000 bytes. CORE requires every JPEG pull to carry the status `sequence`,
+limits each authenticated token to at most one successful pull per 400 ms, and accepts
+a regressed capture timestamp only after the prior local receipt lease expired
+(Gazebo/camera epoch reset). Dashboard reauthentication, page hide, and hidden
+tab transitions abort in-flight fetches and revoke the previous blob.
+
+**References:** D-23, D-34, D-47, D-77, D-118, D-136, D-150, D-151.

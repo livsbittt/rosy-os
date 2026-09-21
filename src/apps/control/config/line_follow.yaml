@@ -19,3 +19,41 @@
     camera_roi_top_fraction: 0.40
     camera_washed_fraction: 0.40
     camera_min_pixels: 80
+    require_camera_controls_stable: true
+
+/**/road_observer_node:
+  ros__parameters:
+    map_id: map_260905_update_v2
+    scene_revision: road-scene-v1
+    width: 320
+    height: 240
+    rotate_deg: 180
+    camera_profile_revision: camera-profile-v1
+    bright_threshold: 180
+    lane_roi_top_fraction: 0.30
+    horizontal_min_fraction: 0.40
+    horizontal_padding_px: 2
+    crosswalk_min_bars: 3
+    crosswalk_max_gap_px: 20
+    signal_roi_bottom_fraction: 0.35
+    signal_min_pixels: 50
+    # Observation-only dashboard preview. This never feeds the detector or
+    # command path and is capped to protect DDS/API bandwidth.
+    dashboard_preview_fps: 2.0
+    dashboard_preview_max_width: 640
+    dashboard_preview_jpeg_quality: 72
+    dashboard_preview_max_bytes: 512000
+    dashboard_source: PINKY
+    require_camera_controls_stable: true
+    # Metric range remains unavailable until an independently validated
+    # profile is explicitly enabled for the current session.
+    camera_homography_path: ''
+    camera_homography_enabled: false
+    camera_homography_allow_uniform_resize: false
+    camera_homography_max_fit_rmse_cm: 0.8
+    camera_homography_max_validation_rmse_cm: 1.0
+    camera_homography_max_validation_error_cm: 2.0
+    camera_homography_min_validation_points: 8
+    camera_homography_min_validation_frames: 2
+    camera_homography_min_validation_span_cm: 10.0
+    camera_homography_max_range_m: 0.6

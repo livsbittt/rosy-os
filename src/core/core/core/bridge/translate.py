@@ -14,6 +14,8 @@ from __future__ import annotations
 import math
 from typing import Any, Optional
 
+from core_features.traffic_policy import RoadEvidence
+
 
 def yaw_from_quat(q: Any) -> float:
     """쿼터니언의 z 축 회전. 브리지 세 곳에 같은 식이 흩어져 있던 것을 모았다."""
@@ -128,3 +130,82 @@ def battery_sample(msg: Any, received_at: float) -> dict[str, Any]:
         "location": msg.location,
         "received_at": received_at,
     }
+
+
+def _wire_mapping(value: Any, name: str) -> dict:
+    if type(value) is not dict:
+        raise TypeError(f"{name} must be an object")
+    return value
+
+
+def _wire_bool(value: Any, name: str) -> bool:
+    if type(value) is not bool:
+        raise TypeError(f"{name} must be a boolean")
+    return value
+
+
+def _wire_number(value: Any, name: str, *, optional: bool = False):
+    if optional and value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError(f"{name} must be a number")
+    if not math.isfinite(float(value)):
+        raise ValueError(f"{name} must be finite")
+    return float(value)
+
+
+def road_evidence(data: Any) -> RoadEvidence:
+    """Decode one strict semantic-road JSON object into policy evidence."""
+    root = _wire_mapping(data, "road observation")
+    lane = _wire_mapping(root["lane"], "lane")
+    stop = _wire_mapping(root["stop_line"], "stop_line")
+    crosswalk = _wire_mapping(root["crosswalk"], "crosswalk")
+    signal = _wire_mapping(root["signal"], "signal")
+
+    lane_visible = _wire_bool(lane["visible"], "lane.visible")
+    lane_error = _wire_number(
+        lane["error"], "lane.error", optional=not lane_visible)
+    if lane_visible and lane_error is None:
+        raise ValueError("visible lane requires error")
+    if not lane_visible and lane_error is not None:
+        raise ValueError("invisible lane cannot carry error")
+    _wire_number(lane["confidence"], "lane.confidence")
+
+    stop_visible = _wire_bool(stop["visible"], "stop_line.visible")
+    _wire_number(stop["image_row"], "stop_line.image_row", optional=True)
+    stop_distance = _wire_number(
+        stop["distance_m"], "stop_line.distance_m", optional=True)
+    stop_confidence = _wire_number(
+        stop["confidence"], "stop_line.confidence")
+
+    crosswalk_visible = _wire_bool(
+        crosswalk["visible"], "crosswalk.visible")
+    _wire_number(
+        crosswalk["image_row"], "crosswalk.image_row", optional=True)
+    _wire_number(
+        crosswalk["distance_m"], "crosswalk.distance_m", optional=True)
+    _wire_number(crosswalk["confidence"], "crosswalk.confidence")
+
+    signal_visible = _wire_bool(signal["visible"], "signal.visible")
+    signal_conflict = _wire_bool(signal["conflict"], "signal.conflict")
+    signal_colour = signal["colour"]
+    if signal_visible and signal_colour is None:
+        raise ValueError("visible signal requires colour")
+    if not signal_visible and signal_colour is not None:
+        raise ValueError("invisible signal cannot carry colour")
+    signal_confidence = _wire_number(
+        signal["confidence"], "signal.confidence")
+
+    return RoadEvidence(
+        source=root["source"],
+        stamp=_wire_number(root["stamp"], "stamp"),
+        map_id=root["map_id"],
+        scene_revision=root["scene_revision"],
+        stop_line_visible=stop_visible,
+        stop_line_distance_m=stop_distance,
+        stop_line_confidence=stop_confidence,
+        crosswalk_visible=crosswalk_visible,
+        signal_colour=signal_colour,
+        signal_confidence=signal_confidence,
+        signal_conflict=signal_conflict,
+    )

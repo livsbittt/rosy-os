@@ -26,6 +26,12 @@ from core_features.maps import MapSnapshotStore
 from core_features.navigation.manager import NavigationManager
 from core_features.navigation.readiness import NavigationReadinessGate
 from core_features.line_follow import LineFollowConfig, LineFollowManager
+from core_features.traffic_policy import (
+    TrafficPolicyConfig,
+    TrafficPolicyManager,
+    TrafficPolicyMode,
+)
+from core_features.vision import VisionFrameStore
 from core_features.swarm import SwarmManager
 from core_features.power.battery import (
     BatteryConfig,
@@ -145,6 +151,31 @@ def _line_follow_config(raw: dict[str, Any]) -> LineFollowConfig:
     )
 
 
+def _traffic_policy_config(raw: dict[str, Any]) -> TrafficPolicyConfig:
+    """Parse revision-bound traffic policy without weakening its bounds."""
+    defaults = TrafficPolicyConfig()
+    return TrafficPolicyConfig(
+        mode=TrafficPolicyMode(raw.get("mode", defaults.mode.value)),
+        map_id=str(raw.get("map_id", defaults.map_id)),
+        scene_revision=str(raw.get(
+            "scene_revision", defaults.scene_revision)),
+        policy_revision=str(raw.get(
+            "policy_revision", defaults.policy_revision)),
+        approach_distance_m=float(raw.get(
+            "approach_distance_m", defaults.approach_distance_m)),
+        stop_distance_m=float(raw.get(
+            "stop_distance_m", defaults.stop_distance_m)),
+        stop_dwell_s=float(raw.get(
+            "stop_dwell_s", defaults.stop_dwell_s)),
+        stale_after_s=float(raw.get(
+            "stale_after_s", defaults.stale_after_s)),
+        min_confidence=float(raw.get(
+            "min_confidence", defaults.min_confidence)),
+        proceed_speed_scale=float(raw.get(
+            "proceed_speed_scale", defaults.proceed_speed_scale)),
+    )
+
+
 @dataclass
 class CoreServices:
     config: dict[str, Any]
@@ -161,6 +192,8 @@ class CoreServices:
     waypoints: WaypointManager
     nav: NavigationManager
     line_follow: LineFollowManager
+    traffic_policy: TrafficPolicyManager
+    vision: VisionFrameStore
     readiness: NavigationReadinessGate
     power: PowerManager
     battery: BatteryMonitor
@@ -250,6 +283,24 @@ class CoreServices:
                                 readiness=readiness)
         line_follow = LineFollowManager(
             events, config=_line_follow_config(config.get("line_follow", {}) or {}))
+        traffic_policy = TrafficPolicyManager(
+            events,
+            config=_traffic_policy_config(
+                config.get("traffic_policy", {}) or {}),
+            simulation_signal_control=bool(
+                (config.get("runtime") or {}).get("mode") == "simulation"
+                and (config.get("traffic_policy") or {}).get(
+                    "simulation_signal_control", False)
+            ),
+        )
+        vision_cfg = config.get("vision", {}) or {}
+        vision = VisionFrameStore(
+            max_bytes=int(vision_cfg.get("preview_max_bytes", 512_000)),
+            stale_after_s=float(
+                vision_cfg.get("preview_stale_after_s", 2.0)),
+            min_pull_interval_s=float(
+                vision_cfg.get("preview_min_pull_interval_s", 0.4)),
+        )
         power = PowerManager(_power_config(config.get("power", {})), events=events)
         battery = BatteryMonitor(
             _battery_config(safety_cfg, data_path=waypoints_path.parent),
@@ -289,6 +340,10 @@ class CoreServices:
             command.clear_navigation()
             state.set_line_follow(status)
         safety.estop_listeners.append(stop_line_follow)
+        def reset_traffic_policy():
+            status = traffic_policy.reset("estop")
+            state.set_traffic_policy(status)
+        safety.estop_listeners.append(reset_traffic_policy)
         runtime_probe = HostRuntimeProbe(
             host_root=os.environ.get("ROSY_HOST_ROOT", "/"),
             data_path=waypoints_path.parent,
@@ -298,6 +353,8 @@ class CoreServices:
                    command=command, safety=safety, advisory_feed=advisory_feed,
                    waypoints=waypoints, nav=nav,
                    line_follow=line_follow,
+                   traffic_policy=traffic_policy,
+                   vision=vision,
                    readiness=readiness,
                    power=power, battery=battery, docking=docking, swarm=swarm,
                    runtime_probe=runtime_probe, maps=MapSnapshotStore(),

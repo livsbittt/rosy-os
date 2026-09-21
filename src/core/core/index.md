@@ -30,6 +30,8 @@
 | D-123 | 웹은 Cyclone을 오버레이에 저장한 뒤 Host Agent 재부팅을 요청한다 |
 | D-124 | 대시보드는 AP on/off와 Wi-Fi 연결을 Host Agent로 확인하고 적용한다 |
 | D-144 | 하드웨어 맵 생성은 runtime mode가 아니라 검증된 navigation backend다 |
+| D-151 | 도로 의미 인식·정책·최종 명령을 분리하고 관제 변경은 정지 상태에서만 적용한다 |
+| D-152 | CORE 관제의 카메라 표시는 저주기 최신 1장 preview 예외다 |
 
 ## 계획·결과 문서
 
@@ -39,8 +41,12 @@
 - [2026-09-15-module-harness-design.md](../../../docs/plans/2026-09-15-module-harness-design.md)
 - [2026-09-15-navigation-swarm-split-design.md](../../../docs/plans/2026-09-15-navigation-swarm-split-design.md)
 - [2026-09-17-interface-design-implementation-design.md](../../../docs/plans/2026-09-17-interface-design-implementation-design.md)
+- [2026-09-21-camera-preview-dashboard-design.md](../../../docs/plans/2026-09-21-camera-preview-dashboard-design.md)
+- [2026-09-21-camera-preview-dashboard.md](../../../docs/plans/2026-09-21-camera-preview-dashboard.md)
 - [2026-09-21-hardware-mapping-g5-design.md](../../../docs/plans/2026-09-21-hardware-mapping-g5-design.md)
 - [2026-09-21-hardware-mapping-g5.md](../../../docs/plans/2026-09-21-hardware-mapping-g5.md)
+- [2026-09-21-semantic-road-control-design.md](../../../docs/plans/2026-09-21-semantic-road-control-design.md)
+- [2026-09-21-semantic-road-control.md](../../../docs/plans/2026-09-21-semantic-road-control.md)
 
 ## 교훈 (docs/solutions)
 
@@ -52,8 +58,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · feat(core): serve a bounded authenticated camera preview (D-152)
+- 2026-09-21 · uncommitted · fix(core): route traffic type through api.deps (D-147, D-151)
+- 2026-09-21 · uncommitted · feat(core): gate line driving with supervised traffic policy (D-151)
 - 2026-09-21 · uncommitted · feat(safety): PersonAdvisoryFeed wire ingest seam (D-137 T4)
 - 2026-09-21 · uncommitted · test(safety): D-137 T1 sequence contracts, host pytest 4
-- 2026-09-21 · uncommitted · refactor(core_api_web): route v1 domain types through api.deps
-- 2026-09-21 · uncommitted · test(core): make ROS-installed native ARM64 tests deterministic
-- 2026-09-21 · uncommitted · feat(core): gate SLAM mapping and persist maps safely (D-144)

@@ -894,3 +894,21 @@
 - 변경: D-149 Status Proposed→Accepted. 승격 근거를 구성 증거로 대체 기록 — core 이미지는 control 미복사(Dockerfile optional-slices 단계), 배포 launch 폐쇄(compose→bringup/hardware.launch→line_follow.launch)의 control 실행파일은 ir_adc_node·camera_detect_node·line_observer_node뿐(D-143 증거 생산), 최종 발행자 safety_node는 deploy 미참조 레거시 launch 3개에만 존재. 운영 프로파일 remap 요구는 기각(격리가 구조적이라 요구할 대상 없음). 최초 기기 가동 시 device_readback ROS 그래프는 승격 조건이 아니라 상시 DEVICE 게이트 확인 항목으로 기록.
 - 증거: 근거 사실 전부 트리에서 직접 검증 + 계약 테스트 6종 변이 증명 완료. ADR 로그 계약 테스트 통과(아래 명령). 로봇 부재(rosy-01.local 미해석, 8080/22 불통)로 실물 readback은 상시 게이트로 이연.
 - gate 변화: 없음
+
+## 2026-09-21 · uncommitted · docs(adr): separate semantic evidence, policy, and command (D-151)
+
+- 변경: D-151과 설계·실행 계획에 `road_scene` → `road_perception` → `traffic_policy` → CORE command gate → 관제의 책임 경계를 고정했다. 정책 변경은 stage 후 정지 증거가 있는 상태에서만 apply하며 simulation signal은 명시적 capability로 제한한다.
+- 증거: synthetic camera closed loop가 실제 detector·strict decoder·policy·command gate를 통과하고 Chromium 관제 흐름이 stage→apply 순서를 검증한다.
+- gate 변화: SOURCE/LOCAL 증거만 추가. 실제 Gazebo camera graph, Pi/ARM64, Pinky Pro 보정·정지거리와 FIELD는 승격하지 않는다.
+- 결정: D-151 Accepted.
+- 교훈: 장면 정답은 렌더링과 평가에만 쓰며 detector 입력으로 재사용하면 인식 검증이 아니다.
+
+## 2026-09-21 · uncommitted · docs(adr): bound the single-dashboard camera preview (D-152)
+
+- Review hardening: D-152/API v1.12 now state monotonic rate, depth-1 QoS, sequence binding, 400 ms token pull, source-clock epoch reset, and browser lifecycle cancellation.
+- Latest evidence: integrated CORE `1026 passed, 12 skipped`; Control `1131 passed, 26 skipped`; Chromium camera lifecycle `6 passed`.
+
+- 변경: D-136의 Proposed CORE 영상 바이트 전면 금지를 Superseded로 표시하고, 디코딩·재인코딩 없는 최신 JPEG 한 장에만 적용되는 D-152를 Accepted로 추가했다. API Ref v1.12와 설계·실행 계획이 status/frame 계약 및 증거 경계를 고정한다.
+- 증거: ADR/API/harness 계약과 CORE·Control 전체 회귀, Chromium dashboard 흐름을 통합 main 병합 상태에서 재검증했다.
+- gate 변화: 문서 SOURCE/LOCAL 유지. HOST-SIM 캡처는 ROS-SIM/DEVICE 증거가 아니다.
+- 결정: D-152. raw/Fleet/WebSocket/MJPEG/녹화는 범위 밖이며 D-136의 예산 원칙은 유지한다.

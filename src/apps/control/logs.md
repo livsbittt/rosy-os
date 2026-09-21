@@ -119,3 +119,20 @@
 - 변경: `control/control/burst_gate.py` 신규 — 패킷당 1문항: 이 증거가 영상 버스트를 시작·유지할 수 있는가. D-137 §4(YOLO 단독 트리거 금지 — corroboration 또는 operator), D-136 §5(quality 저하는 evidence 무효로만 결합). operator_request 단축 → fresh+metric 교차만 트리거, 나머지는 vision_only/no_detection/vision_missed/vision_stale/vision_invalid 로 기각. 분당 FP 상한은 ROS-SIM 합의 전이라 의도적으로 없다(정해지면 송신 측 token bucket, D-136 §4). 대역폭 정책이지 motion 정책이 아니다 — 결코 cmd_vel 에 닿지 않는다.
 - 증거: test_burst_gate.py 7건 녹색(operator 단축, 교차 트리거, vision_only 금지, metric 단독·부재 불가, missed≠부재, stale/invalid 불가, 입력 타입 검증). 인수인수 검증: control 전체 1101 passed·28 skipped, core 전체 976 passed·11 skipped (2026-09-21 Windows, 패키지 cwd/PYTHONPATH — 병렬 콘솔 세션 작업을 이 세션에서 검증·랜딩).
 - gate 변화: 없음. FP 상한(ROS-SIM 합의 항목)과 T5(DEVICE)가 남아 있다.
+
+## 2026-09-21 · uncommitted · feat(control): detect semantic road evidence (D-151)
+
+- 변경: camera frame에서 차선·정지선·횡단보도·적색/황색/녹색 신호와 충돌을 검출하는 sensing-only observer를 추가했다. 수평 표식은 차선 중심 계산에서 제외하고, 정지선 거리는 검증된 ground model이 활성일 때만 발행한다.
+- 증거: `map_260905_update_v2` synthetic camera closed loop가 `FOLLOW` → `APPROACH` → `STOP_REQUIRED` → `WAIT_SIGNAL` → `PROCEED` → stale `HOLD`를 통과했다. Control 통합 회귀 `1131 passed, 26 skipped`.
+- gate 변화: SOURCE/LOCAL GO 유지. 실제 Gazebo camera topic graph, Pi camera/IR, 물리 homography·제동거리와 FIELD는 HOLD/PARKED 유지.
+- 결정: D-151. Control은 evidence만 만들고 최종 주행 명령은 CORE가 중재한다.
+
+## 2026-09-21 · uncommitted · feat(control): publish the bounded semantic camera preview (D-152)
+
+- Review hardening: startup validates 0.2..2 FPS, 160..640 px, JPEG quality 40..90, and 512000 bytes; local monotonic limiting and BEST_EFFORT depth 1 are enforced.
+- Latest evidence: integrated Control `1131 passed, 26 skipped`; Chromium dashboard `6 passed`.
+
+- 변경: `road_observer_node`가 detector와 동일한 `camera/front` frame에 차선·횡단보도·정지선·신호 overlay를 그려 기본 2 FPS, 최대 폭 640, JPEG 품질 72로 `camera/preview/compressed`에 발행한다. 원본 detector 입력은 변경하지 않는다.
+- 안전: hardware에서는 camera control 안정성이 유지돼야 detection evidence가 유효하다. simulation launch만 그 gate를 명시적으로 해제하며 preview 자체에는 주행 권한이 없다.
+- 증거: host preview JPG/GIF와 browser panel은 HOST-SIM으로 명시했다.
+- gate 변화: SOURCE/LOCAL 유지. 실제 CSI frame과 물리 보정은 DEVICE/FIELD HOLD다.

@@ -71,6 +71,8 @@
 | D-141 | 대형 주행 실측은 네 게이트를 순서대로 통과한다 — 단일 세션 묶음 |
 | D-144 | 하드웨어 맵 생성은 runtime mode가 아니라 검증된 navigation backend다 |
 | D-145 | 네이티브 ARM64 빌드는 unsigned artifact까지만 자동화한다 |
+| D-151 | 도로 의미 인식·정책·최종 명령을 분리하고 관제 변경은 정지 상태에서만 적용한다 |
+| D-152 | CORE 관제의 카메라 표시는 저주기 최신 1장 preview 예외다 |
 
 ## 계획·결과 문서
 
@@ -82,8 +84,12 @@
 - [2026-09-18-rosy-games-remaining-adr-plan.md](plans/2026-09-18-rosy-games-remaining-adr-plan.md)
 - [2026-09-20-fleet-console-ops-plan.md](plans/2026-09-20-fleet-console-ops-plan.md)
 - [2026-09-20-ui-grammar-boundary-plan.md](plans/2026-09-20-ui-grammar-boundary-plan.md)
+- [2026-09-21-camera-preview-dashboard-design.md](plans/2026-09-21-camera-preview-dashboard-design.md)
+- [2026-09-21-camera-preview-dashboard.md](plans/2026-09-21-camera-preview-dashboard.md)
 - [2026-09-21-hardware-mapping-g5-design.md](plans/2026-09-21-hardware-mapping-g5-design.md)
 - [2026-09-21-hardware-mapping-g5.md](plans/2026-09-21-hardware-mapping-g5.md)
+- [2026-09-21-semantic-road-control-design.md](plans/2026-09-21-semantic-road-control-design.md)
+- [2026-09-21-semantic-road-control.md](plans/2026-09-21-semantic-road-control.md)
 
 ## 교훈 (docs/solutions)
 
@@ -96,8 +102,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · docs(adr): bound the single-dashboard camera preview (D-152)
+- 2026-09-21 · uncommitted · docs(adr): separate semantic evidence, policy, and command (D-151)
 - 2026-09-21 · uncommitted · docs(adr): promote D-149 to Accepted on structural composition evidence
 - 2026-09-21 · uncommitted · docs(api-ref): vision DetectionEvidence 지연 메타 (v1.11 additive)
 - 2026-09-21 · uncommitted · docs(adr): formalize domain regroup and boundary contracts (D-147..D-150)
-- 2026-09-21 · uncommitted · docs(adr): keep native artifact building separate from offline signing (D-145)
-- 2026-09-21 · uncommitted · docs(adr): define physical hardware mapping as D-144

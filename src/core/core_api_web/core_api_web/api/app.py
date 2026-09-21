@@ -29,6 +29,8 @@ from core_api_web.api.v1.routes import (
     slam_router,
     swarm_router,
     system_router,
+    traffic_router,
+    vision_router,
     waypoints_router,
     diagnostics_router,
     docking_router,
@@ -68,6 +70,8 @@ def create_app(config: dict[str, Any], services: CoreServicesLike) -> FastAPI:
     app.include_router(robot_router)
     app.include_router(control_router)
     app.include_router(line_follow_router)
+    app.include_router(traffic_router)
+    app.include_router(vision_router)
     app.include_router(safety_router)
     app.include_router(navigation_router)
     app.include_router(map_router)
@@ -101,7 +105,7 @@ def create_app(config: dict[str, Any], services: CoreServicesLike) -> FastAPI:
                 "Cache-Control": "no-cache",
                 "Content-Security-Policy": (
                     "default-src 'self'; connect-src 'self' ws: wss:; "
-                    "img-src 'self' data:; style-src 'self'; script-src 'self'; "
+                    "img-src 'self' data: blob:; style-src 'self'; script-src 'self'; "
                     "frame-ancestors 'none'; base-uri 'self'"
                 ),
             },

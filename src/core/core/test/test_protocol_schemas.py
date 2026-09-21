@@ -15,6 +15,7 @@ from core_common.protocol.schemas import (
     SwarmFollowParams,
     SwarmRole,
     SwarmStatus,
+    VisionPreviewStatus,
 )
 
 
@@ -54,6 +55,33 @@ def test_state_snapshot_defaults():
     assert snap.mode.value == "IDLE"
     assert snap.navigation.value == "IDLE"
     assert snap.evidence == {}
+
+
+def test_vision_preview_status_contract():
+    status = VisionPreviewStatus(
+        available=True,
+        stale=False,
+        source="GAZEBO",
+        frame_id="front_camera",
+        captured_at=42.5,
+        age_ms=80,
+        width=640,
+        height=360,
+        overlay="semantic-road-v1",
+        sequence=7,
+    )
+    assert status.model_dump() == {
+        "available": True,
+        "stale": False,
+        "source": "GAZEBO",
+        "frame_id": "front_camera",
+        "captured_at": 42.5,
+        "age_ms": 80,
+        "width": 640,
+        "height": 360,
+        "overlay": "semantic-road-v1",
+        "sequence": 7,
+    }
 
 
 def test_state_snapshot_evidence_is_additive():

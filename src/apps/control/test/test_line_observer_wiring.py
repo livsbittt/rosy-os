@@ -25,6 +25,7 @@ def test_line_observer_detector_settings_are_operator_tunable():
     assert params["ir_white"] == [0.0, 0.0, 0.0]
     assert 1 <= params["camera_bright_threshold"] <= 254
     assert 0.0 <= params["camera_roi_top_fraction"] < 1.0
+    assert params["require_camera_controls_stable"] is True
 
 
 def test_package_and_launch_expose_the_line_observer():

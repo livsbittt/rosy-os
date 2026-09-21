@@ -10,7 +10,7 @@ gates:
     cmd: "python -m pytest src/sim/gz_sim/test -q"
   LOCAL:
     state: GO
-    evidence: "host 계약과 ROS Jazzy 컨테이너 package build/test 통과; Gazebo 실제 실행은 ROS-SIM 증거"
+    evidence: "host 계약과 ROS Jazzy 컨테이너 package build/test 통과; D-151 semantic derived-world identity와 synthetic-camera closed loop PASS; Gazebo 실제 실행은 ROS-SIM 증거"
     cmd: "colcon build --symlink-install --packages-select description core_common gz_sim"
   ROS-SIM:
     state: GO
@@ -22,12 +22,16 @@ gates:
     state: N/A
   FIELD:
     state: N/A
-adrs: [D-4, D-33, D-49, D-79, D-114, D-115, D-117, D-118, D-120]
+adrs: [D-4, D-33, D-49, D-79, D-114, D-115, D-117, D-118, D-120, D-151, D-152]
 plans:
   - docs/plans/2026-09-08-swarm-formation-slice-design.md
   - docs/plans/2026-09-08-swarm-formation-slice.md
   - docs/plans/2026-09-08-swarm-formation-slice-results.md
   - docs/plans/2026-09-15-module-harness-design.md
+  - docs/plans/2026-09-21-semantic-road-control-design.md
+  - docs/plans/2026-09-21-semantic-road-control.md
+  - docs/plans/2026-09-21-camera-preview-dashboard-design.md
+  - docs/plans/2026-09-21-camera-preview-dashboard.md
 ---
 ## 지금 상태
 
@@ -46,3 +50,9 @@ plans:
 
 - aarch64 `return()`을 고치지 않는다.
 - 이 패키지를 로봇 이미지에 넣지 않는다.
+
+## 2026-09-21 semantic-road derived-world status
+
+- 기존 exact-map ROS-SIM GO와 별도로 차선·정지선·횡단보도·신호등을 가진 `map_260905_traffic.world`와 preview를 생성했다.
+- semantic identity와 host camera closed loop는 PASS지만 이 변경에서 새 Gazebo camera/ROS graph를 실행하지 않았다. 따라서 기존 mapping ROS-SIM 증거를 semantic perception 증거로 대체하지 않는다.
+- `semantic_road_dashboard.launch.py`는 실제 Gazebo camera를 `camera/front`로 opt-in 연결하고 dashboard까지 기동한다. launch 계약은 통과했지만 이 Windows 세션의 screenshot source는 정직하게 `HOST-SIM`이며 실제 `GAZEBO` frame 증거는 HOLD다.

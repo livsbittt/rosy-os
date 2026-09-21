@@ -569,6 +569,45 @@ body[data-view="operate"] .page-footer { display: none; }
    보조 요소는 전부 지도 위로 올린다. 흐름에 두면 툴바 두 줄·범례·안내가
    264px을 먼저 가져가고 지도는 남는 것을 받는다 — 순서가 거꾸로다. */
 .field-map-panel { flex: 1; min-height: 0; }
+.vision-panel { flex: none; gap: var(--space-2); }
+.vision-heading { align-items: center; }
+.vision-stage {
+  position: relative;
+  height: clamp(190px, 31vh, 290px);
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius-control);
+  background: var(--ground-deep);
+  overflow: hidden;
+}
+.vision-stage::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border: 2px solid transparent;
+  pointer-events: none;
+}
+.vision-stage[data-state="live"]::before { border-color: color-mix(in srgb, var(--nominal) 52%, transparent); }
+.vision-stage[data-state="stale"]::before { border-color: color-mix(in srgb, var(--status-warn) 62%, transparent); }
+#vision-frame { width: 100%; height: 100%; display: block; object-fit: contain; background: var(--ground-deep); }
+.vision-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--muted);
+  font: var(--text-label)/1.5 var(--mono);
+  letter-spacing: 0.04em;
+}
+.vision-reticle { position: absolute; z-index: 3; inset: 0; pointer-events: none; opacity: 0.42; }
+.vision-reticle i { position: absolute; display: block; background: var(--nominal); }
+.vision-reticle i:first-child { left: 50%; top: 42%; width: 1px; height: 16%; }
+.vision-reticle i:last-child { left: 46%; top: 50%; width: 8%; height: 1px; }
+.vision-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin: 0; background: var(--surface-line); }
+.vision-meta div { min-width: 0; padding: var(--space-1) var(--space-2); background: var(--ground); }
+.vision-meta dt { color: var(--nominal-quiet); font: var(--text-micro)/1.2 var(--mono); }
+.vision-meta dd { margin: var(--space-1) 0 0; overflow: hidden; color: var(--paper); font: 700 var(--text-micro)/1.2 var(--mono); text-overflow: ellipsis; white-space: nowrap; }
 .map-stage {
   position: relative;
   flex: 1;
@@ -707,6 +746,29 @@ body[data-view="operate"] .page-footer { display: none; }
 .line-follow-facts dt { color: var(--nominal-quiet); font: var(--text-micro)/1.2 var(--mono); }
 .line-follow-facts dd { overflow: hidden; margin: var(--space-1) 0 0; font: 700 var(--text-label)/1.2 var(--mono); text-overflow: ellipsis; white-space: nowrap; }
 .line-follow-message { min-height: 1.4em; margin: 0; color: var(--nominal-quiet); font: var(--text-micro)/1.4 var(--mono); }
+
+.traffic-policy-control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--surface-line);
+}
+.traffic-policy-copy { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.traffic-policy-copy h3 { margin: 0; }
+.traffic-policy-copy span { color: var(--nominal-quiet); font: var(--text-micro)/1.3 var(--mono); }
+.traffic-policy-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-1); margin: 0; }
+.traffic-policy-facts div { min-width: 0; padding: var(--space-1); border: 1px solid var(--surface-line); border-radius: var(--radius-control); }
+.traffic-policy-facts dt { color: var(--nominal-quiet); font: var(--text-micro)/1.2 var(--mono); }
+.traffic-policy-facts dd { overflow: hidden; margin: var(--space-1) 0 0; font: 700 var(--text-label)/1.2 var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.traffic-policy-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+.traffic-policy-grid label { display: grid; gap: var(--space-1); color: var(--nominal-quiet); font: var(--text-micro)/1.2 var(--mono); }
+.traffic-policy-grid input, .traffic-policy-grid select { min-width: 0; min-height: var(--target-secondary); border: 1px solid var(--surface-line); border-radius: var(--radius-control); color: var(--paper); background: var(--ground); padding: 0 var(--space-2); }
+.traffic-policy-actions, .simulation-signal-controls { display: flex; align-items: center; gap: var(--space-1); }
+.traffic-policy-actions button { flex: 1; }
+.simulation-signal-controls span { margin-right: auto; color: var(--nominal-quiet); font: var(--text-micro)/1.2 var(--mono); }
+.simulation-signal-controls button:disabled { opacity: 0.35; cursor: not-allowed; }
+.simulation-signal-controls button[data-active="true"] { color: var(--button-primary-ink); background: var(--series-primary); }
 
 /* 저속 직접 제어도 카드가 아니다 — 같은 면 위의 묶음이다. */
 .teleop-commissioning { display: flex; flex-direction: column; gap: var(--space-2); }

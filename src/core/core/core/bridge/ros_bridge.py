@@ -29,7 +29,7 @@ from nav2_msgs.action import NavigateToPose
 from nav2_msgs.msg import Costmap
 from lifecycle_msgs.msg import TransitionEvent
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
-from sensor_msgs.msg import BatteryState, Imu, LaserScan, Range
+from sensor_msgs.msg import BatteryState, CompressedImage, Imu, LaserScan, Range
 from std_msgs.msg import Bool, Float32, String
 from std_srvs.srv import Empty
 
@@ -39,10 +39,12 @@ from core.bridge import (
     odometry,
     reconcile,
     save_map,
+    traffic_gate,
     translate,
 )
 from core.bridge.goal_tracker import GoalTracker
 from core_features.maps import occupancy_map_id
+from core_features.vision import parse_preview_format
 from core_features.navigation.initial_pose import amcl_pose_covariance
 from interfaces.srv import SetLed
 import tf2_ros
@@ -98,6 +100,12 @@ class RosBridge:
         # (D-136 §2). 판정은 ROS-free 피드가 하고, 이 파일은 적응만 한다.
         node.create_subscription(String, "detection_evidence",
                                  self._on_detection_evidence, 10)
+        node.create_subscription(String, "road/observation", self._on_road_observation, 10)
+        preview_qos = QoSProfile(
+            depth=1, reliability=ReliabilityPolicy.BEST_EFFORT)
+        node.create_subscription(
+            CompressedImage, "camera/preview/compressed",
+            self._on_camera_preview, preview_qos)
         # Nav2 lifecycle nodes announce their authoritative goal state on
         # transition_event.  CORE never infers readiness from node discovery;
         # it requires these active transitions plus the motor adapter lease.
@@ -255,19 +263,74 @@ class RosBridge:
                 "detail": str(exc),
             })
 
+    def _on_road_observation(self, msg: String) -> None:
+        """Decode road evidence; invalid data invalidates an enforced lease."""
+        try:
+            observation = translate.road_evidence(json.loads(msg.data))
+            source_now = self._node.get_clock().now().nanoseconds * 1e-9
+            self._svc.traffic_policy.observe(
+                observation,
+                received_at=time.monotonic(),
+                source_now=source_now,
+            )
+            self._svc.state.set_sensor("traffic_policy", {
+                "valid": True,
+                "source": observation.source,
+                "map_id": observation.map_id,
+                "scene_revision": observation.scene_revision,
+            })
+        except (KeyError, TypeError, ValueError,
+                json.JSONDecodeError) as exc:
+            status = self._svc.traffic_policy.reset(
+                "invalid_road_observation")
+            if self._svc.traffic_policy.mode.value == "ENFORCED":
+                self._svc.command.clear_navigation()
+            self._svc.state.set_traffic_policy(status)
+            self._svc.state.set_sensor("traffic_policy", {
+                "valid": False,
+                "reason": "invalid_observation",
+                "detail": str(exc),
+            })
+
+    def _on_camera_preview(self, msg: CompressedImage) -> None:
+        """Store one display-only JPEG without coupling it to driving policy."""
+        try:
+            metadata = parse_preview_format(msg.format)
+            if metadata is None:
+                raise ValueError("camera preview format must be jpeg")
+            stamp = (
+                float(msg.header.stamp.sec)
+                + float(msg.header.stamp.nanosec) * 1e-9
+            )
+            self._svc.vision.publish(
+                bytes(msg.data),
+                captured_at=stamp,
+                frame_id=str(msg.header.frame_id),
+                **metadata,
+            )
+        except (AttributeError, TypeError, ValueError, OverflowError) as exc:
+            self._node.get_logger().warning(
+                f"ignored camera preview: {exc}")
+
     def _tick_line_follow(self) -> None:
         if not self._svc.line_follow.active:
             return
         now = time.monotonic()
         decision = self._svc.line_follow.tick(now)
-        self._svc.line_follow.apply_if_current(
+        traffic_gate.apply_line_candidate(
+            self._svc.line_follow,
+            self._svc.traffic_policy,
+            self._svc.command,
             decision,
-            lambda current: self._svc.command.set_nav_twist(
-                CoreTwist(linear=current.linear, angular=current.angular), now=now),
+            now,
         )
         status = self._svc.line_follow.status()
         self._svc.state.set_line_follow(status)
         self._svc.state.set_sensor("line_follow", status.model_dump())
+        traffic_status = self._svc.traffic_policy.status()
+        self._svc.state.set_traffic_policy(traffic_status)
+        self._svc.state.set_sensor(
+            "traffic_policy", traffic_status.model_dump())
 
     @staticmethod
     def _lifecycle_active(msg: TransitionEvent) -> bool:

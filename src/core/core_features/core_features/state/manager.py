@@ -21,6 +21,7 @@ from core_common.protocol.schemas import (
     SafetySummary,
     StateSnapshot,
     SwarmStatus,
+    TrafficPolicyStatus,
     Velocity,
 )
 
@@ -66,6 +67,7 @@ class StateManager:
         self._swarm = SwarmStatus()
         self._power = PowerStatus()
         self._line_follow = LineFollowStatus()
+        self._traffic_policy = TrafficPolicyStatus()
         self._map_id: Optional[str] = None
         self._diagnostics: dict[str, HealthState] = {}
         self._errors: list[str] = []
@@ -130,6 +132,10 @@ class StateManager:
         with self._lock:
             self._line_follow = LineFollowStatus.model_validate(status)
 
+    def set_traffic_policy(self, status: TrafficPolicyStatus) -> None:
+        with self._lock:
+            self._traffic_policy = TrafficPolicyStatus.model_validate(status)
+
     def set_battery_status(self, status: BatteryStatus) -> None:
         with self._lock:
             self._battery_status = status
@@ -185,6 +191,7 @@ class StateManager:
                 swarm=self._swarm.model_copy(),
                 power=self._power.model_copy(),
                 line_follow=self._line_follow.model_copy(),
+                traffic_policy=self._traffic_policy.model_copy(),
                 diagnostics_summary=dict(self._diagnostics),
                 errors=list(self._errors),
                 seq=self._seq,

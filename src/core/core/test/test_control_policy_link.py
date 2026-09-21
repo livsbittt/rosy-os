@@ -16,6 +16,11 @@ def linked(monkeypatch):
     from control.control.command_gate import CommandPolicy, GateInputs, GateSnapshot
     policy = CommandPolicy('revision-1')
     safety = SafetyManager(SpeedLimits(), BatteryPolicy())
+    # These contract tests exercise policy semantics, not host scheduling.
+    # The dedicated budget test below replaces this clock with over-budget
+    # ticks; keeping the default deterministic prevents suite load from
+    # turning a collision-limit assertion into an unrelated e-stop.
+    safety._policy_clock = lambda: 1.0
     modes = ModeMachine()
     command = CommandManager(SourceRegistry(), modes, safety)
     safety.bind_control_policy(policy)
