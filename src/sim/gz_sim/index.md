@@ -39,8 +39,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · fix(sim): canonicalize semantic scene hashes (D-151)
 - 2026-09-21 · uncommitted · feat(sim): add semantic road scene and host closed loop (D-151)
 - 2026-09-21 · uncommitted · refactor(gz_sim): swarm_bench consumes fleet.bench only (D-148)
 - 2026-09-21 · uncommitted · feat(sim): finish exact-map live SLAM traversal
 - 2026-09-20 · uncommitted · fix(sim): stabilize exact-map Nav2 startup and corner geometry
-- 2026-09-18 · uncommitted · feat(sim): pin Cyclone and keep images off gz_multi (D-117, D-118, D-120)

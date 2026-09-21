@@ -18,6 +18,12 @@ DEFAULT_WORLD = ROOT / "worlds" / "map_260905_traffic.world"
 DEFAULT_PREVIEW = ROOT / "review" / "map_260905_traffic.png"
 
 
+def canonical_text_bytes(path: Path) -> bytes:
+    """Hash text identically across LF and CRLF worktrees."""
+    text = path.read_text(encoding="utf-8")
+    return text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+
+
 def validate_scene(scene: dict) -> None:
     """Validate the semantic scene before it can produce runtime assets."""
     groups = ("lanes", "crosswalks", "stop_lines", "traffic_signals")
@@ -196,11 +202,11 @@ def render_preview(scene: dict, output: Path) -> None:
 
 
 def build(scene_path: Path, world_output: Path, preview_output: Path) -> None:
-    scene_bytes = scene_path.read_bytes()
+    scene_bytes = canonical_text_bytes(scene_path)
     scene = yaml.safe_load(scene_bytes.decode("utf-8"))
     validate_scene(scene)
     source = ROOT / scene["source_world"]
-    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    digest = hashlib.sha256(canonical_text_bytes(source)).hexdigest()
     if digest != scene["source_world_sha256"]:
         raise ValueError("source world checksum does not match semantic map")
     text = source.read_text(encoding="utf-8")

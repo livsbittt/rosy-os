@@ -104,4 +104,3 @@ ROS-SIM 합격은 Gazebo 렌더링, 카메라 perception, CORE policy, 단일 pu
 관제 readback이 같은 run ID에서 확인될 때만 선언한다. 합성 프레임 시험이나
 semantic truth 자체는 카메라 인식 증거가 아니다. 실제 Pinky Pro 카메라 노출,
 장착 자세, 정지거리와 물리 신호 환경은 DEVICE/FIELD gate로 남는다.
-

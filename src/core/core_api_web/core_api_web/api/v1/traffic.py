@@ -5,10 +5,14 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict
 
-from core_api_web.api.deps import AuthContext, CoreServicesLike, get_services
+from core_api_web.api.deps import (
+    AuthContext,
+    CoreServicesLike,
+    Mode,
+    get_services,
+)
 from core_api_web.api.errors import ApiError
 from core_api_web.api.v1.common import operator, viewer
-from core_features.command.arbitration import Mode
 
 
 traffic_router = APIRouter(prefix="/api/v1/traffic", tags=["traffic"])

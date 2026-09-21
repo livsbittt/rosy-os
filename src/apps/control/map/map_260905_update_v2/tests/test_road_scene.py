@@ -51,10 +51,10 @@ def test_scene_rejects_signal_references_to_unknown_features():
 
 def test_generated_world_binds_source_and_semantic_hashes():
     world = (ROOT / "worlds" / "map_260905_traffic.world").read_text(encoding="utf-8")
-    source_hash = BUILDER.hashlib.sha256(
-        (ROOT / "worlds" / "map_260905.world").read_bytes()).hexdigest()
-    semantic_hash = BUILDER.hashlib.sha256(
-        (ROOT / "semantic" / "road_scene.yaml").read_bytes()).hexdigest()
+    source_hash = BUILDER.hashlib.sha256(BUILDER.canonical_text_bytes(
+        ROOT / "worlds" / "map_260905.world")).hexdigest()
+    semantic_hash = BUILDER.hashlib.sha256(BUILDER.canonical_text_bytes(
+        ROOT / "semantic" / "road_scene.yaml")).hexdigest()
 
     assert f"source_world_sha256={source_hash}" in world
     assert f"road_scene_sha256={semantic_hash}" in world
@@ -69,5 +69,11 @@ def test_manifest_covers_semantic_source_and_generated_assets():
         "review/map_260905_traffic.png",
     )
     for relative in paths:
-        digest = BUILDER.hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
+        path = ROOT / relative
+        content = (
+            path.read_bytes()
+            if path.suffix == ".png"
+            else BUILDER.canonical_text_bytes(path)
+        )
+        digest = BUILDER.hashlib.sha256(content).hexdigest()
         assert f"{digest}  {relative}" in manifest

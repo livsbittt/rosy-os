@@ -163,3 +163,10 @@
 - 증거: 정책·API·bridge·dashboard focused tests와 실제 Chromium stage→apply 흐름이 통과했다. 첫 캡처에서 발견한 test-stub state 유실과 거짓 양성 문자열 검사를 수정해 성공 문구를 정확히 단언한다.
 - gate 변화: SOURCE/LOCAL 증거만 추가. 실제 ROS graph와 장치·현장 gate는 HOLD/PARKED 유지.
 - 결정: D-151.
+
+## 2026-09-21 · uncommitted · fix(core): route traffic type through api.deps (D-147, D-151)
+
+- 변경: 최신 main의 v1 import 경계에 맞춰 traffic router의 `Mode`를 `core_api_web.api.deps` 재수출 면에서 가져오도록 했다.
+- 증거: `test_v1_import_boundary.py`와 traffic API 8건 통과, focused flake8 0 errors.
+- gate 변화: 없음. rebase 통합 경계 수정이다.
+- 결정: D-147의 API 결합도 경계와 D-151의 traffic API를 함께 지킨다.
