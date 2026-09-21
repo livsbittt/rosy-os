@@ -51,3 +51,25 @@ def test_deploy_configs_do_not_expose_control_debug_surface():
     assert not offenders, (
         "control debug surface leaked into deploy config (D-150): " + ", ".join(offenders)
     )
+
+
+def test_core_launches_do_not_reference_the_control_stack():
+    """D-149: CORE launch files stay CORE-only; control nodes never ride along.
+
+    단일 발행자 원칙(D-2/D-38)의 코어 쪽 면 — core launch 가 control 노드를
+    포함하면 control 의 standalone 최종 발행(계약된 예외)과 CORE 가 같은
+    그래프에서 만난다. launch 파일 이름 개명(rosy_core → core)에도 견디도록
+    디렉터리를 glob 한다.
+    """
+    core_launch_dir = ROOT / "src" / "core" / "core" / "launch"
+    launches = sorted(core_launch_dir.glob("*.launch.py"))
+    assert launches, "core launch directory unexpectedly empty — guard lost its scope"
+    offenders = []
+    for path in launches:
+        text = path.read_text(encoding="utf-8")
+        for marker in ("package='control'", 'package="control"', "apps/control"):
+            if marker in text:
+                offenders.append(f"{path.name}: {marker}")
+    assert not offenders, (
+        "CORE launch must not reference the control stack (D-149): " + ", ".join(offenders)
+    )

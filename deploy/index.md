@@ -47,8 +47,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · test(deploy): core launches never reference the control stack (D-149)
 - 2026-09-21 · uncommitted · test(deploy): keep control debug ports out of deploy configs (D-150)
 - 2026-09-21 · uncommitted · feat(release): verify unsigned ARM64 handoffs (D-146)
 - 2026-09-21 · uncommitted · feat(release): export native ARM64 unsigned payloads (D-145)
 - 2026-09-21 · uncommitted · feat(deploy): make physical G5 mapping evidence-bound (D-144)
-- 2026-09-21 · 6f6c515 · feat(deploy): capture Pinky connection evidence
