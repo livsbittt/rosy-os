@@ -6,9 +6,11 @@ tools/gz/obstacle_camera.py mounts the sensor at pose '.055 0 .08 0 .25 0' --
 horizontal FOV.
 """
 import math
+import inspect
 
 import pytest
 
+from control.sensing import camera_ground
 from control.sensing.camera_ground import focal_from_hfov, ground_plane
 
 HEIGHT, PITCH = 0.08, 0.25
@@ -38,6 +40,31 @@ def test_the_principal_row_is_the_pure_pitch_ray():
     # At v == cy the atan term vanishes, so Z is h / tan(pitch) exactly.
     assert plane().distance(CY) == pytest.approx(HEIGHT / math.tan(PITCH))
     assert plane().distance(CY) == pytest.approx(0.3133, abs=1e-4)
+
+
+def test_ground_distance_accepts_the_detector_column_contract():
+    assert "column" in inspect.signature(plane().distance).parameters
+    assert plane().distance(CY, CX) == pytest.approx(plane().distance(CY))
+
+
+def test_simulation_plane_is_explicitly_gazebo_only():
+    factory = getattr(camera_ground, "simulation_ground_plane", None)
+    assert callable(factory)
+    kwargs = dict(
+        width_px=640,
+        height_px=360,
+        height_m=0.060194,
+        pitch_rad=math.radians(25.0),
+        hfov_rad=1.1519,
+        max_range_m=0.6,
+    )
+    assert factory(source="PINKY", **kwargs) is None
+    model = factory(source="GAZEBO", **kwargs)
+    assert model is not None
+    assert model.focal_px == pytest.approx(focal_from_hfov(640, 1.1519))
+    assert model.principal_x == pytest.approx(320.0)
+    assert model.principal_y == pytest.approx(180.0)
+    assert 0.0 < model.distance(300, 320) <= 0.6
 
 
 def test_rows_lower_in_the_image_are_nearer():

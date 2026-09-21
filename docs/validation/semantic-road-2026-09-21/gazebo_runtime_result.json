@@ -1,55 +1,70 @@
 {
-  "schema_version": 1,
-  "captured_at": "2026-09-21T16:21:00+09:00",
+  "schema_version": 2,
+  "captured_at": "2026-09-21T17:22:27+09:00",
   "runtime": {
-    "environment": "WSL2 Ubuntu 24.04",
+    "environment": "WSL2 Ubuntu 24.04.4 LTS",
     "ros_distribution": "Jazzy",
-    "gazebo_version": "8.11.0",
+    "gazebo_server_version": "8.11.0",
     "launch": "ros2 launch gz_sim semantic_road_dashboard.launch.py gazebo_gui:=false",
     "world": "map_260905_traffic.world",
     "world_sha256": "af70bbd26d1b3fbe3812af2008403bcfbab42df1b6d4dc6a07d660737ba87373",
     "installed_world_hash_matches_source": true,
-    "gazebo_gui_process_started": false
+    "gazebo_gui_process_started": false,
+    "sampled_real_time_factor_under_validation_load": 0.2546004389820769
   },
   "camera": {
     "topic": "/camera/front",
     "source": "GAZEBO",
     "frame_id": "front_camera_link",
-    "width": 640,
-    "height": 360,
-    "sequence": 74,
-    "captured_at_sim_s": 78.9,
-    "capture_age_ms": 289,
+    "width": 320,
+    "height": 180,
+    "configured_update_rate_hz": 5.0,
+    "sequence": 252,
+    "captured_at_sim_s": 84.4,
+    "capture_age_ms": 229,
     "overlay": "semantic-road-v1",
     "artifact": "gazebo_camera_frame.jpg",
-    "artifact_sha256": "849163f149ef5736f45aef5816d78b444d501f1615f12365fa964095fb41bc87",
+    "artifact_sha256": "ace64765d979499c9310ad117cbcb562a72ce9db9e93cd86f1a36c15096c9d90",
     "observed_wall_rate_hz": {
-      "software_rendering_range": [0.59, 0.80],
-      "wsl_gpu_attempt": 0.37,
-      "dashboard_preview": 0.36
+      "raw_ros_range": [2.026, 2.651],
+      "dashboard_preview_range": [1.323, 1.501],
+      "diagnostic_gazebo_transport_range": [3.62, 3.98]
     },
-    "freshness": "intermittent_on_this_wsl_host"
+    "freshness": "fresh_for_dashboard_on_this_wsl_host",
+    "tunable_launch_arguments": [
+      "camera_width",
+      "camera_height",
+      "camera_update_rate"
+    ]
+  },
+  "camera_ground": {
+    "mode": "gazebo_pinhole",
+    "physical_profile_activated": false,
+    "height_m": 0.060194,
+    "pitch_deg": 25.0,
+    "horizontal_fov_rad": 1.1519,
+    "max_range_m": 0.6,
+    "boundary": "accepted_only_when_dashboard_source_is_GAZEBO"
   },
   "road_observation": {
     "source": "CAMERA_ROAD",
     "map_id": "map_260905_update_v2",
     "scene_revision": "road-scene-v1",
     "stop_line_visible": true,
-    "stop_line_confidence": 0.8141533745659723,
-    "stop_line_image_row": 431.5,
-    "stop_line_distance_m": null,
+    "stop_line_confidence": 0.8128038194444445,
+    "stop_line_image_row": 107.5,
+    "stop_line_distance_m": 0.1083128819752865,
     "lane_visible": false,
     "crosswalk_visible": false,
     "signal_visible": false
   },
   "core_readback": {
     "line_follow_mode": "CAMERA_LINE",
-    "line_follow_state": "HOLD",
-    "line_follow_reason": "line_not_visible",
     "traffic_policy_mode": "MONITOR_ONLY",
-    "traffic_policy_state": "HOLD",
-    "traffic_policy_reason": "stop_distance_unavailable",
-    "linear_scale": 0.0,
+    "traffic_policy_state": "WAIT_SIGNAL",
+    "traffic_policy_reason": "signal_unknown",
+    "traffic_evidence_age_s": 0.29,
+    "traffic_linear_scale": 0.0,
     "robot_linear_velocity_mps": 0.0,
     "robot_angular_velocity_rps": 0.0,
     "estop": false
@@ -57,9 +72,11 @@
   "gates": {
     "actual_gazebo_camera_graph": "PASS",
     "map_scene_identity": "PASS",
-    "detector_to_core_policy": "PASS_FAIL_CLOSED",
-    "continuous_realtime_preview_on_this_host": "HOLD",
-    "metric_stop_distance": "HOLD_REQUIRES_VALIDATED_HOMOGRAPHY",
+    "detector_metric_stop_distance": "PASS_GAZEBO_DECLARED_GEOMETRY_ONLY",
+    "detector_to_core_policy": "PASS",
+    "dashboard_preview_freshness_on_this_host": "PASS",
+    "dashboard_browser_capture": "HOLD_NO_BROWSER_BACKEND",
+    "physical_camera_homography": "HOLD_REQUIRES_PHYSICAL_VALIDATION",
     "physical_pinky_pro": "NOT_TESTED"
   }
 }

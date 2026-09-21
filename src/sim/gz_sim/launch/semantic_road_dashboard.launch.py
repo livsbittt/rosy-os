@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """One-robot semantic road camera + CORE dashboard simulation."""
 
+import math
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -28,6 +29,10 @@ def generate_launch_description():
             "world": world,
             "bridge_image": "true",
             "cam_tilt_deg": "25",
+            "camera_width": LaunchConfiguration("camera_width"),
+            "camera_height": LaunchConfiguration("camera_height"),
+            "camera_update_rate": LaunchConfiguration(
+                "camera_update_rate"),
             "gui": LaunchConfiguration("gazebo_gui"),
         }.items(),
     )
@@ -38,6 +43,9 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument("gazebo_gui", default_value="false"),
+        DeclareLaunchArgument("camera_width", default_value="320"),
+        DeclareLaunchArgument("camera_height", default_value="180"),
+        DeclareLaunchArgument("camera_update_rate", default_value="5"),
         simulation,
         Node(
             package="control",
@@ -54,6 +62,11 @@ def generate_launch_description():
             parameters=[line_config, {
                 **simulation_camera,
                 "dashboard_source": "GAZEBO",
+                "camera_ground_mode": "gazebo_pinhole",
+                "gazebo_camera_height_m": 0.060194,
+                "gazebo_camera_pitch_rad": math.radians(25.0),
+                "gazebo_camera_hfov_rad": 1.1519,
+                "gazebo_camera_max_range_m": 0.6,
             }],
         ),
         Node(

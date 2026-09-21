@@ -40,6 +40,35 @@ def test_single_robot_gazebo_gui_is_optional():
     assert 'if="$(var gui)"' in launch
 
 
+def test_single_robot_camera_render_profile_reaches_the_description():
+    launch = (ROOT / "launch" / "launch_sim.launch.xml").read_text(
+        encoding="utf-8")
+
+    for name, default in (
+        ("camera_width", "1280"),
+        ("camera_height", "720"),
+        ("camera_update_rate", "10"),
+    ):
+        assert f'<arg name="{name}" default="{default}"/>' in launch
+        assert f"<arg name='{name}' value='$(var {name})'/>" in launch
+
+
+def test_semantic_road_uses_a_bounded_camera_profile_and_gazebo_range():
+    launch = (ROOT / "launch" / "semantic_road_dashboard.launch.py").read_text(
+        encoding="utf-8")
+
+    assert 'DeclareLaunchArgument("camera_width", default_value="320")' in launch
+    assert 'DeclareLaunchArgument("camera_height", default_value="180")' in launch
+    assert 'DeclareLaunchArgument("camera_update_rate", default_value="5")' in launch
+    assert '"camera_width": LaunchConfiguration("camera_width")' in launch
+    assert '"camera_height": LaunchConfiguration("camera_height")' in launch
+    assert '"camera_update_rate": LaunchConfiguration(' in launch
+    assert '"camera_ground_mode": "gazebo_pinhole"' in launch
+    assert '"gazebo_camera_height_m": 0.060194' in launch
+    assert '"gazebo_camera_pitch_rad": math.radians(25.0)' in launch
+    assert '"gazebo_camera_hfov_rad": 1.1519' in launch
+
+
 def test_gz_multi_uses_ros_gz_bridge_not_domain_bridge():
     """D-114: 시뮬은 네임스페이스 + ros_gz_bridge. domain_bridge / ROS_DOMAIN_ID 없음."""
     launch = (ROOT / "launch" / "gz_multi.launch.py").read_text(encoding="utf-8")
