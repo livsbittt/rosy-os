@@ -59,6 +59,7 @@ Flask parity checklist가 추적용으로 여기에 합류했다. 둘은 실행 
 | `2026-09-21-pinky-device-commissioning-design.md` (+ implementation plan) | Fail-closed G0-G5 first physical Pinky Pro session and evidence workflow |
 | `2026-09-21-hardware-mapping-g5-design.md` (+ implementation plan) | D-144 hardware SLAM backend, writable map output, and MCAP/hash-bound G5 evidence |
 | `2026-09-21-traffic-light-controller-research.md` | 알리 신호등(접점 스위치)을 ESP32+릴레이로 관제 제어하는 조사 보고서 — 제품/릴레이/보드/펌웨어/통신/안전 비교와 ROSY-SIGNAL-001 근거 |
+| `2026-09-21-fleet-signals-integration-design.md` | G-S3 설계: Fleet 콘솔이 ROSY-SIGNAL-001 장치를 gather/scatter — signals.yaml, SignalConsole(재단언·all_red scatter), snapshot/UI 통합 |
 | D-73 | `tools/harness/harness.yaml` `functional` + `test/test_module_functional_surface.py` |
 
 ## Subdirectories
