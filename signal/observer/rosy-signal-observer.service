@@ -1,0 +1,27 @@
+# 라즈베리파이 상시 기동용 (신호등 관측 · 읽기 전용)
+#
+# 설치 (Pi 에서):
+#   sudo cp rosy-signal-observer.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now rosy-signal-observer
+#
+# 전제: /opt/rosy/signal/observer/ 에 observer.py 와 observer.json(캘리브레이션된
+# 설정)이 있고, picamera2 가 설치돼 있으며, 설정의 source 는 {"type": "picamera2"}다.
+#
+# 이 서비스는 읽기 전용 증거(observations)만 내어준다 — 명령 경로가 없으므로
+# 0.0.0.0 바인딩이 노출하는 것은 관측값뿐이다 (D-163).
+
+[Unit]
+Description=ROSY signal light observer (read-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/rosy
+ExecStart=/usr/bin/python3 /opt/rosy/signal/observer/observer.py --config /opt/rosy/signal/observer/observer.json --host 0.0.0.0 --port 8095
+Restart=always
+RestartSec=3
+User=rosy
+
+[Install]
+WantedBy=multi-user.target

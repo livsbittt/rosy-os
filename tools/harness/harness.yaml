@@ -99,9 +99,9 @@ modules:
     functional: [test/test_dock_contract.py]
   - name: signal
     path: signal
-    tests: [test/test_signal_contract.py]
+    tests: [test/test_signal_contract.py, signal/observer/test]
     functional_kind: host-contract
-    functional: [test/test_signal_contract.py]
+    functional: [test/test_signal_contract.py, signal/observer/test]
   - name: docs
     path: docs
     tests: [test/test_network_topology_contracts.py, test/test_harness_contracts.py]

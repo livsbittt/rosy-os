@@ -169,9 +169,78 @@ def test_picamera2_outside_pi_is_a_clear_refusal():
         pass
 
 
+# --- 안정 상태 (debounce) ---------------------------------------------------------
+
+def test_stable_needs_two_consecutive_frames():
+    """한 프레임 반짝임은 stable 을 바꾸지 못한다 — 두 프레임 연속 일치가 조건이다."""
+    from observer import ObserverConfig, create_app
+    cfg = ObserverConfig(rois=tuple(ROIS), stable_after=2)
+    frame = make_frame({"left": RED_BGR})
+    client = _client([frame, frame], config=cfg)
+    first = client.get("/observed").json()
+    assert first["lamps"]["left"]["lit"] is True              # raw 는 즉시
+    assert first["stable"]["left"]["lit"] is None             # stable 은 아직
+    assert first["stable"]["left"]["pending"] is True
+    second = client.get("/observed").json()
+    assert second["stable"]["left"]["lit"] is True
+    assert second["stable"]["left"]["pending"] is False
+
+
+def test_stable_holds_through_a_single_frame_glitch():
+    """빨강으로 안정된 뒤 초록 한 프레임이 반짝여도 stable 은 유지된다."""
+    from observer import ObserverConfig, create_app
+    cfg = ObserverConfig(rois=tuple(ROIS), stable_after=2)
+    red = make_frame({"left": RED_BGR})
+    green = make_frame({"left": GREEN_BGR})
+    client = _client([red, red, green, green], config=cfg)
+    client.get("/observed")
+    client.get("/observed")
+    mid = client.get("/observed").json()
+    assert mid["lamps"]["left"]["group"] in ("green", "blue")  # raw 는 이미 바뀌었다
+    assert mid["stable"]["left"]["lit"] is True                # 아직 직전 안정 상태 유지
+    assert mid["stable"]["left"]["pending"] is True
+    final = client.get("/observed").json()
+    assert final["stable"]["left"]["pending"] is False
+
+
+def test_stable_after_one_is_pass_through(tmp_path):
+    """stable_after=1 이면 안정화가 사실상 꺼진다 — 바로 stable 이 따라간다."""
+    from observer import ObserverConfig, create_app
+    cfg = ObserverConfig(rois=tuple(ROIS), stable_after=1)
+    client = _client([make_frame({"left": RED_BGR})], config=cfg)
+    body = client.get("/observed").json()
+    assert body["stable"]["left"]["lit"] is True
+    assert body["stable"]["left"]["pending"] is False
+
+
+# --- preview (캘리브레이션 조격) ----------------------------------------------------
+
+def test_preview_returns_annotated_jpeg_after_first_observation():
+    client = _client([make_frame({"left": RED_BGR})])
+    client.get("/observed")                       # 프레임을 하나 확보한 뒤에
+    resp = client.get("/preview.jpeg")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "image/jpeg"
+    assert resp.content[:2] == b"\xff\xd8"        # JPEG magic
+
+
+def test_preview_is_503_before_any_frame():
+    assert _client([]).get("/preview.jpeg").status_code == 503
+
+
+def test_config_rejects_non_positive_stable_after(tmp_path):
+    import json
+    path = tmp_path / "observer.json"
+    path.write_text(json.dumps({
+        "camera": 0, "stable_after": 0,
+        "rois": [{"name": "a", "x": 1, "y": 1, "w": 1, "h": 1}]}), encoding="utf-8")
+    with pytest.raises(ObserverConfigError):
+        load_config(path)
+
+
 # --- HTTP 경계 -------------------------------------------------------------------
 
-def _client(frames):
+def _client(frames, config: "ObserverConfig | None" = None):
     source = iter(frames)
 
     def grab():
@@ -180,7 +249,7 @@ def _client(frames):
         except StopIteration:
             return None
 
-    cfg = ObserverConfig(camera=0, rois=tuple(ROIS))
+    cfg = config or ObserverConfig(camera=0, rois=tuple(ROIS))
     return TestClient(create_app(grab, cfg))
 
 
