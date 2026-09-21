@@ -81,7 +81,11 @@ class _Anything(types.ModuleType):
     """A module that answers any attribute with a fresh permissive dummy class."""
 
     def __getattr__(self, name: str) -> Any:
-        created = _Permissive(name, (), {"__init__": lambda self, *a, **k: None})
+        def initialize(instance, *args, **kwargs):
+            for key, value in kwargs.items():
+                setattr(instance, key, value)
+
+        created = _Permissive(name, (), {"__init__": initialize})
         setattr(self, name, created)
         return created
 
@@ -102,6 +106,10 @@ def _qos_kind(qos) -> object:
     name = getattr(qos, "__name__", None) or type(qos).__name__
     if name == "qos_profile_sensor_data":
         return "SENSOR"
+    reliability = getattr(qos, "reliability", None)
+    if (getattr(qos, "depth", None) == 1
+            and getattr(reliability, "__name__", "") == "BEST_EFFORT"):
+        return "PREVIEW"
     return "LATCHED"
 
 
@@ -198,6 +206,7 @@ EXPECTED_SUBSCRIPTIONS = [
     ("nav_cmd_vel", "_on_nav_cmd_vel", 10),
     ("line/observation", "_on_line_observation", 10),
     ("road/observation", "_on_road_observation", 10),
+    ("camera/preview/compressed", "_on_camera_preview", "PREVIEW"),
     ("amcl/transition_event", "_on_amcl_transition", 10),
     ("map_server/transition_event", "_on_map_server_transition", 10),
     ("slam_toolbox/transition_event", "_on_slam_transition", 10),

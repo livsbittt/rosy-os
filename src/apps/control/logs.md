@@ -121,3 +121,13 @@
 - 증거: `map_260905_update_v2` synthetic camera closed loop가 `FOLLOW` → `APPROACH` → `STOP_REQUIRED` → `WAIT_SIGNAL` → `PROCEED` → stale `HOLD`를 통과했다. Control 패키지 `1103 passed, 26 skipped`; semantic scene/simulation focused `8 passed`.
 - gate 변화: SOURCE/LOCAL GO 유지. 실제 Gazebo camera topic graph, Pi camera/IR, 물리 homography·제동거리와 FIELD는 HOLD/PARKED 유지.
 - 결정: D-151. Control은 evidence만 만들고 최종 주행 명령은 CORE가 중재한다.
+
+## 2026-09-21 · uncommitted · feat(control): publish the bounded semantic camera preview (D-152)
+
+- Review hardening: startup validates 0.2..2 FPS, 160..640 px, JPEG quality 40..90, and 512000 bytes; local monotonic limiting and BEST_EFFORT depth 1 are enforced.
+- Latest evidence: Control `1114 passed, 26 skipped`; preview/store/API focused `30 passed`.
+
+- 변경: `road_observer_node`가 detector와 동일한 `camera/front` frame에 차선·횡단보도·정지선·신호 overlay를 그려 기본 2 FPS, 최대 폭 640, JPEG 품질 72로 `camera/preview/compressed`에 발행한다. 원본 detector 입력은 변경하지 않는다.
+- 안전: hardware에서는 camera control 안정성이 유지돼야 detection evidence가 유효하다. simulation launch만 그 gate를 명시적으로 해제하며 preview 자체에는 주행 권한이 없다.
+- 증거: Control 전체 `1106 passed, 26 skipped`; host preview JPG/GIF와 browser panel은 HOST-SIM으로 명시했다.
+- gate 변화: SOURCE/LOCAL 유지. 실제 CSI frame과 물리 보정은 DEVICE/FIELD HOLD다.

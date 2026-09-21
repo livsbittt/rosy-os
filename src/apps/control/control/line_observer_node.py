@@ -35,6 +35,7 @@ class LineObserverNode(Node):
         self.declare_parameter('camera_roi_top_fraction', 0.4)
         self.declare_parameter('camera_washed_fraction', 0.4)
         self.declare_parameter('camera_min_pixels', 80)
+        self.declare_parameter('require_camera_controls_stable', True)
 
         self._ir_calibration = None
         self._camera_controls_stable = False
@@ -82,7 +83,9 @@ class LineObserverNode(Node):
 
     def _on_camera(self, msg: Image) -> None:
         observation = None
-        if not self._camera_controls_stable:
+        if (bool(self.get_parameter(
+                'require_camera_controls_stable').value)
+                and not self._camera_controls_stable):
             self._publish('CAMERA_LINE', None, stamp=(
                 float(msg.header.stamp.sec) + float(msg.header.stamp.nanosec) * 1e-9))
             return

@@ -290,6 +290,21 @@ class TrafficPolicyStatus(BaseModel):
     linear_scale: float = 0.0
 
 
+class VisionPreviewStatus(BaseModel):
+    """Latest bounded front-camera preview available through CORE (v1.12)."""
+
+    available: bool = False
+    stale: bool = False
+    source: Optional[str] = None
+    frame_id: Optional[str] = None
+    captured_at: Optional[float] = None
+    age_ms: Optional[int] = None
+    width: int = 0
+    height: int = 0
+    overlay: str = "none"
+    sequence: int = 0
+
+
 class StateSnapshot(BaseModel):
     """로봇 상태 스냅샷 — /ws/state payload와 동일 (API Ref §6.1)."""
 

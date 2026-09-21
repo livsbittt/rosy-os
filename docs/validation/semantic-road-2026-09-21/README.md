@@ -30,6 +30,13 @@ to the detector. `result.json` records
 - `semantic_road_simulation.svg`: state/command timeline.
 - `camera_detection_montage.png`: the synthetic camera inputs used by the
   production detector.
+- `camera_preview_demo.jpg`: one HOST-SIM camera frame with the same semantic
+  overlay published to the dashboard preview topic.
+- `camera_preview_simulation.gif`: six HOST-SIM camera frames played as a
+  preview animation. This demonstrates the UI input shape, not Gazebo runtime.
+- `camera_live_dashboard.png`: Chromium rendering of the camera panel and map
+  together, using the HOST-SIM preview fixture. It shows the source capture
+  clock separately from local receipt latency.
 - `traffic_policy_dashboard.png`: Chromium evidence of the applied
   `ENFORCED` policy, active revision, evidence readback, tunable thresholds,
   and simulation-only signal controls.
@@ -49,6 +56,21 @@ python -m pytest `
   src/apps/control/test/test_semantic_road_simulation.py `
   src/apps/control/map/map_260905_update_v2/tests/test_road_scene.py -q
 ```
+
+On a ROS 2 Jazzy host with Gazebo installed, run the real simulated camera path:
+
+```bash
+ros2 launch gz_sim semantic_road_dashboard.launch.py
+```
+
+Then open `http://127.0.0.1:8080/dashboard`, enter the Viewer token, and check
+that the camera source reads `GAZEBO`. The checked-in screenshot is deliberately
+labelled `HOST-SIM`; it proves the browser/dashboard rendering without claiming
+that Gazebo was running on this Windows host.
+
+The browser fixture also verifies that status sequence 7 is requested as
+`frame?sequence=7`, the JPEG response returns the same sequence header, and a
+failed reauthentication clears the old frame and stops camera polling.
 
 ## Acceptance boundary
 

@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 import sys
 
+from PIL import Image
+
 
 ROOT = Path(__file__).parents[1]
 REPO_ROOT = ROOT.parents[2]
@@ -61,3 +63,8 @@ def test_red_wait_green_resume_and_stale_stop_are_closed_loop(tmp_path):
     assert "map_260905_update_v2" in graphic
     assert "WAIT_SIGNAL" in graphic
     assert "PROCEED" in graphic
+    preview = Image.open(tmp_path / "camera_preview_demo.jpg")
+    assert preview.size == (320, 240)
+    animation = Image.open(tmp_path / "camera_preview_simulation.gif")
+    assert animation.is_animated is True
+    assert animation.n_frames == 6

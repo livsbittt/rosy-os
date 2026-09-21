@@ -4,7 +4,7 @@
 
 **Goal:** Gazebo와 Pinky의 실제 전방 카메라 프레임 및 도로 인식 오버레이를 인증된 CORE 대시보드에서 저대역폭으로 확인한다.
 
-**Architecture:** Control이 `camera/front`를 인식하고 JPEG preview를 발행한다. CORE는 최신 프레임만 보관하고 인증 REST로 제공하며, 대시보드는 Bearer fetch로 2 FPS 표시한다.
+**Architecture:** D-152에 따라 Control이 `camera/front`를 인식하고 bounded JPEG preview를 발행한다. CORE는 디코딩·재인코딩 없이 최신 한 장만 보관하고 인증 REST로 제공하며, 대시보드는 Bearer fetch로 2 FPS 표시한다. raw/Fleet/WebSocket 영상 경로는 만들지 않는다.
 
 **Tech Stack:** ROS 2 Jazzy, sensor_msgs Image/CompressedImage, OpenCV, FastAPI, vanilla ES modules, pytest, Playwright
 
@@ -75,7 +75,14 @@
 2. 지도 옆 운용 패널에 산업용 모니터 형태의 preview를 구현한다.
 3. Playwright로 실제 렌더와 스크린샷을 확인한다.
 
-### Task 6: 계약·문서·최종 검증
+### Task 6: 리뷰 경계 강화
+
+1. 로컬 monotonic 2 FPS, 640 px, 512000 byte, DDS depth 1을 강제한다.
+2. status/frame sequence binding과 token별 400 ms pull 제한을 적용한다.
+3. capture-clock epoch reset, 재인증/pagehide/hidden-tab 취소를 시험한다.
+4. Chromium에서 캡처 시각과 receipt latency를 별도로 표시하고 재촬영한다.
+
+### Task 7: 계약·문서·최종 검증
 
 **Files:**
 - Modify: `docs/reference/ROSY API & Protocol Reference.md`

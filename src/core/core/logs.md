@@ -170,3 +170,13 @@
 - 증거: `test_v1_import_boundary.py`와 traffic API 8건 통과, focused flake8 0 errors.
 - gate 변화: 없음. rebase 통합 경계 수정이다.
 - 결정: D-147의 API 결합도 경계와 D-151의 traffic API를 함께 지킨다.
+
+## 2026-09-21 · uncommitted · feat(core): serve a bounded authenticated camera preview (D-152)
+
+- Review hardening: status/frame sequence binding, per-token 400 ms pulls, capture-clock epoch reset, BEST_EFFORT depth 1, and browser lifecycle cancellation.
+- Latest evidence: CORE `1016 passed, 11 skipped`; Chromium camera suite `6 passed`; boundary-focused `73 passed`; new-file flake8 0 errors.
+
+- 변경: `camera/preview/compressed`의 최신 JPEG 한 장만 보관하고 Viewer 인증 status/frame API와 지도 위 dashboard panel을 추가했다. 크기·JPEG marker·시각 역행·2초 stale을 거부하며 JPEG 재압축은 `Content-Encoding: identity`로 차단한다.
+- 증거: CORE 전체 `1014 passed, 11 skipped`; 실제 Chromium과 root launch 계약 `17 passed`; UI token·first-paint·vision boundary 집중 `39 passed`.
+- gate 변화: SOURCE/LOCAL 증거만 추가. Windows HOST-SIM frame은 실제 Gazebo/Pinky frame이 아니므로 ROS-SIM/DEVICE/FIELD는 승격하지 않는다.
+- 결정: D-152. 이 예외는 MJPEG/녹화/raw/Fleet/상태 WebSocket으로 확장하지 않는다.

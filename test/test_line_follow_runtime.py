@@ -67,3 +67,29 @@ def test_bridge_checks_original_sensor_age_not_only_receipt_age():
     assert "traffic_gate.apply_line_candidate" in bridge
     assert "line_follow.apply_if_current" in gate
     assert "traffic_policy.apply_if_current" in gate
+
+
+def test_semantic_road_launch_connects_real_gazebo_camera_to_dashboard():
+    launch = (
+        ROOT / "src/sim/gz_sim/launch/semantic_road_dashboard.launch.py"
+    ).read_text(encoding="utf-8")
+    package = (ROOT / "src/sim/gz_sim/package.xml").read_text(encoding="utf-8")
+    config = yaml.safe_load((
+        ROOT / "src/sim/gz_sim/config/semantic_road_core.yaml"
+    ).read_text(encoding="utf-8"))
+
+    assert "map_260905_traffic.world" in launch
+    assert '"bridge_image": "true"' in launch
+    assert 'package="core"' in launch
+    assert 'executable="line_observer_node"' in launch
+    assert 'executable="road_observer_node"' in launch
+    assert '"require_camera_controls_stable": False' in launch
+    assert '"dashboard_source": "GAZEBO"' in launch
+    assert "<exec_depend>core</exec_depend>" in package
+    for dependency in (
+        "ament_index_python", "launch", "launch_ros", "ros_gz_image",
+    ):
+        assert f"<exec_depend>{dependency}</exec_depend>" in package
+    assert config["runtime"]["mode"] == "simulation"
+    assert config["traffic_policy"]["simulation_signal_control"] is True
+    assert config["vision"]["preview_min_pull_interval_s"] == 0.4

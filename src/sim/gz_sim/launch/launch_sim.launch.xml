@@ -33,5 +33,7 @@
 
     <node pkg="ros_gz_bridge" exec="parameter_bridge" name='parameter_bridge' output='screen' args="--ros-args -p config_file:=$(var bridge_params)"/>
     <node pkg="ros_gz_image" exec="image_bridge" name='image_bridge' output='screen'
-          args="/camera/image_raw" if="$(var bridge_image)"/>
+          args="/camera/image_raw" if="$(var bridge_image)">
+        <remap from="/camera/image_raw" to="camera/front"/>
+    </node>
 </launch>

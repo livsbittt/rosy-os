@@ -10,7 +10,7 @@ gates:
     cmd: "python3 -m pytest test/test_control_absorption_package.py -q"
   LOCAL:
     state: GO
-    evidence: "1103 passed, 26 skipped (2026-09-21 Windows, 패키지 cwd). D-143 IR/camera와 D-151 semantic-road detector·host closed loop, 본체 반경 기반 map audit 포함"
+    evidence: "1114 passed, 26 skipped (2026-09-21 Windows, 패키지 cwd). D-143 IR/camera, D-151 semantic-road detector, D-152 monotonic 2 FPS/depth-1 bounded overlay preview 포함"
     cmd: "cd src/apps/control && python -m pytest test -q"
   ROS-SIM:
     state: HOLD
@@ -23,7 +23,7 @@ gates:
     blocker: "Pi bench Device 설치와 device-readback.sh --json 증거 없음. Control sensor adapter 활성화는 Device 보정 generation에 묶인다(D-47)"
   FIELD:
     state: PARKED
-adrs: [D-37, D-38, D-40, D-42, D-47, D-50, D-57, D-58, D-77, D-118, D-119, D-143, D-151]
+adrs: [D-37, D-38, D-40, D-42, D-47, D-50, D-57, D-58, D-77, D-118, D-119, D-143, D-151, D-152]
 plans:
   - docs/plans/2026-09-06-module-split-criteria.md
   - docs/plans/2026-09-12-rosy-control-absorption-plan.md
@@ -36,6 +36,8 @@ plans:
   - docs/plans/2026-09-21-line-follow-modes.md
   - docs/plans/2026-09-21-semantic-road-control-design.md
   - docs/plans/2026-09-21-semantic-road-control.md
+  - docs/plans/2026-09-21-camera-preview-dashboard-design.md
+  - docs/plans/2026-09-21-camera-preview-dashboard.md
 ---
 ## 지금 상태
 
@@ -68,6 +70,11 @@ plans:
 - 순수 로직 결정은 `control/control/`, `control/planning/`, `control/sensing/`, `control/watch.py`에만 두고 ROS import를 넣지 않는다(AGENTS.md).
 - 이 패키지의 레거시 최종 `/cmd_vel` publisher를 CORE와 나란히 기동하지 않는다(AGENTS.md, D-38).
 - `config/robot.yaml`이 단일 공유 파라미터 소스이며 per-node yaml은 이후에만 override한다(AGENTS.md).
+
+## 2026-09-21 camera preview status
+
+- road observer가 동일 detector frame의 overlay JPEG를 기본 2 FPS·최대 폭 640으로 발행한다. preview는 관측 전용이고 detector 입력이나 주행 명령을 바꾸지 않는다.
+- HOST-SIM JPG/GIF와 dashboard 렌더는 통과했다. Pi CSI 실제 frame, exposure/AWB readback과 물리 homography는 DEVICE/FIELD HOLD다.
 
 ## 2026-09-20 adaptive speed authorization status
 

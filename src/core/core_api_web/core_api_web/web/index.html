@@ -113,6 +113,26 @@
 
         <div class="region region-observe" aria-label="관측">
           <div class="region-head"><h2>관측</h2><span>지도 위 현재 위치와 경로</span></div>
+        <section id="vision-panel" class="panel vision-panel" aria-labelledby="vision-heading">
+          <div class="panel-heading vision-heading">
+            <div>
+              <h2 id="vision-heading">전방 카메라 · 인식 오버레이</h2>
+            </div>
+            <span id="vision-status" class="machine-tag">WAITING</span>
+          </div>
+          <div id="vision-stage" class="vision-stage" data-state="waiting"
+               role="img" aria-label="로봇 전방 카메라와 도로 인식 오버레이">
+            <img id="vision-frame" alt="전방 카메라 실시간 프레임" hidden>
+            <div class="vision-reticle" aria-hidden="true"><i></i><i></i></div>
+            <p id="vision-empty" class="vision-empty">카메라 프레임 수신 대기</p>
+          </div>
+          <dl class="vision-meta">
+            <div><dt>SOURCE</dt><dd id="vision-source"></dd></div>
+            <div><dt>FRAME</dt><dd id="vision-resolution"></dd></div>
+            <div><dt>CAPTURE</dt><dd id="vision-captured"></dd></div>
+            <div><dt>LATENCY</dt><dd id="vision-age"></dd></div>
+          </dl>
+        </section>
         <section id="field-map-panel" class="panel field-map-panel" aria-labelledby="field-map-heading">
           <div class="panel-heading">
             <div>

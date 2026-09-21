@@ -18,8 +18,41 @@ pytestmark = pytest.mark.skipif(
 )
 
 MAP_STUB = """
-export function createFieldMap() {
-  return { refresh: async () => ({}), setPose() {} };
+export function createFieldMap({canvas, empty, status}) {
+  function paint() {
+    if (!canvas) return;
+    canvas.width = 720;
+    canvas.height = 360;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#111b22';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#70818b';
+    ctx.lineWidth = 12;
+    ctx.strokeRect(28, 24, 664, 312);
+    ctx.strokeStyle = '#d7e0df';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([18, 15]);
+    ctx.beginPath();
+    ctx.moveTo(60, 180);
+    ctx.lineTo(660, 180);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#f5f3df';
+    for (let x = 350; x <= 430; x += 16) ctx.fillRect(x, 88, 9, 184);
+    ctx.fillStyle = '#d84a3a';
+    ctx.fillRect(330, 78, 7, 204);
+    ctx.fillStyle = '#35b879';
+    ctx.beginPath();
+    ctx.arc(230, 180, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#dbe6e4';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText('map_260905_update_v2 · HOST-SIM', 48, 55);
+    if (empty) empty.hidden = true;
+    if (status) status.textContent = 'HOST-SIM MAP · 720×360';
+  }
+  requestAnimationFrame(paint);
+  return { refresh: async () => { paint(); return {}; }, setPose: paint };
 }
 """
 
@@ -27,6 +60,9 @@ FETCH_INIT = """
 sessionStorage.setItem('rosy.dashboard.token', 'operator-test-token');
 window.__teleopCommands = [];
 window.__apiCalls = [];
+window.__cameraSequence = 7;
+window.__cameraFrameStatus = 200;
+window.__nativeFetch = window.fetch.bind(window);
 window.__trafficReadback = {
   status: {
     mode: 'MONITOR_ONLY', state: 'FOLLOW', reason: 'clear_road',
@@ -48,18 +84,29 @@ window.WebSocket = class extends EventTarget {
   close() {}
 };
 window.fetch = async (input, options = {}) => {
-  const path = new URL(typeof input === 'string' ? input : input.url, location.href).pathname;
+  const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+  const path = url.pathname;
   const method = (options.method || 'GET').toUpperCase();
   let parsed = null;
   if (options.body) {
     try { parsed = JSON.parse(options.body); } catch (_error) { parsed = options.body; }
   }
-  window.__apiCalls.push({ method, path, body: parsed });
+  window.__apiCalls.push({ method, path, search: url.search, body: parsed });
+  const authorization = new Headers(options.headers || {}).get('Authorization') || '';
+  if (authorization.includes('bad-token')) {
+    return new Response(JSON.stringify({error: {code: 'UNAUTHORIZED', message: 'invalid token'}}), {
+      status: 401, headers: {'Content-Type': 'application/json'},
+    });
+  }
   const bodies = {
     '/api/v1/robot/state': {
       robot_id: 'rosy_01', online: true, mode: 'MANUAL', navigation: 'IDLE',
       pose: {x: 1.25, y: -0.5, yaw: 0.3}, velocity: {linear: 0, angular: 0},
       battery: {percent: 90, voltage: 7.5}, safety: {estop: false}, seq: 1,
+      evidence: {
+        pose: {evidence: 'fresh', stale_after_s: 2.0},
+        velocity: {evidence: 'fresh', stale_after_s: 0.5},
+      },
       traffic_policy: {
         mode: 'MONITOR_ONLY', state: 'FOLLOW', reason: 'clear_road',
         signal_colour: 'GREEN', stop_line_distance_m: null,
@@ -88,6 +135,12 @@ window.fetch = async (input, options = {}) => {
     },
     '/api/v1/events': {events: []},
     '/api/v1/traffic': window.__trafficReadback,
+    '/api/v1/vision/front/status': {
+      available: true, stale: false, source: 'HOST-SIM',
+      frame_id: 'front_camera_link', captured_at: 42.25,
+      age_ms: 80, width: 640, height: 360,
+      overlay: 'semantic-road-v1', sequence: window.__cameraSequence,
+    },
     '/api/v1/waypoints': {waypoints: []},
     '/api/v1/docking/status': {state: 'UNDOCKED', dock_id: null, supported: false},
     '/api/v1/docking/docks': {docks: []},
@@ -103,6 +156,23 @@ window.fetch = async (input, options = {}) => {
     window.__teleopCommands.push(command);
     return new Response(JSON.stringify({accepted: true}), {
       status: 200, headers: {'Content-Type': 'application/json'},
+    });
+  }
+  if (path === '/api/v1/vision/front/frame') {
+    if (window.__cameraFrameStatus !== 200) {
+      return new Response(JSON.stringify({error: {code: 'CAMERA_RATE_LIMITED'}}), {
+        status: window.__cameraFrameStatus,
+        headers: {'Content-Type': 'application/json'},
+      });
+    }
+    const mock = await window.__nativeFetch('/mock-camera.jpg');
+    return new Response(await mock.blob(), {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/jpeg',
+        'X-Rosy-Camera-Sequence': String(window.__cameraSequence),
+        'X-Rosy-Camera-Captured-At': '42.25',
+      },
     });
   }
   if (method === 'POST' && path === '/api/v1/waypoints') {
@@ -209,6 +279,15 @@ def _launch_page(playwright):
         route.fulfill(status=200, content_type="application/javascript", body=body)
 
     page.route("http://rosy.test/dashboard/assets/*.js", _serve_module)
+    camera = (
+        ROOT / "docs" / "validation" / "semantic-road-2026-09-21"
+        / "camera_preview_demo.jpg"
+    )
+    page.route(
+        "http://rosy.test/mock-camera.jpg",
+        lambda route: route.fulfill(
+            status=200, content_type="image/jpeg", body=camera.read_bytes()),
+    )
     page.add_init_script(script=FETCH_INIT)
     page.on("dialog", lambda dialog: dialog.accept())
     return browser, page
@@ -224,12 +303,18 @@ def test_delayed_positive_request_cannot_arrive_after_release_zero():
         except Exception as error:
             pytest.skip(f"Playwright Chromium unavailable: {error}")
         page.goto("http://rosy.test/dashboard", wait_until="domcontentloaded", timeout=5_000)
+        page.wait_for_function(
+            "document.getElementById('robot-mode')?.textContent === 'MANUAL'"
+        )
         assert page.locator("#network-rx-rate").inner_text() == "—"
         assert page.locator("#network-tx-rate").inner_text() == "—"
         assert "그래프 수집 불가" in page.locator("#ros-risk-list").inner_text()
         assert page.locator("#ros-risk-list .risk-clear").count() == 0
         page.locator("#bench-safety-confirmed").check()
         forward = page.locator('[data-teleop="forward"]')
+        page.wait_for_function(
+            "!document.querySelector('[data-teleop=\"forward\"]')?.disabled"
+        )
         assert forward.is_enabled()
 
         forward.dispatch_event("pointerdown", {"pointerId": 1, "button": 0})
@@ -254,7 +339,10 @@ def test_field_settings_save_limits_waypoint_and_dock_without_navigation():
         except Exception as error:
             pytest.skip(f"Playwright Chromium unavailable: {error}")
         page.goto("http://rosy.test/dashboard", wait_until="domcontentloaded", timeout=5_000)
-        page.locator("#close-auth").click()
+        page.wait_for_function(
+            "document.getElementById('robot-mode')?.textContent === 'MANUAL'"
+        )
+        page.locator("#view-inspect").click()
         page.locator("#field-settings-panel").scroll_into_view_if_needed()
 
         page.wait_for_function(
@@ -349,3 +437,105 @@ def test_traffic_policy_is_staged_before_stopped_only_apply():
         ("POST", "/api/v1/traffic/policy/stage"),
         ("POST", "/api/v1/traffic/policy/apply"),
     ]
+
+
+def test_live_camera_preview_is_visible_beside_the_map():
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        try:
+            browser, page = _launch_page(playwright)
+        except Exception as error:
+            pytest.skip(f"Playwright Chromium unavailable: {error}")
+        page.goto(
+            "http://rosy.test/dashboard",
+            wait_until="domcontentloaded",
+            timeout=5_000,
+        )
+        page.wait_for_function(
+            "document.getElementById('vision-stage')?.dataset.state === 'live'"
+        )
+        assert page.locator("#vision-frame").is_visible()
+        assert page.locator("#vision-source").inner_text() == "HOST-SIM"
+        assert page.locator("#vision-resolution").inner_text() == "640×360"
+        assert page.locator("#vision-captured").inner_text() == "42.250 s"
+        assert page.locator("#vision-status").inner_text() == "LIVE"
+        if screenshot := os.environ.get("ROSY_CAMERA_DASHBOARD_SCREENSHOT"):
+            output = Path(screenshot)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            page.locator(".region-observe").screenshot(path=str(output))
+        calls = page.evaluate("window.__apiCalls")
+        browser.close()
+
+    paths = [call["path"] for call in calls]
+    assert "/api/v1/vision/front/status" in paths
+    assert "/api/v1/vision/front/frame" in paths
+    frame_call = next(
+        call for call in calls
+        if call["path"] == "/api/v1/vision/front/frame"
+    )
+    assert frame_call["search"] == "?sequence=7"
+
+
+def test_camera_preview_is_cleared_when_reauthentication_fails():
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        try:
+            browser, page = _launch_page(playwright)
+        except Exception as error:
+            pytest.skip(f"Playwright Chromium unavailable: {error}")
+        page.goto(
+            "http://rosy.test/dashboard",
+            wait_until="domcontentloaded",
+            timeout=5_000,
+        )
+        page.wait_for_function(
+            "document.getElementById('vision-stage')?.dataset.state === 'live'"
+        )
+        page.locator("#open-auth").click()
+        page.locator("#token-input").fill("bad-token")
+        page.locator("#auth-form button[type=submit]").click()
+        page.wait_for_function(
+            "document.getElementById('vision-empty')?.textContent.includes('인증 실패')"
+        )
+        assert page.locator("#vision-frame").is_hidden()
+        assert page.locator("#vision-status").inner_text() == "WAITING"
+        before = page.evaluate(
+            "window.__apiCalls.filter((call) => call.path === '/api/v1/vision/front/status').length"
+        )
+        page.wait_for_timeout(700)
+        after = page.evaluate(
+            "window.__apiCalls.filter((call) => call.path === '/api/v1/vision/front/status').length"
+        )
+        browser.close()
+
+    assert after == before
+
+
+def test_rate_limited_camera_never_leaves_an_old_frame_live():
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        try:
+            browser, page = _launch_page(playwright)
+        except Exception as error:
+            pytest.skip(f"Playwright Chromium unavailable: {error}")
+        page.goto(
+            "http://rosy.test/dashboard",
+            wait_until="domcontentloaded",
+            timeout=5_000,
+        )
+        page.wait_for_function(
+            "document.getElementById('vision-stage')?.dataset.state === 'live'"
+        )
+        page.evaluate("window.__cameraSequence = 8; window.__cameraFrameStatus = 429")
+        page.wait_for_function(
+            "document.getElementById('vision-empty')?.textContent.includes('속도 제한')"
+        )
+        assert page.locator("#vision-frame").is_hidden()
+        assert page.locator("#vision-status").inner_text() == "WAITING"
+        browser.close()

@@ -110,6 +110,11 @@ traffic_policy:                    # D-151 semantic road evidence gate
   proceed_speed_scale: 0.50
   simulation_signal_control: false  # simulation runtime에서만 true 허용
 
+vision:                            # authenticated, latest-only dashboard preview
+  preview_max_bytes: 512000         # reject oversized JPEG frames before storage
+  preview_stale_after_s: 2.0        # hide frames after the local receipt lease expires
+  preview_min_pull_interval_s: 0.4  # authenticated viewer cap (<= 2.5 pulls/s)
+
 navigation:
   max_linear_velocity: 0.20       # HWA-001에서 주입 (여기值은 폴백)
   max_angular_velocity: 0.80

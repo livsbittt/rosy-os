@@ -897,3 +897,13 @@
 - gate 변화: SOURCE/LOCAL 증거만 추가. 실제 Gazebo camera graph, Pi/ARM64, Pinky Pro 보정·정지거리와 FIELD는 승격하지 않는다.
 - 결정: D-151 Accepted.
 - 교훈: 장면 정답은 렌더링과 평가에만 쓰며 detector 입력으로 재사용하면 인식 검증이 아니다.
+
+## 2026-09-21 · uncommitted · docs(adr): bound the single-dashboard camera preview (D-152)
+
+- Review hardening: D-152/API v1.12 now state monotonic rate, depth-1 QoS, sequence binding, 400 ms token pull, source-clock epoch reset, and browser lifecycle cancellation.
+- Latest evidence: CORE `1016 passed, 11 skipped`; Control `1114 passed, 26 skipped`; Chromium camera lifecycle `6 passed`.
+
+- 변경: D-136의 Proposed CORE 영상 바이트 전면 금지를 Superseded로 표시하고, 디코딩·재인코딩 없는 최신 JPEG 한 장에만 적용되는 D-152를 Accepted로 추가했다. API Ref v1.12와 설계·실행 계획이 status/frame 계약 및 증거 경계를 고정한다.
+- 증거: ADR/API/harness 계약 `70 passed, 6 warnings`; CORE `1014 passed, 11 skipped`; browser/launch `17 passed`.
+- gate 변화: 문서 SOURCE/LOCAL 유지. HOST-SIM 캡처는 ROS-SIM/DEVICE 증거가 아니다.
+- 결정: D-152. raw/Fleet/WebSocket/MJPEG/녹화는 범위 밖이며 D-136의 예산 원칙은 유지한다.

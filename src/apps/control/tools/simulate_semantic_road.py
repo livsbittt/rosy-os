@@ -25,6 +25,7 @@ for _package in ("core", "core_common", "core_events", "core_features"):
 
 from control.sensing.road import (  # noqa: E402
     detect_road_observation,
+    render_road_preview,
     road_observation_payload,
 )
 from core.bridge import traffic_gate, translate  # noqa: E402
@@ -100,6 +101,20 @@ def _render_montage(frames: list[tuple[str, np.ndarray]], output: Path) -> None:
         draw.text((index * WIDTH + 10, 10), label, fill="#f3f6fb")
     output.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(output)
+
+
+def _render_preview_evidence(frames: list[np.ndarray], output_dir: Path) -> None:
+    images = [Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+              for frame in frames]
+    images[2].save(output_dir / "camera_preview_demo.jpg", quality=86)
+    images[0].save(
+        output_dir / "camera_preview_simulation.gif",
+        save_all=True,
+        append_images=images[1:],
+        duration=650,
+        loop=0,
+        optimize=False,
+    )
 
 
 def _svg(scene: dict, samples: list[dict]) -> str:
@@ -239,6 +254,7 @@ def run_simulation(output_dir: Path | str) -> dict:
     command = _CommandRecorder()
     samples = []
     montage = []
+    preview_frames = []
 
     def run_frame(phase, at, frame):
         now[0] = at
@@ -276,6 +292,8 @@ def run_simulation(output_dir: Path | str) -> dict:
             "command_angular": round(twist.angular, 5),
         })
         montage.append((phase, frame))
+        preview_frames.append(render_road_preview(
+            frame, detected, source=f"HOST-{phase}", max_width=WIDTH))
 
     run_frame("clear", 10.0, _camera_frame())
     run_frame("approach", 10.2, _camera_frame(
@@ -348,6 +366,7 @@ def run_simulation(output_dir: Path | str) -> dict:
     (target / "semantic_road_simulation.svg").write_text(
         _svg(scene, samples), encoding="utf-8")
     _render_montage(montage, target / "camera_detection_montage.png")
+    _render_preview_evidence(preview_frames, target)
     return summary
 
 

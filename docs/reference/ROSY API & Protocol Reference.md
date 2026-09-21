@@ -2,7 +2,7 @@
 ## 공유 인터페이스 계약서
 
 **Document ID:** ROSY-API-REF-001
-**Version:** v1.10
+**Version:** v1.12
 **Status:** Approved
 **대상 독자:** rosy_core 개발자, rosy_fleet 개발자, 외부 SDK·AI·연동 시스템
 
@@ -179,6 +179,8 @@ Breaking Change 발생 시 `/api/v2/...`로 분리한다.
 | POST | `/api/v1/traffic/policy/stage` | Operator | D-151 — 정책 모드·revision·거리·dwell·신뢰도 기준을 검증해 검토본으로 저장. 활성 정책은 바꾸지 않음 |
 | POST | `/api/v1/traffic/policy/apply` | Operator | D-151 — IDLE/EMERGENCY이고 line-follow가 꺼져 있으며, fresh 0 속도 또는 E-stop으로 정지가 증명된 경우에만 staged 정책을 원자 적용 |
 | PUT | `/api/v1/traffic/simulation/signal` | Operator | D-151 — 명시적 simulation capability에서만 `{colour: RED\|YELLOW\|GREEN}` 허용. 실제 장치에서는 501 |
+| GET | `/api/v1/vision/front/status` | Viewer | 최신 front camera preview의 available/stale, source, frame, 크기, overlay, sequence 메타데이터. 원본 영상은 상태 WebSocket에 싣지 않음 |
+| GET | `/api/v1/vision/front/frame` | Viewer | D-152 fresh 최신 JPEG 한 장. `Cache-Control: no-store`, `Content-Encoding: identity`; 없거나 stale이면 404 `CAMERA_FRAME_UNAVAILABLE` |
 | POST | `/api/v1/localization/initialpose` | Operator | AMCL 초기화 |
 | POST | `/api/v1/slam/start` | Operator | NAV-005 — 추종 세션이 주행을 쥐고 있으면 409 `NAVIGATION_ACTIVE` |
 | POST | `/api/v1/slam/stop` | Operator | NAV-005 |
@@ -334,7 +336,47 @@ STOP_REQUIRED | WAIT_SIGNAL | PROCEED | HOLD` 다. `ENFORCED`에서는 stale,
 기준을 통과한 `GREEN`만 `PROCEED`를 허용한다. `MONITOR_ONLY`는 같은 판정을
 표시하지만 주행 후보를 변경하지 않는다.
 
+카메라 preview는 v1.12 additive다. Control은 인식 오버레이가 포함된 bounded JPEG를
+최대 2 FPS로 만들고 CORE는 최신 한 장만 보관한다. 대시보드는 Viewer 토큰으로
+`status`를 먼저 조회한 다음 sequence가 바뀐 경우에만 `frame`을 가져온다. 프레임이
+`preview_stale_after_s`를 넘으면 CORE는 이미지를 제공하지 않고 관제 화면은 `STALE`로
+전환한다. raw frame은 `/ws/state`, Fleet, Games 또는 명령 경로에 포함하지 않는다.
+
+`GET /api/v1/vision/front/status` 응답 예:
+
+```json
+{
+  "available": true,
+  "stale": false,
+  "source": "GAZEBO",
+  "frame_id": "front_camera_link",
+  "captured_at": 42.25,
+  "age_ms": 80,
+  "width": 640,
+  "height": 360,
+  "overlay": "semantic-road-v1",
+  "sequence": 7
+}
+```
+
 `evidence` 는 v1.8 additive 다. 채널별 `{received_at, evidence, stale_after_s}` 이며, `evidence` 는 서버가 판정한 `fresh` | `delayed` | `disconnected` | `unavailable` 이다. 판정에 쓴 임계값(`stale_after_s`)도 같이 실는다. 클라이언트는 임계값을 다시 계산하지 않고 이 문자열을 그대로 표시·게이트한다. 알 수 없는 채널 키는 무시한다(API-002). `PROTOCOL_VERSION`(envelope 1.0)은 바꾸지 않는다.
+
+Camera preview transfer rules (v1.12, D-152):
+
+- Both `status` and `frame` responses are `Cache-Control: no-store`.
+- A client MUST request
+  `GET /api/v1/vision/front/frame?sequence={status.sequence}`. If the latest
+  frame advanced between the two calls, CORE returns
+  `409 CAMERA_FRAME_ADVANCED`; the client refreshes status instead of pairing
+  old metadata with new JPEG bytes.
+- Omitting `sequence` fails request validation with `400 VALIDATION_ERROR`.
+- CORE returns `429 CAMERA_RATE_LIMITED` when the same authenticated token
+  successfully pulls frames less than 400 ms apart. A sequence mismatch is
+  checked first and does not consume this allowance.
+- `captured_at` is the ROS/source capture clock. `age_ms` is the independent
+  local receipt age used for freshness; the dashboard displays both.
+- Successful JPEG responses include `X-Rosy-Camera-Sequence`,
+  `X-Rosy-Camera-Captured-At`, and `X-Rosy-Camera-Source`.
 
 ## 6.1.1 Vision `DetectionEvidence` (v1.9 additive, D-137)
 
@@ -639,6 +681,7 @@ Fleet(rosy_fleet)이 제공하는 엔드포인트. Base: `http://<fleet-host>:80
 
 | 버전 | 일자 | 내용 |
 |---|---|---|
+| v1.12 | 2026-09-21 | Additive: 인증된 front camera preview status/JPEG API. latest-only bounded frame, source/overlay/sequence 메타데이터, stale 시 404, raw image의 상태 WebSocket·Fleet·명령 경로 제외 |
 | v1.11 | 2026-09-21 | Additive: semantic road `traffic_policy` 상태. map/scene/policy revision과 camera evidence를 결합하고, stale/conflict/거리 미확정을 `HOLD`, 정지선 dwell 뒤 검증된 GREEN만 `PROCEED`로 판정 |
 | v1.10 | 2026-09-21 | Additive: D-143 `line-follow` 조회·모드 선택 API와 상태 스냅샷 `line_follow`. IR/카메라 소스는 상호 배타적이며 stale·저신뢰·형식 오류는 0 명령, 3초 손실은 재선택 전까지 `LOST` latch |
 | v1.9 | 2026-09-20 | Additive: §6.1.1 vision `DetectionEvidence` — 박스 정규화 좌표, `model_revision` 바인딩(D-47), 신선도 300 ms(D-136), 빈 detections/seq 점프 구분, 자문 전용(SAF-006, D-137). envelope `protocol_version` 은 1.0 유지 |

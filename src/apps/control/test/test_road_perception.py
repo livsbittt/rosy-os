@@ -2,8 +2,11 @@ import numpy as np
 import pytest
 
 from control.sensing.road import (
+    PreviewRateLimiter,
     RoadObservation,
+    RoadPreviewConfig,
     detect_road_observation,
+    render_road_preview,
     road_observation_payload,
 )
 
@@ -154,3 +157,59 @@ def test_payload_is_strict_json_shape_and_observations_are_immutable():
 def test_payload_rejects_unbound_or_invalid_evidence(args):
     with pytest.raises(ValueError):
         road_observation_payload(*args, detect_road_observation(_frame()))
+
+
+def test_preview_draws_detected_evidence_without_mutating_source_frame():
+    source = _frame(
+        lane_x=220, stop_y=190,
+        crosswalk_rows=(120, 132, 144, 156), signals=("RED",))
+    original = source.copy()
+    observation = detect_road_observation(source)
+
+    preview = render_road_preview(
+        source, observation, source="GAZEBO", max_width=240)
+
+    assert np.array_equal(source, original)
+    assert preview.shape == (180, 240, 3)
+    assert not np.array_equal(
+        preview, source[::source.shape[0] // preview.shape[0],
+                        ::source.shape[1] // preview.shape[1]][
+                            :preview.shape[0], :preview.shape[1]])
+    # The overlay carries a strong cyan guide that is absent from the fixture.
+    assert np.any(np.all(preview == (255, 220, 0), axis=2))
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"fps": 2.01},
+        {"fps": 0.19},
+        {"max_width": 641},
+        {"max_width": 159},
+        {"jpeg_quality": 91},
+        {"max_bytes": 512_001},
+    ],
+)
+def test_preview_config_rejects_values_outside_transport_budget(kwargs):
+    with pytest.raises(ValueError):
+        RoadPreviewConfig(**kwargs)
+
+
+def test_preview_rate_limiter_uses_local_monotonic_time_and_resets_safely():
+    limiter = PreviewRateLimiter(fps=2.0)
+
+    assert limiter.allow(10.0) is True
+    assert limiter.allow(10.1) is False
+    assert limiter.allow(10.5) is True
+    # Local monotonic regression starts a new epoch instead of wedging output.
+    assert limiter.allow(0.0) is True
+
+
+def test_preview_renderer_never_accepts_width_above_dashboard_budget():
+    observation = detect_road_observation(_frame(lane_x=160))
+
+    with pytest.raises(ValueError, match="640"):
+        render_road_preview(
+            _frame(lane_x=160), observation,
+            source="GAZEBO", max_width=641,
+        )

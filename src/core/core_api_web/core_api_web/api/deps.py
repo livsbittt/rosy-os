@@ -31,6 +31,8 @@ from core_features.maps import valid_costmap_scope
 from core_features.navigation.manager import NavigationError
 from core_features.swarm import SwarmError
 from core_features.waypoints.manager import Waypoint
+from core_features.vision import VisionFrameAdvanced, VisionPullRateLimited
+from core_common.protocol.schemas import VisionPreviewStatus
 
 #: 라우터용 재수출 면. __all__ 선언으로 재수출임을 명시한다(F401 진정).
 __all__ = [
@@ -44,6 +46,9 @@ __all__ = [
     "worst",
     "SwarmError",
     "Waypoint",
+    "VisionPreviewStatus",
+    "VisionFrameAdvanced",
+    "VisionPullRateLimited",
 ]
 
 
@@ -78,6 +83,7 @@ class CoreServicesLike(Protocol):
     state: Any
     swarm: Any
     traffic_policy: Any
+    vision: Any
     waypoints: Any
 
 

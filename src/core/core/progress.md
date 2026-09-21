@@ -10,7 +10,7 @@ gates:
     cmd: "python3 -m pytest src/core/test/test_module_criteria.py test/test_control_absorption_package.py -q"
   LOCAL:
     state: GO
-    evidence: "1005 passed, 11 skipped (2026-09-21 Windows). D-151 traffic policy, atomic command gate, stage/apply API와 dashboard 계약 포함; 실제 Chromium 정책 적용 흐름 1 passed"
+    evidence: "1016 passed, 11 skipped (2026-09-21 Windows). D-151 traffic policy와 D-152 sequence-bound, rate-limited authenticated camera preview 포함; Chromium camera/map panel과 재인증 fail-closed 흐름 통과"
     cmd: "PYTHONPATH=src/core:src python3 -m pytest src/core/test -q"
   ROS-SIM:
     state: HOLD
@@ -23,7 +23,7 @@ gates:
     blocker: "Pi bench Device 설치와 device-readback.sh --json 증거 없음. G4 viewport·보정 상태기계 미실행"
   FIELD:
     state: PARKED
-adrs: [D-1, D-2, D-8, D-18, D-23, D-32, D-38, D-42, D-47, D-58, D-60, D-72, D-75, D-77, D-82, D-119, D-121, D-122, D-123, D-124, D-144, D-151]
+adrs: [D-1, D-2, D-8, D-18, D-23, D-32, D-38, D-42, D-47, D-58, D-60, D-72, D-75, D-77, D-82, D-119, D-121, D-122, D-123, D-124, D-144, D-151, D-152]
 plans:
   - docs/plans/2026-09-06-module-split-criteria.md
   - docs/plans/2026-09-13-control-safety-boundary.md
@@ -35,6 +35,8 @@ plans:
   - docs/plans/2026-09-21-hardware-mapping-g5.md
   - docs/plans/2026-09-21-semantic-road-control-design.md
   - docs/plans/2026-09-21-semantic-road-control.md
+  - docs/plans/2026-09-21-camera-preview-dashboard-design.md
+  - docs/plans/2026-09-21-camera-preview-dashboard.md
 ---
 ## 지금 상태
 
@@ -60,3 +62,8 @@ plans:
 - stale/conflict/scene mismatch는 `HOLD`와 zero command다. 정책은 `DISABLED`, `MONITOR_ONLY`, `ENFORCED`로 분리되며 기본값은 `DISABLED`다.
 - 관제 stage/apply는 fresh zero velocity 또는 E-stop, `IDLE`/`EMERGENCY`, line-follow OFF를 요구한다. simulation signal은 simulation runtime과 capability가 모두 있어야 한다.
 - LOCAL `1005 passed, 11 skipped`; 실제 Chromium stage→apply `1 passed`. 실제 ROS bridge graph와 물리 주행은 여전히 ROS-SIM/DEVICE/FIELD HOLD다.
+
+## 2026-09-21 bounded camera preview status
+
+- Viewer 인증 status/JPEG API는 최대 512000 bytes의 최신 1장만 제공하고 2초 stale이면 404다. JPEG는 CORE에서 디코딩·재인코딩하지 않는다(D-152).
+- 대시보드는 지도 위에서 source·해상도·지연과 overlay frame을 표시한다. HOST-SIM Chromium 증거는 통과했지만 실제 Gazebo/Pinky frame readback은 각각 ROS-SIM/DEVICE HOLD다.

@@ -19,6 +19,12 @@ FORBIDDEN_IMPORTS = frozenset({"cv2", "picamera2", "ffmpeg", "av", "PIL", "libca
 FORBIDDEN_TOKENS = ("VideoCapture", "VideoWriter", "imencode", "imdecode",
                     "multipart/x-mixed", "image/jpeg", "RTSP", "WebRTC", "mjpeg")
 
+# D-152: CORE may pass through one bounded latest JPEG without decoding or
+# encoding it. No other production module receives a video/media API exception.
+ALLOWED_VIDEO_TOKENS = {
+    "core_api_web/core_api_web/api/v1/vision.py": frozenset({"image/jpeg"}),
+}
+
 
 def _prod_files():
     for package in PACKAGES:
@@ -55,6 +61,8 @@ def test_core_production_names_no_video_api():
     violations = []
     for path in _prod_files():
         tree = ast.parse(path.read_text(encoding="utf-8"))
+        relative = path.relative_to(SRC).as_posix()
+        allowed = ALLOWED_VIDEO_TOKENS.get(relative, frozenset())
         tokens = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.Name):
@@ -63,8 +71,8 @@ def test_core_production_names_no_video_api():
                 tokens.add(node.attr)
             elif isinstance(node, ast.Constant) and isinstance(node.value, str):
                 tokens.add(node.value)
-        hit = [token for token in FORBIDDEN_TOKENS
+        hit = [token for token in FORBIDDEN_TOKENS if token not in allowed
                if any(token in found for found in tokens)]
         if hit:
-            violations.append((str(path.relative_to(SRC)), hit))
+            violations.append((relative, hit))
     assert not violations, f"CORE production names video APIs: {violations}"

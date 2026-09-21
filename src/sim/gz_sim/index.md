@@ -19,6 +19,7 @@
 | D-118 | 생 Image는 Fleet·보드·gz_multi 브리지에 타지 않는다 |
 | D-120 | 시뮬 디스커버리는 LOCALHOST 범위이며 ROS_LOCALHOST_ONLY를 쓰지 않는다 |
 | D-151 | 도로 의미 인식·정책·최종 명령을 분리하고 관제 변경은 정지 상태에서만 적용한다 |
+| D-152 | CORE 관제의 카메라 표시는 저주기 최신 1장 preview 예외다 |
 
 ## 계획·결과 문서
 
@@ -26,6 +27,8 @@
 - [2026-09-08-swarm-formation-slice-results.md](../../../docs/plans/2026-09-08-swarm-formation-slice-results.md)
 - [2026-09-08-swarm-formation-slice.md](../../../docs/plans/2026-09-08-swarm-formation-slice.md)
 - [2026-09-15-module-harness-design.md](../../../docs/plans/2026-09-15-module-harness-design.md)
+- [2026-09-21-camera-preview-dashboard-design.md](../../../docs/plans/2026-09-21-camera-preview-dashboard-design.md)
+- [2026-09-21-camera-preview-dashboard.md](../../../docs/plans/2026-09-21-camera-preview-dashboard.md)
 - [2026-09-21-semantic-road-control-design.md](../../../docs/plans/2026-09-21-semantic-road-control-design.md)
 - [2026-09-21-semantic-road-control.md](../../../docs/plans/2026-09-21-semantic-road-control.md)
 
@@ -39,8 +42,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · feat(sim): wire the semantic Gazebo camera to the CORE dashboard (D-152)
 - 2026-09-21 · uncommitted · fix(sim): canonicalize semantic scene hashes (D-151)
 - 2026-09-21 · uncommitted · feat(sim): add semantic road scene and host closed loop (D-151)
 - 2026-09-21 · uncommitted · refactor(gz_sim): swarm_bench consumes fleet.bench only (D-148)
 - 2026-09-21 · uncommitted · feat(sim): finish exact-map live SLAM traversal
-- 2026-09-20 · uncommitted · fix(sim): stabilize exact-map Nav2 startup and corner geometry

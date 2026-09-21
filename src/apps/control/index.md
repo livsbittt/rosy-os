@@ -22,6 +22,7 @@
 | D-119 | 스캔·이미지·IMU는 sensor-data QoS다 |
 | D-143 | IR·카메라 차선 추종은 NAVIGATION 내부의 배타적 evidence 소스다 |
 | D-151 | 도로 의미 인식·정책·최종 명령을 분리하고 관제 변경은 정지 상태에서만 적용한다 |
+| D-152 | CORE 관제의 카메라 표시는 저주기 최신 1장 preview 예외다 |
 
 ## 계획·결과 문서
 
@@ -32,6 +33,8 @@
 - [2026-09-13-rosy-os-device-validation-implementation-plan.md](../../../docs/plans/2026-09-13-rosy-os-device-validation-implementation-plan.md)
 - [2026-09-15-module-harness-design.md](../../../docs/plans/2026-09-15-module-harness-design.md)
 - [2026-09-17-interface-design-implementation-design.md](../../../docs/plans/2026-09-17-interface-design-implementation-design.md)
+- [2026-09-21-camera-preview-dashboard-design.md](../../../docs/plans/2026-09-21-camera-preview-dashboard-design.md)
+- [2026-09-21-camera-preview-dashboard.md](../../../docs/plans/2026-09-21-camera-preview-dashboard.md)
 - [2026-09-21-line-follow-modes-design.md](../../../docs/plans/2026-09-21-line-follow-modes-design.md)
 - [2026-09-21-line-follow-modes.md](../../../docs/plans/2026-09-21-line-follow-modes.md)
 - [2026-09-21-semantic-road-control-design.md](../../../docs/plans/2026-09-21-semantic-road-control-design.md)
@@ -48,8 +51,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · feat(control): publish the bounded semantic camera preview (D-152)
 - 2026-09-21 · uncommitted · feat(control): detect semantic road evidence (D-151)
 - 2026-09-21 · uncommitted · docs(control): mark web_node debug surface and the map home (D-150)
 - 2026-09-21 · uncommitted · feat(control): DetectionEvidence producer snapshot (D-137 T2)
 - 2026-09-21 · uncommitted · fix(control): legacy launches point at absorbed package names (D-149)
-- 2026-09-21 · uncommitted · feat(control): selectable IR and camera line following (D-143)

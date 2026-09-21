@@ -31,6 +31,7 @@ from core_features.traffic_policy import (
     TrafficPolicyManager,
     TrafficPolicyMode,
 )
+from core_features.vision import VisionFrameStore
 from core_features.swarm import SwarmManager
 from core_features.power.battery import (
     BatteryConfig,
@@ -185,6 +186,7 @@ class CoreServices:
     nav: NavigationManager
     line_follow: LineFollowManager
     traffic_policy: TrafficPolicyManager
+    vision: VisionFrameStore
     readiness: NavigationReadinessGate
     power: PowerManager
     battery: BatteryMonitor
@@ -280,6 +282,14 @@ class CoreServices:
                     "simulation_signal_control", False)
             ),
         )
+        vision_cfg = config.get("vision", {}) or {}
+        vision = VisionFrameStore(
+            max_bytes=int(vision_cfg.get("preview_max_bytes", 512_000)),
+            stale_after_s=float(
+                vision_cfg.get("preview_stale_after_s", 2.0)),
+            min_pull_interval_s=float(
+                vision_cfg.get("preview_min_pull_interval_s", 0.4)),
+        )
         power = PowerManager(_power_config(config.get("power", {})), events=events)
         battery = BatteryMonitor(
             _battery_config(safety_cfg, data_path=waypoints_path.parent),
@@ -332,6 +342,7 @@ class CoreServices:
                    command=command, safety=safety, waypoints=waypoints, nav=nav,
                    line_follow=line_follow,
                    traffic_policy=traffic_policy,
+                   vision=vision,
                    readiness=readiness,
                    power=power, battery=battery, docking=docking, swarm=swarm,
                    runtime_probe=runtime_probe, maps=MapSnapshotStore(),

@@ -76,3 +76,12 @@
 - 증거: rebase 후 raw-byte test가 Windows에서 2건 실패하는 것을 재현했고, canonical builder·manifest 적용 후 semantic scene/simulation `26 passed`.
 - gate 변화: 없음. 호스트 자산 재현성을 수정했으며 ROS-SIM/DEVICE/FIELD 증거를 승격하지 않는다.
 - 결정: D-151 scene revision은 OS 줄바꿈과 무관한 동일 identity를 가져야 한다.
+
+## 2026-09-21 · uncommitted · feat(sim): wire the semantic Gazebo camera to the CORE dashboard (D-152)
+
+- Review hardening: package.xml now declares `ament_index_python`, `launch`, `launch_ros`, and `ros_gz_image`; the simulation CORE profile fixes the authenticated pull floor at 0.4 s.
+
+- 변경: single-sim image bridge를 opt-in할 때 `/camera/image_raw`를 `camera/front`로 remap하고, semantic road world·line/road observers·CORE dashboard를 함께 띄우는 `semantic_road_dashboard.launch.py`를 추가했다. 다중 로봇 기본 image-off 계약은 유지한다.
+- 증거: launch/package/bridge 계약과 Chromium dashboard `17 passed`; HOST-SIM screenshot과 6-frame GIF 보존.
+- gate 변화: 기존 exact-map ROS-SIM GO는 유지한다. 새 semantic camera launch는 이 Windows 세션에서 실제 Gazebo로 실행하지 않았으므로 해당 프레임 gate는 HOLD다.
+- 결정: D-152의 bounded preview 예외와 D-118의 기본 image-off를 함께 유지한다.

@@ -29,6 +29,55 @@ class RoadPerceptionConfig:
 
 
 @dataclass(frozen=True)
+class RoadPreviewConfig:
+    """Hard transport budget for the observation-only dashboard stream."""
+
+    fps: float = 2.0
+    max_width: int = 640
+    jpeg_quality: int = 72
+    max_bytes: int = 512_000
+    source: str = "PINKY"
+
+    def __post_init__(self) -> None:
+        fps = float(self.fps)
+        if isinstance(self.fps, bool) or not math.isfinite(fps) \
+                or not 0.2 <= fps <= 2.0:
+            raise ValueError("preview fps must be finite and in [0.2, 2.0]")
+        if isinstance(self.max_width, bool) \
+                or not 160 <= int(self.max_width) <= 640:
+            raise ValueError("preview max_width must be in [160, 640]")
+        if isinstance(self.jpeg_quality, bool) \
+                or not 40 <= int(self.jpeg_quality) <= 90:
+            raise ValueError("preview jpeg_quality must be in [40, 90]")
+        if isinstance(self.max_bytes, bool) \
+                or not 4 <= int(self.max_bytes) <= 512_000:
+            raise ValueError("preview max_bytes must be in [4, 512000]")
+        if not str(self.source).strip():
+            raise ValueError("preview source is required")
+
+
+class PreviewRateLimiter:
+    """Local-clock limiter, independent from replayed ROS capture stamps."""
+
+    def __init__(self, *, fps: float) -> None:
+        value = float(fps)
+        if not math.isfinite(value) or value <= 0.0:
+            raise ValueError("preview limiter fps must be positive and finite")
+        self._interval_s = 1.0 / value
+        self._last_allowed: float | None = None
+
+    def allow(self, now: float) -> bool:
+        current = float(now)
+        if not math.isfinite(current):
+            return False
+        if (self._last_allowed is None or current < self._last_allowed
+                or current - self._last_allowed >= self._interval_s):
+            self._last_allowed = current
+            return True
+        return False
+
+
+@dataclass(frozen=True)
 class RoadMarkingObservation:
     image_row: float
     distance_m: float | None
@@ -48,6 +97,61 @@ class RoadObservation:
     crosswalk: RoadMarkingObservation | None
     signal: TrafficSignalObservation | None
     signal_conflict: bool = False
+
+
+def render_road_preview(bgr: np.ndarray, observation: RoadObservation, *,
+                        source: str, max_width: int = 640) -> np.ndarray:
+    """Render an observation-only preview; never feed this back to detection."""
+    if not isinstance(bgr, np.ndarray) or bgr.ndim != 3 or bgr.shape[2] != 3:
+        raise ValueError("road preview requires a BGR frame")
+    if not isinstance(observation, RoadObservation):
+        raise ValueError("road preview requires a RoadObservation")
+    limit = int(max_width)
+    if limit < 160 or limit > 640:
+        raise ValueError("road preview max_width must be in [160, 640]")
+    scale = min(1.0, limit / float(bgr.shape[1]))
+    width = max(1, int(round(bgr.shape[1] * scale)))
+    height = max(1, int(round(bgr.shape[0] * scale)))
+    preview = cv2.resize(
+        bgr, (width, height), interpolation=cv2.INTER_AREA).copy()
+    cyan = (255, 220, 0)
+    white = (245, 248, 250)
+    shadow = (12, 18, 28)
+
+    if observation.lane is not None:
+        lane_x = int(round(
+            width * (0.5 + 0.5 * float(observation.lane.error))))
+        cv2.line(preview, (width // 2, height - 1),
+                 (lane_x, int(height * 0.42)), cyan, 2)
+    for marking, label, colour in (
+        (observation.crosswalk, "CROSSWALK", (255, 190, 0)),
+        (observation.stop_line, "STOP", (40, 70, 255)),
+    ):
+        if marking is None:
+            continue
+        row = max(0, min(height - 1,
+                         int(round(marking.image_row * scale))))
+        cv2.line(preview, (0, row), (width - 1, row), colour, 2)
+        cv2.putText(preview, label, (8, max(18, row - 6)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.42, colour, 1,
+                    cv2.LINE_AA)
+
+    signal = "CONFLICT" if observation.signal_conflict else (
+        observation.signal.colour if observation.signal is not None else "NONE")
+    signal_colours = {
+        "RED": (40, 70, 255),
+        "YELLOW": (0, 220, 255),
+        "GREEN": (60, 220, 90),
+        "CONFLICT": (180, 80, 255),
+        "NONE": (130, 145, 160),
+    }
+    cv2.rectangle(preview, (0, 0), (width - 1, 28), shadow, -1)
+    cv2.putText(preview, str(source).upper()[:16], (8, 19),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.43, white, 1, cv2.LINE_AA)
+    cv2.circle(preview, (width - 84, 14), 5, signal_colours[signal], -1)
+    cv2.putText(preview, signal, (width - 73, 19),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.40, white, 1, cv2.LINE_AA)
+    return preview
 
 
 def _groups(flags: np.ndarray) -> list[tuple[int, int]]:

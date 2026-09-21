@@ -29,7 +29,7 @@ from nav2_msgs.action import NavigateToPose
 from nav2_msgs.msg import Costmap
 from lifecycle_msgs.msg import TransitionEvent
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
-from sensor_msgs.msg import BatteryState, Imu, LaserScan, Range
+from sensor_msgs.msg import BatteryState, CompressedImage, Imu, LaserScan, Range
 from std_msgs.msg import Bool, Float32, String
 from std_srvs.srv import Empty
 
@@ -44,6 +44,7 @@ from core.bridge import (
 )
 from core.bridge.goal_tracker import GoalTracker
 from core_features.maps import occupancy_map_id
+from core_features.vision import parse_preview_format
 from core_features.navigation.initial_pose import amcl_pose_covariance
 from interfaces.srv import SetLed
 import tf2_ros
@@ -96,6 +97,11 @@ class RosBridge:
         node.create_subscription(Twist, "nav_cmd_vel", self._on_nav_cmd_vel, 10)
         node.create_subscription(String, "line/observation", self._on_line_observation, 10)
         node.create_subscription(String, "road/observation", self._on_road_observation, 10)
+        preview_qos = QoSProfile(
+            depth=1, reliability=ReliabilityPolicy.BEST_EFFORT)
+        node.create_subscription(
+            CompressedImage, "camera/preview/compressed",
+            self._on_camera_preview, preview_qos)
         # Nav2 lifecycle nodes announce their authoritative goal state on
         # transition_event.  CORE never infers readiness from node discovery;
         # it requires these active transitions plus the motor adapter lease.
@@ -268,6 +274,26 @@ class RosBridge:
                 "reason": "invalid_observation",
                 "detail": str(exc),
             })
+
+    def _on_camera_preview(self, msg: CompressedImage) -> None:
+        """Store one display-only JPEG without coupling it to driving policy."""
+        try:
+            metadata = parse_preview_format(msg.format)
+            if metadata is None:
+                raise ValueError("camera preview format must be jpeg")
+            stamp = (
+                float(msg.header.stamp.sec)
+                + float(msg.header.stamp.nanosec) * 1e-9
+            )
+            self._svc.vision.publish(
+                bytes(msg.data),
+                captured_at=stamp,
+                frame_id=str(msg.header.frame_id),
+                **metadata,
+            )
+        except (AttributeError, TypeError, ValueError, OverflowError) as exc:
+            self._node.get_logger().warning(
+                f"ignored camera preview: {exc}")
 
     def _tick_line_follow(self) -> None:
         if not self._svc.line_follow.active:

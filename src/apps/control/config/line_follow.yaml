@@ -19,6 +19,7 @@
     camera_roi_top_fraction: 0.40
     camera_washed_fraction: 0.40
     camera_min_pixels: 80
+    require_camera_controls_stable: true
 
 /**/road_observer_node:
   ros__parameters:
@@ -36,6 +37,14 @@
     crosswalk_max_gap_px: 20
     signal_roi_bottom_fraction: 0.35
     signal_min_pixels: 50
+    # Observation-only dashboard preview. This never feeds the detector or
+    # command path and is capped to protect DDS/API bandwidth.
+    dashboard_preview_fps: 2.0
+    dashboard_preview_max_width: 640
+    dashboard_preview_jpeg_quality: 72
+    dashboard_preview_max_bytes: 512000
+    dashboard_source: PINKY
+    require_camera_controls_stable: true
     # Metric range remains unavailable until an independently validated
     # profile is explicitly enabled for the current session.
     camera_homography_path: ''
