@@ -5,9 +5,9 @@
 
 | 모듈 | owner | last verified | SOURCE | LOCAL | ROS-SIM | ARTIFACT | DEVICE | FIELD |
 |---|---|---|---|---|---|---|---|---|
-| [core](src/core/core/progress.md) | CORE | uncommitted (2026-09-21) | GO | GO | GO | HOLD | HOLD | PARKED |
+| [core](src/core/core/progress.md) | CORE | uncommitted (2026-09-22) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [deploy](deploy/progress.md) | 릴리스·플랫폼 | uncommitted (2026-09-22) | GO | GO | N/A | HOLD | HOLD | N/A |
-| [control](src/apps/control/progress.md) | CONTROL | uncommitted (2026-09-21) | GO | GO | HOLD | HOLD | HOLD | PARKED |
+| [control](src/apps/control/progress.md) | CONTROL | uncommitted (2026-09-22) | GO | GO | HOLD | HOLD | HOLD | PARKED |
 | [fleet](src/site/fleet/progress.md) | FLEET | uncommitted (2026-09-22) | GO | GO | HOLD | PARKED | PARKED | PARKED |
 | [games](src/apps/games/progress.md) | GAMES | 411a303 (2026-09-18) | GO | GO | N/A | N/A | PARKED | PARKED |
 | [gz_sim](src/sim/gz_sim/progress.md) | SIM | uncommitted (2026-09-21) | GO | GO | GO | N/A | N/A | N/A |
@@ -26,6 +26,7 @@
 
 ## HOLD blockers
 
+- core ROS-SIM: 2026-09-22 D-162 T5가 ros_bridge/translate(road evidence 경로)를 변경했다. 2026-09-21 부트 스모크(docs/validation/ros-sim-core-2026-09-21)는 이전 트리 증거다. docs/validation/ros-sim-core-2026-09-22/README.md 절차 실행 후 복원
 - core ARTIFACT: ARM64 개발 후보만 존재. 서명 manifest와 immutable digest 발행 전
 - core DEVICE: Pi bench Device 설치와 device-readback.sh --json 증거 없음. G4 viewport·보정 상태기계 미실행
 - deploy ARTIFACT: Ubuntu 24.04.5 raspi base URL/SHA는 고정했으나 native ARM64 host 다운로드 검증, native Jazzy/ROSY payload 실행, 완성 이미지·SBOM·서명 전
@@ -58,4 +59,4 @@
 - dock ARTIFACT: ESP32 Arduino 펌웨어 빌드·플래시 증거 없음. 이 호스트에는 ESP32 toolchain이 없어 실행하지 않았다
 - dock DEVICE: 물리 도크 벤치 설치와 device-readback류 증거 없음. `dock/firmware/rosy_dock/rosy_dock.ino` 참조 구현만 존재하고 실기 조립·통전 시험 기록이 없다
 - signal ARTIFACT: ESP32 Arduino 펌웨어 빌드·플래시 증거 없음. 이 호스트에는 ESP32 toolchain이 없어 실행하지 않았다
-- signal DEVICE: 물리 벤치(G-S1) 미실행: 신호등 제품 미확정(전압/배선/소비전류), 릴레이 모듈 3.3V 트리거 실측, 부팅 글리치로 접점 닫힘 여부 실측 없음
+- signal DEVICE: 물리 벤치(G-S1) 미실행 — 수용 기준·절차는 docs/plans/2026-09-22-signals-acceptance-plan.md 로 고정했다. 최초 관문은 B0 신호등 입고 특성화(전압/배선/색당 전류), 이후 B2 부팅 글리치 10회(AC-02), B3 침묵→점멸 12 s(AC-11), B4 공유기 재시작 자기 복귀(AC-12, W1 위험)

@@ -1248,3 +1248,29 @@
 - gate 변화: 없음
 - 결정: 없음
 - 교훈: 없음
+
+## 2026-09-22 · uncommitted · docs(plans+adr): 장면 상황 프로파일 설계·실행 플랜, D-162 등록
+
+- 변경: `docs/plans/2026-09-22-scene-context-road-design.md`(장면 상황 프로파일 설계 — closed context 집합, 오프라인 리비전 프로파일, 폴백 우선 일반화, road_scene.yaml/scene_revision과의 이름 구분), `docs/plans/2026-09-22-scene-context-road.md`(실행 플랜 T1–T5) 추가. ADR 로그에 D-162 "학습된 장면은 설정이지 권한이 아니다" Proposed 등록. 둘 다 `docs/plans/AGENTS.md` 표에 등록
+- 증거: control LOCAL 1168 passed, 28 skipped (2026-09-22 Windows, T1/T2 순수 로직+시험 포함) — `src/apps/control/logs.md` 2026-09-22 항목 참조
+- gate 변화: 없음 (D-162는 Proposed)
+- 결정: 장면=상황 기반 context(닫힌 집합: generic/lane_follow/stop_line/crosswalk), 학습은 오프라인 프로파일 저작, 일반화는 제네릭 보수 폴백이 기본값, 첫 소비자=도로 인식 파라미터(D-151 구조 안)
+- 교훈: 없음
+
+## 2026-09-22 · uncommitted · feat(control+core): D-162 T3·T5 scene context 착지
+
+- 변경: control — road_observer_node에 scene_context 파라미터(기본 비활성), `road_observation_payload` additive `context` 필드(all-or-none 검증), 보정 명령 시 matcher reset, `default_scene_context_store()`(v0 중립 프로파일). core — `RoadEvidence` 선택 context 필드(all-or-none·[0,1]), `translate.road_evidence` 엄격 선택 디코딩(부재 시 전부 None, null/부분 키 거부), `ros_bridge` sensor snapshot에 context 표시. 정책 판정(`_verdict`)은 변경 없음.
+- 증거: control LOCAL 1179 passed, 28 skipped; core 1054 passed, 12 skipped (2026-09-22 Windows)
+- gate 변화: core ROS-SIM GO→HOLD(ros_bridge 변경 후 부트 스모크 재실행 전까지 — 2026-09-21 증거는 이전 트리 것), control SOURCE/LOCAL GO 유지
+- 결정: `TrafficPolicyStatus` 프로토콜 스키마는 확장하지 않고 sensor snapshot observability로만 노출했다. 상태 스키마 확장은 별도 슬라이스에서 D-18과 함께 한다
+- 발견(미수정, 본 스코프 밖): `ros_bridge.py`에 `import json`이 없어 road/observation 첫 메시지에서 NameError가 난다. 별도 결함 처리 필요
+- 교훈: 같은 저장소에서 동시 에이전트가 작업 중이면 모듈 progress/logs가 순간적으로 낡은 내용을 보여줄 수 있다 — 편집 전 현재 파일을 다시 읽고 중복 삽입을 확인하라
+
+## 2026-09-22 · uncommitted · fix(core)+docs(validation): import json 결함 수정, ROS-SIM 재실행 절차문
+
+- 변경: `src/core/core/core/bridge/ros_bridge.py`에 `import json` 추가(전 항 발견 결함 수정), `src/core/core/test/test_executor_contracts.py`에 json 사용↔임포트 AST 계약 시험 추가, `docs/validation/ros-sim-core-2026-09-22/README.md`에 ROS-SIM 재실행 절차 작성(기본 프로브 + road/observation 유효/malformed 프로브, 판정선·evidence 목록·복원 규칙 포함)
+- 증거: test_executor_contracts 4 passed, flake8 F821 소거. ROS-SIM 실행은 WSL2/Linux에서 별도로
+- gate 변화: 없음(ROS-SIM HOLD 유지, 절차문 실행 대기)
+- 결정: malformed road payload 프로브를 절차에 넣어 except 절 `json.JSONDecodeError` 평가 경로를 ROS-SIM에서 직접 검증한다
+- 교훈: 없음
+

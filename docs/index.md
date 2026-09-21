@@ -112,8 +112,8 @@
 
 ## 최근 기록
 
+- 2026-09-22 · uncommitted · fix(core)+docs(validation): import json 결함 수정, ROS-SIM 재실행 절차문
+- 2026-09-22 · uncommitted · feat(control+core): D-162 T3·T5 scene context 착지
+- 2026-09-22 · uncommitted · docs(plans+adr): 장면 상황 프로파일 설계·실행 플랜, D-162 등록
 - 2026-09-22 · uncommitted · docs(plans): signals 연동 설계·실행 계획
 - 2026-09-22 · uncommitted · docs(deploy): offline signing ceremony runbook for the staged payload
-- 2026-09-21 · 5dd076c · test(core): ROS-SIM 재실행으로 HOLD 해소 + vendor 카드 A 베이스라인 절차 추가
-- 2026-09-21 · uncommitted · feat(signal): add fail-safe ESP32 reference implementation
-- 2026-09-21 · uncommitted · docs(signal): record the fail-safe traffic signal draft contract
