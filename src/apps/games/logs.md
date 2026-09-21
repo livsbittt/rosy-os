@@ -163,3 +163,10 @@
 - 변경: `stair1_visibility` 코너·로봇·골·공 보고. `ready` ≠ FIELD GO. LOCAL 호스트 트랙 닫힘. 다음은 웹캠·Pinky.
 - 증거: `python -m pytest src/games/test test/test_games_surface.py -q`
 - gate 변화: 없음. DEVICE/FIELD PARKED
+
+## 2026-09-22 · uncommitted · test(games): unique test basenames; fix the gate cmd spec
+
+- 변경: `test_cli/test_session/test_transport.py`를 `test_games_cli/test_host_session/test_host_transport.py`로, `fakes.py`를 `fake_host.py`로 바꿨다. fleet/test와 같은 basename이면 합친 pytest 수집이 깨지는 것을 없앤다.
+- 변경: `progress.md` gate cmd와 `AGENTS.md` 테스트 명령의 옛 경로를 고쳤다 — `src/games/test`→`src/apps/games/test`, 없는 `test/test_games_surface.py`→`test/test_rosy_games_surface.py` (harness.yaml과 같게).
+- 증거: `python -m pytest src/apps/games/test test/test_rosy_games_surface.py -q` 110 passed (2026-09-22 Windows)
+- gate 변화: 없음. SOURCE·LOCAL GO 유지.

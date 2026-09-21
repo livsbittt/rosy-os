@@ -143,3 +143,9 @@
 - 증거: 시뮬레이터 CLI·회귀와 모듈 경계 10 passed.
 - gate 변화: SOURCE/LOCAL GO 유지. 실제 ROS graph publisher 검증은 D-156 Proposed다.
 - 결정: D-155. D-156은 launch/graph 증거 전 Proposed.
+
+## 2026-09-22 · uncommitted · test(control): anchor subprocess children to the package root
+
+- 변경: `test_calibration_spaces.py`와 `test_os_calibration_concurrency.py`가 자식 프로세스에 `cwd=PKG_ROOT`를 넘긴다. 저장소 루트에서 모듈을 합쳐 pytest를 돌려도 `tools.gz`·`control` 임포트가 실패하지 않는다. calibration_spaces CLI 자식은 `capture_output`으로 stderr를 실패 메시지에 남긴다.
+- 증거: `python -m pytest src/apps/control/test/test_calibration_spaces.py src/apps/control/test/test_os_calibration_concurrency.py -q` 15 passed (2026-09-22 Windows, 저장소 루트)
+- gate 변화: 없음. SOURCE/LOCAL GO 유지.

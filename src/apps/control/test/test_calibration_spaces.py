@@ -1,10 +1,13 @@
 import json
 import math
+from pathlib import Path
 import xml.etree.ElementTree as ET
 import numpy as np
 import pytest
 from tools.gz.calibration_spaces import CASES, prepare_case
 from tools.gz.prepare_track_world import boxes, clearance
+
+PKG_ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.mark.parametrize('name', CASES)
@@ -74,5 +77,7 @@ def test_wall_cases_leave_translation_room_before_rotation_relocation(name,tmp_p
 def test_cli_case_and_output_arguments(tmp_path):
     import subprocess
     import sys
-    subprocess.run([sys.executable,'-m','tools.gz.calibration_spaces','open',str(tmp_path)],check=True)
+    result=subprocess.run([sys.executable,'-m','tools.gz.calibration_spaces','open',str(tmp_path)],
+                          capture_output=True,text=True,cwd=PKG_ROOT)
+    assert result.returncode==0,result.stderr
     assert json.loads((tmp_path/'track_identity.json').read_text())['case']=='open'

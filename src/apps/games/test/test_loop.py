@@ -2,7 +2,7 @@ from games.field import Pose2D
 from games.game import Observation, Phase
 from games.host import MatchHost
 
-from fakes import FakeObserver, FakePlayerClient
+from fake_host import FakeObserver, FakePlayerClient
 
 
 def _obs(

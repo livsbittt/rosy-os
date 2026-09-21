@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
+from pathlib import Path
 import subprocess
 import sys
 
@@ -7,6 +8,8 @@ import pytest
 
 from control import calibration_storage as storage
 from control.calibration_record import decode_record
+
+PKG_ROOT = Path(__file__).resolve().parents[1]
 
 CONTEXT = dict(robot_id='rosy_01', hardware_model='Pinky Pro', geometry_revision='g1',
                sensor_revision='s1', data_generation='release-1')
@@ -61,7 +64,7 @@ def test_process_exit_releases_lock_without_removing_lock_file(tmp_path):
               ' sys.stdin.read()\n')
     process = subprocess.Popen([sys.executable, '-c', script, str(path)],
                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                               text=True)
+                               text=True, cwd=PKG_ROOT)
     try:
         assert process.stdout.readline().strip() == 'locked'
         with pytest.raises(ValueError, match='busy'):

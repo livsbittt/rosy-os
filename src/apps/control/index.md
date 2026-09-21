@@ -53,8 +53,8 @@
 
 ## 최근 기록
 
+- 2026-09-22 · uncommitted · test(control): anchor subprocess children to the package root
 - 2026-09-21 · uncommitted · refactor(control): move cross-domain simulations to repository tools
 - 2026-09-21 · uncommitted · feat(control): publish the bounded semantic camera preview (D-152)
 - 2026-09-21 · uncommitted · feat(control): detect semantic road evidence (D-151)
 - 2026-09-21 · uncommitted · feat(control): burst trigger gate — corroboration or operator (D-137 T4 순수 조각)
-- 2026-09-21 · uncommitted · docs(control): mark web_node debug surface and the map home (D-150)
