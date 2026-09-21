@@ -2,44 +2,64 @@
 
 ## Actual Gazebo runtime result
 
-`GAZEBO_CAMERA_GRAPH_PASS` / `GAZEBO_METRIC_STOP_DISTANCE_PASS`
+`GAZEBO_CAMERA_GRAPH_PASS` / `GAZEBO_POSE_DISTANCE_PASS` /
+`ENFORCED_TRAFFIC_STOP_PASS`
 
-WSL2 Ubuntu 24.04.4, ROS 2 Jazzy, Gazebo Harmonic에서 실제
+WSL2 Ubuntu 24.04.4, ROS 2 Jazzy, Gazebo Sim 8.11.0에서 실제
 `semantic_road_dashboard.launch.py gazebo_gui:=false`를 실행했다. Gazebo가
 설치 overlay의 `map_260905_traffic.world`를 로드했고 소스와 설치본의
 SHA-256은 `af70bbd...a87373`으로 일치했다.
 
+로봇은 차선 중심의 정지선 상류 `(-0.20, -0.15, yaw=0)`에 생성됐다.
 실제 `/camera/front` 프레임은 `GAZEBO`, `front_camera_link`, 320x180으로
-수신됐다. production road detector는 정지선을 confidence `0.812804`, image
-row `107.5`에서 검출했다. Gazebo URDF에 선언된 카메라 높이·pitch·FOV로만
-구성되는 simulation-only pinhole 모델이 거리 `0.108313 m`를 계산했다.
-물리 카메라 homography와 사용자가 제공한
-`approximate_requires_physical_validation` 값은 활성화하지 않았다.
+수신됐고, 흰색 표식만 분리하도록 Gazebo 전용 밝기 임계값을 220으로
+설정했다. production detector가 동일 프레임 경로에서 차선, 정지선,
+횡단보도를 모두 검출했다.
 
-CORE에서 `CAMERA_LINE`을 선택한 뒤 traffic policy는 기존의
-`stop_distance_unavailable`에서 벗어나 `WAIT_SIGNAL / signal_unknown`을
-보고했다. 현재 시야에는 신호등이 보이지 않으므로 진행을 허용하지 않았고,
-실제 readback 속도는 linear `0.0 m/s`, angular `0.0 rad/s`였다.
+정지 상태에서 Gazebo pose와 semantic truth로 계산한 카메라-정지선 거리는
+`0.113843 m`, 검출 거리는 `0.118260 m`였다. 절대 오차는 `0.004417 m`
+(약 4.4 mm, 3.88%)다. 이 비교는 이전처럼 화면의 임의 수평선을 정지선으로
+간주하지 않고 로봇 pose, 카메라 URDF offset, 정지선 world 좌표를 함께
+사용한다.
 
 ![Actual Gazebo front camera frame](gazebo_camera_frame.jpg)
 
-이 WSL software-rendering 환경에서 320x180 raw ROS camera는 약
-`2.026~2.651 Hz`, dashboard preview는 `1.323~1.501 Hz`였다. CORE preview
-status는 `stale=false`, capture age `229 ms`였다. 640x360 진단에서는 raw ROS
-전달이 약 1.9 Hz였고, 320x180에서 2 Hz 이상으로 회복되어 raw RGB bridge/DDS
-복사량이 이 호스트의 주 병목임을 확인했다. semantic launch는
-`camera_width`, `camera_height`, `camera_update_rate`를 공개하므로 호스트 성능에
-맞춰 조정할 수 있다.
+CORE는 `CAMERA_LINE + ENFORCED`로 실행됐다. 차선 추종 후보는 linear
+`0.079820 m/s`, angular `-0.002776 rad/s`였고, 정지선 접근 중 traffic
+scale이 `0.1968`에서 최저 `0.15`로 내려갔다. 로봇은 약 `0.04768 m`
+전진한 뒤 정지선 거리 `0.118260 m`에서 `WAIT_SIGNAL / signal_unknown`으로
+전환됐다. 이때 최종 readback은 linear `0.0 m/s`, angular `0.0 rad/s`였다.
+따라서 이번 결과는 관측 연결만이 아니라 비영점 후보에 대한 실제 강제 차단도
+증명한다.
+
+현재 아래로 25도 기울어진 한 개 카메라 시야에는 신호등 램프가 들어오지 않아
+camera signal 검출은 PASS로 올리지 않았다. 신호 미확인 상태에서 진행하지 않는
+fail-closed 동작은 확인됐으며, 실제 신호 검출은 별도 시야/마운트 검증이 남아 있다.
+
+이 호스트에서 raw ROS camera는 `4.111~4.360 Hz`, dashboard preview는
+7초 표본에서 약 `1.63 Hz`였다. semantic launch의 `camera_width`,
+`camera_height`, `camera_update_rate`로 호스트 성능에 맞게 조정할 수 있다.
+
+## Simulation-only distance safety boundary
+
+Gazebo pinhole 거리 모델은 다음 세 조건을 모두 만족해야만 생성된다.
+
+1. `allow_simulation_ground=true` 명시적 opt-in
+2. `use_sim_time=true`
+3. dashboard source가 `GAZEBO`
+
+기하 파라미터 전체가 캐시 키에 포함되므로 런타임 파라미터가 바뀐 뒤 오래된
+모델을 재사용하지 않는다. 물리 기본값은 `camera_ground_mode=homography`,
+`allow_simulation_ground=false`다. 사용자가 제공한
+`approximate_requires_physical_validation` homography는 활성화하지 않았다.
 
 ## Deterministic host simulation result
 
 `SEMANTIC_ROAD_HOST_SIM_PASS`
 
-The `map_260905_update_v2` geometry is preserved and a derived semantic road
-scene adds one lane, one stop line, one crosswalk, and one traffic signal. The
-host simulation exercises the production detector, strict bridge decoder,
-line-follow manager, traffic policy, and the atomic command gate immediately
-before the sole CORE Command Manager.
+`map_260905_update_v2` 기하를 보존한 파생 scene에는 차선, 정지선, 횡단보도,
+신호등이 들어 있다. host simulation은 production detector, strict bridge
+decoder, line-follow manager, traffic policy, 최종 atomic command gate를 검사한다.
 
 | Phase | Detected / policy state | Final linear command |
 |---|---|---:|
@@ -50,33 +70,30 @@ before the sole CORE Command Manager.
 | green proceed | crosswalk + stop line + green / `PROCEED` | 0.02457 m/s |
 | stale | expired observation / `HOLD` | 0.00000 m/s |
 
-Semantic YAML truth is used only to build and audit the scene. It is not fed
-to the detector. `result.json` records
-`semantic_truth_fed_to_detector: false` and
-`physical_device_validated: false`.
+Semantic YAML truth는 scene 생성과 감사에만 쓰며 detector 입력으로 전달하지 않는다.
+`result.json`은 `semantic_truth_fed_to_detector: false`와
+`physical_device_validated: false`를 기록한다.
 
 ## Evidence
 
-- `gazebo_runtime_result.json`: actual Gazebo camera, detector, metric range,
-  and CORE readback.
-- `gazebo_camera_frame.jpg`: actual Gazebo frame pulled from CORE's authenticated
-  preview endpoint; this is not a HOST-SIM fixture.
-- `result.json`: deterministic policy and command samples.
-- `semantic_road_simulation.svg`: state/command timeline.
-- `camera_detection_montage.png`: synthetic camera inputs used by the production
-  detector.
-- `camera_live_dashboard.png`: prior HOST-SIM browser fixture, not evidence of
-  the live Gazebo process.
-- `traffic_policy_dashboard.png`: prior browser evidence of policy controls.
+- `gazebo_runtime_result.json`: 실제 Gazebo camera, pose-ground-truth 거리 비교,
+  detector, ENFORCED CORE readback.
+- `gazebo_camera_frame.jpg`: CORE authenticated preview endpoint에서 받은 실제
+  Gazebo 프레임. HOST-SIM fixture가 아니다.
+- `result.json`: deterministic policy/command 표본.
+- `semantic_road_simulation.svg`: 상태/명령 timeline.
+- `camera_detection_montage.png`: production detector의 합성 camera 입력.
+- `camera_live_dashboard.png`: 과거 HOST-SIM browser fixture이며 이번 실제 Gazebo
+  browser 증거가 아니다.
+- `traffic_policy_dashboard.png`: 과거 browser policy control 증거.
 - `src/apps/control/map/map_260905_update_v2/review/map_260905_traffic.png`:
-  semantic overlay on the measured 16-wall map.
+  측정된 16-wall map 위 semantic overlay.
 - `src/apps/control/map/map_260905_update_v2/worlds/map_260905_traffic.world`:
-  Gazebo world with lane, crosswalk, stop line, and signal models.
+  lane, crosswalk, stop line, signal model이 포함된 Gazebo world.
 
-The in-app browser inventory was empty during this run, so a live full-dashboard
-screenshot was not captured. The authenticated API frame above and API state
-readback are actual runtime evidence; the browser screenshot gate remains
-`HOLD_NO_BROWSER_BACKEND` rather than being substituted with a fixture.
+이번 실행에서 in-app browser inventory가 비어 있어 live full-dashboard screenshot은
+찍지 못했다. 위 API frame과 API state readback은 실제 런타임 증거지만 browser
+gate는 fixture로 대체하지 않고 `HOLD_NO_BROWSER_BACKEND`로 유지한다.
 
 ## Reproduce
 
@@ -86,20 +103,21 @@ source <workspace>/install/setup.bash
 ros2 launch gz_sim semantic_road_dashboard.launch.py gazebo_gui:=false
 ```
 
-Tune only when the host requires it:
+필요한 경우 카메라 부하만 조정한다.
 
 ```bash
 ros2 launch gz_sim semantic_road_dashboard.launch.py \
   camera_width:=640 camera_height:=360 camera_update_rate:=5
 ```
 
-Then open `http://127.0.0.1:8080/dashboard`, enter the Viewer token, and check
-that the camera source reads `GAZEBO`.
+`http://127.0.0.1:8080/dashboard`에서 Viewer token을 입력하고 camera source가
+`GAZEBO`인지 확인한다.
 
 ## Acceptance boundary
 
-This proves the actual Gazebo camera/ROS graph, exact installed semantic world,
-simulation-only metric stop distance, dashboard preview freshness on this host,
-and detector-to-CORE policy readback. It does not prove Pi/ARM64 behavior,
-physical Pinky Pro camera mounting or homography, braking distance, motor
-response, or unattended field acceptance. Those remain DEVICE and FIELD gates.
+이번 증거는 실제 Gazebo camera/ROS graph, 정확한 installed semantic world,
+pose-ground-truth 기반 simulation 거리, 차선·정지선·횡단보도 검출, adaptive
+approach, ENFORCED 최종 정지를 증명한다. 현재 마운트에서 실제 camera signal
+검출, Pi/ARM64, 물리 Pinky Pro camera mounting/homography, braking distance,
+motor response, 무인 field acceptance는 증명하지 않는다. 이 항목은 DEVICE와
+FIELD gate로 남는다.

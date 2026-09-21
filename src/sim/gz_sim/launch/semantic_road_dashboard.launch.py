@@ -33,6 +33,8 @@ def generate_launch_description():
             "camera_height": LaunchConfiguration("camera_height"),
             "camera_update_rate": LaunchConfiguration(
                 "camera_update_rate"),
+            "spawn_x": "-0.20",
+            "spawn_y": "-0.15",
             "gui": LaunchConfiguration("gazebo_gui"),
         }.items(),
     )
@@ -52,7 +54,10 @@ def generate_launch_description():
             executable="line_observer_node",
             name="line_observer_node",
             output="screen",
-            parameters=[line_config, simulation_camera],
+            parameters=[line_config, {
+                **simulation_camera,
+                "camera_bright_threshold": 220,
+            }],
         ),
         Node(
             package="control",
@@ -62,7 +67,9 @@ def generate_launch_description():
             parameters=[line_config, {
                 **simulation_camera,
                 "dashboard_source": "GAZEBO",
+                "bright_threshold": 220,
                 "camera_ground_mode": "gazebo_pinhole",
+                "allow_simulation_ground": True,
                 "gazebo_camera_height_m": 0.060194,
                 "gazebo_camera_pitch_rad": math.radians(25.0),
                 "gazebo_camera_hfov_rad": 1.1519,

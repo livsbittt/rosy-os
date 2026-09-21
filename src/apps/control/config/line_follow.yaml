@@ -30,6 +30,7 @@
     rotate_deg: 180
     camera_profile_revision: camera-profile-v1
     camera_ground_mode: homography
+    allow_simulation_ground: false
     bright_threshold: 180
     lane_roi_top_fraction: 0.30
     horizontal_min_fraction: 0.40

@@ -6,7 +6,7 @@ network:
   api_port: 8080
 
 traffic_policy:
-  mode: MONITOR_ONLY
+  mode: ENFORCED
   map_id: map_260905_update_v2
   scene_revision: road-scene-v1
   policy_revision: traffic-policy-v1

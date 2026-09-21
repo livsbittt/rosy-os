@@ -51,6 +51,8 @@ def test_simulation_plane_is_explicitly_gazebo_only():
     factory = getattr(camera_ground, "simulation_ground_plane", None)
     assert callable(factory)
     kwargs = dict(
+        simulation_enabled=True,
+        use_sim_time=True,
         width_px=640,
         height_px=360,
         height_m=0.060194,
@@ -65,6 +67,26 @@ def test_simulation_plane_is_explicitly_gazebo_only():
     assert model.principal_x == pytest.approx(320.0)
     assert model.principal_y == pytest.approx(180.0)
     assert 0.0 < model.distance(300, 320) <= 0.6
+
+
+@pytest.mark.parametrize("simulation_enabled,use_sim_time", [
+    (False, True),
+    (True, False),
+    (False, False),
+])
+def test_simulation_plane_requires_explicit_opt_in_and_simulated_clock(
+        simulation_enabled, use_sim_time):
+    assert camera_ground.simulation_ground_plane(
+        source="GAZEBO",
+        simulation_enabled=simulation_enabled,
+        use_sim_time=use_sim_time,
+        width_px=320,
+        height_px=180,
+        height_m=0.060194,
+        pitch_rad=math.radians(25.0),
+        hfov_rad=1.1519,
+        max_range_m=0.6,
+    ) is None
 
 
 def test_rows_lower_in_the_image_are_nearer():
