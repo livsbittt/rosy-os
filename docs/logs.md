@@ -1274,3 +1274,11 @@
 - 결정: malformed road payload 프로브를 절차에 넣어 except 절 `json.JSONDecodeError` 평가 경로를 ROS-SIM에서 직접 검증한다
 - 교훈: 없음
 
+
+## 2026-09-22 · uncommitted · feat(fleet): Implement Pinky-to-Fleet WebSocket communication path
+
+- feat(fleet): Implement Pinky-to-Fleet WebSocket communication path (Task 7)
+  - Extended HelloPayload with device_uid, model, hardware_serial
+  - Created fleet hub --listen WebSocket server wrapper around SiteHub
+  - Implemented FleetAgent outbound connection, exponential backoff, and event buffering
+  - Fed Hub registry snapshots into FleetConsole
