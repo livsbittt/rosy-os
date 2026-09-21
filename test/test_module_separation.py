@@ -99,12 +99,17 @@ def test_control_has_no_final_cmd_vel():
     topic string is forbidden. The one exception is the pinned legacy
     comparison-graph publisher default (LEGACY_FINAL_PUBLISHER).
     """
+    forbidden_patterns = [
+        FINAL_CMD_VEL,
+        re.compile(r"['\"]/robot/state/.*?['\"]"),
+        re.compile(r"['\"]/robot/intent/.*?['\"]"),
+    ]
     violations = []
     for path in _prod_py_files(CONTROL_PKG):
         rel = path.relative_to(SRC).as_posix()
         text = path.read_text(encoding="utf-8")
         for i, line in enumerate(text.splitlines(), 1):
-            if FINAL_CMD_VEL.search(line):
+            if any(p.search(line) for p in forbidden_patterns):
                 if rel == LEGACY_FINAL_PUBLISHER[0] and line.strip() == LEGACY_FINAL_PUBLISHER[1]:
                     continue
                 violations.append(f"{rel}:{i}: {line.strip()[:100]}")
@@ -192,3 +197,20 @@ def test_fleet_prod_only_core_common():
             if top.startswith("core_") and top != "core_common":
                 violations.append(f"{path.relative_to(SRC)} imports {top}")
     assert violations == [], violations
+
+def test_control_imports_no_core_code():
+    """Guard 4 (ADR-1003): control runtime never imports core.
+
+    The control application is a plugin that is loaded by core. It must not
+    statically import core_features, core_api_web, core, etc.
+    """
+    violations = []
+    core_tops = {"core", "core_features", "core_api_web", "core_events", "core_common"}
+    for path in _prod_py_files(CONTROL_PKG.parent):
+        tops = _import_tops(path)
+        bad = tops & core_tops
+        if bad:
+            rel = path.relative_to(SRC).as_posix()
+            violations.append(f"{rel}: imported {', '.join(sorted(bad))}")
+    assert not violations, "control must not depend on core:\n" + "\n".join(violations)
+

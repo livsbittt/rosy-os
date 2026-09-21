@@ -62,7 +62,18 @@ def test_payload_carries_every_field_the_screen_renders():
         "reason": "cmd_vel",
         "presence": "CONTACT",
         "hold_s": 3.0,
+        "hitl_requested": False,
     }
+
+
+def test_payload_carries_hitl_request_to_the_robot_face():
+    snapshot = _snapshot()
+    snapshot.hitl_requested = True
+
+    payload = display.info_payload(
+        snapshot, _status(), health="DEGRADED", address="x", hold_s=1.0)
+
+    assert payload["hitl_requested"] is True
 
 
 def test_address_prefers_the_routed_interface():

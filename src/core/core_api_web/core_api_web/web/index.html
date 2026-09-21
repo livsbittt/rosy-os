@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#111614">
   <title>Rosy OS — Field Runtime</title>
-  <link rel="stylesheet" href="/dashboard/assets/tokens.css">
+  <link rel="stylesheet" href="/common/tokens.css">
   <link rel="stylesheet" href="/dashboard/assets/styles.css">
   <script type="module" src="/dashboard/assets/app.js"></script>
 </head>
@@ -247,6 +247,11 @@
               <button type="button" data-simulation-signal="GREEN" disabled>GREEN</button>
             </div>
             <p id="traffic-policy-message" class="line-follow-message" role="status" aria-live="polite">정책 readback 대기</p>
+          </div>
+          <div id="hitl-escalation" class="hitl-escalation" role="alert" hidden>
+            <h3>운영자 지원 요청</h3>
+            <p>로봇이 자동 판단을 중단하고 사람의 확인을 요청했습니다.</p>
+            <button type="button" id="teleop-override">저속 직접 제어로 이동</button>
           </div>
           <div class="teleop-commissioning" aria-labelledby="teleop-heading">
             <div class="teleop-copy">

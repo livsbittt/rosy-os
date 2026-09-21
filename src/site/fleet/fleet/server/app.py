@@ -24,8 +24,8 @@ from fleet.swarm.transport import RobotApiError
 WEB_ROOT = Path(__file__).resolve().parent / "web"
 
 #: 경로 순회를 막는 유일한 방어다 — 디렉터리 스캔으로 바꾸지 않는다 (core 와 같은 규칙).
-#: tokens.css 는 여기 없다 — D-129 로 L1 토큰은 트리 전체에서 하나이고, 이
-#: 서버는 설정받은 그 파일을 /ui/tokens.css 로 서빙한다(아래 ui_tokens_asset).
+#: 공용 L1 자산은 여기 없다. 서버는 설정받은 web_common 디렉터리에서 명시된
+#: 파일만 /common 아래로 서빙한다(D-129, D-1005).
 CONSOLE_ASSETS = {
     "styles.css": "text/css",
     "console.js": "application/javascript",
@@ -75,14 +75,14 @@ def _http_error(exc: BaseException) -> HTTPException:
 
 
 def create_app(console: FleetConsole, *, console_token: Optional[str] = None,
-               ui_tokens: Optional[Path] = None) -> FastAPI:
+               web_common: Optional[Path] = None) -> FastAPI:
     app = FastAPI(
         title="ROSY Fleet",
         version="0.1.0",
         description="사이트 오케스트레이터 — 모음과 원자 액션 흩뿌림 (D-59)",
     )
     app.state.console = console
-    app.state.ui_tokens = Path(ui_tokens) if ui_tokens is not None else None
+    app.state.web_common = Path(web_common) if web_common is not None else None
 
     def authorize(authorization: Optional[str] = Header(default=None)) -> None:
         if console_token is None:
@@ -169,17 +169,32 @@ def create_app(console: FleetConsole, *, console_token: Optional[str] = None,
             headers={"Cache-Control": "no-cache", "Content-Security-Policy": CONSOLE_CSP},
         )
 
-    @app.get("/ui/tokens.css", include_in_schema=False)
-    def ui_tokens_asset():
-        # D-129 — L1 토큰은 CORE 웹 자산의 단일 파일이다. fleet 은 사본을 두지
-        # 않고 경로만 설정으로 받는다(launch 가 share 경로를 주입하고 이 패키지의
-        # ROS import 금지 경계는 유지된다, D-126 선례).
-        path = app.state.ui_tokens
-        if path is None or not path.is_file():
-            raise HTTPException(status_code=404, detail={"code": "UI_TOKENS_UNCONFIGURED",
-                                                         "message": "--ui-tokens 가 설정되지 않았다"})
-        return FileResponse(path, media_type="text/css",
+    common_assets = {
+        "tokens.css": "text/css",
+        "core_ui_logic.js": "application/javascript",
+    }
+
+    @app.get("/common/{asset_name:path}", include_in_schema=False)
+    def common_asset(asset_name: str):
+        media_type = common_assets.get(asset_name)
+        root = app.state.web_common
+        if media_type is None:
+            raise HTTPException(status_code=404, detail="common asset not found")
+        if root is None or not root.is_dir():
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "WEB_COMMON_UNCONFIGURED",
+                        "message": "--web-common 가 설정되지 않았다"},
+            )
+        path = root / asset_name
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="common asset not found")
+        return FileResponse(path, media_type=media_type,
                             headers={"Cache-Control": "no-cache"})
+
+    @app.get("/ui/tokens.css", include_in_schema=False)
+    def legacy_ui_tokens_asset():
+        return common_asset("tokens.css")
 
     @app.get("/console/assets/{asset_name:path}", include_in_schema=False)
     def console_asset(asset_name: str):

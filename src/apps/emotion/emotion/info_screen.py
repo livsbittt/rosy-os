@@ -94,6 +94,8 @@ def render(payload: dict, size: tuple[int, int] = DEFAULT_SIZE) -> Image.Image:
     ]
     if payload.get("estop"):
         rows[2] = ("HEALTH", "E-STOP")
+    elif payload.get("hitl_requested"):
+        rows[2] = ("HEALTH", "ASSIST REQ")
 
     for index, (label, value) in enumerate(rows):
         y = 142 + index * 24

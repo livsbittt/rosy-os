@@ -26,6 +26,16 @@ from fleet.swarm.session import FormationSession, FormationSpec, HoldPolicy, Ses
 from fleet.swarm.transport import HttpRobotClient
 
 
+def default_web_common() -> Path:
+    """Resolve installed assets first, with a source-tree fallback for host tools."""
+    try:
+        from ament_index_python.packages import get_package_share_directory
+
+        return Path(get_package_share_directory("web_common"))
+    except (ImportError, LookupError):
+        return Path(__file__).resolve().parents[3] / "core" / "web_common"
+
+
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="fleet")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -50,8 +60,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     console.add_argument("--robots", required=True, type=Path, help="robots.yaml")
     console.add_argument("--host", default="127.0.0.1")
     console.add_argument("--port", type=int, default=8090)
-    console.add_argument("--ui-tokens", default=None, type=Path,
-                         help="단일 L1 토큰 파일(CORE 웹 자산) — /ui/tokens.css 로 서빙한다(D-129)")
+    console.add_argument("--web-common", default=default_web_common(), type=Path,
+                         help="공용 L1 웹 자산 디렉터리 — /common 아래로 서빙한다(D-1005)")
     console.add_argument("--token", default=None,
                          help="관제 UI 접속 토큰. 루프백 밖으로 열 때는 필수다")
     return parser.parse_args(argv)
@@ -249,7 +259,7 @@ def run_console(args: argparse.Namespace) -> None:
     endpoints = load_robots(args.robots)
     _warn_if_world_readable(args.robots)
     console = FleetConsole(endpoints, [HttpRobotClient(ep) for ep in endpoints])
-    app = create_app(console, console_token=args.token, ui_tokens=args.ui_tokens)
+    app = create_app(console, console_token=args.token, web_common=args.web_common)
     print(f"fleet console: http://{args.host}:{args.port}/console  ({len(endpoints)} robots)",
           flush=True)
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")

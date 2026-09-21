@@ -1192,3 +1192,11 @@
 - gate 변화: ARTIFACT/MEDIA/BOOT/DEVICE/FLEET은 HOLD다. SD 기록, 단일 장치 HTTP 응답과 host simulation은 FLEET GO를 대신하지 않는다.
 - 결정: 공통 Pinky 이미지는 비활성 FleetAgent 코드를 포함하고, 검증된 장치별 bootstrap/pairing 뒤에만 outbound 연결을 연다. 이 부분은 D-88의 로봇 이미지 제외/PARKED 결정을 대체하되 Site Hub의 관제 PC 소유권은 유지한다.
 - 교훈: 장치별 OS라는 말은 장치별 이미지 fork가 아니라 공통 release와 장치별 신원의 결합이다. 군집 준비는 서로 다른 두 장치의 등록·heartbeat·명령·재접속·단절 HOLD까지 증명해야 한다.
+
+## 2026-09-21 · uncommitted · docs(research): pin the pinklab upstream stack facts behind the Rosy OS fork
+
+- 변경: `docs/plans/2026-09-21-pinky-pro-os-research.md` 신규. 조직 규명(pinklab-art 정격, pinklab-kr 404), frozen zip vs live main diff(차이는 pinky_mujoco 추가·문서뿐, 하드웨어 스택 동일), 출하 전용 SD 이미지·AP(`pinky_XXXX`)+Jupyter(8888)+SSH(`pinky@192.168.4.1`) 운용 흐름, XL330(SDK·UART4)·RPLIDAR C1(sllidar_ros2·UART0)·BNO055(wiringPi·i2c-0)·ADC MCU(i2c-1) 드라이버 FACT, 제어 루프 30Hz·클램프 2층과 안전 부재(cmd_vel watchdog·deadman 없음, teleop·Nav2 동시 발행 허용) 기록, FACT 12·UNKNOWN 11건 분리
+- 증거: 1차 소스만 사용 — `reference/src/pinky_pro-main.zip` 해제 분석(X:\DevTemp\opencode\pinky-pro-research\pinky_pro-main), live main 전체 트리(codeload zip, 최신 커밋 014a09f) 파일 단위 MD5 diff, pinky_study wiki 초기설정·2.4 페이지 본문, pinky_desktop README·MANUAL.md, REP-2000 raw(Jazzy arm64 Noble 24.04 Tier 1, rmw_fastrtps* 기본). 실기 실행 없음 — 문서 조사
+- gate 변화: 없음. 문서 모듈이며 ARTIFACT/MEDIA/BOOT/DEVICE/FIELD 판정과 무관
+- 결정: 없음 — upstream의 velocity_smoother·teleop 직결 cmd_vel 구조는 D-2 갈라섬 유지 근거로만 기록했다. 참조는 값(wheel 0.027/0.0961, 0.25 m/s, RPM 100, 6.8V)과 장치 매핑(UART0/UART4, i2c-0/i2c-1, GPIO19)이고 구조는 따르지 않는다
+- 교훈: vendor 스택에 "최종 명령 단일 발행자"와 안전 센서 결합이 없다는 사실이 오히려 CORE 게이트 설계(D-2)의 차별점을 확증한다 — upstream은 배포판명조차 공식 문시하지 않아(netplan·PEP668·ufw 간접 근거만 존재) 우리의 명시적 OS 계약이 문서 자산이 된다

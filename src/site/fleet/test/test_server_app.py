@@ -15,11 +15,11 @@ GRID = {"map_id": "occupancy:abc", "width": 1, "height": 1, "resolution": 0.05,
         "origin": {"x": 0.0, "y": 0.0, "yaw": 0.0}, "data": [0]}
 
 
-def _client(*robots: FakeRobot, token=None, ui_tokens=None) -> TestClient:
+def _client(*robots: FakeRobot, token=None, web_common=None) -> TestClient:
     endpoints = [RobotEndpoint(robot_id=r.robot_id, base_url=f"http://127.0.0.1:808{i}",
                                token="t") for i, r in enumerate(robots)]
     console = FleetConsole(endpoints, list(robots))
-    return TestClient(create_app(console, console_token=token, ui_tokens=ui_tokens))
+    return TestClient(create_app(console, console_token=token, web_common=web_common))
 
 
 def test_state_lists_the_roster():
@@ -91,7 +91,7 @@ def test_console_page_and_its_assets_are_served():
     assert page.status_code == 200 and "ROSY FLEET" in page.text
     assert client.get("/console/assets/console.js").status_code == 200
     assert client.get("/console/assets/styles.css").status_code == 200
-    assert 'href="/ui/tokens.css"' in page.text  # D-129 — 단일 토큰 파일을 링크한다
+    assert 'href="/common/tokens.css"' in page.text
 
 
 def test_the_tokens_copy_is_gone_from_the_allowlist():
@@ -100,16 +100,24 @@ def test_the_tokens_copy_is_gone_from_the_allowlist():
     assert client.get("/console/assets/tokens.css").status_code == 404
 
 
-def test_ui_tokens_is_404_until_configured():
-    assert _client(FakeRobot("rosy_01")).get("/ui/tokens.css").status_code == 404
+def test_common_assets_are_404_until_configured():
+    client = _client(FakeRobot("rosy_01"))
+    assert client.get("/common/tokens.css").status_code == 404
+    assert client.get("/common/core_ui_logic.js").status_code == 404
 
 
-def test_ui_tokens_serves_the_configured_single_file(tmp_path):
+def test_common_assets_serve_only_the_configured_allowlist(tmp_path):
     tokens = tmp_path / "tokens.css"
     tokens.write_text(":root { --probe: #000000; }", encoding="utf-8")
-    resp = _client(FakeRobot("rosy_01"), ui_tokens=tokens).get("/ui/tokens.css")
+    logic = tmp_path / "core_ui_logic.js"
+    logic.write_text("export class HeadlessState {}", encoding="utf-8")
+    client = _client(FakeRobot("rosy_01"), web_common=tmp_path)
+    resp = client.get("/common/tokens.css")
     assert resp.status_code == 200
     assert resp.text == ":root { --probe: #000000; }"
+    assert client.get("/common/core_ui_logic.js").status_code == 200
+    assert client.get("/common/secret.txt").status_code == 404
+    assert client.get("/ui/tokens.css").text == resp.text
 
 
 def test_asset_allowlist_refuses_anything_it_does_not_name():

@@ -1,4 +1,4 @@
-"""D-129 — L1 토큰 파일은 하나이고 /ui/tokens.css 로 서빙된다. D-130.3 — 해시 고정."""
+"""D-129·D-1005 — 공용 L1 토큰 파일과 호환 경로. D-130.3 — 해시 고정."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from core_api_web.api.app import create_app
 
 WEB_ROOT = Path(__file__).resolve().parents[1] / "core_api_web" / "web"
-TOKENS = WEB_ROOT / "tokens.css"
+TOKENS = Path(__file__).resolve().parents[2] / "web_common" / "tokens.css"
 
 #: D-92 어휘 표의 열 이름 — 갤러리가 이 목록과 어긋나면 표와 갤러리가 두 개의
 #: 사실이 된다(D-129 Consequences).
@@ -31,6 +31,13 @@ def test_ui_tokens_serves_the_single_file():
     assert resp.headers["content-type"].startswith("text/css")
     assert resp.content == body
     assert resp.headers["x-ui-tokens-sha256"] == hashlib.sha256(body).hexdigest()
+
+
+def test_common_route_serves_only_the_declared_shared_assets():
+    client = _client()
+    assert client.get("/common/tokens.css").status_code == 200
+    assert client.get("/common/core_ui_logic.js").status_code == 200
+    assert client.get("/common/../api/app.py").status_code == 404
 
 
 def test_styleguide_renders_the_whole_vocabulary_table():

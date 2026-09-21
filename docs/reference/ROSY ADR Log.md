@@ -1,4 +1,4 @@
-# ROSY ADR Log
+﻿# ROSY ADR Log
 ## Architecture Decision Records
 
 **Document ID:** ROSY-ADR-001
@@ -162,6 +162,9 @@
 | D-152 | CORE 관제의 카메라 표시는 저주기 최신 1장 preview 예외다 | Accepted |
 | D-153 | UI/UX 평가는 세 계층이고 판정 단위는 표면이다 | Accepted |
 | D-154 | 공통 OS 이미지와 장치별 SD 개인화를 분리한다 | Accepted |
+| D-155 | Zero-Coupling AST Validation (Build-time Guard) | Accepted |
+| D-156 | ROS 2 Namespace Strict Segregation (Runtime Guard) | Accepted |
+| D-157 | Shared Headless UI Package (Monorepo Web Decoupling) | Accepted |
 
 ---
 
@@ -5231,3 +5234,25 @@ D-59, D-66, D-78, D-81, D-83, D-88,
 one dynamically via console.js if there are no robots with hitl_requested or capabilities_degraded. This strictly enforces zero alarm colors in the Fleet Console during nominal states.
 2. **Token Compliance:** CSS was rewritten to solely use variables mapped from 	okens.css (e.g., --status-warn, --status-crit, --ground-card, --ground-raise, --paper).
 **References:** docs/validation/uiux-surfaces-2026-09-21/g3-checklist.md, ADR-1000.
+
+## D-155 Zero-Coupling AST Validation (Build-time Guard)
+
+**Date:** 2026-09-21
+**Status:** Accepted
+**Context:** Static code dependencies between modules are currently maintained manually. Python's dynamic nature makes it easy to accidentally introduce cross-domain imports that pass local monolithic tests but break isolated runtime slices.
+**Decision:** Implement a mandatory AST-based boundary test (	est_module_boundaries.py or similar) that fails the build if any module imports from an unauthorized upper or peer domain outside of explicitly defined test boundaries.
+
+## D-156 ROS 2 Namespace Strict Segregation (Runtime Guard)
+
+**Date:** 2026-09-21
+**Status:** Accepted
+**Context:** While static imports are clean, ROS 2 topics are global. To prevent accidental cmd_vel overriding by rogue applications, we must enforce namespace boundaries.
+**Decision:** pps/control nodes must strictly publish under /robot/evidence/* or /robot/sensor/*. Only core is authorized to publish to /robot/state/*, /robot/intent/*, and /cmd_vel. Compliance will be verified via launch testing.
+
+## D-157 Shared Headless UI Package (Monorepo Web Decoupling)
+
+**Date:** 2026-09-21
+**Status:** Accepted
+**Context:** D-153 introduced core_ui_logic.js in core_api_web to decouple state math from visual components. However, leet and future dashboards need this logic without coupling directly to core_api_web.
+**Decision:** Extract core_ui_logic.js and frontend telemetry schemas into an agnostic 
+osy-web-core NPM package or shared web_common directory, establishing a strict dependency graph for web surfaces.

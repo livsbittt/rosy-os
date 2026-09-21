@@ -2,6 +2,7 @@
 
 import pytest
 
+from PIL import ImageChops
 from pathlib import Path
 
 from emotion.info_screen import DEFAULT_SIZE, _CRIT, battery_color, render
@@ -86,3 +87,12 @@ class TestRender:
 
     def test_estop_payload_renders(self):
         assert render(self._payload(estop=True)).size == DEFAULT_SIZE
+
+    def test_hitl_request_changes_the_health_row_but_never_overrides_estop(self):
+        normal = render(self._payload())
+        hitl = render(self._payload(hitl_requested=True))
+        estop = render(self._payload(estop=True))
+        estop_and_hitl = render(self._payload(estop=True, hitl_requested=True))
+
+        assert ImageChops.difference(normal, hitl).getbbox() is not None
+        assert ImageChops.difference(estop, estop_and_hitl).getbbox() is None

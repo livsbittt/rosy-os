@@ -35,6 +35,16 @@ from core_api_web.api.v1.routes import (
     diagnostics_router,
     docking_router,
 )
+
+
+def _web_common_root() -> Path:
+    """Resolve installed assets first, with a source-tree fallback for host tests."""
+    try:
+        from ament_index_python.packages import get_package_share_directory
+
+        return Path(get_package_share_directory("web_common"))
+    except (ImportError, LookupError):
+        return Path(__file__).resolve().parent.parent.parent.parent / "web_common"
 from core_api_web.api.ws import ws_router
 
 
@@ -55,8 +65,7 @@ def create_app(config: dict[str, Any], services: CoreServicesLike) -> FastAPI:
     dashboard_assets = {
         # tokens.css는 색의 단일 출처다(D-72 L1). styles.css보다 먼저 링크된다.
         # 이 allowlist는 `{asset_name:path}`가 슬래시를 허용하므로 경로 순회를
-        # 막는 유일한 방어이기도 하다 — 디렉터리 스캔으로 바꾸지 않는다.
-        "tokens.css": "text/css",
+        # 막는 파일시스템 방어목적이므로 폴더 스캔으로 바꾸지 않는다.
         "styles.css": "text/css",
         "app.js": "application/javascript",
         "map.js": "application/javascript",
@@ -126,7 +135,8 @@ def create_app(config: dict[str, Any], services: CoreServicesLike) -> FastAPI:
     # /ui/tokens.css 로 링크하고 각자 사본을 두지 않는다. D-130.3 — 릴리스가
     # 핀을 걸면 기동 때 어긋남을 경고한다(사이트 PC 서버가 로봇 이미지보다
     # 낡은 토큰을 서빙하는 버전 스큐).
-    ui_tokens = web_root / "tokens.css"
+    web_common = _web_common_root()
+    ui_tokens = web_common / "tokens.css"
     ui_tokens_sha = hashlib.sha256(ui_tokens.read_bytes()).hexdigest()
     pinned_sha = config.get("ui_tokens_sha256")
     if pinned_sha and pinned_sha != ui_tokens_sha:
@@ -134,6 +144,17 @@ def create_app(config: dict[str, Any], services: CoreServicesLike) -> FastAPI:
             "ui tokens sha mismatch: pinned %s, serving %s (%s)",
             pinned_sha, ui_tokens_sha, ui_tokens,
         )
+
+    @app.get("/common/{asset_name:path}", include_in_schema=False)
+    def common_asset(asset_name: str):
+        valid_assets = {
+            "tokens.css": "text/css",
+            "core_ui_logic.js": "application/javascript"
+        }
+        media_type = valid_assets.get(asset_name)
+        if not media_type:
+            raise HTTPException(status_code=404, detail="common asset not found")
+        return FileResponse(web_common / asset_name, media_type=media_type, headers={"Cache-Control": "no-cache"})
 
     @app.get("/ui/tokens.css", include_in_schema=False)
     def ui_tokens_asset():

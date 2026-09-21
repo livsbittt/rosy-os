@@ -23,8 +23,8 @@ pytestmark = pytest.mark.skipif(
 
 ROOT = Path(__file__).resolve().parents[1]
 WEB = ROOT / "src" / "site" / "fleet" / "fleet" / "server" / "web"
-#: D-129 — /ui/tokens.css 의 실체는 CORE 웹 자산의 단일 파일이다. fleet 사본은 없다.
-CANONICAL_TOKENS = ROOT / "src" / "core" / "core_api_web" / "core_api_web" / "web" / "tokens.css"
+#: D-129·D-1005 — 공용 L1 자산의 단일 파일. fleet 사본은 없다.
+CANONICAL_TOKENS = ROOT / "src" / "core" / "web_common" / "tokens.css"
 
 from browser_harness import (  # noqa: E402
     DECLINE_CONFIRM,
@@ -84,13 +84,13 @@ API = {
 
 @pytest.fixture()
 def console_url():
-    # index.html 의 절대 경로(/ui/tokens.css, /console/assets/*)를 웹 디렉터로 풀어 준다.
+    # index.html 의 절대 경로(/common/tokens.css, /console/assets/*)를 풀어 준다.
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=str(WEB), **kwargs)
 
         def translate_path(self, path: str) -> str:
-            if path == "/ui/tokens.css":
+            if path == "/common/tokens.css":
                 return str(CANONICAL_TOKENS)
             if path.startswith("/console/assets/"):
                 path = "/" + path[len("/console/assets/"):]

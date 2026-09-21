@@ -65,6 +65,7 @@ What is shared is law and vocabulary. Components are not shared.
 | Layer | Content | Scope |
 |---|---|---|
 | L1 — Law | tokens, evidence states, colour sets, surface hierarchy | binding on every surface |
+| L1.5 — Headless state | framework-free accessors over server-judged evidence | shared behaviour, no visual components |
 | L2 — Grammar | layout, interaction model, components | per surface, independent, not shared |
 | L3 — Content | what a capability contributes | portable across surfaces |
 

@@ -3,6 +3,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
 import sys
 
 
@@ -15,7 +16,7 @@ def _module():
         path = str(REPO_ROOT / "src/core" / package)
         if path not in sys.path:
             sys.path.insert(0, path)
-    path = ROOT / "tools/simulate_line_follow.py"
+    path = REPO_ROOT / "tools/simulate_line_follow.py"
     spec = importlib.util.spec_from_file_location("simulate_line_follow", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -40,3 +41,14 @@ def test_both_modes_track_turn_slow_and_fail_closed(tmp_path):
     assert saved == summary
     assert {"cross_track_m", "yaw_rad"} <= set(summary["series"]["IR_LINE"][0])
     assert "IR_LINE" in (tmp_path / "line_follow_simulation.svg").read_text(encoding="utf-8")
+
+
+def test_repository_tool_entrypoint_loads_without_external_pythonpath():
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "tools/simulate_line_follow.py"), "--help"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr

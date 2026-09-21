@@ -47,8 +47,8 @@ if (-not $token) {
     }
 }
 
-# ── 3. CORE 웹 자산의 단일 L1 토큰 파일 (D-129) ────────────────────────
-$uiTokens = Join-Path $repo "src\core\core_api_web\core_api_web\web\tokens.css"
+# ── 3. 설치 가능한 공용 L1 웹 자산 (D-129, D-1005) ────────────────────
+$webCommon = Join-Path $repo "src\core\web_common"
 
 # ── 4. 서버 기동 — 0.0.0.0 바인드 + 토큰 필수 ─────────────────────────
 # 로봇(pinky) → 타워는 아웃바운드라 방화벽 규칙이 필요 없다. 로봇을 향해
@@ -65,4 +65,4 @@ $env:PYTHONPATH = @(
 ) -join ";"
 
 Write-Host "fleet console: http://127.0.0.1:8090/console  (token required)"
-python -m fleet.cli console --robots $robots --host 0.0.0.0 --port 8090 --ui-tokens $uiTokens --token $token
+python -m fleet.cli console --robots $robots --host 0.0.0.0 --port 8090 --web-common $webCommon --token $token

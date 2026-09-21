@@ -106,8 +106,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · docs(research): pin the pinklab upstream stack facts behind the Rosy OS fork
 - 2026-09-21 · uncommitted · docs(adr): require per-device Fleet bootstrap and two-Pinky evidence (D-154 amendment)
 - 2026-09-21 · uncommitted · docs(adr): record the surface-based UI/UX evaluation decision (D-153)
 - 2026-09-21 · uncommitted · docs(adr): separate common image from per-device SD personalization (D-154)
 - 2026-09-21 · uncommitted · docs(uiux): D-153 session 12 — re-verification catch: concurrent fleet token drift (F-11), Fleet GO withdrawn
-- 2026-09-21 · uncommitted · docs(uiux): D-153 session 11 — HOST track closed: four surfaces GO, §7.5 focal grammar

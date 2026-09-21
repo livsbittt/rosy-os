@@ -90,7 +90,7 @@
 ### Task 6: Closed-loop simulation and governance
 
 **Files:**
-- Create: `src/apps/control/tools/simulate_semantic_road.py`
+- Create: `tools/simulate_semantic_road.py`
 - Create: `src/apps/control/test/test_semantic_road_simulation.py`
 - Create: `docs/validation/semantic-road-2026-09-21/README.md`
 - Generate: `docs/validation/semantic-road-2026-09-21/result.json`

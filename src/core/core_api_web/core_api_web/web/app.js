@@ -1,5 +1,6 @@
 import { createFieldMap } from "./map.js";
 import { triage } from "./triage.js";
+import { HeadlessState } from "/common/core_ui_logic.js";
 import {
   bindFormSave,
   bytes,
@@ -40,7 +41,7 @@ const fieldMap = createFieldMap({
   getPose: () => session.robotState?.pose,
   getNavigation: () => session.robotState?.navigation,
   canGoal: () => session.capabilities?.navigation?.goal_navigation === true
-    && evidenceOf(session.robotState, "pose") === "fresh",
+    && new HeadlessState(session.robotState).isFresh("pose"),
   setAction: (text) => setText("action-message", text),
 });
 
@@ -56,11 +57,12 @@ export const TELEMETRY_CHANNELS = Object.freeze({
 });
 
 function evidenceOf(state, channel) {
-  return state?.evidence?.[channel]?.evidence;
+  return new HeadlessState(state).evidenceOf(channel);
 }
 
 function motionEvidenceBlocks(state) {
-  return evidenceOf(state, "pose") !== "fresh" || evidenceOf(state, "velocity") !== "fresh";
+  const hs = new HeadlessState(state);
+  return !hs.isFresh("pose") || !hs.isFresh("velocity");
 }
 
 function renderRobotInfo(info) {
@@ -319,6 +321,7 @@ function renderTriage() {
 
 function renderRobotState(state) {
   session.robotState = state;
+  elements["hitl-escalation"].hidden = state.hitl_requested !== true;
   setText("robot-id", state.robot_id || "—");
   setText("robot-mode", state.mode);
   setText("state-sequence", `SEQ ${state.seq ?? "—"}`);
@@ -1109,6 +1112,11 @@ document.querySelectorAll("[data-teleop]").forEach((button) => {
   button.addEventListener("pointercancel", () => stopTeleop("포인터 취소로 정지했습니다."));
   button.addEventListener("pointerleave", () => stopTeleop("버튼 이탈로 정지했습니다."));
   button.addEventListener("contextmenu", (event) => event.preventDefault());
+});
+
+elements["teleop-override"].addEventListener("click", () => {
+  elements["teleop-heading"].scrollIntoView({ behavior: "smooth", block: "center" });
+  elements["bench-safety-confirmed"].focus();
 });
 
 elements["bench-safety-confirmed"].addEventListener("change", () => {

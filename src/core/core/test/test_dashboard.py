@@ -48,6 +48,7 @@ def test_dashboard_shell_is_served_with_accessible_landmarks(dashboard_client):
 def test_dashboard_assets_are_local_and_reference_runtime_contract(dashboard_client):
     css = dashboard_client.get("/dashboard/assets/styles.css")
     script = dashboard_client.get("/dashboard/assets/app.js")
+    headless = dashboard_client.get("/common/core_ui_logic.js")
 
     assert css.status_code == 200
     assert css.headers["content-type"].startswith("text/css")
@@ -55,6 +56,8 @@ def test_dashboard_assets_are_local_and_reference_runtime_contract(dashboard_cli
     assert "prefers-reduced-motion" in css.text
 
     assert script.status_code == 200
+    assert headless.status_code == 200
+    assert "export class HeadlessState" in headless.text
     bundle = dashboard_js()
     assert "sessionStorage" in bundle
     assert "runtime_mode" in bundle
@@ -495,12 +498,14 @@ def test_dashboard_binds_server_evidence_and_gates_stale_motion():
     for element_id, channel in channels.items():
         assert f'"{element_id}": "{channel}"' in app
         assert f'setText("{element_id}"' in app
-        assert f"state.evidence?.{channel}" in app
 
     assert 'setText("host-name", runtime.hostname);' in app
     assert 'setText("clock"' in app
     assert "motionEvidenceBlocks" in app
     assert "!motionEvidenceBlocks(session.robotState)" in app
+    assert 'new HeadlessState(state).evidenceOf(channel)' in app
+    assert '!hs.isFresh("pose")' in app
+    assert '!hs.isFresh("velocity")' in app
     assert "pose ${pose} · velocity ${velocity}" in app
     assert 'evidenceOf(session.robotState, "pose") === "fresh"' in app
     assert "dataset.evidence" in dom
@@ -510,6 +515,16 @@ def test_dashboard_binds_server_evidence_and_gates_stale_motion():
     assert "stale_after_s" not in app
     assert "stale_after_s" not in dom
     assert "stale_after_s" not in css
+
+
+def test_dashboard_hitl_handoff_points_to_existing_teleop_controls():
+    app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+    html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+
+    assert 'id="hitl-escalation"' in html
+    assert 'id="teleop-override"' in html
+    assert 'elements["teleop-override"]' in app
+    assert 'elements["teleop-heading"]' in app
 
 
 def test_uncompressed_clients_still_get_the_dashboard(dashboard_client):

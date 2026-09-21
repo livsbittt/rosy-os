@@ -49,6 +49,15 @@ def test_relay_defaults(tmp_path):
     assert leader.robot_id == "rosy_01" and len(followers) == 2
 
 
+def test_console_defaults_to_the_installable_web_common_assets(tmp_path):
+    p = _write(tmp_path)
+    args = cli.parse_args(["console", "--robots", str(p)])
+
+    assert args.web_common.name == "web_common"
+    assert (args.web_common / "tokens.css").is_file()
+    assert (args.web_common / "core_ui_logic.js").is_file()
+
+
 def test_console_commands_map_to_session_methods():
     class Recorder:
         def __init__(self):

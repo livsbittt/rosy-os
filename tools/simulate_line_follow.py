@@ -7,8 +7,20 @@ import argparse
 import json
 import math
 from pathlib import Path
+import sys
 
 import numpy as np
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+for _path in (
+    REPO_ROOT / "src/apps/control",
+    REPO_ROOT / "src/core/core_common",
+    REPO_ROOT / "src/core/core_events",
+    REPO_ROOT / "src/core/core_features",
+):
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
 
 from control.sensing.lane import IRLineCalibration, detect_ir_line, detect_lane_error
 from core_events.events.bus import EventBus

@@ -1,6 +1,6 @@
 """concept 16 §6, §7.3 / D-72 L1 / D-82 / D-129 — 관제 표면 팔레트의 수치 게이트.
 
-D-129 부터 L1 토큰은 트리 전체에서 하나다 — CORE 웹 자산의 tokens.css. 이
+D-129 부터 L1 토큰은 트리 전체에서 하나다 — web_common의 tokens.css. 이
 모듈은 그 단일 파일을 읽는다. D-73이 "표면 간 토큰 단언의 거처가 없다"고 한
 자리가 이제 여기다: 그 파일이 공유 계약 자산이 된 이상(core_common 스키마
 선례, D-18) fleet 시험이 그 값을 읽는 것은 경계 침범이 아니라 계약 소비다.
@@ -25,8 +25,7 @@ import pytest
 
 WEB = Path(__file__).resolve().parents[1] / "fleet" / "server" / "web"
 #: D-129 — 단일 L1 파일. 사본은 없다.
-CANON = (Path(__file__).resolve().parents[3] / "core" / "core_api_web"
-         / "core_api_web" / "web" / "tokens.css")
+CANON = Path(__file__).resolve().parents[3] / "core" / "web_common" / "tokens.css"
 
 COLOR_LITERAL = re.compile(r"#[0-9a-fA-F]{3,8}\b|rgba?\(\s*\d|hsla?\(\s*\d")
 ROBOTS = ("robot-1", "robot-2", "robot-3")

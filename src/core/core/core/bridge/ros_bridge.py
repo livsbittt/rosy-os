@@ -12,7 +12,6 @@
 
 from __future__ import annotations
 
-import json
 import math
 import os
 import threading
@@ -43,6 +42,7 @@ from core.bridge import (
     translate,
 )
 from core.bridge.goal_tracker import GoalTracker
+from core.bridge.hitl import parse_hitl_request
 from core_features.maps import occupancy_map_id
 from core_features.vision import parse_preview_format
 from core_features.navigation.initial_pose import amcl_pose_covariance
@@ -122,6 +122,8 @@ class RosBridge:
         node.create_subscription(TransitionEvent, "global_costmap/global_costmap/transition_event",
                                  self._on_global_costmap_transition, 10)
         node.create_subscription(Bool, "motor/ready", self._on_motor_ready, _LATCHED)
+        node.create_subscription(String, "robot/hitl_request", self._on_hitl_request, 10)
+        node.create_subscription(String, "robot/degraded_modules", self._on_degraded_modules, 10)
         node.create_subscription(LaserScan, "scan", self._on_scan, qos_profile_sensor_data)
         node.create_subscription(Imu, "imu_raw", self._on_imu, qos_profile_sensor_data)
         node.create_subscription(Range, "us_sensor/range", self._on_us_range, qos_profile_sensor_data)
@@ -538,9 +540,18 @@ class RosBridge:
         self._led_client.call_async(request)
         return True
 
-    def _on_hitl_request(self, msg: Bool) -> None:
-        """ADR-1000: Update HITL request state."""
-        self._svc.state.set_hitl_requested(msg.data)
+    def _on_hitl_request(self, msg: String) -> None:
+        """ADR-999: Parse HITL request, log module and confidence, update state."""
+        try:
+            request = parse_hitl_request(msg.data)
+            if request.requested:
+                self._node.get_logger().warn(
+                    f"HITL Assistance Requested by [{request.module}] "
+                    f"(confidence: {request.confidence:.2f})"
+                )
+            self._svc.state.set_hitl_requested(request.requested)
+        except ValueError as exc:
+            self._node.get_logger().error(f"Failed to parse HITL request: {exc}")
 
     def _on_degraded_modules(self, msg: String) -> None:
         """ADR-1000: Update degraded modules list."""

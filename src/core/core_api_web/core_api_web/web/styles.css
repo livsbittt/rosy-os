@@ -1054,3 +1054,21 @@ body[data-view="operate"] .page-footer { display: none; }
     transition-duration: 0.01ms !important;
   }
 }
+/* ADR-999: HITL Escalation */
+.hitl-escalation {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: var(--status-crit-a10);
+  border-left: 4px solid var(--status-crit);
+  border-radius: 4px;
+}
+.hitl-escalation h3 {
+  margin: 0 0 0.5rem 0;
+  color: var(--status-crit);
+  font-size: 1rem;
+}
+.hitl-escalation p {
+  margin: 0 0 1rem 0;
+  color: var(--paper);
+  font-size: 0.9rem;
+}

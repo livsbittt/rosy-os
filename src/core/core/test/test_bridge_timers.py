@@ -217,6 +217,8 @@ EXPECTED_SUBSCRIPTIONS = [
     ("local_costmap/local_costmap/transition_event", "_on_local_costmap_transition", 10),
     ("global_costmap/global_costmap/transition_event", "_on_global_costmap_transition", 10),
     ("motor/ready", "_on_motor_ready", "LATCHED"),
+    ("robot/hitl_request", "_on_hitl_request", 10),
+    ("robot/degraded_modules", "_on_degraded_modules", 10),
     ("scan", "_on_scan", "SENSOR"),
     ("imu_raw", "_on_imu", "SENSOR"),
     ("us_sensor/range", "_on_us_range", "SENSOR"),
