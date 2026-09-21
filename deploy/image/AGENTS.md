@@ -7,6 +7,10 @@
 
 Build a signed Ubuntu Server 24.04 LTS arm64 ROSY OS release image with native ROS 2 Jazzy on **native aarch64**. The scripts refuse x86/QEMU release hosts. Inputs must be pinned in `inputs.lock.yaml`; producing a file is not enough — `verify-artifacts.sh` is the go/no-go.
 
+D-163 fixes the product artifact as
+`rosy-os-pinky-pro-<release-id>-arm64.img.xz`. A generic installer ISO is not
+a Pinky Pro release artifact.
+
 ## Key Files
 
 | File | Description |
@@ -33,6 +37,10 @@ Build a signed Ubuntu Server 24.04 LTS arm64 ROSY OS release image with native R
 - Do not add an x86 "release" path. Dev QEMU images are not shippable (design 7.1).
 - D-161 supersedes the Raspberry Pi OS/container product mechanism. Docker remains development/CI-only and must not be introduced as an on-device product dependency.
 - Required Pinky Pro ROS packages are an offline image payload; first boot must not download them.
+- Keep the common `.img.xz` device-neutral. Identity, Wi-Fi and Fleet secrets
+  enter only through the one-time post-write bundle owned by `deploy/sd`.
+- A signature file's presence is not verification. The signed checksum,
+  manifest identity and actual image hash must match before disk discovery.
 - Base-image fetch, native payload, release rollback and first-boot overlay staging
   are implemented. Full Ubuntu image customization is still fail-closed in
   `build-image.sh`; `inputs.lock.yaml` retains unverified native-host inputs. Do not

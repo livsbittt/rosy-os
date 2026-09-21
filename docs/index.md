@@ -80,6 +80,7 @@
 | D-157 | Shared Headless UI Package (Monorepo Web Decoupling) |
 | D-158 | UI Component Consistency: Strict Outline Borders (Law 2) |
 | D-159 | State Summary Visibility: Management by Exception (Law 0) |
+| D-163 | Pinky Pro 제품 산출물은 ISO가 아니라 서명된 Raspberry Pi 디스크 이미지다 |
 
 ## 계획·결과 문서
 
@@ -100,6 +101,8 @@
 - [2026-09-21-rosy-sd-personalization.md](plans/2026-09-21-rosy-sd-personalization.md)
 - [2026-09-21-semantic-road-control-design.md](plans/2026-09-21-semantic-road-control-design.md)
 - [2026-09-21-semantic-road-control.md](plans/2026-09-21-semantic-road-control.md)
+- [2026-09-22-pinky-pro-flashable-image-design.md](plans/2026-09-22-pinky-pro-flashable-image-design.md)
+- [2026-09-22-pinky-pro-flashable-image.md](plans/2026-09-22-pinky-pro-flashable-image.md)
 
 ## 교훈 (docs/solutions)
 
@@ -112,6 +115,7 @@
 
 ## 최근 기록
 
+- 2026-09-22 · uncommitted · docs(image): choose a flashable Pinky Pro disk image (D-163)
 - 2026-09-22 · uncommitted · feat(fleet): Implement Pinky-to-Fleet WebSocket communication path
 - 2026-09-22 · uncommitted · test(control): D-162 노드 그래프 검증 PASS — scene context 슬라이스
 - 2026-09-22 · uncommitted · test(core): ROS-SIM 재실행 PASS — D-162 T5 이후 트리 복원

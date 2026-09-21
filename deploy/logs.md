@@ -133,3 +133,14 @@
   SBOM·서명·readback 전까지 ARTIFACT/MEDIA/BOOT/DEVICE/FLEET은 HOLD다.
 - 결정: D-154와 D-161. 공통 서명 이미지는 device-neutral로 유지하고 장치별 비밀과
   신원은 카드별 bundle 및 첫 부팅 serial binding에서만 적용한다.
+
+## 2026-09-22 · uncommitted · docs(image): plan the flashable `.img.xz` pipeline (D-163)
+
+- 변경: Canonical Pi preinstalled image에서 native ARM64 loop/mount/chroot 방식으로
+  ROSY를 설치하고 `.img.xz`를 생성하는 설계와 TDD 실행 계획을 추가했다. offline
+  signature를 Windows disk discovery 전에 검증하고 전체 media readback 뒤에만
+  MEDIA를 승격하도록 경계를 고정했다.
+- 증거: 공식 Canonical/Raspberry Pi 문서 확인과 ADR/plan 계약. 실제 native build는
+  아직 실행하지 않았다.
+- gate 변화: 없음. ARTIFACT와 DEVICE는 HOLD 유지.
+- 결정: D-163. ISO는 제품 artifact가 아니다.
