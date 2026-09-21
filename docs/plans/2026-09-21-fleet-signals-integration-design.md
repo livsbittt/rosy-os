@@ -1,6 +1,7 @@
 # Fleet 콘솔 ↔ 신호등 컨트롤러 연동 설계 (G-S3)
 
-- **Status:** Draft — 구현 전 설계. 실행 계획(태스크 분해)은 승인 후 별도 파일로
+- **Status:** 구현됨 (2026-09-22, T-S3-1~6 — 실행 기록은
+  `2026-09-22-fleet-signals-integration.md` 과 `src/site/fleet/logs.md`)
 - **Date:** 2026-09-21
 - **Related:** `signal/README.md` (ROSY-SIGNAL-001 — 장치 계약, 이미 구현됨),
   `docs/plans/2026-09-21-traffic-light-controller-research.md` (조사 보고서),

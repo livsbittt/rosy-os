@@ -1240,3 +1240,11 @@
 - gate 변화: 없음 — deploy ARTIFACT는 승인된 오프라인 서명·publication 검증 번들 발행 전까지 HOLD 유지. 본 문서는 그 실행 절차만 닫는다.
 - 결정: ARTIFACT 판정 입력을 ① 승인 키 서명 번들 ② publication 검증 JSON ③ 공개키 커밋+ROSY_RELEASE_KEY_ID 승인 ④ 기록의 4요소로 고정하고, 이 넷이 장비 G0의 입력이 된다.
 - 교훈: "서명하라"는 요청의 절반은 키가 아니라 준비 상태의 증명이었다 — 키가 존재하지 않는다는 사실을 문서가 아니라 디렉터리(empty public-keys/)로 먼저 확인해야 운영자 몫과 에이전트 몫이 갈린다.
+
+## 2026-09-22 · uncommitted · docs(plans): signals 연동 설계·실행 계획
+
+- 변경: `docs/plans/2026-09-21-fleet-signals-integration-design.md`(G-S3 설계 — signals.yaml, SignalConsole, e-stop 병렬 scatter, UI), `docs/plans/2026-09-22-fleet-signals-integration.md`(실행 계획 — 상시 루프를 throttled refresh 로 바꾼 근거 포함) 추가. 둘 다 `docs/plans/AGENTS.md` 표에 등록
+- 증거: 구현과 시험 결과는 fleet 모듈 로그(`src/site/fleet/logs.md` 2026-09-22 항목) 참조 — 362 passed, 5 skipped
+- gate 변화: 없음
+- 결정: 없음
+- 교훈: 없음

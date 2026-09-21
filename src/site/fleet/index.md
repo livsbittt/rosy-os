@@ -35,6 +35,8 @@
 - [2026-09-14-site-middleware-role-fabric-design.md](../../../docs/plans/2026-09-14-site-middleware-role-fabric-design.md)
 - [2026-09-14-site-middleware-role-fabric.md](../../../docs/plans/2026-09-14-site-middleware-role-fabric.md)
 - [2026-09-15-module-harness-design.md](../../../docs/plans/2026-09-15-module-harness-design.md)
+- [2026-09-21-fleet-signals-integration-design.md](../../../docs/plans/2026-09-21-fleet-signals-integration-design.md)
+- [2026-09-22-fleet-signals-integration.md](../../../docs/plans/2026-09-22-fleet-signals-integration.md)
 
 ## 교훈 (docs/solutions)
 
@@ -46,8 +48,8 @@
 
 ## 최근 기록
 
+- 2026-09-22 · uncommitted · feat(server): G-S3 signals — 관제가 ROSY-SIGNAL-001 장치를 모으고 흩뿌린다
 - 2026-09-21 · uncommitted · refactor(fleet): serve installable shared web assets
 - 2026-09-21 · uncommitted · chore(tools): drop automatic firewall rule from tower runbook
 - 2026-09-21 · uncommitted · chore(server): tower runbook follow-up
 - 2026-09-21 · uncommitted · fix(server): console UI sends the console token
-- 2026-09-21 · uncommitted · feat(fleet): expose fleet.bench public surface (D-148)

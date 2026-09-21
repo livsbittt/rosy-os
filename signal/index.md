@@ -12,7 +12,9 @@
 
 ## 계획·결과 문서
 
+- [2026-09-21-fleet-signals-integration-design.md](../docs/plans/2026-09-21-fleet-signals-integration-design.md)
 - [2026-09-21-traffic-light-controller-research.md](../docs/plans/2026-09-21-traffic-light-controller-research.md)
+- [2026-09-22-fleet-signals-integration.md](../docs/plans/2026-09-22-fleet-signals-integration.md)
 
 ## 교훈 (docs/solutions)
 
@@ -24,4 +26,5 @@
 
 ## 최근 기록
 
+- 2026-09-22 · uncommitted · feat(signal): Fleet G-S3 클라이언트·관제 연동
 - 2026-09-21 · uncommitted · feat(signal): ROSY-SIGNAL-001 계약 초안 + ESP32 참조 펌웨어

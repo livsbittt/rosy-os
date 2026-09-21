@@ -2,15 +2,16 @@
 module: signal
 logical_modules: []
 owner: 사이트 인프라
-last_verified: { commit: "uncommitted", date: 2026-09-21 }
+last_verified: { commit: "uncommitted", date: 2026-09-22 }
 gates:
   SOURCE:
     state: GO
     evidence: "ROSY-SIGNAL-001 host source-contract 14 passed. README ↔ 펌웨어 상태/명령, 부팅 페일세이프, 충돌 가드, token fail-closed, helper 정의, Wi-Fi 입력 분리, 자격증명 부재를 대조. Arduino compile/bench는 미실행 (2026-09-21 Windows)"
     cmd: "python -m pytest test/test_signal_contract.py -q"
   LOCAL:
-    state: HOLD
-    blocker: "Fleet 서버 쪽 signals 클라이언트와 엔드포인트(G-S3) 미작성. README §클라이언트 책임의 재명령·명령/구동 대조가 코드로 존재하지 않는다"
+    state: GO
+    evidence: "Fleet G-S3 클라이언트·API·UI와 의도 1회 재단언/all_red 병렬 scatter 구현. fleet 362 passed, 5 skipped + ROSY-SIGNAL-001 계약 14 passed (2026-09-22 Windows)"
+    cmd: "python -m pytest src/site/fleet/test test/test_signal_contract.py -q"
   ROS-SIM:
     state: PARKED
     blocker: "시뮬레이션 대상 아님(실물 접점 장비). Gazebo 쪽 lamp 플러그인과 무관"
@@ -25,6 +26,8 @@ gates:
 adrs: []
 plans:
   - docs/plans/2026-09-21-traffic-light-controller-research.md
+  - docs/plans/2026-09-21-fleet-signals-integration-design.md
+  - docs/plans/2026-09-22-fleet-signals-integration.md
 ---
 ## 지금 상태
 
@@ -38,17 +41,17 @@ plans:
   조회만 하고 어떤 명령도 수용하지 않는다. 적+녹 동시 명령은 `400 conflict`.
 - `all_red`(점등, 명령된 정지)과 `failsafe`(점멸, 고장 표시)는 다른 말이다 —
   관제 화면이 "정지시켰다"와 "장비 고장"을 구별해야 하므로.
-- Fleet 서버 쪽 클라이언트·엔드포인트·UI 는 아직 없다(G-S3 HOLD). 로봇 CORE 는
-  신호등을 모른다(site 장비, D-59).
+- Fleet G-S3 클라이언트·엔드포인트·UI가 구현됐다. 관제는 상태를 모으고, e-stop과
+  함께 `all_red`를 병렬 하달하며, failsafe 장치에는 마지막 운영 의도를 한 번만
+  재단언한다. 로봇 CORE 는 여전히 신호등을 모른다(site 장비, D-59).
 
 ## 다음 gate
 
 1. 신호등 제품 확정(DC 12/24V 권장) + 릴레이 모듈 조달(3.3V 트리거 확인) 후 벤치
    G-S1: 접점 개폐 실측, 부팅 글리치로 접점 닫힘 여부 실측 → DEVICE 증거.
 2. ESP32 toolchain 환경에서 펌웨어 빌드·플래시 증거 → ARTIFACT 되돌리기.
-3. G-S3: `src/site/fleet` 에 signals 클라이언트 + `/api/fleet/signals/*` 엔드포인트
-   + 관제 UI 카드, 가짜 신호등 만으로 pytest → LOCAL 되돌리기. 이때 계약 시험에
-   클라이언트 파서 대조를 추가한다(dock 선례).
+3. 물리 장치와 Fleet 콘솔을 같은 LAN에 놓고 status/command/failsafe 복귀를 실측한다.
+   이는 host LOCAL GO를 DEVICE GO로 대체하지 않는다.
 
 ## 현재 유효한 금지사항
 

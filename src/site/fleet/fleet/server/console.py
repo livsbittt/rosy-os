@@ -73,6 +73,7 @@ class FleetConsole:
         clearance_m: float = traffic.DEFAULT_CLEARANCE_M,
         yield_keep_out_m: float = bays.YIELD_KEEP_OUT_M,
         relay_factory=None,
+        signal_console=None,
     ) -> None:
         if len(endpoints) != len(clients):
             raise ValueError("endpoints and clients must line up one for one")
@@ -116,6 +117,9 @@ class FleetConsole:
         self.fleet_name = fleet_name
         # e-stop 은 hub 의 scatter 를 그대로 쓴다 — 흩뿌림의 규칙을 두 군데 두지 않는다.
         self._hub = SiteHub(list(endpoints), dict(self._clients), fleet_name=fleet_name)
+        #: 신호등 컨트롤러(ROSY-SIGNAL-001). signals.yaml 이 없는 사이트도 같은 서버로
+        #: 뜬다 — 없으면 신호등 기능은 조용히 비어 있다("signals": {}).
+        self._signals = signal_console
 
     @property
     def robot_ids(self) -> list[str]:
@@ -156,9 +160,16 @@ class FleetConsole:
             row["goal"] = self._goals.get(row["robot_id"])
             row["yielding"] = self._yielding.get(row["robot_id"])
         online = sum(1 for r in robots if r["online"])
+        if self._signals is not None:
+            # 신호등 갱신은 로봇 gather 뒤에서, 그리고 실패해도 로봇 상태를 흔들지 않는다.
+            try:
+                await self._signals.refresh()
+            except Exception:
+                pass
         return {
             "fleet": {"name": self.fleet_name, "online": online, "total": len(robots)},
             "robots": robots,
+            "signals": self._signals.snapshot() if self._signals is not None else {},
             "ts": self._clock(),
         }
 
@@ -526,6 +537,10 @@ class FleetConsole:
             except Exception:
                 pass
             self._formation_leader = None
+        # 신호등의 all_red 는 로봇 정지와 병렬이다 — 순서를 정하는 동안 한쪽이 늦게
+        # 간다. 어느 쪽이 실패했는지는 본문이 대신 말한다.
+        signals_task = (asyncio.ensure_future(self._signals.all_red())
+                        if self._signals is not None else None)
         results = await asyncio.gather(
             *(self._hub.scatter_estop(rid) for rid in self._order),
             return_exceptions=True,
@@ -542,7 +557,33 @@ class FleetConsole:
                 self._queued.pop(robot_id, None)
                 self._yielding.pop(robot_id, None)
                 rows.append({"robot_id": robot_id, "stopped": True, "result": result})
-        return {"stopped": sum(1 for r in rows if r["stopped"]), "total": len(rows), "robots": rows}
+        signal_result = None
+        if signals_task is not None:
+            # 신호등 쪽 문제가 로봇 정지 보고를 집어삼키지 않는다 — 본문으로만 남긴다.
+            try:
+                signal_result = await signals_task
+            except Exception as exc:
+                signal_result = {"all_red": 0, "total": 0, "signals": [],
+                                 "error": _error_of(exc)}
+        return {"stopped": sum(1 for r in rows if r["stopped"]), "total": len(rows),
+                "robots": rows, "signals": signal_result}
+
+    # --- 신호등 (ROSY-SIGNAL-001) -------------------------------------------------
+
+    async def signals_detail(self) -> dict:
+        """신호별 상세. 캐시가 나갸 있으면 한 틱 돌려서 채운다(주기 제한은 콘솔 안에)."""
+        if self._signals is None:
+            raise HubError("NO_SIGNALS", "signals are not configured")
+        try:
+            await self._signals.refresh()
+        except Exception:
+            pass
+        return {"signals": self._signals.snapshot()}
+
+    async def signal_command(self, signal_id: str, body: dict) -> dict:
+        if self._signals is None:
+            raise HubError("NO_SIGNALS", "signals are not configured")
+        return await self._signals.command(signal_id, body)
 
     # --- 대형 (FOR-004) --------------------------------------------------------
 
@@ -681,3 +722,5 @@ class FleetConsole:
             closer: Any = getattr(client, "aclose", None)
             if closer is not None:
                 await closer()
+        if self._signals is not None:
+            await self._signals.aclose()

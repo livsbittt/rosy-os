@@ -8,7 +8,7 @@
 | [core](src/core/core/progress.md) | CORE | uncommitted (2026-09-21) | GO | GO | GO | HOLD | HOLD | PARKED |
 | [deploy](deploy/progress.md) | 릴리스·플랫폼 | uncommitted (2026-09-21) | GO | GO | N/A | HOLD | HOLD | N/A |
 | [control](src/apps/control/progress.md) | CONTROL | uncommitted (2026-09-21) | GO | GO | HOLD | HOLD | HOLD | PARKED |
-| [fleet](src/site/fleet/progress.md) | FLEET | ab8bf1b (2026-09-20) | GO | GO | HOLD | PARKED | PARKED | PARKED |
+| [fleet](src/site/fleet/progress.md) | FLEET | uncommitted (2026-09-22) | GO | GO | HOLD | PARKED | PARKED | PARKED |
 | [games](src/apps/games/progress.md) | GAMES | 411a303 (2026-09-18) | GO | GO | N/A | N/A | PARKED | PARKED |
 | [gz_sim](src/sim/gz_sim/progress.md) | SIM | uncommitted (2026-09-21) | GO | GO | GO | N/A | N/A | N/A |
 | [navigation](src/navigation/navigation/progress.md) | NAV | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
@@ -21,7 +21,7 @@
 | [interfaces](src/core/interfaces/progress.md) | 장치 | dc89264 (2026-09-17) | GO | GO | N/A | HOLD | HOLD | PARKED |
 | [description](src/sim/description/progress.md) | 로봇 통합 | uncommitted (2026-09-21) | GO | GO | GO | HOLD | HOLD | PARKED |
 | [dock](dock/progress.md) | 도킹 | dc89264 (2026-09-17) | GO | GO | HOLD | HOLD | HOLD | PARKED |
-| [signal](signal/progress.md) | 사이트 인프라 | uncommitted (2026-09-21) | GO | HOLD | PARKED | HOLD | HOLD | PARKED |
+| [signal](signal/progress.md) | 사이트 인프라 | uncommitted (2026-09-22) | GO | GO | PARKED | HOLD | HOLD | PARKED |
 | [docs](docs/progress.md) | 거버넌스 | uncommitted (2026-09-21) | GO | GO | N/A | N/A | N/A | N/A |
 
 ## HOLD blockers
@@ -57,6 +57,5 @@
 - dock ROS-SIM: 코스트맵 충돌 면제(docking/collision_exemption)는 실제 costmap 통합 시험 전까지 intent-only (Device 검증 계획 P1 §7). ROS 2 Jazzy 환경에서 도킹 시퀀스 시뮬레이션 미실행
 - dock ARTIFACT: ESP32 Arduino 펌웨어 빌드·플래시 증거 없음. 이 호스트에는 ESP32 toolchain이 없어 실행하지 않았다
 - dock DEVICE: 물리 도크 벤치 설치와 device-readback류 증거 없음. `dock/firmware/rosy_dock/rosy_dock.ino` 참조 구현만 존재하고 실기 조립·통전 시험 기록이 없다
-- signal LOCAL: Fleet 서버 쪽 signals 클라이언트와 엔드포인트(G-S3) 미작성. README §클라이언트 책임의 재명령·명령/구동 대조가 코드로 존재하지 않는다
 - signal ARTIFACT: ESP32 Arduino 펌웨어 빌드·플래시 증거 없음. 이 호스트에는 ESP32 toolchain이 없어 실행하지 않았다
 - signal DEVICE: 물리 벤치(G-S1) 미실행: 신호등 제품 미확정(전압/배선/소비전류), 릴레이 모듈 3.3V 트리거 실측, 부팅 글리치로 접점 닫힘 여부 실측 없음

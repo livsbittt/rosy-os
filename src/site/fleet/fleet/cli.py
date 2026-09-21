@@ -58,6 +58,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
     console = sub.add_parser("console", help="사이트 관제 서버 (웹 UI + 로봇별 미션 하달)")
     console.add_argument("--robots", required=True, type=Path, help="robots.yaml")
+    console.add_argument("--signals", default=None, type=Path,
+                         help="signals.yaml — 없으면 신호등 기능은 비어 있는 채로 뜬다")
     console.add_argument("--host", default="127.0.0.1")
     console.add_argument("--port", type=int, default=8090)
     console.add_argument("--web-common", default=default_web_common(), type=Path,
@@ -258,9 +260,20 @@ def run_console(args: argparse.Namespace) -> None:
         sys.exit("--token 없이 루프백 밖으로 열 수 없다: 이 포트는 현장의 모든 로봇을 움직인다")
     endpoints = load_robots(args.robots)
     _warn_if_world_readable(args.robots)
-    console = FleetConsole(endpoints, [HttpRobotClient(ep) for ep in endpoints])
+    signal_console = None
+    if args.signals is not None:
+        from fleet.server.signals import HttpSignalClient, SignalConsole, load_signals
+
+        signal_eps = load_signals(args.signals)
+        _warn_if_world_readable(args.signals)
+        signal_console = SignalConsole(signal_eps,
+                                       [HttpSignalClient(ep) for ep in signal_eps])
+    console = FleetConsole(endpoints, [HttpRobotClient(ep) for ep in endpoints],
+                           signal_console=signal_console)
     app = create_app(console, console_token=args.token, web_common=args.web_common)
-    print(f"fleet console: http://{args.host}:{args.port}/console  ({len(endpoints)} robots)",
+    signals_note = f", {len(signal_eps)} signals" if signal_console is not None else ""
+    print(f"fleet console: http://{args.host}:{args.port}/console  "
+          f"({len(endpoints)} robots{signals_note})",
           flush=True)
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 

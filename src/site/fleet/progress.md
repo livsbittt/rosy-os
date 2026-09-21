@@ -2,7 +2,7 @@
 module: fleet
 logical_modules: [M07, M11]
 owner: FLEET
-last_verified: { commit: "ab8bf1b", date: 2026-09-20 }
+last_verified: { commit: "uncommitted", date: 2026-09-22 }
 gates:
   SOURCE:
     state: GO
@@ -10,7 +10,7 @@ gates:
     cmd: "python3 -m pytest src/fleet/test/test_boundaries.py -q"
   LOCAL:
     state: GO
-    evidence: "235 passed, 5 skipped (2026-09-17 Windows, 미커밋 WIP 포함 작업 트리). Fleet 서버 v1 시험 19건 포함"
+    evidence: "362 passed, 5 skipped (2026-09-22 Windows, fastapi 0.141/httpx 0.28). signals 슬라이스(G-S3: server/signals.py + /api/fleet/signals* + UI)와 재단언/stale_seq 안전 회귀 2건 포함"
     cmd: "python3 -m pytest src/fleet/test -q"
   ROS-SIM:
     state: HOLD
@@ -30,12 +30,15 @@ plans:
   - docs/plans/2026-09-08-swarm-formation-slice.md
   - docs/plans/2026-09-08-swarm-formation-slice-results.md
   - docs/plans/2026-09-15-module-harness-design.md
+  - docs/plans/2026-09-21-fleet-signals-integration-design.md
+  - docs/plans/2026-09-22-fleet-signals-integration.md
 ---
 ## 지금 상태
 
 - Formation geometry(FOR-001)·slot assignment(FOR-002)는 순수 함수다. 리더→팔로워 pose 릴레이는 바이트 그대로 팬아웃하고 새 프레임을 합성하지 않는다(D-31). FOR-004 세션(arm→relay→watch→hold)과 SiteHub 계약 gather(hello/heartbeat/event)·REST scatter(e-stop)(D-59)까지 구현·시험됨.
 - `test_boundaries.py`가 패키지 전체 `rclpy` 금지와 `hub/`의 `core.protocol.schemas` 외 CORE import 금지를 강제한다(D-18).
 - **Fleet 서버 v1 있음**: `fleet console --robots robots.yaml` 이 N대를 한 화면에 모으고 로봇별 목표·취소와 전체 정지를 내린다(site-fabric 설계 §2, 전환 순서 3단계). WSL ROS 2 Jazzy + Gazebo 2대 위에서 지도 클릭 미션 하달 → 양쪽 `ARRIVED` 확인(2026-09-17).
+- **신호등 연동 있음(G-S3)**: `fleet console --signals signals.yaml` 이 ROSY-SIGNAL-001 장치를 snapshot 에 모으고(`/api/fleet/signals*`), e-stop 때 전 기기 `all_red` 를 병렬로 흩뿌린다. `mode=failsafe` 를 보면 마지막 의도를 한 번 재단언한다. 신호등은 표시 장치지 안전 인터록이 아니다 — `traffic.py` 판정은 건드리지 않았다.
 - 아직 없는 것: `fleet hub --listen` 소켓과 CORE `FleetAgent` outbound. 그래서 v1 의 gather 는 REST 폴링이다 — 에이전트가 붙으면 `FleetConsole.snapshot()` 의 출처만 바뀐다.
 - 축구 매치 시작 버튼은 없다 (D-106). `games`를 import하지 않는다. `reset()`은 games.
 - 물리 대형(FAT-06 등) 실측은 아직 없다. D-35(전체 HOLD는 릴레이를 끊는 것)는 sim bench 실측 대기 중인 후보이며 ADR log에는 의도적으로 미등재다(`adr_gaps`).

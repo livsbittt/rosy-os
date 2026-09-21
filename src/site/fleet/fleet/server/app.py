@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from fleet.hub.hub import HubError
 from fleet.server.console import FleetConsole
+from fleet.server.signals import SignalApiError
 from fleet.swarm.transport import RobotApiError
 
 WEB_ROOT = Path(__file__).resolve().parent / "web"
@@ -57,14 +58,28 @@ class ReformRequest(BaseModel):
     max_speed: Optional[float] = None
 
 
+class SignalCommandRequest(BaseModel):
+    """ROSY-SIGNAL-001 의 `POST /command` 본문. `seq` 는 콘솔이 채운다 — 화면이
+    붙이기 시작하면 두 명령이 같은 seq 로 싸운다."""
+    mode: str
+    lamps: Optional[dict[str, bool]] = None
+    cycle: Optional[dict[str, int]] = None
+
+
 def _http_error(exc: BaseException) -> HTTPException:
     if isinstance(exc, HubError):
         # 409 는 "지금 상태에서는 안 된다"(이미 대형이 열려 있음, 팔로워가 대형에 묶임)이고,
         # 400 은 "요청이 틀렸다"(없는 대형 이름)다. 화면이 둘을 다르게 안내해야 한다.
         conflict = {"FORMATION_ACTIVE", "NO_FORMATION", "REFORM_REFUSED",
                     "RESUME_REFUSED", "ARMING_FAILED", "NO_FOLLOWERS"}
-        status = 404 if exc.code == "UNKNOWN_ROBOT" else 409 if exc.code in conflict else 400
+        status = (404 if exc.code in ("UNKNOWN_ROBOT", "UNKNOWN_SIGNAL", "NO_SIGNALS")
+                  else 409 if exc.code in conflict else 400)
         return HTTPException(status_code=status, detail={"code": exc.code, "message": str(exc)})
+    if isinstance(exc, SignalApiError):
+        # 신호등이 거절한 것이다 — 400 conflict 같은 장치 코드를 그대로 화면에 옮긴다.
+        return HTTPException(status_code=502,
+                             detail={"code": exc.code, "message": str(exc),
+                                     "signal_id": exc.signal_id})
     if isinstance(exc, RobotApiError):
         # 로봇이 거절한 것이지 관제가 잘못 만든 요청이 아니다 — 502 로 그 사실을 남긴다.
         return HTTPException(status_code=502,
@@ -150,6 +165,20 @@ def create_app(console: FleetConsole, *, console_token: Optional[str] = None,
     async def formation_stop() -> dict:
         # 해제는 거절하지 않는다. 대형을 못 푸는 화면은 대형을 여는 화면보다 나쁘다.
         return await console.formation_stop()
+
+    @app.get("/api/fleet/signals", dependencies=guard, tags=["signals"])
+    async def fleet_signals() -> dict:
+        try:
+            return await console.signals_detail()
+        except (HubError, OSError) as exc:
+            raise _http_error(exc) from exc
+
+    @app.post("/api/fleet/signals/{signal_id}/command", dependencies=guard, tags=["signals"])
+    async def fleet_signal_command(signal_id: str, body: SignalCommandRequest) -> dict:
+        try:
+            return await console.signal_command(signal_id, body.model_dump(exclude_none=True))
+        except (HubError, SignalApiError, OSError) as exc:
+            raise _http_error(exc) from exc
 
     @app.post("/api/fleet/estop", dependencies=guard, tags=["fleet"])
     async def fleet_estop() -> dict:

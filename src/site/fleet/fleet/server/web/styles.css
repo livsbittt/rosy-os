@@ -192,6 +192,33 @@ main {
 }
 .robot-actions button:hover:not(:disabled) { border-color: var(--focus-ring); color: var(--paper); }
 .robot-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* 신호등 카드(ROSY-SIGNAL-001). 램프 도트는 구동값(lamps)을 그대로 보여 준다 —
+   "켜라고 시킨 것"이 아니라 "실제 켜진 것"이 화면의 축이다. */
+.signal-cards { display: grid; gap: 0.6rem; margin-top: 0.6rem; }
+.signal {
+  border: 1px solid var(--line-10);
+  border-left: 3px solid var(--series-primary);
+  border-radius: 0.7rem;
+  background: var(--ground-card);
+  padding: 0.7rem 0.8rem;
+}
+.signal.broken { border-left-color: var(--status-crit); }
+
+.lamps { display: flex; gap: 0.45rem; align-items: center; }
+.lamp {
+  width: 0.85rem; height: 0.85rem; border-radius: 50%;
+  border: 1px solid var(--line-30);
+  background: var(--ground-deep);
+  opacity: 0.5;
+}
+.lamp.on { opacity: 1; }
+.lamp.red.on { background: var(--status-crit); border-color: var(--status-crit); }
+.lamp.yellow.on { background: var(--status-warn); border-color: var(--status-warn); }
+.lamp.green.on { background: var(--nominal); border-color: var(--nominal); }
+
+.signal-body { display: flex; align-items: center; gap: 0.7rem; margin-top: 0.5rem; }
+.signal-meta { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); }
 .robot-actions button.arming { background: var(--paper); color: var(--ground); border-color: var(--paper); }
 
 .log {
