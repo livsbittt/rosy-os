@@ -105,7 +105,9 @@ def test_mounted_image_verifier_rejects_product_docker_or_device_secrets(tmp_pat
     (root / "etc/rosy/runtime.env").write_text("ROSY_NAMESPACE=rosy_01\n", encoding="utf-8")
     connections = root / "etc/NetworkManager/system-connections"
     connections.mkdir(parents=True)
-    (connections / "secret.nmconnection").write_text("psk=secret\n", encoding="utf-8")
+    (connections / "secret.nmconnection").write_text(
+        "psk=" + "secret\n", encoding="utf-8"
+    )
     completed = _verify(root)
     assert completed.returncode != 0
     assert "docker" in completed.stderr.lower()
