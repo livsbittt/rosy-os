@@ -76,12 +76,32 @@ class SiteHub:
         expected = self._tokens.get(hello.robot_id)
         if expected is None or expected != hello.pairing_token:
             return _error("PAIRING_INVALID", "unknown robot or token")
+            
+        # Check UUID duplicates
+        if hello.device_uid:
+            for other_id in self.registry.online_ids():
+                if other_id != hello.robot_id:
+                    other_row = self.registry.record(other_id)
+                    if other_row.device_uid == hello.device_uid:
+                        return _error("DUPLICATE_IDENTITY", "UUID in use")
+        
         row = self.registry.record(hello.robot_id)
+        
+        # Check Hardware serial drift
+        if row.hardware_serial and hello.hardware_serial and row.hardware_serial != hello.hardware_serial:
+            return _error("IDENTITY_DRIFT", "hardware serial changed")
+            
+        row.device_uid = hello.device_uid
+        row.device_name = hello.device_name
+        row.model = hello.model
+        row.hardware_serial = hello.hardware_serial
+        
         row.online = True
         self._paired.add(hello.robot_id)
         welcome = WelcomePayload(
             robot_id=hello.robot_id,
             fleet_name=self._fleet_name,
+            last_event_seq=row.last_event_seq,
         )
         return Envelope(type=EnvelopeType.WELCOME, payload=welcome.model_dump())
 

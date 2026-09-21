@@ -12,6 +12,10 @@ from core_common.protocol.schemas import EventMessage, StateSnapshot
 class RobotRecord:
     robot_id: str
     online: bool = False
+    device_uid: str = ""
+    device_name: str = ""
+    model: str = ""
+    hardware_serial: str = ""
     snapshot: Optional[StateSnapshot] = None
     last_event_seq: int = 0
     events: list[EventMessage] = field(default_factory=list)

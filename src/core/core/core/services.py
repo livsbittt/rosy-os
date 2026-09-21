@@ -182,6 +182,7 @@ class CoreServices:
     identity: RobotIdentity
     profile: Optional[RobotProfile]
     capability: Capability
+    fleet_agent: FleetAgent
     events: EventBus
     state: StateManager
     registry: SourceRegistry
@@ -348,7 +349,10 @@ class CoreServices:
             host_root=os.environ.get("ROSY_HOST_ROOT", "/"),
             data_path=waypoints_path.parent,
         )
-        return cls(config=config, identity=identity, profile=profile, capability=capability,
+        fleet_agent = FleetAgent(state, events, config, identity)
+        fleet_agent.start()
+        
+        return cls(config=config, identity=identity, profile=profile, capability=capability, fleet_agent=fleet_agent,
                    events=events, state=state, registry=registry, modes=modes,
                    command=command, safety=safety, advisory_feed=advisory_feed,
                    waypoints=waypoints, nav=nav,

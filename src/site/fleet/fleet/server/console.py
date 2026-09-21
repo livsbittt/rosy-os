@@ -115,6 +115,7 @@ class FleetConsole:
         #: 시험이 가짜 릴레이를 끼우는 자리. 운용에서는 None 이라 세션의 기본값을 쓴다.
         self._relay_factory = relay_factory
         self.fleet_name = fleet_name
+        self.hub = hub
         # e-stop 은 hub 의 scatter 를 그대로 쓴다 — 흩뿌림의 규칙을 두 군데 두지 않는다.
         self._hub = SiteHub(list(endpoints), dict(self._clients), fleet_name=fleet_name)
         #: 신호등 컨트롤러(ROSY-SIGNAL-001). signals.yaml 이 없는 사이트도 같은 서버로

@@ -102,6 +102,10 @@ class HelloPayload(BaseModel):
     pairing_token: str
     api_versions: list[str] = ["v1"]
     protocol_version: str = PROTOCOL_VERSION
+    device_uid: str = ""
+    device_name: str = ""
+    model: str = ""
+    hardware_serial: str = ""
 
 
 class WelcomePayload(BaseModel):
@@ -109,6 +113,7 @@ class WelcomePayload(BaseModel):
     fleet_name: str
     long_term_token: Optional[str] = None
     protocol_version: str = PROTOCOL_VERSION
+    last_event_seq: int = 0
 
 
 # --- Heartbeat (API Ref §7.3, PRT-003) ------------------------------------
