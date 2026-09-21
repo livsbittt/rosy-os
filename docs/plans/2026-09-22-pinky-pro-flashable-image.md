@@ -150,7 +150,11 @@ sign offline; personalize only after writing each card.
 - Task 2: source-complete. The fetcher now pins Canonical's checksum document,
   detached signature, Ubuntu image-signing key fingerprint and trusted keyring; it
   rejects signature, signer, filename, signed-digest and downloaded-byte drift.
-- Tasks 3-7: planned; existing native payload, systemd, rollback and first-boot pieces
+- Task 3: source-complete. A native-root-only disposable workspace decompresses a
+  copy, expands partition 2, mounts root then boot, exposes bounded paths to one
+  customizer and always unmounts/detaches/removes in reverse order. It publishes
+  no raw image when setup, customization or cleanup fails.
+- Tasks 4-7: planned; existing native payload, systemd, rollback and first-boot pieces
   are inputs, not proof of a completed disk image.
 - Task 8: blocked until a native ARM64 run verifies the real Canonical inputs and
   produces the actual signed `.img.xz`; `base_image.verified` therefore remains false.

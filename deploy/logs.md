@@ -165,3 +165,15 @@
 - gate 변화: SOURCE만 갱신. 실제 native ARM64 host 검증 전이므로
   `base_image.verified: false`와 ARTIFACT HOLD를 유지한다.
 - 결정: D-163 Task 2 source-complete.
+
+## 2026-09-22 · uncommitted · feat(image): add fail-closed Pi image workspace
+
+- 변경: native arm64/root/tool preflight 뒤 Canonical `.img.xz`를 고유한 임시
+  workspace에만 풀고, root partition 확장, loop partition 탐색, root→boot mount,
+  customizer 실행과 boot→root→loop 역순 정리를 수행한다. 성공할 때만 raw `.img`를
+  원자적으로 내보내며 cache 원본은 수정하지 않는다.
+- 증거: 가짜 block/mount 도구를 이용한 workspace 계약 `7 passed`; native-host가
+  없어 실제 loop device에는 아직 실행하지 않았다.
+- gate 변화: SOURCE만 갱신. Task 4 customizer가 없으면 `build-image.sh`가 계속
+  fail-closed하므로 ARTIFACT는 HOLD다.
+- 결정: D-163 Task 3 source-complete.

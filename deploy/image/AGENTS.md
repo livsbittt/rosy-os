@@ -17,6 +17,7 @@ a Pinky Pro release artifact.
 |------|-------------|
 | `build-image.sh` | Native arm64 image build; requires `--release-id YYYY.MM.DD-NNN` |
 | `fetch-base-image.sh` | Fetch/cache the exact HTTPS Ubuntu image and verify size + SHA-256 |
+| `image-workspace.sh` | Disposable raw-image expansion, loop/mount lifecycle and fail-closed cleanup |
 | `build-native-payload.sh` | Native ARM64 rosdep/colcon build and deterministic inventory export |
 | `verify-package-inventory.sh` | Required-package and `ros2 pkg prefix` release-root readback |
 | `required-ros-packages.txt` | Mandatory offline Pinky Pro ROS package set |
@@ -41,8 +42,9 @@ a Pinky Pro release artifact.
   enter only through the one-time post-write bundle owned by `deploy/sd`.
 - A signature file's presence is not verification. The signed checksum,
   manifest identity and actual image hash must match before disk discovery.
-- Base-image fetch, native payload, release rollback and first-boot overlay staging
-  are implemented. Full Ubuntu image customization is still fail-closed in
+- Signed base-image provenance, disposable raw-image workspace, native payload,
+  release rollback and first-boot overlay staging are implemented. Full Ubuntu
+  rootfs customization is still fail-closed in
   `build-image.sh`; `inputs.lock.yaml` retains unverified native-host inputs. Do not
   pretend a shippable image exists.
 - Tests: `test/test_ubuntu_native_runtime_contract.py`, `test/test_image_pipeline.py`,

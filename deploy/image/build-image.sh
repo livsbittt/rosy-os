@@ -14,6 +14,7 @@ LOCK="$SCRIPT_DIR/inputs.lock.yaml"
 DIST="${ROSY_DIST_DIR:-$REPO_ROOT/dist}"
 WORKSPACE="$REPO_ROOT"
 CACHE_DIR="${ROSY_IMAGE_CACHE:-$SCRIPT_DIR/cache}"
+IMAGE_WORK_ROOT="${ROSY_IMAGE_WORK_ROOT:-$DIST/.image-work}"
 
 RELEASE_ID=""
 while [[ $# -gt 0 ]]; do
@@ -66,7 +67,31 @@ mkdir -p "$OUT"
     --source-revision "$SOURCE_REVISION" \
     --release-id "$RELEASE_ID"
 
-echo "==> building $RELEASE_ID into $OUT"
-echo "    The verified base image and offline native ROSY payload are ready."
-fail "not implemented: no image has been built yet, and this script will not \
-pretend otherwise. See docs/deployment/pi5-acceptance-checklist.md section 2."
+BASE_URL="$(awk '
+    /^base_image:[[:space:]]*$/ { in_base=1; next }
+    in_base && /^[^[:space:]]/ { exit }
+    in_base && $1 == "url:" { print $2; exit }
+' "$LOCK" | tr -d '\r')"
+BASE_IMAGE="$CACHE_DIR/${BASE_URL##*/}"
+EXPAND_MIB="$(awk '
+    /^product_artifact:[[:space:]]*$/ { in_artifact=1; next }
+    in_artifact && /^[^[:space:]]/ { exit }
+    in_artifact && $1 == "rootfs_expansion_mib:" { print $2; exit }
+' "$LOCK" | tr -d '\r')"
+RAW_IMAGE="$OUT/rosy-os-pinky-pro-$RELEASE_ID-arm64.img"
+CUSTOMIZER="$SCRIPT_DIR/customize-rootfs.sh"
+
+[[ -x "$CUSTOMIZER" ]] || fail "rootfs customizer is not implemented; Task 3 workspace \
+is ready but no raw product image may be published before Task 4"
+
+"$SCRIPT_DIR/image-workspace.sh" \
+    --base-image "$BASE_IMAGE" \
+    --output-image "$RAW_IMAGE" \
+    --work-root "$IMAGE_WORK_ROOT" \
+    --expand-mib "$EXPAND_MIB" \
+    -- "$CUSTOMIZER" \
+        --payload "$OUT/payload" \
+        --release-id "$RELEASE_ID" \
+        --source-revision "$SOURCE_REVISION"
+
+echo "==> raw image workspace completed for $RELEASE_ID"

@@ -37,6 +37,7 @@ def test_lock_names_the_exact_flashable_artifact_contract():
         "rosy-os-pinky-pro-{release_id}-arm64.img.xz"
     )
     assert artifact["intermediate_suffix"] == ".img"
+    assert artifact["rootfs_expansion_mib"] >= 4096
     assert artifact["raspberry_pi_imager_compatible"] is True
     assert artifact["contains_partition_table"] is True
     assert artifact["device_neutral"] is True
