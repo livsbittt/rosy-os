@@ -90,21 +90,69 @@ v1의 온라인 키 rotation은 비범위다. 교체 경로는 하나뿐이다.
 
 ## 7. 릴리스 서명 절차
 
-> **`sign_release.py`는 아직 없다.** 아래 CLI는 WP-6에서 이미지 파이프라인과 함께
-> 붙일 목표 인터페이스이며, 지금 복사해 실행하면 실패한다. 그때까지는 서명 환경에서
-> `deploy/release/signing.py`의 함수를 직접 호출한다.
+> **2026-09-22 갱신:** 예고됐던 `sign_release.py` 대신
+> `deploy/release/package_release.py`(오프라인 서명+번들)와
+> `deploy/release/publication.py`(발행 검증)가 구현돼 있다. 아래는 실제로
+> 존재하는 인터페이스다.
+
+전제: D-145 네이티브 빌더의 unsigned payload를 D-146 importer가 검증해
+`signed: false` handoff로 노출한 상태여야 한다. 첫 대상은
+`manifest.json`에 `release_id: 2026.09.21-001`, full 40-hex `git_revision`,
+`signing_key_id: rosy-release-2026-01`이 기입된 payload다.
+
+### 7.0 키가 아직 없다
+
+`deploy/release/public-keys/`는 비어 있다(README: "No production key exists
+yet"). 가장 먼저 §3대로 **서명 전용 환경에서** 키를 생성하고 §5대로 백업한다.
+개발 PC·CI·로봇에서 키를 만들지 않는다. 키 소유권이 정해지면 공개키만
+`deploy/release/public-keys/rosy-release-2026-01.pem`으로 커밋하고, GitHub
+`release` 환경의 `ROSY_RELEASE_KEY_ID`에 같은 key id를 승인 필수로 등록한다.
+
+### 7.1 서명 환경(오프라인)에서 — package_release
 
 ```bash
-# 목표 인터페이스 (WP-6에서 제공 예정)
-python3 deploy/release/sign_release.py dist/2026.09.01-001 \
+# 0) 서명 환경 준비: python3, OpenSSL 3, zstd 번들 압축에 필요
+# 1) payload 반입 + 반입 checksum 기록
+sha256sum rosy-unsigned-payload.tar.zst > import-checksum.txt
+
+# 2) 서명 + 번들 (개인키는 payload 디렉터리 밖 — 스크립트가 경계를 강제한다)
+python3 deploy/release/package_release.py \
+    2026.09.21-001/rosy-unsigned-payload \
+    dist/rosy-release-2026.09.21-001.tar.zst \
+    --public-key rosy-release-2026-01.pem \
     --private-key /secure/rosy-release-2026-01.key
 ```
 
-현재 `deploy/release/signing.py`가 제공하는 것:
+`package_release`는 payload secret scan → `SHA256SUMS` 작성 → Ed25519 raw
+서명 → `verify_tree`(공개키) → tar+zstd 번들 순서로 진행하고, 어떤 단계든
+실패하면 번들을 남기지 않는다. 번들 파일명은
+`rosy-release-<release_id>.tar.zst`로 고정된다(`PACKAGE_NAME`).
 
-- `build_sha256sums(root, paths)` — 경로 오름차순 checksum 목록(LF, 정확한 바이트)
-- `sign_checksums(sums, private_key)` — raw Ed25519 64바이트 서명을 base64로
-- `verify_release_files(root, public_key)` — 서명 먼저, 그 다음 파일 checksum
+### 7.2 네트워크 측 발행 검증 — publication (공개키만 필요)
+
+서명된 번들을 저장소 소유자에게 가져오면, 개인키 없이 검증한다:
+
+```bash
+python3 deploy/release/publication.py verify-publication \
+    dist/rosy-release-2026.09.21-001.tar.zst \
+    --release-id 2026.09.21-001 \
+    --git-revision 397bb25de9d92e659ab68658a46f275203d52659 \
+    --public-key deploy/release/public-keys/rosy-release-2026-01.pem \
+    --json
+# {"ok": true, "signed": true, "physical_acceptance": "HOLD", ...}
+```
+
+`signed: true`는 서명·번들 identity를 증명할 뿐이고 `physical_acceptance`는
+별도 게이트로 HOLD로 남는다.
+
+### 7.3 증거 귀환과 gate 연결
+
+- 서명 작업 로그(언제, 어떤 release_id, 어떤 git revision)는 일반 artifact와
+  **분리 보관**한다(§4).
+- `publication.py` JSON 출력과 번들 SHA-256을 deploy 게이트 증거로 착지한다.
+- ARTIFACT gate는 ① 승인된 키로 서명된 번들 ② publication 검증 JSON
+  ③ 공개키 커밋 + `ROSY_RELEASE_KEY_ID` 승인 설정 ④ 기록이 모일 때 판정한다.
+  이 넷은 장비 G0(stage/manifest)의 입력이 된다.
 
 
 ## 8. 검증 순서를 바꾸지 말 것

@@ -1232,3 +1232,11 @@
 - gate 변화: core ROS-SIM HOLD→GO(2026-09-21 현재 트리 재실행, D-79). ARTIFACT·DEVICE는 HOLD 유지 — G0–G5 전까지 실물 주장 없음.
 - 결정: core ROS-SIM은 "부트 스모크+ROS 출력+API"로 판정한다. Gazebo 리그는 gz_sim, Nav2 스택 실행은 navigation 게이트의 범위로 갈라 둔다.
 - 교훈: HOLD 해소 주장은 그 HOLD이 기록한 원래 결함(09-20 부팅 AttributeError)을 직접 재시험해야 닫힌다 — 빌드 성공만으로 부팅 증거를 대신하지 않는다.
+
+## 2026-09-22 · uncommitted · docs(deploy): offline signing ceremony runbook for the staged payload
+
+- 변경: `docs/deployment/release-signing-key.md` §7을 구버전("sign_release.py는 아직 없다")에서 실제 구현 기준으로 교체 — `package_release.py`(오프라인 서명+번들, secret scan→SHA256SUMS→Ed25519→verify_tree→tar.zst)와 `publication.py verify-publication`(공개키만으로 발행 검증, signed:true + physical_acceptance HOLD)의 실제 CLI와 순서를 기록했다.
+- 증거: staged payload 확인 — `.release-artifacts/397bb25-imported-d146/rosy-unsigned-payload`의 manifest에 release_id 2026.09.21-001, full 40-hex revision 397bb25de…, core/io 이미지 digest, `signing_key_id: rosy-release-2026-01` 기입 완료. `deploy/release/public-keys/`는 여전히 비어 있어(README "No production key exists yet") 키 의식 자체가 미수행 상태임을 문서에 명시했다. 실제 서명·키 생성은 실행하지 않았다 — 이 문서는 소유자의 오프라인 절차이며 이 머신에서 키를 만드는 것은 ROSY-DEPLOY-SIGNKEY-001 §3 위반이다.
+- gate 변화: 없음 — deploy ARTIFACT는 승인된 오프라인 서명·publication 검증 번들 발행 전까지 HOLD 유지. 본 문서는 그 실행 절차만 닫는다.
+- 결정: ARTIFACT 판정 입력을 ① 승인 키 서명 번들 ② publication 검증 JSON ③ 공개키 커밋+ROSY_RELEASE_KEY_ID 승인 ④ 기록의 4요소로 고정하고, 이 넷이 장비 G0의 입력이 된다.
+- 교훈: "서명하라"는 요청의 절반은 키가 아니라 준비 상태의 증명이었다 — 키가 존재하지 않는다는 사실을 문서가 아니라 디렉터리(empty public-keys/)로 먼저 확인해야 운영자 몫과 에이전트 몫이 갈린다.

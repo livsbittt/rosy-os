@@ -112,8 +112,8 @@
 
 ## 최근 기록
 
+- 2026-09-22 · uncommitted · docs(deploy): offline signing ceremony runbook for the staged payload
 - 2026-09-21 · 5dd076c · test(core): ROS-SIM 재실행으로 HOLD 해소 + vendor 카드 A 베이스라인 절차 추가
 - 2026-09-21 · uncommitted · feat(signal): add fail-safe ESP32 reference implementation
 - 2026-09-21 · uncommitted · docs(signal): record the fail-safe traffic signal draft contract
 - 2026-09-21 · uncommitted · feat(arch): integrate headless evidence, module guards, and shared web assets
-- 2026-09-21 · uncommitted · docs(research): pin the pinklab upstream stack facts behind the Rosy OS fork
