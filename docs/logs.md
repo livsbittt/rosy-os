@@ -1200,3 +1200,19 @@
 - gate 변화: 없음. 문서 모듈이며 ARTIFACT/MEDIA/BOOT/DEVICE/FIELD 판정과 무관
 - 결정: 없음 — upstream의 velocity_smoother·teleop 직결 cmd_vel 구조는 D-2 갈라섬 유지 근거로만 기록했다. 참조는 값(wheel 0.027/0.0961, 0.25 m/s, RPM 100, 6.8V)과 장치 매핑(UART0/UART4, i2c-0/i2c-1, GPIO19)이고 구조는 따르지 않는다
 - 교훈: vendor 스택에 "최종 명령 단일 발행자"와 안전 센서 결합이 없다는 사실이 오히려 CORE 게이트 설계(D-2)의 차별점을 확증한다 — upstream은 배포판명조차 공식 문시하지 않아(netplan·PEP668·ufw 간접 근거만 존재) 우리의 명시적 OS 계약이 문서 자산이 된다
+
+## 2026-09-21 · uncommitted · feat(arch): integrate headless evidence, module guards, and shared web assets
+
+- 변경: D-155 AST 경계 가드와 D-157 설치 가능한 `web_common` ament 패키지를 통합했다. CORE 대시보드는 서버 판정 evidence enum만 소비하고 HITL 요청을 기존 저속 teleop 절차로 연결한다. Fleet는 같은 공용 토큰을 `/common` allowlist로 서빙한다. D-156 실제 ROS graph publisher 검증은 Proposed로 남겼다.
+- 증거: CORE focused 95 passed, Fleet 335 passed·5 skipped, Control/모듈 경계 10 passed, Emotion 19 passed. 제어문자 0, JS/Python 문법 검사 통과.
+- gate 변화: SOURCE/LOCAL 유지. ROS-SIM·ARTIFACT·DEVICE·FIELD와 두 대 Pinky FLEET 증거는 승격하지 않았다.
+- 결정: D-155, D-157 Accepted. D-156 Proposed.
+- 교훈: 공용 자산을 소스 폴더로 옮기는 것만으로는 colcon 복사 설치가 완성되지 않는다. 별도 설치 패키지와 ament share 경로 검증이 함께 있어야 한다.
+
+## 2026-09-21 · uncommitted · docs(signal): record the fail-safe traffic signal draft contract
+
+- 변경: `signal/README.md`에 Fleet 폴링, 단조 `seq`, 인증 요청 heartbeat, 감독자 단절 시 적색 점멸, 명령값이 아닌 실제 lamp readback 경계를 기록했다.
+- 증거: 문서 초안만 존재한다. 펌웨어·계약 시험·벤치·Fleet 클라이언트는 아직 없으며 검증 명령을 완료된 것처럼 기재하지 않았다.
+- gate 변화: 없음. Signal SOURCE/ARTIFACT/DEVICE 판정은 만들지 않았다.
+- 결정: 없음. `docs/plans/2026-09-21-traffic-light-controller-research.md`의 G-S2 설계 입력이다.
+- 교훈: 안전 장치 문서가 미래 파일과 시험을 현재형으로 쓰면 존재하지 않는 증거를 만든다. Draft는 예정 경로와 실제 산출물을 분리해야 한다.

@@ -24,6 +24,8 @@
 | D-106 | Fleet 매치 시작은 나중에 Fleet→games 한 방향이며 지금은 버튼을 만들지 않는다 |
 | D-114 | gz_multi 시뮬은 도메인 하나·네임스페이스·ros_gz_bridge다 |
 | D-116 | 관제 양보는 출발 로봇과 겹친 pose를 길로 보지 않는다 |
+| D-157 | Shared Headless UI Package (Monorepo Web Decoupling) |
+| D-159 | State Summary Visibility: Management by Exception (Law 0) |
 
 ## 계획·결과 문서
 
@@ -44,8 +46,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · refactor(fleet): serve installable shared web assets
 - 2026-09-21 · uncommitted · chore(tools): drop automatic firewall rule from tower runbook
 - 2026-09-21 · uncommitted · chore(server): tower runbook follow-up
 - 2026-09-21 · uncommitted · fix(server): console UI sends the console token
 - 2026-09-21 · uncommitted · feat(fleet): expose fleet.bench public surface (D-148)
-- 2026-09-20 · uncommitted · feat(fleet): no video relay boundary (D-136 T1)

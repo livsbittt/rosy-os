@@ -1,5 +1,5 @@
 /**
- * Framework-free access to server-judged evidence states (ADR-1002).
+ * Framework-free access to server-judged evidence states (D-999, D-157).
  *
  * The server owns freshness thresholds. This adapter deliberately contains no
  * clock math; every surface consumes the same per-channel evidence enum while

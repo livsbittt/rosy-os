@@ -73,7 +73,7 @@ def info_payload(snapshot, status, *, health: str, address: str,
         "reason": status.last_wake_reason,
         "presence": status.presence.value,
         "hold_s": round(hold_s, 1),
-        "hitl_requested": getattr(snapshot, 'hitl_requested', False),
+        "hitl_requested": snapshot.hitl_requested,
     }
 
 

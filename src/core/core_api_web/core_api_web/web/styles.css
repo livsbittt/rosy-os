@@ -838,7 +838,6 @@ body[data-view="operate"] .page-footer { display: none; }
   border: 1px solid var(--surface-line);
   border-radius: var(--radius-panel);
   background: var(--surface-flat);
-  box-shadow: inset 0 1px 0 var(--surface-sheen);
   scroll-margin-top: calc(var(--topbar-height) + var(--space-3));
 }
 .inspect .panel h2 { font-size: var(--text-title); letter-spacing: 0; text-transform: none; color: var(--paper); }
@@ -1062,13 +1061,14 @@ body[data-view="operate"] .page-footer { display: none; }
   border-left: 4px solid var(--status-crit);
   border-radius: 4px;
 }
+.hitl-escalation[hidden] { display: none; }
 .hitl-escalation h3 {
   margin: 0 0 0.5rem 0;
   color: var(--status-crit);
-  font-size: 1rem;
+  font-size: var(--text-value);
 }
 .hitl-escalation p {
   margin: 0 0 1rem 0;
   color: var(--paper);
-  font-size: 0.9rem;
+  font-size: var(--text-body);
 }

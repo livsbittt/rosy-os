@@ -63,3 +63,10 @@
   소유한다 — 임시 스크립트는 증거 체인에서 빠진다
 - 교훈: 옵트인 캡처 시험은 침묵하지 않는다 — 재현 불가능한 캡처 절차는 시험이
   될 때 비로소 회차 기록이 된다
+
+## 2026-09-21 · uncommitted · feat(emotion): render operator-assistance request on the robot face
+
+- 변경: `display/info`의 `hitl_requested`가 참이면 HEALTH 행에 `ASSIST REQ`를 표시한다. E-STOP이 동시에 참이면 안전 상태가 우선한다.
+- 증거: `test_info_screen.py` 19 passed; normal/HITL 이미지 차이와 E-STOP 우선순위를 픽셀 비교로 검증했다.
+- gate 변화: SOURCE/LOCAL GO 유지. 실제 LCD DEVICE 증거는 PARKED다.
+- 결정: D-999.

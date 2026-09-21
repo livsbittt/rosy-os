@@ -549,6 +549,25 @@ async function refreshState() {
     const pill = el("online-pill");
     pill.textContent = `${snapshot.fleet.online}/${snapshot.fleet.total} 연결`;
     pill.className = `pill ${snapshot.fleet.online === snapshot.fleet.total ? "good" : "bad"}`;
+    
+    const degraded = snapshot.robots.filter(r => r.state && r.state.capabilities_degraded);
+    const hitl = snapshot.robots.filter(r => r.state && r.state.hitl_requested);
+    let summary = "정상 구동 중";
+    if (hitl.length > 0) {
+      summary = `${hitl.length}대 원격 조종 개입 요청`;
+    } else if (degraded.length > 0) {
+      summary = `${degraded.length}대 일부 센서 단절`;
+    }
+    const summaryPill = document.getElementById("fleet-summary-pill") || (() => {
+      const p = document.createElement("span");
+      p.id = "fleet-summary-pill";
+      p.className = "pill";
+      document.getElementById("online-pill").after(p);
+      return p;
+    })();
+    summaryPill.textContent = summary;
+    summaryPill.className = `pill ${hitl.length > 0 ? 'crit' : (degraded.length > 0 ? 'warn' : 'good')}`;
+
     render();
   } catch (err) {
     const pill = el("online-pill");

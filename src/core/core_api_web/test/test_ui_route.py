@@ -48,7 +48,7 @@ def test_styleguide_renders_the_whole_vocabulary_table():
 
 def test_styleguide_links_the_single_tokens_file():
     text = _client().get("/styleguide").text
-    assert 'href="/ui/tokens.css"' in text
+    assert 'href="/common/tokens.css"' in text
     assert 'href="/styleguide/assets/styleguide.css"' in text
     assert "/dashboard/assets/" not in text, "갤러리는 대시보드 자산을 훔치지 않는다"
 

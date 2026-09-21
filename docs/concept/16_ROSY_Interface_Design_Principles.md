@@ -252,7 +252,7 @@ guidance:
 - the operate view does not scroll and the map keeps the observe region
   (`src/core/core/test/test_console_layout.py`)
 
-D-73: a test that opened both `core_api_web/web/tokens.css` and
+D-73: a test that opened both `web_common/tokens.css` and
 `control/web/dashboard.html` would have no owning module. Do not add one.
 
 ## 11. v1 Mapping

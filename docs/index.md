@@ -75,6 +75,11 @@
 | D-152 | CORE 관제의 카메라 표시는 저주기 최신 1장 preview 예외다 |
 | D-153 | UI/UX 평가는 세 계층이고 판정 단위는 표면이다 |
 | D-154 | 공통 OS 이미지와 장치별 SD 개인화를 분리한다 |
+| D-155 | Zero-Coupling AST Validation (Build-time Guard) |
+| D-156 | ROS 2 Namespace Strict Segregation (Runtime Guard) |
+| D-157 | Shared Headless UI Package (Monorepo Web Decoupling) |
+| D-158 | UI Component Consistency: Strict Outline Borders (Law 2) |
+| D-159 | State Summary Visibility: Management by Exception (Law 0) |
 
 ## 계획·결과 문서
 
@@ -90,6 +95,7 @@
 - [2026-09-21-camera-preview-dashboard.md](plans/2026-09-21-camera-preview-dashboard.md)
 - [2026-09-21-hardware-mapping-g5-design.md](plans/2026-09-21-hardware-mapping-g5-design.md)
 - [2026-09-21-hardware-mapping-g5.md](plans/2026-09-21-hardware-mapping-g5.md)
+- [2026-09-21-module-coupling-consistency-plan.md](plans/2026-09-21-module-coupling-consistency-plan.md)
 - [2026-09-21-rosy-sd-personalization-design.md](plans/2026-09-21-rosy-sd-personalization-design.md)
 - [2026-09-21-rosy-sd-personalization.md](plans/2026-09-21-rosy-sd-personalization.md)
 - [2026-09-21-semantic-road-control-design.md](plans/2026-09-21-semantic-road-control-design.md)
@@ -106,8 +112,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · docs(signal): record the fail-safe traffic signal draft contract
+- 2026-09-21 · uncommitted · feat(arch): integrate headless evidence, module guards, and shared web assets
 - 2026-09-21 · uncommitted · docs(research): pin the pinklab upstream stack facts behind the Rosy OS fork
 - 2026-09-21 · uncommitted · docs(adr): require per-device Fleet bootstrap and two-Pinky evidence (D-154 amendment)
 - 2026-09-21 · uncommitted · docs(adr): record the surface-based UI/UX evaluation decision (D-153)
-- 2026-09-21 · uncommitted · docs(adr): separate common image from per-device SD personalization (D-154)
-- 2026-09-21 · uncommitted · docs(uiux): D-153 session 12 — re-verification catch: concurrent fleet token drift (F-11), Fleet GO withdrawn

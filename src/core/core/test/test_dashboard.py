@@ -507,7 +507,7 @@ def test_dashboard_binds_server_evidence_and_gates_stale_motion():
     assert '!hs.isFresh("pose")' in app
     assert '!hs.isFresh("velocity")' in app
     assert "pose ${pose} · velocity ${velocity}" in app
-    assert 'evidenceOf(session.robotState, "pose") === "fresh"' in app
+    assert 'new HeadlessState(session.robotState).isFresh("pose")' in app
     assert "dataset.evidence" in dom
     assert '[data-evidence="delayed"]' in css
     assert '[data-evidence="disconnected"]' in css

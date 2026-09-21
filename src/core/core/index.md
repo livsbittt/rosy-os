@@ -32,6 +32,11 @@
 | D-144 | 하드웨어 맵 생성은 runtime mode가 아니라 검증된 navigation backend다 |
 | D-151 | 도로 의미 인식·정책·최종 명령을 분리하고 관제 변경은 정지 상태에서만 적용한다 |
 | D-152 | CORE 관제의 카메라 표시는 저주기 최신 1장 preview 예외다 |
+| D-155 | Zero-Coupling AST Validation (Build-time Guard) |
+| D-156 | ROS 2 Namespace Strict Segregation (Runtime Guard) |
+| D-157 | Shared Headless UI Package (Monorepo Web Decoupling) |
+| D-158 | UI Component Consistency: Strict Outline Borders (Law 2) |
+| D-159 | State Summary Visibility: Management by Exception (Law 0) |
 
 ## 계획·결과 문서
 
@@ -58,8 +63,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · feat(core): consume server-judged evidence and expose HITL handoff
 - 2026-09-21 · uncommitted · fix(web): inspect order follows §7.2 bring-up order (D-153 session 10, F-10)
 - 2026-09-21 · uncommitted · fix(web): graph topics no longer spend the warning colour (D-153 session 8, F-08)
 - 2026-09-21 · uncommitted · test(safety): D-137 T4 fault-injection composition (metric stop + broken vision)
 - 2026-09-21 · uncommitted · feat(bridge): detection_evidence subscription + ROS graph injection test (D-137 T4)
-- 2026-09-21 · uncommitted · feat(core): serve a bounded authenticated camera preview (D-152)

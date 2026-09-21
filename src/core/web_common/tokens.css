@@ -1,7 +1,8 @@
 /* ROSY 웹 표면 토큰 — concept 16 §6, D-72 L1, D-82, D-129.
  *
  * 이 파일이 색의 단일 출처다(D-129 — 모든 웹 표면이 이 한 파일을
- * `/ui/tokens.css`로 링크하고 각자 사본을 두지 않는다). 표면 스타일시트나
+ * `/common/tokens.css`로 링크하고 각자 사본을 두지 않는다). `/ui/tokens.css`는
+ * 기존 배포를 위한 호환 경로일 뿐이다. 표면 스타일시트나
  * 스크립트에 원시 색이 있으면 `test_ui_token_contracts.py`가 실패하고, 값
  * 자체는 `test_palette_gates.py`가 지킨다.
  *

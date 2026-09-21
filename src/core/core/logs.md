@@ -230,3 +230,10 @@
   순서다. D-153 회차10 F-10
 - 교훈: "존재" 게이트는 순서를 못 지킨다 — 순서가 법 계약이면 순서 게이트를
   별도로 세운다
+
+## 2026-09-21 · uncommitted · feat(core): consume server-judged evidence and expose HITL handoff
+
+- 변경: `HeadlessState`가 브라우저 시계 계산 없이 서버 evidence enum을 소비한다. HITL JSON 요청은 ROS-free parser에서 검증하고, 상태·LCD 얼굴·대시보드 지원 요청으로 전달한다. 버튼은 자동 주행 명령을 내리지 않고 기존 저속 teleop 영역으로만 이동한다.
+- 증거: dashboard/headless/HITL/bridge/token/package focused 95 passed, `node --check`와 Python compile 통과.
+- gate 변화: SOURCE/LOCAL GO 유지. 실제 ROS subscription과 Pinky LCD/teleop DEVICE 증거는 HOLD다.
+- 결정: D-999, D-157.

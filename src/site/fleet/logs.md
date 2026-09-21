@@ -1,5 +1,4 @@
-
-# fleet logs
+﻿# fleet logs
 
 추가만 한다. 형식: [module harness 설계](../../docs/plans/2026-09-15-module-harness-design.md) §4.2.
 2026-09-15 이전 이력은 [사이트 패브릭 계획](../../docs/plans/2026-09-14-site-middleware-role-fabric.md), [군집 대형 슬라이스 결과](../../docs/plans/2026-09-08-swarm-formation-slice-results.md)와 `git log -- src/fleet`를 본다.
@@ -125,4 +124,9 @@
 ## 2026-09-21 · uncommitted · chore(tools): drop automatic firewall rule from tower runbook
 - 변경: fleet_console.ps1 no longer adds a firewall rule. Robot-side traffic is outbound only (gather/scatter), so no inbound rule is needed for devices; the rule only mattered for viewing the tower UI from another device, which is now a documented manual step. Bind stays 0.0.0.0 (token-enforced)
 - 증거: parser-based syntax check clean. No server/UI code change
+- gate 변화: 없음
+
+## 2026-09-21 · uncommitted · refactor(fleet): serve installable shared web assets
+- 변경: fleet/server/app.py 와 cli.py 에서 --ui-tokens 대신 --web-common 을 받아 /common 경로로 서빙하도록 수정 (D-157).
+- 증거: src/site/fleet/test/test_server_app.py 가 /common/tokens.css 와 /common/core_ui_logic.js 라우트를 검증함 (23 passed).
 - gate 변화: 없음

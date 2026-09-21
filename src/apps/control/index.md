@@ -23,6 +23,8 @@
 | D-143 | IR·카메라 차선 추종은 NAVIGATION 내부의 배타적 evidence 소스다 |
 | D-151 | 도로 의미 인식·정책·최종 명령을 분리하고 관제 변경은 정지 상태에서만 적용한다 |
 | D-152 | CORE 관제의 카메라 표시는 저주기 최신 1장 preview 예외다 |
+| D-155 | Zero-Coupling AST Validation (Build-time Guard) |
+| D-156 | ROS 2 Namespace Strict Segregation (Runtime Guard) |
 
 ## 계획·결과 문서
 
@@ -51,8 +53,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · refactor(control): move cross-domain simulations to repository tools
 - 2026-09-21 · uncommitted · feat(control): publish the bounded semantic camera preview (D-152)
 - 2026-09-21 · uncommitted · feat(control): detect semantic road evidence (D-151)
 - 2026-09-21 · uncommitted · feat(control): burst trigger gate — corroboration or operator (D-137 T4 순수 조각)
 - 2026-09-21 · uncommitted · docs(control): mark web_node debug surface and the map home (D-150)
-- 2026-09-21 · uncommitted · feat(control): DetectionEvidence producer snapshot (D-137 T2)

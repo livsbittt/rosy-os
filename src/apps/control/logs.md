@@ -136,3 +136,10 @@
 - 안전: hardware에서는 camera control 안정성이 유지돼야 detection evidence가 유효하다. simulation launch만 그 gate를 명시적으로 해제하며 preview 자체에는 주행 권한이 없다.
 - 증거: host preview JPG/GIF와 browser panel은 HOST-SIM으로 명시했다.
 - gate 변화: SOURCE/LOCAL 유지. 실제 CSI frame과 물리 보정은 DEVICE/FIELD HOLD다.
+
+## 2026-09-21 · uncommitted · refactor(control): move cross-domain simulations to repository tools
+
+- 변경: line-follow·semantic-road 통합 시뮬레이터를 `src/apps/control/tools`에서 루트 `tools/`로 이동하고 직접 실행 경로와 문서 참조를 맞췄다. Control 생산 코드의 CORE import와 최종 operational topic 소유권을 AST/소스 경계로 고정했다.
+- 증거: 시뮬레이터 CLI·회귀와 모듈 경계 10 passed.
+- gate 변화: SOURCE/LOCAL GO 유지. 실제 ROS graph publisher 검증은 D-156 Proposed다.
+- 결정: D-155. D-156은 launch/graph 증거 전 Proposed.

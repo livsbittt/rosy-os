@@ -199,7 +199,7 @@ def test_fleet_prod_only_core_common():
     assert violations == [], violations
 
 def test_control_imports_no_core_code():
-    """Guard 4 (ADR-1003): control runtime never imports core.
+    """Guard 4 (D-155): control runtime never imports core.
 
     The control application is a plugin that is loaded by core. It must not
     statically import core_features, core_api_web, core, etc.

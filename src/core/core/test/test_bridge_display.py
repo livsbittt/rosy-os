@@ -19,6 +19,7 @@ def _snapshot(percent=87.6543, voltage=7.8912, estop=False):
         mode=SimpleNamespace(value="IDLE"),
         navigation=SimpleNamespace(value="ARRIVED"),
         safety=SimpleNamespace(estop=estop),
+        hitl_requested=False,
     )
 
 

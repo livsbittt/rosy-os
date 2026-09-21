@@ -1,7 +1,7 @@
 # Module Coupling Consistency Continuation Plan
 
 - Date: 2026-09-21
-- Status: Proposed
+- Status: Partially implemented — D-155 and D-157 Accepted; D-156 Proposed
 
 ## Context
 
@@ -12,19 +12,19 @@ require a source-level back-edge. Maintaining that result still needs explicit
 build-time and runtime guardrails; the move and this proposal are not by
 themselves proof of zero coupling.
 
-## Proposed ADRs
+## Decisions and remaining gate
 
-### 1. [ADR-1003] Zero-Coupling AST Validation (Build-time Guard)
+### 1. [D-155] Zero-Coupling AST Validation (Build-time Guard) — Accepted
 
 - **Problem**: Python's dynamic nature allows accidental cross-domain imports
   that pass in a monolithic development environment but break isolated runtime
   slices.
 - **Decision**: Introduce an automated AST parser in
-  `test/test_module_boundaries.py`. It will inspect `import` and
+  `test/test_module_separation.py`. It inspects `import` and
   `from ... import ...` statements and reject dependencies outside the explicit
   domain allowlist. Test-only boundaries remain separately declared.
 
-### 2. [ADR-1004] ROS 2 Namespace Strict Segregation (Runtime Guard)
+### 2. [D-156] ROS 2 Namespace Strict Segregation (Runtime Guard) — Proposed
 
 - **Problem**: Static imports can be clean while ROS 2 topics remain global. An
   application node could accidentally publish the operational final
@@ -34,12 +34,10 @@ themselves proof of zero coupling.
   and final `cmd_vel`. A launch/graph check must verify actual publishers before
   this proposal can become Accepted.
 
-### 3. [ADR-1005] Shared Headless UI Package (Monorepo Web Decoupling)
+### 3. [D-157] Shared Headless UI Package (Monorepo Web Decoupling) — Accepted
 
-- **Problem**: ADR-1002 puts the framework-free adapter in `core_api_web`.
-  Fleet or future dashboards must not import a robot dashboard package merely
-  to consume the server-judged evidence vocabulary.
-- **Decision**: Evaluate extraction of `core_ui_logic.js` and frontend protocol
-  types into a neutral `web_common` package. Extraction is accepted only when
-  both consumers exist and package-boundary tests prove there is no visual
-  component sharing or reverse dependency.
+- **Problem**: D-999 called for a framework-free adapter, but placing it in
+  `core_api_web` would couple other surfaces to the robot dashboard package.
+- **Decision**: Install `core_ui_logic.js` and `tokens.css` through the neutral
+  `web_common` ament package. CORE and Fleet resolve the installed share path,
+  retain source-tree fallbacks for host tests, and share no visual components.
