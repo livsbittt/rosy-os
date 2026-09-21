@@ -3,7 +3,7 @@ from games.host.hold import HoldObserver
 from games.host.loop import MatchHost
 from games.host.session import run_match
 
-from fakes import FakePlayerClient
+from fake_host import FakePlayerClient
 
 
 def test_hold_observer_keeps_both_robots_at_zero():
