@@ -214,3 +214,31 @@ def test_control_imports_no_core_code():
             violations.append(f"{rel}: imported {', '.join(sorted(bad))}")
     assert not violations, "control must not depend on core:\n" + "\n".join(violations)
 
+
+
+
+def test_games_imports_isolation():
+    """Guard 6 (D-160): games runtime never imports core, rclpy, httpx, cv2.
+
+    The games application must remain decoupled from the ROS graph (rclpy),
+    the robot core (core), the fleet server (fleet), and network/vision
+    hardware libraries (httpx, cv2) except where explicitly allowed (e.g. host).
+    """
+    violations = []
+    forbidden_tops = {"core", "fleet", "rclpy", "httpx", "cv2"}
+    games_src = SRC / "apps" / "games" / "games"
+    if not games_src.exists():
+        return
+    for path in _prod_py_files(games_src):
+        # Only field, game, policy are strictly pure
+        parts = path.relative_to(games_src).parts
+        if not parts:
+            continue
+        domain = parts[0]
+        if domain in ("field", "game", "policy"):
+            tops = _import_tops(path)
+            bad = tops & forbidden_tops
+            if bad:
+                rel = path.relative_to(SRC).as_posix()
+                violations.append(f"{rel}: imported {', '.join(sorted(bad))}")
+    assert not violations, "games pure domains must not depend on forbidden libs:\n" + "\n".join(violations)
