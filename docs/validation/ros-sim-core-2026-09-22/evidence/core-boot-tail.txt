@@ -1,0 +1,6 @@
+[INFO] [1790012247.262222050] [core]: ros_bridge ready (cmd_vel sole publisher @50Hz)
+[INFO] [1790012247.263609859] [core]: core up: robot_id=rosy_01 model=Pinky Pro
+[INFO] [1790012252.756255594] [core]: api server on 0.0.0.0:8080
+[INFO] [1790012553.639721132] [core]: core shutting down
+Failed to publish log message to rosout: publisher's context is invalid, at ./src/rcl/publisher.c:423
+The following exception was never retrieved: Failed to publish: publisher's context is invalid, at ./src/rcl/publisher.c:423

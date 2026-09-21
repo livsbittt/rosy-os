@@ -1,0 +1,10 @@
+# 2026-09-22 ROS-SIM core 종료 세션 콘솔 캡처 (세션 출력 그대로)
+# 내용: road/observation 구독 확인(Subscription count 1) → SIGTERM → 프로세스 소멸 확인
+CORE_PID=807
+Type: std_msgs/msg/String
+Publisher count: 0
+Subscription count: 1
+=== still running? ===
+GONE
+=== final log ===
+(로그 전문은 core-boot-console.log — 마지막 줄: core shutting down)

@@ -13,9 +13,9 @@ gates:
     evidence: "1054 passed, 12 skipped (2026-09-22 Windows). D-162 scene context additive 수용(translate road_evidence, RoadEvidence 선택 필드, ros_bridge sensor snapshot) 포함 — D-137/D-151/D-152 회귀 없음"
     cmd: "PYTHONPATH=src/core:src python3 -m pytest src/core/test -q"
   ROS-SIM:
-    state: HOLD
-    blocker: "2026-09-22 D-162 T5가 ros_bridge/translate(road evidence 경로)를 변경했다. 2026-09-21 부트 스모크(docs/validation/ros-sim-core-2026-09-21)는 이전 트리 증거다. docs/validation/ros-sim-core-2026-09-22/README.md 절차 실행 후 복원"
-    cmd: "docs/validation/ros-sim-core-2026-09-22/README.md — colcon build --packages-up-to core && ros2 run core core + road/observation 유효/malformed 프로브"
+    state: GO
+    evidence: "2026-09-22 WSL2 Jazzy 부트 스모크 + road/observation 회귀 프로브(유효 context payload·malformed JSON) — NameError 없음, /cmd_vel 단일 발행자, API 200, 정상 종료. docs/validation/ros-sim-core-2026-09-22/ (스냅샷 = commit 89c1d11 git archive)"
+    cmd: "docs/validation/ros-sim-core-2026-09-22/README.md 절차 — colcon build --packages-up-to core && ros2 run core core + road/observation 유효/malformed 프로브"
   ARTIFACT:
     state: HOLD
     blocker: "ARM64 개발 후보만 존재. 서명 manifest와 immutable digest 발행 전"
@@ -50,7 +50,7 @@ plans:
 
 ## 다음 gate
 
-1. ROS Jazzy에서 부트 스모크를 재실행해 ROS-SIM을 복원한다. 2026-09-21 완료 이력이 있으나 2026-09-22 D-162 T5(ros_bridge/translate road 경로 변경)가 이후 트리에 포함되어 재검증이 필요하다(절차: docs/validation/ros-sim-core-2026-09-21).
+1. ROS Jazzy에서 부트 스모크로 ROS-SIM 복원 — 완료(2026-09-22, docs/validation/ros-sim-core-2026-09-22, D-162 T5 이후 트리).
 2. 서명된 native ARM64 artifact 발행 후 Pi readback(ARTIFACT → DEVICE).
 
 ## 현재 유효한 금지사항

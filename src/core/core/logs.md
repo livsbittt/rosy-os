@@ -259,3 +259,10 @@
 - 증거: `python -m pytest core/core/test/test_executor_contracts.py -q` 4 passed. flake8 F821(`json` undefined) 소거 확인.
 - gate 변화: 없음(ROS-SIM HOLD 유지 — 절차문은 실행 전). ROS-SIM gate에 절차문 경로를 cmd로 기록.
 - 결정: 계약 시험은 test_executor_contracts.py의 기존 정적 AST 패턴을 따르고, 구조 전용 stub인 test_bridge_timers.py에는 넣지 않는다(bridge/AGENTS.md 규칙).
+
+## 2026-09-22 · uncommitted · test(core): ROS-SIM 재실행 PASS — ROS-SIM 복원 (D-162 T5 이후 트리)
+
+- 변경: 없음(검증과 기록만). WSL2 Jazzy에서 `git archive HEAD`(89c1d11) 스냅샷을 빌드(`--packages-up-to core`, 7패키지)하고 부트 스모크 + road/observation 회귀 프로브를 실행했다. 절차·판정 기준은 `docs/validation/ros-sim-core-2026-09-22/README.md`.
+- 증거: `/core` 기동, `/cmd_vel` publisher 1(단일 발행자), API 200·대시보드 200·/robot/state 401, **유효 context payload와 malformed JSON 모두 NameError 없이 수신**(구독 확인 Subscription count 1, `import json` 수정 검증), SIGTERM 후 `core shutting down`. evidence 13파일.
+- gate 변화: ROS-SIM HOLD→GO. ARTIFACT/DEVICE는 HOLD 유지.
+- 결정: malformed payload 프로브를 표준 절차에 포함한다 — except 절 평가 경로를 ROS-SIM에서 직접 검증하는 유일한 방법이다.

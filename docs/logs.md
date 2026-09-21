@@ -1274,6 +1274,14 @@
 - 결정: malformed road payload 프로브를 절차에 넣어 except 절 `json.JSONDecodeError` 평가 경로를 ROS-SIM에서 직접 검증한다
 - 교훈: 없음
 
+## 2026-09-22 · uncommitted · test(core): ROS-SIM 재실행 PASS — D-162 T5 이후 트리 복원
+
+- 변경: `docs/validation/ros-sim-core-2026-09-22/`에 판정(PASS)·결과 표·evidence 13파일 기록. `src/core/core/progress.md` ROS-SIM HOLD→GO 복원, `src/core/core/logs.md` 실행 기록
+- 증거: WSL2 Jazzy, git archive HEAD(89c1d11) 스냅샷 빌드 7패키지, 부트 스모크 + road/observation 유효/malformed 프로브 전부 통과 — 상세는 core 모듈 로그 2026-09-22 항목
+- gate 변화: core ROS-SIM HOLD→GO
+- 결정: B-1 갭(모드 전환 시 매처 리셋 미와이어링)은 설계 문서에 명시된 대로 히스테리시스 자기 교정+CORE 정책 리셋으로 커버하고, 모드 구독 와이어링은 DEVICE 튜닝 게이트에서 재판정하기로 확정했다
+- 교훈: 같은 WSL에서 타 세션 빌드가 동시 도는 경우 종료 후 그래프 재조회는 오염될 수 있다 — 판정 근거는 실행 중 캡처로 한정하라
+
 
 ## 2026-09-22 · uncommitted · feat(fleet): Implement Pinky-to-Fleet WebSocket communication path
 
