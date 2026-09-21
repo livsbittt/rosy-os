@@ -1,4 +1,4 @@
-# ROSY ADR Log
+﻿# ROSY ADR Log
 ## Architecture Decision Records
 
 **Document ID:** ROSY-ADR-001
@@ -167,6 +167,7 @@
 | D-157 | Shared Headless UI Package (Monorepo Web Decoupling) | Accepted |
 | D-158 | UI Component Consistency: Strict Outline Borders (Law 2) | Accepted |
 | D-159 | State Summary Visibility: Management by Exception (Law 0) | Proposed |
+| D-160 | Games Domain Strict Decoupling (AST Validation) | Accepted |
 
 ---
 
@@ -5290,3 +5291,10 @@ actions remain outlined; primary actions retain a flat background.
 derived from authoritative state, including degraded capabilities and HITL.
 This remains Proposed until the summary vocabulary and both surface behaviors
 have executable contracts.
+
+## D-160 Games Domain Strict Decoupling (AST Validation)
+
+**Date:** 2026-09-21
+**Status:** Accepted
+**Context:** The `apps/games` package encapsulates game logic (`field`, `game`, `policy`) and host/infrastructure (`host`, `web`). The core game logic must be highly portable and completely isolated from the robot's physical constraints (`core`, `rclpy`), fleet context (`fleet`), and specific runtime IO dependencies (`cv2`, `httpx`). While this was established as a rule in `apps/games/AGENTS.md`, it lacked automated enforcement.
+**Decision:** Implement `test_games_imports_isolation` (an AST validation guard) in `test_module_separation.py`. The `field`, `game`, and `policy` submodules within `apps/games` are now statically prohibited from importing `core`, `fleet`, `rclpy`, `httpx`, or `cv2`. The host logic remains allowed to interact with these as needed.
