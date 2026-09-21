@@ -114,3 +114,8 @@
 - 변경: web_node.py 독스트링에 D-150 디버그 서피스 선언 추가(운영 launch/deploy 불가, 포트는 deploy 계약 테스트가 고정, 운용자 콘솔은 CORE /dashboard D-23). web/AGENTS.md 와 map/AGENTS.md 도 같은 계약으로 갱신 — map 은 캘리브레이션 기준 자산으로 격하, 운영 맵 홈은 navigation/map.
 - 증거: python -m pytest test/test_control_launch_boundary.py -q 통과. 신규 deploy 포트 가드 포함 5종 계약 테스트 변이 증명 완료(망가뜨림→적색→복구→초록).
 - gate 변화: 없음
+
+## 2026-09-21 · uncommitted · feat(control): burst trigger gate — corroboration or operator (D-137 T4 순수 조각)
+- 변경: `control/control/burst_gate.py` 신규 — 패킷당 1문항: 이 증거가 영상 버스트를 시작·유지할 수 있는가. D-137 §4(YOLO 단독 트리거 금지 — corroboration 또는 operator), D-136 §5(quality 저하는 evidence 무효로만 결합). operator_request 단축 → fresh+metric 교차만 트리거, 나머지는 vision_only/no_detection/vision_missed/vision_stale/vision_invalid 로 기각. 분당 FP 상한은 ROS-SIM 합의 전이라 의도적으로 없다(정해지면 송신 측 token bucket, D-136 §4). 대역폭 정책이지 motion 정책이 아니다 — 결코 cmd_vel 에 닿지 않는다.
+- 증거: test_burst_gate.py 7건 녹색(operator 단축, 교차 트리거, vision_only 금지, metric 단독·부재 불가, missed≠부재, stale/invalid 불가, 입력 타입 검증). 인수인수 검증: control 전체 1101 passed·28 skipped, core 전체 976 passed·11 skipped (2026-09-21 Windows, 패키지 cwd/PYTHONPATH — 병렬 콘솔 세션 작업을 이 세션에서 검증·랜딩).
+- gate 변화: 없음. FP 상한(ROS-SIM 합의 항목)과 T5(DEVICE)가 남아 있다.

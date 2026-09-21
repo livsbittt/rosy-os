@@ -45,8 +45,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · feat(control): burst trigger gate — corroboration or operator (D-137 T4 순수 조각)
 - 2026-09-21 · uncommitted · docs(control): mark web_node debug surface and the map home (D-150)
 - 2026-09-21 · uncommitted · feat(control): DetectionEvidence producer snapshot (D-137 T2)
 - 2026-09-21 · uncommitted · fix(control): legacy launches point at absorbed package names (D-149)
 - 2026-09-21 · uncommitted · feat(control): selectable IR and camera line following (D-143)
-- 2026-09-21 · uncommitted · feat(mapping): complete the exact v2 Gazebo map

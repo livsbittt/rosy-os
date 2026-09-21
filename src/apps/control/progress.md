@@ -10,7 +10,7 @@ gates:
     cmd: "python3 -m pytest test/test_control_absorption_package.py -q"
   LOCAL:
     state: GO
-    evidence: "1084 passed, 26 skipped (2026-09-21 Windows, 패키지 cwd). D-143 IR/camera detector와 폐루프 운동학 수렴, 본체 반경 기반 map audit 포함"
+    evidence: "1103 passed, 26 skipped (2026-09-21 Windows, 패키지 cwd). D-143 IR/camera detector와 폐루프 운동학 수렴, 본체 반경 기반 map audit, DetectionEvidence 자문 스냅샷(D-137 T2), 버스트 트리거 게이트(D-137 T4 순수 조각) 포함"
     cmd: "cd src/apps/control && python -m pytest test -q"
   ROS-SIM:
     state: HOLD
