@@ -538,6 +538,16 @@ class RosBridge:
         self._led_client.call_async(request)
         return True
 
+    def _on_hitl_request(self, msg: Bool) -> None:
+        """ADR-1000: Update HITL request state."""
+        self._svc.state.set_hitl_requested(msg.data)
+
+    def _on_degraded_modules(self, msg: String) -> None:
+        """ADR-1000: Update degraded modules list."""
+        modules = [m.strip() for m in msg.data.split(",") if m.strip()]
+        self._svc.state.set_capabilities_degraded(modules)
+
+
     def _setup_diagnostics(self) -> None:
         self.diagnostics = DiagnosticsCollector()
         self.diagnostics.register("core", lambda: HealthState.OK)

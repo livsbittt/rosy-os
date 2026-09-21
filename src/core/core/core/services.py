@@ -377,6 +377,7 @@ class CoreServices:
             estop=bool(self.safety.estop),
             booting=not snap.diagnostics_summary,
             cap001=cap001,
+            hitl_requested=snap.hitl_requested,
         )
         data["adapters"] = [item.id for item in self.adapter_registry.enabled()]
         return data

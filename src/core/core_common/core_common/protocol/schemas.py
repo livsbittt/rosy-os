@@ -330,6 +330,8 @@ class StateSnapshot(BaseModel):
     #: v1.8 additive. Server-judged freshness per channel. Consumers must ignore
     #: unknown keys (API-002). Client must not recompute thresholds.
     evidence: dict[str, ValueEvidence] = Field(default_factory=dict)
+    hitl_requested: bool = False  # ADR-1000: HITL intervention request flag
+    capabilities_degraded: list[str] = Field(default_factory=list)  # ADR-1000: Modules in degraded fallback
 
 
 class HeartbeatPayload(BaseModel):

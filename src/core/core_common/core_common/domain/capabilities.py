@@ -34,6 +34,7 @@ class PresentationState(str, enum.Enum):
 
     AVAILABLE = "available"
     CONSTRAINED = "constrained"
+    DEGRADED_FALLBACK = "degraded_fallback"
     BLOCKED = "blocked"
     NOT_PROVIDED = "not_provided"
 
@@ -71,7 +72,7 @@ def _presentation(device_state: Optional[DeviceState]) -> tuple[bool, str, Optio
     if device_state is DeviceState.DEGRADED:
         return (
             True,
-            PresentationState.CONSTRAINED.value,
+            PresentationState.DEGRADED_FALLBACK.value,
             f"device_state:{device_state.value}",
         )
     return True, PresentationState.AVAILABLE.value, None

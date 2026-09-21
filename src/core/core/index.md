@@ -58,8 +58,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · fix(web): inspect order follows §7.2 bring-up order (D-153 session 10, F-10)
+- 2026-09-21 · uncommitted · fix(web): graph topics no longer spend the warning colour (D-153 session 8, F-08)
+- 2026-09-21 · uncommitted · test(safety): D-137 T4 fault-injection composition (metric stop + broken vision)
 - 2026-09-21 · uncommitted · feat(bridge): detection_evidence subscription + ROS graph injection test (D-137 T4)
 - 2026-09-21 · uncommitted · feat(core): serve a bounded authenticated camera preview (D-152)
-- 2026-09-21 · uncommitted · fix(core): route traffic type through api.deps (D-147, D-151)
-- 2026-09-21 · uncommitted · feat(core): gate line driving with supervised traffic policy (D-151)
-- 2026-09-21 · uncommitted · feat(safety): PersonAdvisoryFeed wire ingest seam (D-137 T4)

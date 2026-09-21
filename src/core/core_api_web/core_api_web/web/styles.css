@@ -944,7 +944,7 @@ body[data-view="operate"] .page-footer { display: none; }
 .graph-edge.subscribes { stroke-dasharray: 4 4; }
 .graph-node { fill: var(--ground-raise); stroke: var(--surface-line); stroke-width: 1; }
 .graph-node.foreign { fill: var(--status-crit-a10); stroke: var(--status-crit); }
-.graph-topic { fill: var(--status-warn); stroke: var(--ground); stroke-width: 3; }
+.graph-topic { fill: var(--series-primary); stroke: var(--ground); stroke-width: 3; }
 .graph-node-label, .graph-topic-label, .graph-empty { fill: var(--paper); font: var(--text-label) var(--mono); text-anchor: middle; }
 .graph-topic-label { fill: var(--muted); text-anchor: end; }
 .graph-empty { fill: var(--muted); }
