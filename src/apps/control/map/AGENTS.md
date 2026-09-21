@@ -1,11 +1,13 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-14 | Updated: 2026-09-20 -->
+<!-- Generated: 2026-09-14 | Updated: 2026-09-21 -->
 
 # map
 
 ## Purpose
 
 Gazebo world asset for the Pinky Pro desk maze used by Control sim rigs.
+D-150: the operational map home is `src/navigation/navigation/map` — this
+bundle is a calibration-reference asset only, not the source of runtime maps.
 
 ## Key Files
 

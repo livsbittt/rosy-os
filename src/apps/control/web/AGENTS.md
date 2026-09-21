@@ -1,11 +1,14 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-07 | Updated: 2026-09-14 -->
+<!-- Generated: 2026-09-07 | Updated: 2026-09-21 -->
 # web/ (web_node dashboard UI)
 
 ## Purpose
 Control-stack diagnostic page served by `control/web_node.py` (installed to
 `share/control/web/`). This is **not** the operator console (D-77: that is
-CORE `/dashboard`). It is launched only from legacy `robot.launch.py`, never
+CORE `/dashboard`). D-150 keeps it a debug surface: no operational launch or
+deploy includes it, and its ports (28161/28162) plus the `web_node` executable
+are pinned out of deploy configs by `test/test_control_launch_boundary.py`.
+It is launched only from legacy `robot.launch.py`, never
 from `deploy/robot/compose.yaml`. Polls `/state.json` every 333 ms and `/map.png`
 only when its gen counter changes; posts to `/cmd`, `/wander`, `/estop`,
 `/goal`, `/teleop`, `/map/reset`, `/map/resume`.

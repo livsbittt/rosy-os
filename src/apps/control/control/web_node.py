@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Web node: live map + control state in a browser.
 
+Debug surface (D-150): development/diagnostic only — never part of an
+operational launch or deploy, and its ports are pinned out of deploy configs
+by test/test_control_launch_boundary.py. The operator console is CORE
+/dashboard (D-23).
+
     ros2 run control web_node
     ros2 launch control web.launch.py
     frontend  http://localhost:28161   (port param — the page)

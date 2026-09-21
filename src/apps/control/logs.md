@@ -109,3 +109,8 @@
 - 변경: `control/control/detection_evidence.py` 신규 — 추론 패킷 1프레임 frozen 스냅샷(`TrackedEvidence` 패턴, 행동 어휘 없음). `capture()` 생산 측 전 필드 검증+ROS→모노톤 시계 변환, `evaluate()` 상태 판정만(fresh/empty/missed/stale/invalid — "없음"과 "놓침" 구분, 300ms D-136), `to_wire()` §6.1.1 재구성. 박스 규칙(원점 [0,1]·크기 (0,1]·프레임 수납)은 와이어 진실 `core_common.protocol.detections`와 동일 표현식. `inference_ms`(v1.11 additive)를 detections.py+API Ref §6.1.1에 추가. D-18 동기 시험이 스냅샷↔스키마를 묶음(시험 전용 import, D-64 생산 경계 유지). 중간에 schemas.py에 넣었다가 기존 detections.py 서브모듈 발견 후 되돌린 중복 정의 1건 있음
 - 증거: `test_detection_evidence.py` 10건 신규 녹색 + core `test_protocol_schemas.py` 1건(inference_ms 선택성·음수/NaN 거절·왕복) 신규 녹색. control 전체 1094 passed·26 skipped, core 전체 972 passed·11 skipped (2026-09-21 Windows, PYTHONPATH)
 - gate 변화: 없음. T1(CORE 정책 스냅샷 advisory 자리·단일 발행자·e-stop 해금 경로 계약)과 ROS-SIM 주입이 다음 순서 — 노드 기동은 T5까지 금지
+
+## 2026-09-21 · uncommitted · docs(control): mark web_node debug surface and the map home (D-150)
+- 변경: web_node.py 독스트링에 D-150 디버그 서피스 선언 추가(운영 launch/deploy 불가, 포트는 deploy 계약 테스트가 고정, 운용자 콘솔은 CORE /dashboard D-23). web/AGENTS.md 와 map/AGENTS.md 도 같은 계약으로 갱신 — map 은 캘리브레이션 기준 자산으로 격하, 운영 맵 홈은 navigation/map.
+- 증거: python -m pytest test/test_control_launch_boundary.py -q 통과. 신규 deploy 포트 가드 포함 5종 계약 테스트 변이 증명 완료(망가뜨림→적색→복구→초록).
+- gate 변화: 없음
