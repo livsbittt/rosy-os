@@ -195,3 +195,12 @@
 - 증거: customization, payload, systemd, first-boot 집중 계약 `27 passed`; shell syntax 통과.
 - gate 변화: SOURCE만 갱신. 실제 ARM64 chroot 실행 전 ARTIFACT HOLD.
 - 결정: D-164 Task 4 source-complete.
+
+## 2026-09-22 · uncommitted · feat(image): emit verifiable Pinky image handoff
+
+- 변경: raw image를 분리한 상태에서 ext filesystem 검사 후 bmap과 deterministic
+  `.img.xz`를 만들고 raw intermediate를 제거한다. exact image manifest, SPDX SBOM,
+  deb/ROS inventory, base/build provenance, report와 unsigned `SHA256SUMS`를 생성한다.
+- 증거: finalization/handoff와 기존 image 계약 `64 passed`; shell syntax 통과.
+- gate 변화: SOURCE만 갱신. ARM64 실물과 offline signature 전 ARTIFACT HOLD.
+- 결정: D-164 Tasks 5-6 source-complete.

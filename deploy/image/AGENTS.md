@@ -20,6 +20,8 @@ a Pinky Pro release artifact.
 | `image-workspace.sh` | Disposable raw-image expansion, loop/mount lifecycle and fail-closed cleanup |
 | `customize-rootfs.sh` | Native chroot ROS 2 Jazzy/ROSY installation and device-neutral systemd staging |
 | `verify-mounted-image.py` | Read-only mounted-root package, unit, Docker and device-state checks |
+| `finalize-image.sh` | Detached filesystem check, bmap creation and deterministic `.img.xz` compression |
+| `create-image-manifest.py` | Unsigned manifest, SBOM, inventories, provenance and checksum handoff |
 | `build-native-payload.sh` | Native ARM64 rosdep/colcon build and deterministic inventory export |
 | `verify-package-inventory.sh` | Required-package and `ros2 pkg prefix` release-root readback |
 | `required-ros-packages.txt` | Mandatory offline Pinky Pro ROS package set |

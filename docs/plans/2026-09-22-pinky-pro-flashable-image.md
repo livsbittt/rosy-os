@@ -157,8 +157,10 @@ sign offline; personalize only after writing each card.
 - Task 4: source-complete. Native ARM64 chroot customization installs a SHA-pinned
   official ROS apt-source package, Jazzy/rosdep dependencies, ROSY release and
   CORE-only systemd/first-boot overlay, then checks package/layout neutrality.
-- Tasks 5-6: planned; existing native payload, systemd, rollback and first-boot pieces
-  are inputs, not proof of a completed disk image.
+- Tasks 5-6: source-complete. The pipeline checks the detached raw filesystem,
+  emits deterministic `.img.xz` plus bmap, removes the raw intermediate and builds
+  an unsigned handoff with exact manifest, inventories, SPDX SBOM and provenance.
+  These sources are inputs, not proof of a completed disk image until the ARM64 run.
 - Task 7 writer preflight: source-complete ahead of Tasks 4-6. The Windows writer
   now verifies the Ed25519-signed checksum set and exact image manifest identity
   before its first disk probe; offline key ceremony and real artifact remain pending.
