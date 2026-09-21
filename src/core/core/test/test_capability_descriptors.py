@@ -67,13 +67,13 @@ def test_ready_marks_advertised_descriptors_available():
     assert by_id["perception.localize"].available is True
 
 
-def test_degraded_is_constrained_with_a_server_reason():
+def test_degraded_is_degraded_fallback_with_a_server_reason():
     descriptors = descriptors_from_cap001(
         _PINKY_FLAGS, device_state=DeviceState.DEGRADED
     )
     move = {d.id: d for d in descriptors}["mobility.move"]
     assert move.available is True
-    assert move.state == PresentationState.CONSTRAINED.value
+    assert move.state == PresentationState.DEGRADED_FALLBACK.value
     assert move.reason == "device_state:DEGRADED"
 
 

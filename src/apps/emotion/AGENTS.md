@@ -21,8 +21,7 @@ LCD emotion GIFs (`set_emotion` service) and PWR-003 info-card renderer (`info_s
 
 | Directory | Purpose |
 |-----------|---------|
-| `emotion/` | Node, LCD helper, info_screen (see `emotion/AGENTS.md`) |
-| `emotion/` | GIFs: hello, basic, angry, bored, fun, happy, interest, sad (see `emotion/AGENTS.md`) |
+| `emotion/` | Python package `emotion` (LCD node, info-screen renderer, hardware LCD helper) + emotion GIFs (see `emotion/AGENTS.md`) |
 | `test/` | `test_info_screen.py` + ament linters (see `test/AGENTS.md`) |
 | `resource/` | ament marker |
 
@@ -37,7 +36,7 @@ LCD emotion GIFs (`set_emotion` service) and PWR-003 info-card renderer (`info_s
 ### Testing Requirements
 
 ```bash
-python3 -m pytest src/apps/emotion/test/test_info_screen.py -v
+PYTHONPATH=src/apps/emotion python3 -m pytest src/apps/emotion/test/test_info_screen.py -v
 ```
 
 ### Common Patterns

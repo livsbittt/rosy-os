@@ -87,11 +87,11 @@
             <span id="state-age" class="machine-tag"></span>
           </div>
           <div class="telemetry-grid">
-            <article><span>X</span><strong id="pose-x">0.000</strong><small>metres</small></article>
-            <article><span>Y</span><strong id="pose-y">0.000</strong><small>metres</small></article>
-            <article><span>YAW</span><strong id="pose-yaw">0.000</strong><small>radians</small></article>
-            <article><span>LINEAR</span><strong id="velocity-linear">0.000</strong><small>m/s</small></article>
-            <article><span>ANGULAR</span><strong id="velocity-angular">0.000</strong><small>rad/s</small></article>
+            <article><span>X</span><strong id="pose-x">—</strong><small>metres</small></article>
+            <article><span>Y</span><strong id="pose-y">—</strong><small>metres</small></article>
+            <article><span>YAW</span><strong id="pose-yaw">—</strong><small>radians</small></article>
+            <article><span>LINEAR</span><strong id="velocity-linear">—</strong><small>m/s</small></article>
+            <article><span>ANGULAR</span><strong id="velocity-angular">—</strong><small>rad/s</small></article>
             <article><span>BATTERY</span><strong id="battery-value"></strong><small id="battery-voltage">voltage</small></article>
           </div>
           <div class="navigation-line">
@@ -360,39 +360,6 @@
               </div>
             </form>
           </article>
-
-          <article class="host-card" id="release-card" data-step="2" data-available="unknown"
-                   aria-labelledby="release-card-heading">
-            <header>
-              <h3 id="release-card-heading">릴리스</h3>
-              <span id="release-state" class="mode-chip" data-mode="UNKNOWN"></span>
-            </header>
-            <dl class="host-facts">
-              <div><dt>current</dt><dd id="release-current"></dd></div>
-              <div><dt>previous</dt><dd id="release-previous"></dd></div>
-              <div><dt>staged</dt><dd id="release-staged"></dd></div>
-              <div><dt>Git revision</dt><dd id="release-revision"></dd></div>
-              <div><dt>config / data schema</dt><dd id="release-schema"></dd></div>
-              <div><dt>마지막 실패</dt><dd id="release-failure"></dd></div>
-            </dl>
-            <p class="host-note" id="release-note" role="status"></p>
-            <div class="host-actions">
-              <button type="button" id="release-rollback" data-role="administrator" disabled>
-                이전 릴리스로 롤백
-              </button>
-              <button type="button" id="release-clear-hold" data-role="administrator" disabled>
-                복구 홀드 해제
-              </button>
-            </div>
-          </article>
-
-          <article class="host-card" id="commissioning-card" data-step="3" aria-labelledby="commissioning-heading">
-            <header>
-              <h3 id="commissioning-heading">커미셔닝</h3>
-              <span id="commissioning-mode" class="mode-chip" data-mode="UNKNOWN"></span>
-            </header>
-            <p class="host-note" id="commissioning-note" role="status">확인 전</p>
-          </article>
         </div>
       </section>
 
@@ -435,6 +402,41 @@
           </aside>
         </div>
       </section>
+
+      <div class="host-card-grid">
+<article class="host-card" id="release-card" data-step="2" data-available="unknown"
+                   aria-labelledby="release-card-heading">
+            <header>
+              <h3 id="release-card-heading">릴리스</h3>
+              <span id="release-state" class="mode-chip" data-mode="UNKNOWN"></span>
+            </header>
+            <dl class="host-facts">
+              <div><dt>current</dt><dd id="release-current"></dd></div>
+              <div><dt>previous</dt><dd id="release-previous"></dd></div>
+              <div><dt>staged</dt><dd id="release-staged"></dd></div>
+              <div><dt>Git revision</dt><dd id="release-revision"></dd></div>
+              <div><dt>config / data schema</dt><dd id="release-schema"></dd></div>
+              <div><dt>마지막 실패</dt><dd id="release-failure"></dd></div>
+            </dl>
+            <p class="host-note" id="release-note" role="status"></p>
+            <div class="host-actions">
+              <button type="button" id="release-rollback" data-role="administrator" disabled>
+                이전 릴리스로 롤백
+              </button>
+              <button type="button" id="release-clear-hold" data-role="administrator" disabled>
+                복구 홀드 해제
+              </button>
+            </div>
+          </article>
+
+          <article class="host-card" id="commissioning-card" data-step="3" aria-labelledby="commissioning-heading">
+            <header>
+              <h3 id="commissioning-heading">커미셔닝</h3>
+              <span id="commissioning-mode" class="mode-chip" data-mode="UNKNOWN"></span>
+            </header>
+            <p class="host-note" id="commissioning-note" role="status">확인 전</p>
+          </article>
+      </div>
 
       <section id="field-settings-panel" class="panel field-settings-panel" aria-labelledby="field-settings-heading">
         <div class="panel-heading">

@@ -72,6 +72,16 @@ class StateManager:
         self._diagnostics: dict[str, HealthState] = {}
         self._errors: list[str] = []
         self._sensors: dict[str, dict] = {}
+        self._hitl_requested: bool = False
+        self._capabilities_degraded: list[str] = []
+
+    def set_hitl_requested(self, requested: bool) -> None:
+        with self._lock:
+            self._hitl_requested = requested
+
+    def set_capabilities_degraded(self, modules: list[str]) -> None:
+        with self._lock:
+            self._capabilities_degraded = list(modules)
 
     def set_robot_id(self, robot_id: str) -> None:
         with self._lock:
@@ -196,4 +206,6 @@ class StateManager:
                 errors=list(self._errors),
                 seq=self._seq,
                 evidence=evidence,
+                hitl_requested=self._hitl_requested,
+                capabilities_degraded=list(self._capabilities_degraded),
             )

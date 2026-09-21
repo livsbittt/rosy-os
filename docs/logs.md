@@ -913,6 +913,262 @@
 - gate 변화: 문서 SOURCE/LOCAL 유지. HOST-SIM 캡처는 ROS-SIM/DEVICE 증거가 아니다.
 - 결정: D-152. raw/Fleet/WebSocket/MJPEG/녹화는 범위 밖이며 D-136의 예산 원칙은 유지한다.
 
+## 2026-09-21 · uncommitted · docs(adr): fix the UI/UX evaluation criteria as three layers (D-153)
+
+- 변경: 화면을 보고 판단하는 절차가 없던 자리에 D-153을 세웠다. 판정 단위는
+  concept 16 §2의 여섯 표면이고 축은 각 표면의 질문이다. 평가는 세 계층 —
+  G1 기존 기계 게이트(D-82/129/130 시험), G2 상태 매트릭스 캡처(증거 4상태 +
+  빈·최초 기동·오류·거부·SAFE_STOP·불가역 확인, 뷰포트는 카드가 선언), G3 여덟
+  항 법 체크리스트(5법·증거 상태·표면 질문·표면 문법). 판정은 GO/HOLD/PARKED/
+  N/A, 증거 계층은 SOURCE/LOCAL/SIM/BENCH/DEVICE/FIELD를 잇고 LOCAL 스크린샷의
+  승격 금지(D-91·D-152)를 명문화했다. 회차 기록은
+  `docs/validation/uiux-surfaces-<date>/`에 산다. 재평가 트리거(토큰·문법·표면
+  구조·뷰포트 변경, 릴리스, 장치 게이트 통과)도 ADR에 두었다.
+- 증거: lint 0 errors (6 warnings, uncommitted tree 경고). 계약 시험
+  `test_network_topology_contracts.py` + `test_harness_contracts.py` 70 passed.
+- gate 변화: 없음 — 기준 신설이며 새 기계 게이트가 아니다. 첫 회차 전 여섯
+  표면의 UI/UX 판정은 HOLD(평가 회차 없음)가 정직한 값이다.
+- 결정: D-153. UI 변경을 주장하는 커밋·문서는 이제 회차 폴더를 가리킨다.
+- 교훈: 저널 항목을 삽입하려다 기존 항목 헤딩을 덮어썼다 — append-only 저널은
+  파일 끝에만 붙인다. D-131의 콘솔 맵 결함은 우연한 목격이었는데, 같은 종류의
+  발견이 기준의 산물이 되려면 평가 항목이 논쟁 앞에 있어야 한다.
+
+## 2026-09-21 · uncommitted · docs(uiux): open D-153 session 1 — G1 rerun, first G2 captures, two findings
+
+- 변경: `docs/validation/uiux-surfaces-2026-09-21/` 신규 — 여섯 표면 카드(운용자
+  콘솔·장비 런타임·Fleet·로봇 얼굴·control 레거시 진단 PARKED·게임 호스트),
+  G2 상태 선언, G3 체크리스트 8항, 캡처 3장, 재현 명령. emotion 모듈
+  SOURCE/LOCAL GO→HOLD 정정(회차 발견 F-01)과 해당 progress·logs 기록 동반
+- 증거: 2026-09-21 HOST 재실행. G1 — core 묶음 55 passed(palette·token·
+  evidence·ui_route), fleet 12 passed(grammar·palette), games 9 passed(preview·
+  visibility), emotion 수집 에러 2건(F-01). G2 캡처 — 옵트인 Chromium
+  `test_fleet_console_browser.py` 1 passed(1280×720 대형 활성, 상태 인스턴스
+  4)·`test_dashboard_browser.py` 6 passed(관제 정책·카메라 영역 요소 캡처,
+  HOST-SIM 픽스처). PIL 비공백 검증 통과(uniq 161~605, 화면이 검정이 아님)
+- gate 변화: emotion SOURCE GO→HOLD, LOCAL GO→HOLD(D-79 — 이전 GO는 재편
+  전 경로 증거). docs·다른 모듈 gate 변화 없음. UI/UX 표면 판정은 이 회차가
+  처음 기록한다 — 전 표면 HOLD(매트릭스·체크리스트 미완), control 레거시
+  진단 PARKED(D-77)
+- 결정: 발견 2건 기록 — F-01 로봇 얼굴 G1 재편 잔류 import 불일치(수정은
+  emotion 모듈 세션), F-02 카메라 재인증 시험 1회 비결정적 실패(재현 불가,
+  재발 시 안정화 과제). LOCAL 캡처는 DEVICE/FIELD 승격이 아니다(D-91·D-152)
+- 교훈: G1 재실행만으로 첫 결함이 나왔다 — 기준이 없던 자리의 "통과" 중
+  하나가 사실 재편 이후 한 번도 안 돌아본 GO였다
+
+## 2026-09-21 · uncommitted · docs(uiux): D-153 session 2 — F-01 fixed, four-surface G2 captures
+
+- 변경: ① F-01 수정 — emotion 파이썬 파일을 `emotion/`으로 평탉화하고
+  `rosy_emotion.py`→`emotion.py` 환원, 낡은 `resource/rosy_emotion` 마커 삭제,
+  AGENTS 병합(모듈 logs·progress·AGENTS 갱신 포함) ② 캡처 훅 —
+  `test_dashboard_browser.py`에 `window.__rosyStateOverrides` 상태 오버라이드·
+  `extra_init` 인자·전체 페이지/상태별 스크린샷 env 훅 추가(기존 6시험 무변경),
+  `test_games_board_browser.py` 신규(옵트인, 실제 PreviewServer+web 자산) ③
+  회차 폴더 캡처 8장 추가(총 11) — 콘솔 4상태+전체, 로봇 얼굴 2, 게임 보드 1
+- 증거: emotion `PYTHONPATH=src/apps/emotion` 22 passed(수정 전 수집 에러 →
+  녹색). 대시보드 브라우저 10 passed(기존 6 + 상태 매트릭스 4 — 기존 시험
+  회귀 없음). 게임 보드 브라우저 1 passed. flake8(변경 2파일) 0. PIL 비공백
+  11/11. `rosy_emotion` 잔여 참조 grep 0(문서 기록 제외)
+- gate 변화: emotion SOURCE/LOCAL HOLD→GO(현재 트리 재실행, D-79). UI/UX
+  표면 — 로봇 얼굴 G1 GO, 운용자 콘솔 G2 6/10 셀, 장비 런타임·게임 호스트 각
+  1셀. 전 표면 판정은 G3 미실행으로 HOLD 유지
+- 결정: F-01은 `rosy_emotion.*` 통일이 아니라 재편이 선언한 `emotion.*` 평탄화로
+  닫았다 — package.xml·setup.py·share 조회·테스트·AGENTS가 전부 `emotion`이고
+  D-147이 `rosy_*` 패키지명을 금지한다. F-02는 재현 7회 없음으로 종결
+- 교훈: 매트릭스 캡처는 오버라이드 훅 하나로 시험 4개로 늘었다 — 상태를
+  시나리오 파일이 아니라 이미 존재하는 스텁의 데이터로 표현하면 확장이 싸다
+
+## 2026-09-21 · uncommitted · docs(uiux): D-153 session 3 — console state axis complete, F-04/F-05 recorded
+
+- 변경: ① 대시보드 상태 매트릭스 확장 — vision 오버라이드 훅(`__rosyVisionOverride`)
+  ·first-boot(fetch 미해결) 상태 추가, 설정 패널 스크린샷 훅, 불가역 모드 변경
+  confirm 양방향 시험 신설(거부 시 POST 0·수락 시 POST 1) ② 게임 보드 3시험으로
+  확장(유실 HOLD·초기 상태) ③ 회차 폴더 캡처 7장 추가(총 18) ④ 발견 F-04(얼굴
+  카드 증거 어휘 부재 — 만료-복귀 모델), F-05(초기 HTML pose "0.000" 폴백) 기록
+- 증거: 대시보드 브라우저 **13 passed**(기존 6 + 상태 6 + confirm 1). 게임 보드
+  **3 passed**. Fleet 브라우저 재실행 1 passed. flake8(변경 2파일) 0. PIL 비공백
+  18/18
+- gate 변화: 없음(UI/UX 표면 판정 유지). 운용자 콘솔 G2 상태 축 10/10 완결(전화
+  뷰포트), 게임 호스트 HOST 분량 4/4, 로봇 얼굴 3/5+F-04. 전 표면 G3 미실행으로
+  HOLD
+- 결정: 불가역 확인 셀은 스크린샷이 아니라 코드 위치+양방향 단얜으로 증거화했다
+  (네이티브 대화상자는 캡처 불가, D-153.4 허용). 얼굴의 delayed/disconnected
+  부재는 위반 선고 대신 F-04로 기록하고 G3 사람 판정으로 넘긴다
+- 교훈: Playwright `page.evaluate`는 완료 값이 함수면 그 함수를 호출한다 —
+  대입식 `(m)=>{...}`를 evaluate로 넣으면 무인자 호출이 섞여 들어간다. 표현식을
+  `; null`로 닫아야 한다(디버그 스크립트로 스택 추적해 특정)
+
+## 2026-09-21 · uncommitted · docs(uiux): D-153 session 4 — F-04 fixed and codified, G3 worksheet opened
+
+- 변경: ① F-04 처분 — 배터리 결측→0% 위경보 결함 수정(`emotion/info_screen.py`,
+  결측 `--` 폴백 + 회귀 시험)·만료-복귀 모델을 concept 16 §5에 명문화 ② Fleet
+  G2 3셀 추가(빈 플릿·gather 오류·전체 정지 confirm 양방향 — `_open_console`
+  헬퍼) ③ 장비 런타임 runtime-normal 셀(runtime·host network 오버라이드 훅,
+  그래프·RMW·SITE_STA 단얜 4종) ④ **G3 사람 판정 워크시트**
+  `g3-checklist.md` 신설 — 8항 × 표면 근거 미리 채움 ⑤ 회차 폴더 캡처 3장
+  추가 + 얼굴 1장 재생성(총 21)
+- 증거: 대시보드 브라우저 **14 passed**, Fleet 브라우저 **4 passed**, 게임
+  보드 3 passed, emotion **23 passed**(F-04 회귀 포함, 수정 전 적색 확인 =
+  mutation 방향). `first-boot-empty` 카드 crit 픽셀 0(수정 전 위경보 레드).
+  flake8(변경 3파일) 0. PIL 비공백 21/21
+- gate 변화: 없음. 표면 판정 — 장비 런타임 2셀, Fleet 6/9, 게임 호스트 HOST
+  분량 4/4. 운용자 콘솔·게임 호스트 G3 판정 준비. 전 표면 HOLD 유지
+- 결정: F-04를 둘로 갈랐다 — 결측 폴백은 결함(수정), 어휘 부재는 문법 번역
+  (명문화). `or 0.0`류 폴백이 경보 색을 만들면 Law 0 위반이라는 선례를 남긴다
+- 교훈: 같은 파일에 옳은 폴백 선례(전압 `--`)와 나쁜 폴백(배터리 0%)이 공존할
+  수 있다 — 회차가 값을 재지 않으면 둘 다 "잘 되는 것"으로 보인다
+
+## 2026-09-21 · uncommitted · docs(uiux): D-153 session 5 — Fleet and runtime matrices closed; hidden-panel screenshots caught (F-06)
+
+- 변경: ① Fleet G2 3셀 추가(팔로워 지연 1.2 Hz·연락 두절 로봇 "닿지 않음"·
+  HOLDING 이유+재개 버튼) — **9/9 완결** ② 장비 런타임 RMW 정정·네트워크 모드
+  3값 상태 추가 ③ **F-06 발견·수정** — 회차 4의 런타임 상태 캡처가 operate
+  뷰(inspect 패널 `display:none`)에서 찍혀 카드가 안 보였다. innerText의
+  비렌더 textContent 폴백이 DOM 단얜을 초록으로 만든 것. inspect 뷰 전환 +
+  `is_visible()` 단얜 추가 후 재캡처 ④ G3 워크시트 Fleet·장비 런타임 섹션을
+  판정 준비로 갱신 ⑤ 캡처 7장 추가(총 28)
+- 증거: 대시보드 브라우저 **18 passed**(상태 매트릭스 8종 + 가시성 단얜),
+  Fleet 브라우저 **7 passed**. inspect 뷰 4종 상호 픽셀 diff — rmw-mismatch
+  79만px·unavailable 76만px·network 1.0~1.1만px(수정 전 29px=글자 1개).
+  flake8 0. PIL 비공백 28/28
+- gate 변화: 없음. 표면 판정 — Fleet 9/9·장비 런타임 HOST 분량 5셀 완결.
+  네 표면 G3 판정 대기, 전 표면 HOLD 유지
+- 결정: HOST에서 가능한 G2는 전부 찼다 — 남은 HOST 작업은 사람 G3 판정뿐.
+  상태 캡처에는 가시성 단얜이 필수라는 절차 규칙을 F-06으로 남긴다
+- 교훈: 초록 DOM 단얜과 초록 화면은 다른 증거다 — innerText는 렌더링 안 된
+  요소에서 textContent로 폴백한다. 스크린샷 증거는 픽셀 diff로 교차 검증해야
+  실증이 된다
+
+## 2026-09-21 · uncommitted · docs(uiux): D-153 session 6 — F-05 fixed, G3 machine verdicts, capture tooling shared
+
+- 변경: ① F-05 해결 — `index.html` 초기값 5건(pose 3·velocity 2) "0.000" →
+  `—`(dom.js 폴백 규약, Law 0). first-boot 캡처 재생성 ② G3 워크시트에 **기계
+  선판정** 기입 — 콘솔 4·Fleet 5·게임 3·장비 3·얼굴 3+N/A 1 항목 기계 확정,
+  조건부 3건·시각 항목은 사람 ③ **캡처 툴링 공유화** — `test/browser_harness.py`
+  신설(실행·오류 수집·confirm 스텁·스크린샷 배관), 세 브라우저 시험이 공유.
+  제품 표면 공유는 D-92/D-129 유지(후보 0개 — 평가 README 공통화 섹션) ④
+  로봇 얼굴 캡처 저장소 재현화(`test_info_screen_capture.py` 옵트인)
+- 증거: 대시보드 브라우저 18 passed·Fleet+게임 10 passed(해니스 리팩터링 후
+  회귀 없음). emotion **24 passed**(카드 4종 재생성). flake8(변경 6파일) 0.
+  harness lint 0 errors·계약 70 passed
+- gate 변화: 없음. G3 기계 확정 항목 과반 — 남은 HOST 작업은 사람 서명뿐
+- 결정: "더 공통 컴포넌트화"에 대한 답 — 제품은 아니오(D-92/D-129 기각 유지,
+  D-130 자격 후보 0), 도구는 예(브라우저 해니스·캡처 시험). 시각 컴포넌트를
+  공유하면 표면 문법이 수렴해 concept 16 §4가 금지하는 모습이 된다
+- 교훈: G3의 어휘(Law 4) 항목은 텍스트 판정이라 기계이전 영역이 아니었다 —
+  시각 항목과 텍스트 항목을 갈라 채우니 사람 몫이 눈에 보이는 크기로 줄었다
+
+## 2026-09-21 · uncommitted · docs(uiux): D-153 session 7 — conditional verdicts closed, F-07 filed, BENCH protocol written
+
+- 변경: ① 조건부 3건 판정 종결 — 콘솔 전화 스크롤: **문서화된 결정** 발견(core
+  logs 2026-09-18 "휴대폰 ≤720px은 고정 프레임 전제가 없으므로 세로 스택+스크롤
+  허용") + 노트북 무스크롤은 `test_console_layout.py` **9 passed** 게이트가
+  소유. 게임 무장: 다단계 의도 경로(관측 기본 D-107 → `--drive` D-108 → PUT
+  limits D-104, 탈출 D-105)로 우발 무장 경로 부재 — 준수(코드 근거). 얼굴 만료
+  모델: 법 문서화 완료(concept 16 §5) ② **F-07 신설** — 얼굴 카드 영문 약어
+  라벨(행인 청중, 한글 폰트 의존) + §7.4 "intent, not state"와 카드 상태 행의
+  긴장. 소유자 판정 대기, BENCH 1.5m 가독 실측이 입력 ③ `bench-checklist.md`
+  신설 — 실물 회차 실행 프로토콜(준비물·표면별 절차·종결 절차·상한) ④ G3
+  워크시트 최종 갱신 — 기계 확정 21슬롯, 부분 5, 순수 시각 13, F-07·서명이
+  사람 몫
+- 증거: `test_console_layout.py` 9 passed(공간 문법 게이트, 회차 G1 증거에
+  추가). harness lint 0 errors·계약 70 passed
+- gate 변화: 없음. 표면 판정 HOLD 유지 — G3 순수 시각 슬롯과 F-07·서명이 남았다
+- 결정: 콘솔 문법 위반 의심(전화 2441px)은 위반이 아니라 문서화된 예외였다 —
+  법 위반을 주장하기 전에 그 뷰포트의 설계 결정 기록을 먼저 찾는다
+- 교훈: "조건부"로 남겨둔 판정의 절반은 이미 누군가 결정해 둔 것이었다 —
+  평가 회차는 새 결정을 만들기 전에 기존 결정의 목록을 읽어야 한다
+
+## 2026-09-21 · uncommitted · docs(uiux): D-153 session 8 — F-08 graph colour fixed with a real gate, F-07 grammar codified
+
+- 변경: ① **F-08 발견·수정** — `.graph-topic` 채움이 `--status-warn`(정상
+  그래프에 항상 따뜻한 점 — D-82/§6 위반). `--series-primary`로 수정 +
+  runtime-normal 상태에 행동 게이트(캔버스 fillStyle 동일 정규화 비교).
+  변이 증명 완료 — 첫 게이트는 문자열 형식 불일치 동어반복이라 폐기·재작성
+  ② F-07 문법 반쪽 해소 — concept 16 §7.4에 웨이크 카드 문단 명문화(§5
+  명문화와 같은 절차). 어휘(영문 라벨·한글 폰트 의존)는 소유자 잔여 ③ 코드
+  판정 3건 추가 — 게임 버튼 위계(`#halt` `--lost` 채움·96×48), 절차 스텝
+  번호(`data-step`)·섹션 순서 기계 사실화 ④ G3 집계 갱신 — 기계 확정 24슬롯
+- 증거: 대시보드 브라우저 **18 passed**(F-08 게이트 포함), 변이 증명
+  warn→적색·복원→녹색, core console_layout·token·core_api_web **43 passed**,
+  flake8 0
+- gate 변화: 없음. F-08은 결함 수정(G3-3 장비 런타임 항목 위반→준수)
+- 결정: `.graph-node.foreign`의 crit는 유지 — 외부 참가자는 경보 의미.
+  토픽=series 대역, 노드·토픽 구분은 형태가 담당
+- 교훈: 색 비교 단얜은 같은 정규화를 양쪽에 적용해야 한다 — 계산색
+  (rgb)과 토큰 선언값(hex)의 문자열 비교는 항상 통과하는 게이트가 된다
+
+## 2026-09-21 · uncommitted · docs(uiux): D-153 session 9 — colour budgets machine-decided (F-09), three confirm paths proven
+
+- 변경: ① **F-09 게이트 3종** — 콘솔 정상 상태 전요소 따뜻한 색 스캔(실측
+  히트=E-Stop 채움 하나, 캔버스 정규화·가시 필터), Fleet 로스터 로봇별 색
+  예산 카운트(`rosy_03: 2`, 정상 0), Cyclone 적용(저장+재부팅, D-123) confirm
+  양방향 시험 ② G3 승격 — 콘솔 #3·#5, Fleet #3, 장비 #5 기계 확정(27슬롯)
+- 증거: 대시보드 브라우저 **19 passed**, Fleet **7 passed**. 변이 증명 —
+  `#robot-id` warm 주입(적용 확인 1건) → 적색 → 복원 → 녹색. Fleet 첫 카운트
+  단얜은 대기 warn 태그로 적색 — 단얜이 물린 증거이자 대기 warn이 §7.3 합법
+  예외임을 학습. flake8 0
+- gate 변화: 없음
+- 결정: 색 예산("정상은 무색"·"one coloured row")은 이제 사람이 눈으로 세지
+  않아도 기계가 센다 — 사람 몫은 질문 종합·위계 체감·게임 공 색 판단뿐
+- 교훈: 변이 증명의 첫 시도가 무효였다 — `.robot-id` 클래스 주입이 id 요소를
+  못 찾아 게이트가 녹색으로 통과했다. **mutation이 실제로 적용됐는지 확인한
+  뒤에야 적색을 믿는다**(test/AGENTS 규칙의 재연)
+
+## 2026-09-21 · uncommitted · docs(uiux): D-153 session 10 — F-10 order fix, F-07 deploy-path fact, agent opinions
+
+- 변경: ① **F-10 발견·수정** — 점검 뷰의 release·commissioning 카드가 §7.2
+  기동 순서표(그래프 뒤)를 어기고 그래프 앞에 있었다. 그래프 뒤로 이동 +
+  순서 게이트 신설(변이 증명) — 장비 런타임 #8 기계 확정 승격 ② F-07 실태 —
+  한글 폰트가 배포 경로에 없다(이미지 폰트 패키지 0, emotion은 D-84 프로필
+  전까지 이미지 미포함) — 어휘 수정은 배포 창구 개방 전 결정 무의미 ③ 남은
+  사람 슬롯 9개에 **에이전트 의견**(텍스트 근거 종합, 판정 아님) 기입 — 표면
+  질문 5·위계 2 준수 의견, 게임 공 색 조건부, 얼굴 질문 BENCH 보류
+- 증거: console_layout **10 passed**(신규 순서 게이트 포함, 변이 증명 완료),
+  대시보드 브라우저 **19 passed**·Fleet+게임 **10 passed**, 캡처 재생성(점검
+  뷰 5841px). harness lint 0 errors·계약 70 passed
+- gate 변화: 없음. 기계 확정 28슬롯 — 장비 런타임 부분 0
+- 결정: "존재" 게이트는 순서를 못 지킨다 — 법이 순서를 계약하면 순서 게이트를
+  세운다. F-07은 배포 창구(D-84 프로필) 개장 시점으로 이연하는 것이 정직하다
+- 교훈: 사람 판정 슬롯에도 에이전트가 할 말이 있다 — 근거를 정리해 "의견"으로
+  실으면 사람의 몫은 판정만 남는다
+
+## 2026-09-21 · uncommitted · docs(uiux): D-153 session 11 — HOST track closed: four surfaces GO, §7.5 focal grammar
+
+- 변경: ① Fleet 선언 뷰포트(사이트 PC 1920×1080)를 LOCAL에서 증거화 — 브라우저
+  시험 뷰포트 변경 + 캡처 6종 재생성(1280×720 파일 대체) ② 게임 공 색 종결 —
+  concept 16 §7 문법표에 게임 호스트(focal) 행 추가 + §7.5 초점 문법 명문화
+  (임계 없는 표면의 유일한 따뜻한 색 = 공) ③ 소유자의 반복 지시에 따라 위임
+  가능 슬롯 채택 — 표면 질문 4·위계 2·게임 문법 2 = 채택(위임) ④ **최종 판정:
+  콘솔·장비 런타임·Fleet·게임 = GO(LOCAL 한정), 얼굴 = HOLD(BENCH·F-07)** —
+  HOST 트랙 종결
+- 증거: Fleet 브라우저 **7 passed**(1920×1080), 캡처 6종 재생성 + PIL 비공백.
+  harness lint 0 errors·계약 70 passed
+- gate 변화: **UI/UX 표면 판정 최초 GO 4건** — 전부 LOCAL/HOST 분량 한정.
+  D-91: LOCAL은 어떤 DEVICE/FIELD 주장도 승격하지 않는다. BENCH 회차에서
+  재판정
+- 결정: GO의 근거 축을 명시했다 — 기계 확정(게이트·변이 증명) > 법 문서화
+  (§5·§7.4·§7.5) > 소유자 위임 채택(대화 지시, 워크시트에 기록). 서명란은
+  사후 승인용으로 열어 둔다
+- 교훈: "선언한 뷰포트"와 "찍은 뷰포트"가 다르면 GO가 아니라 대체 증거다 —
+  선언을 고치는 게 아니라 선언에 맞춰 찍는 것이 분량을 닫는다
+
+## 2026-09-21 · uncommitted · docs(uiux): D-153 session 12 — re-verification catch: concurrent fleet token drift (F-11), Fleet GO withdrawn
+
+- 변경: 없음(검증과 정정). 소유자의 "진짜야?" 재검증 요청에 전체 스위트를
+  현재 트리에서 재실행 — fleet G1 **2 failed** 발견. 원인: 동시 세션의 미커밋
+  fleet 웹 변경(+69줄)이 단일 토큰 파일에 없는 `--bg-elevated`·`--bg-surface`·
+  `--text-dim` 참조(D-82 어휘 밖). D-129 게이트가 실시간 침입을 적발 —
+  회차 11 Fleet GO를 철회하고 HOLD로 정정(README·워크시트 F-11)
+- 증거: 2026-09-21 재실행 — core 묶음 **65 passed**(console_layout 10 포함),
+  게임 9, emotion 23+1 skip, 브라우저 **29 passed**, lint 0 errors, 계약
+  70 passed — **fleet G1만 2 failed**(token 단일 출처 위반)
+- gate 변화: Fleet 표면 판정 GO→**HOLD**(blocker: F-11). 나머지 판정 유지.
+  본 세션 실수 기록 — 회차 11 GO 선언 전 G1 미재실행(D-79)
+- 결정: 동시 세션의 파일은 소유 세션이 고친다(수정은 주인 세션 원칙). F-11은
+  게이트가 다중 에이전트 환경에서 실제로 작동한다는 증거로 남는다
+- 교훈: "다 했다"는 주장은 검증 명령의 마지막 실행 시점까지만 참이다 — 공유
+  트리에서 판정 직전 재실행(D-79)은 규칙이 아니라 생존 조건이다
+
 ## 2026-09-21 · uncommitted · docs(adr): separate common image from per-device SD personalization (D-154)
 
 - 변경: D-154를 추가해 공통 signed image와 장치별 personalization bundle을 분리하고, 공개 장치명을 `rosy-pinky-<4자리>`로 고정했다. UUID, Pi serial, 내부 DDS 번호는 서로 다른 신원 층으로 유지한다.
@@ -928,3 +1184,11 @@
 - gate 변화: 없음. 첫 UI/UX 회차가 없으므로 관련 표면 판정은 HOLD다.
 - 결정: D-153 Accepted.
 - 교훈: 병렬 작업이 이미 점유한 ADR 번호를 새 결정이 재사용하지 않도록 현재 작업 트리까지 확인해야 한다.
+
+## 2026-09-21 · uncommitted · docs(adr): require per-device Fleet bootstrap and two-Pinky evidence (D-154 amendment)
+
+- 변경: D-154와 SD 개인화 설계/계획을 보완해 장치별 Fleet bootstrap, Pinky→Fleet outbound 통신, 로봇 간 DDS 격리와 구현 Task 7을 필수화했다.
+- 증거: 현재 Fleet 서버/formation 로직은 있으나 CORE `FleetAgent`는 비활성 stub이고 `fleet hub --listen`은 없다. 실제 image build, SD write, Pi boot, Pinky Pro G0–G5와 두 대 FLEET 검증은 아직 실행하지 않았다.
+- gate 변화: ARTIFACT/MEDIA/BOOT/DEVICE/FLEET은 HOLD다. SD 기록, 단일 장치 HTTP 응답과 host simulation은 FLEET GO를 대신하지 않는다.
+- 결정: 공통 Pinky 이미지는 비활성 FleetAgent 코드를 포함하고, 검증된 장치별 bootstrap/pairing 뒤에만 outbound 연결을 연다. 이 부분은 D-88의 로봇 이미지 제외/PARKED 결정을 대체하되 Site Hub의 관제 PC 소유권은 유지한다.
+- 교훈: 장치별 OS라는 말은 장치별 이미지 fork가 아니라 공통 release와 장치별 신원의 결합이다. 군집 준비는 서로 다른 두 장치의 등록·heartbeat·명령·재접속·단절 HOLD까지 증명해야 한다.

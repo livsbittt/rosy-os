@@ -54,6 +54,7 @@ class FormationRequest(BaseModel):
 class ReformRequest(BaseModel):
     formation: str
     spacing: Optional[float] = None
+    max_speed: Optional[float] = None
 
 
 def _http_error(exc: BaseException) -> HTTPException:
@@ -134,7 +135,7 @@ def create_app(console: FleetConsole, *, console_token: Optional[str] = None,
     @app.post("/api/fleet/formation/reform", dependencies=guard, tags=["formation"])
     async def formation_reform(body: ReformRequest) -> dict:
         try:
-            return await console.formation_reform(body.formation, body.spacing)
+            return await console.formation_reform(body.formation, body.spacing, body.max_speed)
         except (HubError, RobotApiError, OSError) as exc:
             raise _http_error(exc) from exc
 

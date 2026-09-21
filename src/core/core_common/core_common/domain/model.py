@@ -115,6 +115,7 @@ def inventory_from_config(
     estop: bool,
     booting: bool = False,
     cap001: Optional[Mapping[str, Any]] = None,
+    hitl_requested: bool = False,
 ) -> dict[str, Any]:
     robot = config.get("robot") or {}
     robot_id = str(robot.get("id") or "rosy_01")
@@ -146,6 +147,7 @@ def inventory_from_config(
             devices=(robot_id,),
         ),
         "device_state": state,
+        "hitl_requested": hitl_requested,
     }
     if cap001 is not None:
         from core_common.domain.capabilities import descriptors_from_cap001

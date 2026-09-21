@@ -2,13 +2,13 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Build a fail-closed Windows-to-Pi pipeline that flashes one verified Rosy OS image, assigns a `rosy-pinky-<4-character>` device identity, injects site Wi-Fi without logging the passphrase, and proves the resulting device through readback.
+**Goal:** Build a fail-closed Windows-to-Pi pipeline that flashes one verified Rosy OS image, assigns a `rosy-pinky-<4-character>` device identity, injects site Wi-Fi without logging the passphrase, prepares the device for authenticated Fleet enrollment, and proves the resulting device through readback.
 
 **Architecture:** Keep the signed base image device-agnostic. A Windows PowerShell orchestrator verifies the physical target and delegates deterministic identity/manifest work to a ROS-free Python module; a one-shot Pi service consumes the per-card bundle before networking and runtime startup. Human device names, immutable UUIDs, hardware serials, and DDS identities remain separate.
 
 **Tech Stack:** PowerShell 7, Python 3.12 standard library, JSON Schema, systemd, NetworkManager, Raspberry Pi `rpi-image-gen`, Raspberry Pi Imager CLI, pytest.
 
-**Decision prerequisite:** D-154 is Accepted. Implementation must preserve its common-image, public/device/DDS identity separation, secret-handling, core-only first boot, and evidence-tier boundaries.
+**Decision prerequisite:** D-154 is Accepted. Implementation must preserve its common-image, public/device/DDS identity separation, secret-handling, core-only first boot, Fleet bootstrap/DDS-isolation boundary, and evidence-tier boundaries.
 
 ---
 
@@ -92,8 +92,9 @@ git commit -m "feat(deploy): define short Pinky device identities"
 
 Cover exact keys, UUID, device-name pattern, release ID, `pinky_pro`, explicit
 robot number 1..61, derived domain/namespace, requested preset, country code,
-SSID length, 64-hex WPA PSK, creation time, nonce, and payload checksum. Assert
-that passphrase-like values never appear in serialized manifests, receipts,
+SSID length, 64-hex WPA PSK, Fleet endpoint/trust profile/pairing-required flag,
+creation time, nonce, and payload checksum. Assert that passphrase-like values,
+pairing credentials and private keys never appear in serialized receipts,
 exceptions, or logs.
 
 **Step 2: Run RED**
@@ -123,7 +124,9 @@ memory can be securely zeroed.
 
 Keep the existing rule that the common image cannot contain a site PSK. Add a
 specific validator for the transient card bundle that permits only a raw 64-hex
-PSK at the schema-defined path and forbids passphrases, tokens, and private keys.
+PSK and an optional one-time Fleet pairing credential at schema-defined paths.
+It forbids passphrases, reusable tokens and private keys, and neither permitted
+secret may appear in a receipt or log.
 
 **Step 5: Run GREEN**
 
@@ -375,7 +378,92 @@ git add deploy/robot/device_readback.py deploy/robot/commissioning_session.py te
 git commit -m "feat(deploy): bind personalized identity into readback"
 ```
 
-### Task 7: Document, verify, and dry-run the connected SD
+### Task 7: Complete the Pinky-to-Fleet communication path
+
+**Files:**
+- Modify: `src/core/core_common/core_common/protocol/schemas.py`
+- Modify: `src/core/core_features/core_features/fleet_agent/agent.py`
+- Modify: `src/core/core/core/services.py`
+- Modify: `src/core/core/test/test_fleet_agent.py`
+- Create: `src/site/fleet/fleet/hub/server.py`
+- Modify: `src/site/fleet/fleet/cli.py`
+- Modify: `src/site/fleet/fleet/server/console.py`
+- Create: `src/site/fleet/test/test_hub_server.py`
+- Create: `test/test_fleet_enrollment_contracts.py`
+- Modify: `deploy/robot/apply-sd-provision.py`
+
+**Step 1: Write failing identity and connection tests**
+
+Extend the additive hello contract with immutable `device_uid`, public
+`device_name`, model, hardware serial and internal `robot_id`. Test that two
+Pinky devices with different UUID/name/robot-number tuples register as two
+robots even when they share one OS release. Reject duplicate UUID, duplicate
+robot number, hardware-serial drift, invalid endpoint trust and a reused or
+expired pairing credential.
+
+Test that the robot opens no inbound listener and never exposes its DDS domain
+to another robot. With no valid Fleet bootstrap, `FleetAgent` stays disabled
+without delaying CORE. With a valid bootstrap it connects outbound, sends hello,
+heartbeats at 1 Hz, forwards ordered events, resumes from `since_seq` after
+reconnect and uses bounded exponential backoff.
+
+**Step 2: Run RED**
+
+Run:
+
+```bash
+python -m pytest src/core/core/test/test_fleet_agent.py src/site/fleet/test/test_hub.py src/site/fleet/test/test_hub_server.py test/test_fleet_enrollment_contracts.py -q
+```
+
+Expected: tests fail because the network listener, enabled agent and device
+identity fields do not yet exist.
+
+**Step 3: Add the site Hub listener and enrollment exchange**
+
+Implement `fleet hub --listen` on the site PC around the existing pure
+`SiteHub.handle()` contract. TLS/trust policy and one-time pairing are required
+outside explicit development fixtures. Exchange the one-time credential for a
+rotatable long-term device credential stored mode `0600`; remove the one-time
+credential from the robot after a successful exchange. Logs and Fleet registry
+views may contain IDs and certificate fingerprints, never either credential.
+
+**Step 4: Enable the device-side FleetAgent fail-closed**
+
+Ship the agent code in the common Pinky image but enable it only after the
+personalization bootstrap, identity/serial binding and trust checks succeed.
+Wire it as a non-blocking CORE service: CORE remains local-first when Fleet is
+absent, and no reconnect path may activate motor, mission or formation. Fleet
+commands continue through the authenticated robot REST API with correlation ID;
+the outbound socket is gather-only for hello, heartbeat and events.
+
+**Step 5: Replace polling only after equivalent state is proven**
+
+Feed Hub registry snapshots into `FleetConsole` while retaining an explicit
+fallback during transition. Tests must prove that robot state, event sequence,
+offline timeout and reconnect are equivalent before REST polling is removed.
+
+**Step 6: Run GREEN and the two-robot host integration**
+
+Run:
+
+```bash
+python -m pytest src/core/core/test/test_fleet_agent.py src/site/fleet/test/test_hub.py src/site/fleet/test/test_hub_server.py test/test_fleet_enrollment_contracts.py -q
+python -m pytest src/site/fleet/test -q
+```
+
+Then start two distinct host-sim robot endpoints and assert that Fleet shows
+both device identities, receives 1 Hz heartbeats, correlates a command for each,
+recovers both sessions after Hub restart, and holds the formation when one
+connection is cut. This remains SOURCE/SIM evidence, not physical FLEET GO.
+
+**Step 7: Commit**
+
+```bash
+git add src/core/core_common/core_common/protocol/schemas.py src/core/core_features/core_features/fleet_agent/agent.py src/core/core/core/services.py src/core/core/test/test_fleet_agent.py src/site/fleet/fleet/hub/server.py src/site/fleet/fleet/cli.py src/site/fleet/fleet/server/console.py src/site/fleet/test/test_hub_server.py test/test_fleet_enrollment_contracts.py deploy/robot/apply-sd-provision.py
+git commit -m "feat(fleet): connect personalized Pinky devices outbound"
+```
+
+### Task 8: Document, verify, and dry-run the connected SD
 
 **Files:**
 - Create: `docs/deployment/rosy-sd-card-personalization.md`
@@ -402,7 +490,7 @@ password.
 Run:
 
 ```bash
-python -m pytest test/test_sd_personalization.py test/test_sd_writer_contract.py test/test_first_boot_provisioning.py test/test_image_pipeline.py test/test_image_checks.py test/test_network_provisioner.py test/test_pi_wifi_deployment.py test/test_dds_identity_contracts.py test/test_device_readback.py test/test_pinky_commissioning.py -q
+python -m pytest test/test_sd_personalization.py test/test_sd_writer_contract.py test/test_first_boot_provisioning.py test/test_image_pipeline.py test/test_image_checks.py test/test_network_provisioner.py test/test_pi_wifi_deployment.py test/test_dds_identity_contracts.py test/test_device_readback.py test/test_pinky_commissioning.py test/test_fleet_enrollment_contracts.py src/core/core/test/test_fleet_agent.py src/site/fleet/test -q
 python tools/harness/rosy_harness.py generate
 python tools/harness/rosy_harness.py lint
 git diff --check
@@ -437,7 +525,16 @@ phrase, safely eject, boot the Pinky Pro, and collect first-boot/readback
 evidence. A successful write is MEDIA evidence only; BOOT and DEVICE remain
 separate.
 
-**Step 5: Record actual gate state and commit**
+**Step 5: Perform the DEVICE and FLEET gates separately**
+
+Complete G0-G5 on the physical Pinky. FLEET stays HOLD until at least two
+personalized Pinky devices with distinct UUID/name/robot-number tuples are
+available. Pair both to the site Hub, verify 1 Hz heartbeat and correlated
+commands, restart the Hub to prove reconnect, then interrupt one robot's Fleet
+link during a formation and verify the required HOLD behavior. A one-device
+HTTP 200, host simulation, or SD readback is not FLEET acceptance.
+
+**Step 6: Record actual gate state and commit**
 
 Promote only gates supported by captured evidence. If native image or Pi proof
 is absent, keep ARTIFACT/DEVICE as HOLD.
@@ -456,5 +553,7 @@ git commit -m "docs(deploy): add Rosy SD personalization runbook"
 - Never put the site passphrase in a command argument, repository file, receipt,
   console transcript or commissioning evidence.
 - Never promote `motor` or `hardware` during first boot.
+- Never mark FLEET GO from a single Pinky, REST polling alone, host simulation,
+  or an enabled configuration without an observed outbound session.
 - Never call Windows/x86 tests, image-write success, SSH, or HTTP 200 physical
   Pinky Pro acceptance.

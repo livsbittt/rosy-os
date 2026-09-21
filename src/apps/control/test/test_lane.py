@@ -56,6 +56,33 @@ def test_lane_speed_cap_is_a_crawl():
     assert LANE_MAX_LINEAR_M_S == pytest.approx(0.10)
 
 
+def test_centred_lane_commands_no_turn():
+    from control.sensing.lane import steer_correction
+    assert steer_correction(0.0) == pytest.approx(0.0)
+
+
+def test_right_lane_commands_right_turn():
+    """오차 + (차선 우측) → 우회전 = 음각속도 (ROS CCW+)."""
+    from control.sensing.lane import steer_correction
+    assert steer_correction(0.5, max_angular=1.0) == pytest.approx(-0.5)
+
+
+def test_steering_saturates_at_max_angular():
+    from control.sensing.lane import steer_correction
+    assert steer_correction(1.0, gain=2.0, max_angular=0.4) == pytest.approx(-0.4)
+    assert steer_correction(-1.0, gain=2.0, max_angular=0.4) == pytest.approx(0.4)
+
+
+def test_bad_steering_gains_fail_closed():
+    from control.sensing.lane import steer_correction
+    with pytest.raises(ValueError):
+        steer_correction(0.5, gain=-1.0)
+    with pytest.raises(ValueError):
+        steer_correction(float("inf"))
+    # 범위 밖 오차는 던지지 않고 클램프한다 — 센서 글리치가 던지면 주행 중 정지다.
+    assert steer_correction(2.0, max_angular=1.0) == pytest.approx(-1.0)
+
+
 class TestLaneTracker:
     def _tracker(self, now=None):
         clock = now if now is not None else [1000.0]

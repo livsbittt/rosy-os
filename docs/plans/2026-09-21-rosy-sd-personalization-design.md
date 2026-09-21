@@ -10,7 +10,9 @@
 하나의 검증된 Rosy OS 기본 이미지를 여러 Pinky Pro에 공통으로 기록한 뒤,
 Windows 운영자 스크립트가 선택한 SD 카드에 장치별 신원과 Wi-Fi 설정을 안전하게
 개인화한다. 사용자가 보는 장치명은 `rosy-pinky-<4자리>`이고, ROS/DDS 내부 신원과
-전역 고유 ID는 별도 필드로 유지한다.
+전역 고유 ID는 별도 필드로 유지한다. 각 Pinky는 같은 OS release를 사용하면서도
+서로 다른 장치 신원으로 Fleet에 가입해 heartbeat/event를 보내고 군집 명령을 받을
+준비가 되어야 한다.
 
 이 설계는 이미지 생성, 카드 개인화, 첫 부팅 적용, 장치 readback을 서로 다른
 증거 단계로 취급한다. 스크립트가 파일을 만들었다는 사실은 Pi 부팅이나 Pinky Pro
@@ -33,6 +35,9 @@ Windows 운영자 스크립트가 선택한 SD 카드에 장치별 신원과 Wi-
    기록하며 G3/G4/G5 승격 전에 자동 활성화하지 않는다.
 8. Wi-Fi는 카드 개인화 때 자동 주입한다. 비밀번호 평문은 명령행, 로그, Git,
    이미지에 남기지 않는다.
+9. site별 Fleet endpoint와 trust profile은 장치별 bootstrap으로 넣는다. Fleet
+   pairing과 군집제어 인수는 SD 기록과 별도 단계이며 첫 부팅에서 자동 mission이나
+   motor를 활성화하지 않는다.
 
 ## 3. 신원 모델
 
@@ -51,6 +56,10 @@ ros_identity:
   domain_id: 41
   namespace: rosy_01
 requested_preset: hardware
+fleet_bootstrap:
+  endpoint_profile: site-default
+  pairing_required: true
+  transport: outbound_websocket
 ```
 
 `device_uid`와 `device_name`은 카드 개인화 시 생성하고 이후 불변이다. `hostname`과
@@ -61,6 +70,21 @@ requested_preset: hardware
 다른 serial에 결속된 `device_uid`를 재사용하거나, 같은 등록부에서 장치명·로봇
 번호가 중복되면 설치를 거부한다. SD 또는 Pi 교체는 자동 동일시하지 않고 명시적인
 재결속 절차를 요구한다.
+
+### 3.1 Fleet와 군집 통신 경계
+
+각 Pinky는 내부 ROS 2/DDS를 자기 장치 안에 격리한다. 서로 다른 Pinky가 DDS discovery
+또는 ROS topic으로 직접 결합되는 구조를 만들지 않는다. 장치는 Fleet 서버로 outbound
+WebSocket을 열어 heartbeat와 event를 전송하고, Fleet의 인증된 API 경로를 통해 명령과
+상관 ID 기반 실행 상태를 주고받는다. 따라서 `ROSY_ROBOT_NUMBER`는 로봇 내부 DDS
+신원이고, `device_uid`는 Fleet 등록의 불변 장치 키이며, `device_name`은 사람이 찾기
+쉬운 이름이다.
+
+공통 이미지에는 Fleet token이나 client private key를 넣지 않는다. site의 endpoint와
+trust profile은 비밀이 아닌 bootstrap 설정으로 개인화하고, 일회용 pairing credential이
+필요하면 transient bundle의 별도 secret 필드로 전달해 적용 후 삭제한다. Fleet 연결이나
+pairing 실패 시에도 core의 독립 운용과 안전 상태는 유지하며 motor/mission/formation을
+자동 시작하지 않는다.
 
 ## 4. Wi-Fi 비밀정보 처리
 
@@ -165,15 +189,23 @@ passphrase, API token과 전체 NetworkManager profile은 감사 로그에 넣�
 3. **MEDIA:** `rpi-imager` write verification과 카드에서 다시 읽은 receipt 일치.
 4. **BOOT:** Pi 5 부팅, hostname, serial binding, `SITE_STA`, core health.
 5. **DEVICE:** G0~G5 commissioning과 물리 Pinky Pro 검증.
+6. **FLEET:** 서로 다른 신원의 Pinky 두 대 이상을 등록하고 heartbeat, 명령 상관관계,
+   재접속, Fleet 단절 시 안전 정지, leader-follower/formation 시나리오를 검증.
 
 현재 연결된 SD를 인식했다는 사실은 MEDIA가 아니다. 실제 이미지 기록은 SOURCE와
 ARTIFACT가 통과하고 운영자가 최종 erase 문구를 입력한 뒤에만 수행한다.
+
+현재 저장소에는 Fleet 서버 v1과 formation/relay 로직이 있지만 CORE `FleetAgent`는
+비활성 stub이고 실제 `fleet hub --listen` 경로는 없다. 따라서 이 문서가 승인되어도
+FLEET은 HOLD이며, 두 경로 구현과 서로 다른 Pinky 두 대의 실기 검증 전에는 군집제어
+가능으로 표시하지 않는다.
 
 ## 10. 비범위
 
 - 랜덤 ROS namespace 또는 랜덤 ROS domain
 - Wi-Fi 비밀번호나 release signing private key의 Git 저장
 - 첫 부팅에서 motor/hardware 자동 활성화
+- 로봇 간 직접 DDS 통신 또는 SD 기록만으로 Fleet/군집제어 합격 처리
 - SD 복제만으로 기존 장치 identity 이전
 - Windows/x86 결과를 ARM64 이미지 또는 Pinky Pro 실기 합격으로 간주
 

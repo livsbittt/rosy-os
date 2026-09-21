@@ -26,6 +26,13 @@ WEB = ROOT / "src" / "site" / "fleet" / "fleet" / "server" / "web"
 #: D-129 — /ui/tokens.css 의 실체는 CORE 웹 자산의 단일 파일이다. fleet 사본은 없다.
 CANONICAL_TOKENS = ROOT / "src" / "core" / "core_api_web" / "core_api_web" / "web" / "tokens.css"
 
+from browser_harness import (  # noqa: E402
+    DECLINE_CONFIRM,
+    accept_confirm,
+    open_page,
+    save_temp_screenshot,
+)
+
 MAP_GRID = {
     "map_id": "mock:1", "width": 40, "height": 40, "resolution": 0.05,
     "origin": {"x": 0.0, "y": 0.0, "yaw": 0.0}, "data": [20] * (40 * 40),
@@ -105,7 +112,8 @@ def test_the_console_renders_what_swarm_control_says(console_url):
     errors: list[str] = []
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page(viewport={"width": 1280, "height": 720})
+        # D-153 G2 선언 뷰포트 = 사이트 PC 1920×1080(회차 11부터 LOCAL에서 증거화).
+        page = browser.new_page(viewport={"width": 1920, "height": 1080})
         page.on("pageerror", lambda exc: errors.append(str(exc)))
 
         def serve_api(route):
@@ -127,9 +135,226 @@ def test_the_console_renders_what_swarm_control_says(console_url):
         assert "끊김" in roster, "연결이 끊긴 팔로워의 증거 태그가 없다"
         assert "지연" not in roster, "정상 스트림(4.8 Hz)에 지연 태그가 붙었다 — 정상은 무색이어야 한다"
         assert "0.60m" in page.inner_text("#formation-detail"), "슬롯 요약이 사라졌다"
+        # D-82/§7.3 색 예산 — 색칠은 문제 있는 한 대(rosy_03: 끊김 crit + 대기
+        # warn)에만 몰리고 정상 로봇은 무색이다("one coloured row").
+        per_robot = page.evaluate(
+            "() => Object.fromEntries([...document.querySelectorAll('#roster article')]"
+            ".map((el) => [el.querySelector('b')?.textContent,"
+            " el.querySelectorAll('.tag.crit, .tag.warn').length]))"
+        )
+        assert per_robot == {"rosy_01": 0, "rosy_02": 0, "rosy_03": 2}
 
         assert not errors, f"페이지 오류: {errors}"
-        shot = Path(os.environ.get("TEMP", "/tmp")) / "fleet_console_overlay.png"
-        page.screenshot(path=str(shot))
-        print(f"\nscreenshot: {shot}")
+        save_temp_screenshot(page, "fleet_console_overlay.png")
+        browser.close()
+
+
+def _open_console(playwright, api, posts=None, init_script=""):
+    """D-153 회차4 — 상태별 Fleet G2 셀. api 값은 (status, body) 또는 body."""
+    browser, page, errors = open_page(playwright, 1920, 1080)
+
+    def serve_api(route):
+        path = urlparse(route.request.url).path
+        if posts is not None:
+            posts.append((route.request.method, path))
+        entry = api.get(path)
+        if entry is None:
+            route.fulfill(status=404, json={"detail": "no such api"})
+            return
+        status, body = entry if isinstance(entry, tuple) else (200, entry)
+        route.fulfill(status=status, json=body)
+
+    page.route("**/api/**", serve_api)
+    if init_script:
+        page.add_init_script(init_script)
+    return browser, page, errors
+
+
+EMPTY_SNAPSHOT = {
+    "fleet": {"name": "site", "online": 0, "total": 0},
+    "robots": [],
+    "ts": 0.0,
+}
+
+
+def test_empty_fleet_renders_zero_online_and_no_ghosts(console_url):
+    from playwright.sync_api import sync_playwright
+
+    api = {
+        "/api/fleet/state": EMPTY_SNAPSHOT,
+        "/api/fleet/map": MAP_GRID,
+        "/api/fleet/formation": {"active": False, "state": "IDLE"},
+    }
+    with sync_playwright() as p:
+        browser, page, errors = _open_console(p, api)
+        page.goto(console_url, wait_until="networkidle")
+        page.wait_for_function(
+            "() => document.getElementById('online-pill')?.textContent === '0/0 연결'"
+        )
+        assert "rosy" not in page.inner_text("#roster")
+        assert (page.evaluate("window.__swarmOverlay?.slots || 0") == 0), (
+            "비활성 대형에 오버레이가 남아 있다 — 장식이 아니라 현재 작업 대상만 보인다(D-131)"
+        )
+        assert not errors
+        save_temp_screenshot(page, "fleet_console_empty.png")
+        browser.close()
+
+
+def test_gather_failure_names_itself_on_the_pill(console_url):
+    from playwright.sync_api import sync_playwright
+
+    api = {
+        "/api/fleet/state": (500, {"detail": "gather failed"}),
+        "/api/fleet/map": MAP_GRID,
+        "/api/fleet/formation": {"active": False, "state": "IDLE"},
+    }
+    with sync_playwright() as p:
+        browser, page, errors = _open_console(p, api)
+        page.goto(console_url, wait_until="networkidle")
+        page.wait_for_function(
+            "() => document.getElementById('online-pill')?.textContent"
+            " === 'Fleet 서버 없음'"
+        )
+        assert "bad" in page.locator("#online-pill").get_attribute("class")
+        assert not errors
+        save_temp_screenshot(page, "fleet_console_gather-error.png")
+        browser.close()
+
+
+DECLINE_ESTOP_CONFIRM = DECLINE_CONFIRM
+
+
+def test_fleet_estop_requires_confirm_and_decline_blocks_it(console_url):
+    """D-92(a) — 전체 정지는 confirm을 지나며 거부하면 나가지 않는다."""
+    from playwright.sync_api import sync_playwright
+
+    api = {
+        "/api/fleet/state": SNAPSHOT,
+        "/api/fleet/map": MAP_GRID,
+        "/api/fleet/formation": FORMATION,
+        "/api/fleet/estop": {"stopped": 3, "total": 3, "robots": []},
+    }
+    posts: list[tuple[str, str]] = []
+    with sync_playwright() as p:
+        browser, page, errors = _open_console(
+            p, api, posts=posts, init_script=DECLINE_ESTOP_CONFIRM)
+        page.goto(console_url, wait_until="networkidle")
+        page.wait_for_function(
+            "() => (window.__swarmOverlay?.slots || 0) === 2", timeout=8000
+        )
+        page.locator("#estop").click()
+        page.wait_for_function("() => window.__confirms.length === 1")
+        declined = [post for post in posts if post[1] == "/api/fleet/estop"]
+        accept_confirm(page)
+        page.locator("#estop").click()
+        for _ in range(40):
+            if any(post == ("POST", "/api/fleet/estop") for post in posts):
+                break
+            page.wait_for_timeout(100)
+        confirms = page.evaluate("window.__confirms")
+        assert not errors, f"페이지 오류: {errors}"
+        browser.close()
+
+    assert "등록된 모든 로봇을 정지시킵니다" in confirms[0]
+    assert declined == []
+    assert any(post == ("POST", "/api/fleet/estop") for post in posts)
+
+
+DELAYED_FORMATION = {
+    **FORMATION,
+    "relay": {
+        **FORMATION["relay"],
+        "follower_tx_hz": {"rosy_02": 1.2, "rosy_03": 0.0},
+        "follower_connected": {"rosy_02": True, "rosy_03": False},
+    },
+}
+
+HOLDING_FORMATION = {
+    **FORMATION,
+    "state": "HOLDING",
+    "reason": ["STREAM_LOST"],
+    "pending_triggers": ["stream"],
+}
+
+UNREACHABLE_SNAPSHOT = {
+    **SNAPSHOT,
+    "fleet": {"name": "site", "online": 2, "total": 3},
+    "robots": [
+        SNAPSHOT["robots"][0],
+        SNAPSHOT["robots"][1],
+        _robot(
+            "rosy_03", {"x": 0.45, "y": 0.4, "yaw": 0.0},
+            online=False,
+            error={"reachable": False, "code": "CONNECT_ERROR"},
+        ),
+    ],
+}
+
+
+def test_delayed_follower_stream_is_named_in_the_roster(console_url):
+    """FOR-003 — 바닥 Hz 아래 팔로워는 '지연'으로, 단절 팔로워는 '끊김'으로 갈린다."""
+    from playwright.sync_api import sync_playwright
+
+    api = {
+        "/api/fleet/state": SNAPSHOT,
+        "/api/fleet/map": MAP_GRID,
+        "/api/fleet/formation": DELAYED_FORMATION,
+    }
+    with sync_playwright() as p:
+        browser, page, errors = _open_console(p, api)
+        page.goto(console_url, wait_until="networkidle")
+        page.wait_for_function(
+            "() => (window.__swarmOverlay?.slots || 0) === 2", timeout=8000
+        )
+        roster = page.inner_text("#roster")
+        assert "지연" in roster, "1.2 Hz 팔로워에 지연 태그가 없다"
+        assert "끊김" in roster
+        assert not errors
+        save_temp_screenshot(page, "fleet_console_delayed.png")
+        browser.close()
+
+
+def test_unreachable_robot_is_never_drawn_healthy(console_url):
+    """concept 16 §5 — 연락 두절은 자기 상태다. '닿지 않음'과 이유가 보여야 한다."""
+    from playwright.sync_api import sync_playwright
+
+    api = {
+        "/api/fleet/state": UNREACHABLE_SNAPSHOT,
+        "/api/fleet/map": MAP_GRID,
+        "/api/fleet/formation": {"active": False, "state": "IDLE"},
+    }
+    with sync_playwright() as p:
+        browser, page, errors = _open_console(p, api)
+        page.goto(console_url, wait_until="networkidle")
+        page.wait_for_function(
+            "() => document.getElementById('online-pill')?.textContent === '2/3 연결'"
+        )
+        roster = page.inner_text("#roster")
+        assert "닿지 않음: CONNECT_ERROR" in roster
+        assert "OFFLINE" in roster
+        assert not errors
+        save_temp_screenshot(page, "fleet_console_unreachable.png")
+        browser.close()
+
+
+def test_holding_formation_enables_resume_and_warns(console_url):
+    """FOR-004 — HOLDING은 warn 태그·재개 버튼으로 말하고 이유는 맵 칩에 그린다."""
+    from playwright.sync_api import sync_playwright
+
+    api = {
+        "/api/fleet/state": SNAPSHOT,
+        "/api/fleet/map": MAP_GRID,
+        "/api/fleet/formation": HOLDING_FORMATION,
+    }
+    with sync_playwright() as p:
+        browser, page, errors = _open_console(p, api)
+        page.goto(console_url, wait_until="networkidle")
+        page.wait_for_function(
+            "() => document.getElementById('formation-state')?.textContent"
+            " === 'HOLDING'"
+        )
+        assert "warn" in page.locator("#formation-state").get_attribute("class")
+        assert page.locator("#formation-resume").is_enabled()
+        assert not errors
+        save_temp_screenshot(page, "fleet_console_holding.png")
         browser.close()

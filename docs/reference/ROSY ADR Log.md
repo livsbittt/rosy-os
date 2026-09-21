@@ -95,7 +95,7 @@
 | D-85 | 도크 펌웨어 ARTIFACT는 ESP32 툴체인 증거다 | Accepted |
 | D-86 | POSIX identity 시험은 POSIX 호스트에서만 deploy를 찍는다 | Accepted |
 | D-87 | ROS-SIM은 그 트리의 colcon install이 있을 때만 시작한다 | Accepted |
-| D-88 | Fleet 소켓은 사이트 PC 산출물이며 D-83 뒤에 연다 | Accepted |
+| D-88 | Fleet 소켓은 사이트 PC 산출물이며 D-83 뒤에 연다 | Partially superseded by D-154 |
 | D-89 | D-35 대형 후보는 D-83 Task 14 재실행 전에는 열지 않는다 | Accepted |
 | D-90 | 축구는 게임 호스트이지 CORE 모드가 아니다 | Accepted |
 | D-91 | Device 비교 ADR은 호스트 pytest로 Accepted 하지 않는다 | Accepted |
@@ -2579,7 +2579,8 @@ progress에 적는다. 그 전 GO는 이 ADR 위반이다.
 
 ## D-88 Fleet 소켓은 사이트 PC 산출물이며 D-83 뒤에 연다
 
-**Status:** Accepted (2026-09-17). D-81의 다음 단계 순서다.
+**Status:** Partially superseded by D-154 (2026-09-21). Site Hub는 계속 관제 PC
+산출물이지만, FleetAgent를 로봇 이미지에서 제외하고 PARKED로 두는 결정은 대체됐다.
 
 **Context:** 콘솔 v1 gather는 CORE REST다 (D-81). 경로 충돌 대기열도 REST
 위에 있다. `rosy_fleet hub --listen`과 CORE `FleetAgent` outbound는 아직 없다.
@@ -5039,37 +5040,68 @@ D-152는 "Windows HOST-SIM 스크린샷은 브라우저 경로 증거일 뿐"이
      (`fresh`/`delayed`/`disconnected`/`unavailable` — concept 16 §5)에 빈
      목록·미등록, 최초 기동, 오류·거부(501·권한), `SAFE_STOP`, 그리고 입력이
      있는 표면은 불가역 확인 대화상자. 뷰포트 목록은 각 표면 카드가 회차
-     시작에 선언한다. 선언한 셀을 찍지 못하면 그 상태는 평가되지 않은 것이고
-     그 표면은 HOLD다.
+     시작에 선언한다(예: 콘솔은 로봇 AP에 붙은 전화·노트북, Fleet은 사이트
+     PC, 얼굴은 LCD 실물, 게임은 노트북). 선언한 셀을 찍지 못하면 그 상태는
+     평가되지 않은 것이고 그 표면은 HOLD다.
    - **G3 법 체크리스트 (사람).** 여덟 항을 이 ADR이 고정한다. 각 항목의
-     판정은 근거 셀 또는 코드 위치를 지적해야 한다: 정직, 증거 상태, 색, 위계,
-     불가역 조작, 청중별 어휘, 표면 질문, 표면 문법.
+     판정은 근거 셀(또는 코드 위치)을 지적해야 하고 취향을 말하지 않는다.
+     1. 정직(Law 0) — 소스 없는 값이 0이나 빈 문자열로 렌더되지 않는다.
+        로봇이 수행하지 못하는 조작이 활성 버튼으로 존재하지 않는다.
+     2. 증거 상태 — 네 상태가 값별로 갈리고 `delayed`는 나이를,
+        `disconnected`는 결측을 말한다. 한 placeholder로 뭉갠 것은 위반이다.
+     3. 색(Law 1) — 경보 밖에 따뜻한 색이 없다. 장식 그라디언트·지표별 색이
+        없다. 예외형 표면(Fleet)에서 정상은 색을 쓰지 않는다.
+     4. 위계(Law 2) — 보고하는 것은 평평하고 세계를 바꾸는 것은 올라가 있다.
+        같은 외곽선 카드의 남발로 위계가 사라진 화면은 위반이다.
+     5. 불가역(Law 3) — 비상정지·롤백·맵 리셋·언독은 종류가 다른 시각
+        범주이며 2단계 확인을 지난다(D-92 (a)).
+     6. 어휘(Law 4) — 그 표면 청중의 평문이다. 운용자에게 한국어 평문,
+        설치자에게 `DOMAIN ID`·`DDS ISOLATION`는 평문으로 남는다.
+     7. 표면 질문(§2) — 선언된 전 상태의 캡처에서 그 표면의 질문에 답이
+        선다.
+     8. 표면 문법(§7) — 콘솔=공간(스크롤 없음), 장비=절차(스크롤이 절차),
+        Fleet=예외(정상은 안 보임), 얼굴=의도(입력 없음), 게임=가시성.
 3. **판정과 증거 어휘는 모듈 게이트를 잇는다.** 표면마다 회차 단위로
-   GO/HOLD/PARKED/N/A다. GO는 G1 현재 트리 재실행 통과(D-79), G2 선언 셀 전부
-   캡처, G3 위반 0의 셋이다. 호스트 브라우저 캡처는 LOCAL, 실제 로봇 스택 위
-   캡처는 SIM, 실물 장치 화면은 BENCH/DEVICE, 현장은 FIELD다. LOCAL 화면은
-   DEVICE/FIELD 주장으로 승격되지 않는다.
+   GO/HOLD/PARKED/N/A. GO는 G1 현재 트리 재실행 통과(D-79) + G2 선언 셀 전부
+   캡처 + G3 위반 0의 셋이다. 하나라도 없으면 blocker를 이름 붙인 HOLD다.
+   캡처의 증거 계층: 개발 호스트 브라우저(픽스처 응답 포함) = LOCAL이며
+   브라우저 경로 증거다. 실제 로봇 스택 위 캡처(Gazebo `source=GAZEBO`) =
+   SIM. 실물 장치 화면(`source=PINKY`, 로봇 AP에 붙은 단말) = BENCH/DEVICE.
+   LCD 사진 = BENCH 이상. 현장 = FIELD. LOCAL 스크린샷은 어떤
+   DEVICE/FIELD 주장으로도 승격되지 않는다(D-91 정신, D-152 선례).
 4. **기록은 회차 폴더에 산다.** `docs/validation/uiux-surfaces-<date>/`에
-   README와 캡처를 남긴다. ADR 로그는 기준만 소유하고 회차 결과를 다시 쓰지
-   않는다.
-5. **변경은 재평가를 일으킨다.** token, 어휘, 새 패널, 불가역 조작, 증거 상태,
-   뷰포트, 새 표면과 릴리스 변경 범위에 맞춰 해당 표면을 다시 평가한다.
+   README(표면별 카드: 판정·blocker·셀 링크)와 캡처를 남긴다. ADR 로그는
+   기준만 소유하고 회차 결과를 다시 쓰지 않는다. 레거시 control 진단(D-77)은
+   PARKED 카드로 존재만 유지한다.
+5. **재평가 트리거.** `tokens.css` 값·이름 변경 → 전 표면. 어휘 표·문법 게이트
+   목록 변경 → 해당 표면. 새 패널·새 불가역 조작·증거 상태 렌더 변경 → 해당
+   표면 전체. 새 표면 등장 → 카드 신설. 뷰포트·입력 장치 변화 → 뷰포트
+   재선언. 릴리스마다 → 직전 회차 이후 변경이 있는 표면. 장치 게이트 통과 →
+   실물 뷰포트 회차(얼굴·콘솔).
 
-**Alternatives:** 기계 게이트만으로 버티는 안은 값·문법은 지키면서 표면이 실제
-질문에 답하는지를 놓친다. 별도 심각도 체계는 기존 모듈 게이트와 증거 언어를
-갈라 기각한다. ADR 없이 회차 문서만 남기면 기준이 회차마다 변해 기각한다.
+**Alternatives:** 기계 게이트만으로 버티는 안은 값·문법은 지키면서 "답이 서는가"를
+영원히 아무도 보지 않는다 — D-131의 결함이 그 모양이었다. UI 관행의 심각도
+척도(S0~S3)를 신설하는 안은 모듈 게이트와 어휘가 갈라져 증거 언어 재사용을
+잃는다. ADR 없이 회차 문서만 남기는 안은 기준이 회차마다 변해 비교가 불가능하고,
+다중 에이전트 환경에서 리뷰 의존 규율은 D-130이 이미 반증했다.
 
-**Consequences:** 첫 회차 전까지 여섯 표면의 UI/UX 판정은 HOLD다. UI 변경은
-회차 폴더를 근거로 삼는다. G3은 사람 판단이지만 항목과 근거 셀을 고정해 회차 간
-비교가 가능하다.
+**Consequences:** 첫 회차가 열리기 전까지 여섯 표면의 정직한 UI/UX 판정은 전부
+HOLD(평가 회차 없음)다 — 옛 화면이 나빠서가 아니라 아무도 기준대로 보지
+않았기 때문이다(D-79와 같은 논리). UI 변경을 주장하는 커밋·문서는 이제 회차
+폴더를 가리킬 수 있다. 로봇 얼굴은 브라우저가 없는 표면이라 캡처 수단이 사진뿐이고
+그 계층(BENCH)이 다른 표면보다 늦게 채워지는 것을 부정하지 않는다. G3은
+사람(또는 에이전트) 판단이지만 항목과 근거 셀 지적을 강제하므로 회차 간 비교가
+가능하다. 항목 여덟이 옳은지는 회차가 쌓여야 아나 — 회차 셋 안에 다듬을
+필요가 생기면 amendment로 기록한다.
 
-**Validation / Transition:** 첫 회차 폴더가 착지 증거다. G1은 기존 계약 시험을
-재사용한다. 회차 종료 시 `docs/logs.md`에 기록하고 index를 재생성한다. 호스트
-회차는 DEVICE/FIELD 게이트를 승격하지 않는다.
+**Validation / Transition:** 첫 회차 폴더가 이 ADR의 착지 증거다(위치는
+`docs/validation/uiux-surfaces-<date>/`). G1은 이미 계약 시험으로 존재하며 이
+ADR이 새 시험을 추가하지 않는다. 회차 종료 시 `docs/logs.md` 항목과 `index.md`
+재생성. 호스트 회차는 어떤 DEVICE/FIELD 게이트도 승격하지 않는다.
 
-**References:** [concept 16](../concept/16_ROSY_Interface_Design_Principles.md),
-D-23, D-61, D-72, D-75, D-77, D-79, D-82, D-88, D-91, D-92, D-101, D-129,
-D-130, D-131, D-152.
+**References:** [concept 16](../concept/16_ROSY_Interface_Design_Principles.md)
+§2·§5·§7, D-23, D-61, D-72, D-75, D-77, D-79, D-82, D-88, D-91, D-92, D-101,
+D-129, D-130, D-131, D-152.
 
 ---
 
@@ -5077,7 +5109,8 @@ D-130, D-131, D-152.
 
 **Status:** Accepted (2026-09-21). D-15의 `robot_id=rosy_NN`,
 `hostname=rosy-NN` 명명 결정 중 사람이 보는 장치명과 hostname 부분을 대체한다.
-플랫폼명 Rosy 결정과 D-33의 내부 DDS 신원 계약은 유지한다.
+D-88의 FleetAgent 로봇 이미지 제외/PARKED 결정도 대체한다. 플랫폼명 Rosy 결정,
+D-33의 내부 DDS 신원 계약과 D-88의 Site Hub 관제 PC 소유권은 유지한다.
 
 **Context:** D-15는 플랫폼명과 함께 공개 장치명까지 순번에 결합했고, D-33은
 `ROSY_ROBOT_NUMBER`에서 ROS domain과 namespace를 파생한다. 이 구성을 SD에 그대로
@@ -5116,9 +5149,19 @@ Git, 명령행 또는 감사 로그에 넣을 수도 없다. 마지막으로 Win
    최초 bundle 또는 Wi-Fi 후보가 실패하면 후보를 폐기하고 `PROVISIONING_AP`로
    돌아가며 motor/hardware를 시작하지 않는다. 이미 provisioned인 장치의 일반
    WLAN 장애는 D-26대로 `NETWORK_HOLD`이고 자동 recovery AP를 열지 않는다.
-7. **증거는 SOURCE, ARTIFACT, MEDIA, BOOT, DEVICE로 분리한다.** 호스트 테스트,
-   native ARM64 image, SD write/readback, Pi 부팅, Pinky Pro G0–G5 중 어느 하나도
-   다른 단계를 대신하지 않는다.
+7. **개인화는 Fleet 가입 준비까지 포함하되 군집 운용 완료로 간주하지 않는다.**
+   bundle은 site별 `fleet_endpoint`, trust profile과 pairing 필요 여부를 장치 신원에
+   결속한다. 일회용 pairing credential이 필요하면 Wi-Fi PSK와 같은 transient secret
+   경계에서만 전달하고 적용 후 제거한다. 공통 Pinky 이미지는 비활성 FleetAgent
+   코드를 포함하고, 유효한 장치별 bootstrap과 pairing이 있을 때만 outbound 연결을
+   연다. 로봇은 Fleet에 WebSocket으로 heartbeat/event를 보내고 인증된 REST API
+   명령을 받는다. 로봇 간 DDS 통신은 요구하거나 열지 않으며 DDS는 로봇 내부로
+   격리한다. Fleet 등록 성공만으로 motor, mission, formation을 자동 활성화하지 않는다.
+8. **증거는 SOURCE, ARTIFACT, MEDIA, BOOT, DEVICE, FLEET로 분리한다.** 호스트 테스트,
+   native ARM64 image, SD write/readback, Pi 부팅, Pinky Pro G0–G5, 두 대 이상 Fleet
+   연동 중 어느 하나도 다른 단계를 대신하지 않는다. FLEET은 서로 다른 신원의 Pinky
+   두 대 이상에 대해 등록, heartbeat, 상관 ID가 있는 명령 응답, 재접속, 통신 단절
+   안전 정지와 군집 시나리오를 확인해야 GO다.
 
 **Alternatives:** 장치별 완성 이미지는 artifact와 서명 단위를 불필요하게 분기해
 기각한다. `rosy_01`을 공개 hostname으로 계속 쓰는 안은 재번호와 하드웨어 교체를
@@ -5132,6 +5175,9 @@ boot 파티션이나 PowerShell 인자에 쓰는 안은 복구 가능한 비밀�
 전역 UUID, 등록부, 첫 부팅 serial binding으로 보완해야 한다. raw WPA PSK는 평문
 passphrase보다 노출을 줄이지만 약한 비밀번호의 오프라인 추측 위험을 제거하지
 않는다. D-15의 플랫폼명 Rosy와 D-33의 내부 번호 계약은 계속 유효하다.
+장치별 Fleet bootstrap은 향후 endpoint나 인증서를 교체할 수 있어야 하며,
+`device_uid`를 바꾸는 수단으로 사용하지 않는다. SD 개인화 완료는 Fleet 페어링이나
+군집제어 인수 완료를 뜻하지 않는다.
 
 **Validation / Transition:** `test_sd_personalization.py`는 이름 alphabet, UUID,
 등록 충돌, manifest와 secret redaction을 고정한다. `test_sd_writer_contract.py`는
@@ -5139,7 +5185,49 @@ passphrase보다 노출을 줄이지만 약한 비밀번호의 오프라인 추�
 `test_first_boot_provisioning.py`는 원자 적용, mode `0600`, one-shot 소비,
 serial binding과 네트워크 fallback을 검증한다. native ARM64 image와 현재 연결된
 SD/Pi 실행 증거가 생기기 전에는 ARTIFACT, MEDIA, BOOT, DEVICE를 GO로 쓰지 않는다.
+`test_fleet_enrollment_contracts.py`는 endpoint/trust binding, outbound-only 가입,
+secret redaction과 DDS 격리를 고정한다. 서로 다른 Pinky 두 대의 Fleet FAT/MAT 증거가
+생기기 전에는 FLEET을 GO로 쓰지 않는다.
 
-**References:** D-15, D-22, D-26, D-30, D-33, D-36, D-46, D-53, D-66, D-78,
+**References:** D-5, D-6, D-15, D-20, D-22, D-26, D-30, D-33, D-36, D-46, D-53,
+D-59, D-66, D-78, D-81, D-83, D-88,
+`docs/spec/ROSY FLEET SRS.md`,
 `docs/plans/2026-09-21-rosy-sd-personalization-design.md`,
 `docs/plans/2026-09-21-rosy-sd-personalization.md`.
+
+---
+
+## [ADR-999] Interface Philosophy Refinements: Core State Abstraction & Fallback Patterns
+
+**Date:** 2026-09-21
+**Status:** Proposed
+**Context:** 16_ROSY_Interface_Design_Principles.md lacks headless state abstraction to prevent duplicate logic across surfaces, missing degraded AI fallback capabilities, and lacks cross-surface HITL handoff standards.
+**Decision:** 
+1. Introduce Headless State Primitives (L1.5 Layer) for Law 0 logic without forcing shared visual components.
+2. Add `degraded_fallback` capability state.
+3. Standardize HITL escalation across all four UI surfaces.
+**References:** docs/plans/2026-09-21-interface-philosophy-refinement-design.md, [concept 16](../concept/16_ROSY_Interface_Design_Principles.md).
+
+---
+
+## [ADR-1000] Fleet Orchestration for Module Degraded & HITL States
+
+**Date:** 2026-09-21
+**Status:** Accepted
+**Context:** The degraded_fallback and hitl_requested states defined in ADR-999 need explicit handling in the Fleet SRS to prevent the Fleet from mistakenly treating them as standard OFFLINE errors, and to utilize them for mission re-routing.
+**Decision:** 
+1. **Exceptional Teleop Handoff (PRT-1.2):** Allow Fleet to unlock WebRTC teleop control only when hitl_requested is true (overriding the strict no-motor-control rule).
+2. **State Queues (MON-002):** Implement a 'Degraded' warning queue and a 'Requiring Assistance' critical popup queue.
+3. **Mission Re-routing (MSN-004):** Fleet dynamically re-assigns tasks if a robot's capability degrades.
+4. **Formation Speed Adjustment (FOR-004):** Down-sync swarm speed to the slowest degraded robot.
+**References:** ROSY FLEET SRS.md (PRT-1.2, MON-002, MSN-004, FOR-004).
+## [ADR-1001] Fleet UI/UX Exception-Based Queue Adherence & Token System Convergence
+
+**Date:** 2026-09-21
+**Status:** Accepted
+**Context:** During the implementation of the Degraded and HITL Monitoring Queues in the Fleet Console, an initial design showed empty alarm boxes during normal operation. This violated ROSY's 'Management by Exception' principles (Law 8) and zero-alarm-color normal state rule (Law 1, g3-checklist.md). Additionally, the queues used hardcoded colors instead of the central /ui/tokens.css.
+**Decision:** 
+1. **DOM Display Toggling:** The Monitoring Queues container will have its display property set to 
+one dynamically via console.js if there are no robots with hitl_requested or capabilities_degraded. This strictly enforces zero alarm colors in the Fleet Console during nominal states.
+2. **Token Compliance:** CSS was rewritten to solely use variables mapped from 	okens.css (e.g., --status-warn, --status-crit, --ground-card, --ground-raise, --paper).
+**References:** docs/validation/uiux-surfaces-2026-09-21/g3-checklist.md, ADR-1000.

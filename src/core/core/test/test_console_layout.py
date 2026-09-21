@@ -45,6 +45,27 @@ def test_the_operator_panels_are_in_the_console_and_the_rest_in_inspect():
         assert panel in inspect, f"{panel}이 점검 화면에 없다"
 
 
+def test_the_inspect_order_follows_bringup_order():
+    """§7.2 — 절차는 기동 순서를 따른다: host OS·네트워크 → DDS 그래프 →
+    릴리즈 → 커미셔닝. 릴리즈·커미셔닝이 그래프 앞(네트워크 패널 안)에 있던
+    것이 D-153 회차10 F-10이다 — 이 순서는 게이트가 없어 표류했다."""
+    markup = html()
+    order = [
+        markup.find(x)
+        for x in (
+            'id="host-panel"',
+            'id="ros-network-panel"',
+            'id="release-card"',
+            'id="commissioning-card"',
+            'id="field-settings-panel"',
+        )
+    ]
+    assert -1 not in order
+    assert all(a < b for a, b in zip(order, order[1:])), (
+        f"점검 순서가 기동 순서(§7.2)가 아니다: {order}"
+    )
+
+
 def test_a_hidden_view_does_not_take_layout():
     """`display`를 지정한 요소에는 `[hidden]`의 display:none이 진다.
 

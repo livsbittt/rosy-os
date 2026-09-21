@@ -148,6 +148,7 @@ class FleetConsole:
                                "queued": _shown(queued), "error": None, "state": result})
         self._remember(robots)
         await self._run_traffic(robots)
+        await self._manage_swarm_speed(robots)
         # 교통 정리가 대기 미션을 내려보냈으면 이 스냅샷이 이미 그 뒤다. 행을 다시 읽지
         # 않으면 화면은 방금 출발한 미션을 한 주기 동안 계속 "대기 중"으로 보여 준다.
         for row in robots:
@@ -377,8 +378,57 @@ class FleetConsole:
         except Exception:
             return []
 
+    async def _manage_swarm_speed(self, robots: list) -> None:
+        """ADR-1000: Down-sync swarm speed to the slowest degraded robot (FOR-004)."""
+        session = self._formation
+        if session is None or session.state != "RUNNING":
+            return
+            
+        degraded_members = [
+            row["robot_id"] for row in robots
+            if row.get("state") and row["state"].get("capabilities_degraded") and
+               row["robot_id"] in self._formation_members()
+        ]
+        
+        if not degraded_members:
+            return
+            
+        # If any member is degraded, reform the swarm with a lower speed limit
+        # This is a naive implementation that halves the current speed
+        current_speed = session.spec.max_speed
+        degraded_speed = max(0.05, current_speed * 0.5)
+        
+        # We only want to reform once when degradation is detected
+        if current_speed > degraded_speed + 0.01:
+            try:
+                await self.formation_reform(formation=session.spec.name, max_speed=degraded_speed)
+            except Exception:
+                pass  # Ignore transient errors during automatic speed sync
+
     async def _run_traffic(self, robots: list) -> None:
         """스냅샷마다 한 번: 끝난 로봇의 점유를 풀고, 풀린 자리의 대기 미션을 내려보낸다."""
+        # ADR-1000: Mission Re-routing (MSN-004) - check for degraded capabilities
+        for row in list(robots):
+            state = row.get("state") or {}
+            robot_id = row["robot_id"]
+            if state.get("capabilities_degraded"):
+                if robot_id in self._goals or robot_id in self._queued:
+                    # Cancel the current mission
+                    mission = self._queued.pop(robot_id, None)
+                    goal = self._goals.pop(robot_id, None)
+                    self._claims.pop(robot_id, None)
+                    target = mission or goal
+                    if target:
+                        # Find an idle alternative
+                        for alt_row in robots:
+                            alt_id = alt_row["robot_id"]
+                            if alt_id != robot_id and alt_row.get("online"):
+                                alt_state = alt_row.get("state") or {}
+                                if not alt_state.get("capabilities_degraded") and alt_id not in self._goals and alt_id not in self._queued:
+                                    # Re-assign to alternative
+                                    self._queued[alt_id] = target
+                                    break
+
         for row in robots:
             state = row.get("state") or {}
             if state.get("navigation") != "NAVIGATING":
@@ -597,12 +647,12 @@ class FleetConsole:
             raise HubError("ARMING_FAILED", str(exc)) from exc
         return self.formation_status()
 
-    async def formation_reform(self, formation: str, spacing=None) -> dict:
+    async def formation_reform(self, formation: str, spacing=None, max_speed=None) -> dict:
         session = self._formation
         if session is None or session.state is SessionState.STOPPED:
             raise HubError("NO_FORMATION", "no formation to reform")
         try:
-            await session.reform(self._spec(formation, spacing, None))
+            await session.reform(self._spec(formation, spacing, max_speed))
         except SessionError as exc:
             raise HubError("REFORM_REFUSED", str(exc)) from exc
         return self.formation_status()

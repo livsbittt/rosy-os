@@ -6,11 +6,11 @@ last_verified: { commit: "uncommitted", date: 2026-09-21 }
 gates:
   SOURCE:
     state: GO
-    evidence: "D-154 본문·색인과 SD 개인화 설계/실행 계획 정렬; focused ADR/network 계약 검증 (2026-09-21 Windows)"
+    evidence: "D-61 Accepted, D-72/D-77/D-153/D-154 본문·색인 일치. SD 개인화 설계/실행 계획 정렬; focused ADR/network 계약 검증 (2026-09-21 Windows)"
     cmd: "python tools/harness/rosy_harness.py lint"
   LOCAL:
     state: GO
-    evidence: "75 passed, 16 warnings (2026-09-17 Windows). test_network_topology_contracts + test_harness_contracts + test_control_launch_boundary"
+    evidence: "70 passed, 6 warnings (2026-09-21 Windows). test_network_topology_contracts + test_harness_contracts"
     cmd: "python -m pytest test/test_network_topology_contracts.py test/test_harness_contracts.py -q"
   ROS-SIM:
     state: N/A
@@ -44,7 +44,9 @@ plans:
 - ROS-SIM/ARTIFACT/DEVICE/FIELD는 docs가 문서 모듈이라 N/A다.
 - D-61 Accepted. 모듈 progress/logs와 생성 index/STATUS가 계약 시험으로 산다.
 - concept 16과 D-72 L1·증거·capability 계약이 live다. 운용자 콘솔은 CORE `/dashboard` 하나(D-77). G4 DEVICE는 HOLD (D-80).
+- UI/UX 평가 기준은 D-153(세 계층 G1/G2/G3, 판정 단위 표면)이다. 첫 회차(`docs/validation/uiux-surfaces-<date>/`) 전에는 표면 UI/UX 판정을 GO로 쓰지 않는다.
 - 남은 게이트는 D-78–D-81이 가른다. ARTIFACT는 네이티브 Pi(D-78). 옛 ROS-SIM GO는 무효(D-79). Fleet 콘솔 v1 gather는 REST(D-81).
+- D-154는 공통 Pinky 이미지와 장치별 identity/Wi-Fi/Fleet bootstrap을 분리한다. 현재 CORE `FleetAgent`와 Hub listen 경로는 미구현이므로 두 대 실기 등록·heartbeat·명령·재접속·단절 HOLD를 보기 전까지 FLEET은 HOLD다.
 - ADR 로그 분리(개별 `docs/adr/D-NNN-*.md`)는 보류한다.
 
 ## 다음 gate

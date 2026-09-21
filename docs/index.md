@@ -73,6 +73,8 @@
 | D-145 | 네이티브 ARM64 빌드는 unsigned artifact까지만 자동화한다 |
 | D-151 | 도로 의미 인식·정책·최종 명령을 분리하고 관제 변경은 정지 상태에서만 적용한다 |
 | D-152 | CORE 관제의 카메라 표시는 저주기 최신 1장 preview 예외다 |
+| D-153 | UI/UX 평가는 세 계층이고 판정 단위는 표면이다 |
+| D-154 | 공통 OS 이미지와 장치별 SD 개인화를 분리한다 |
 
 ## 계획·결과 문서
 
@@ -88,6 +90,8 @@
 - [2026-09-21-camera-preview-dashboard.md](plans/2026-09-21-camera-preview-dashboard.md)
 - [2026-09-21-hardware-mapping-g5-design.md](plans/2026-09-21-hardware-mapping-g5-design.md)
 - [2026-09-21-hardware-mapping-g5.md](plans/2026-09-21-hardware-mapping-g5.md)
+- [2026-09-21-rosy-sd-personalization-design.md](plans/2026-09-21-rosy-sd-personalization-design.md)
+- [2026-09-21-rosy-sd-personalization.md](plans/2026-09-21-rosy-sd-personalization.md)
 - [2026-09-21-semantic-road-control-design.md](plans/2026-09-21-semantic-road-control-design.md)
 - [2026-09-21-semantic-road-control.md](plans/2026-09-21-semantic-road-control.md)
 
@@ -102,8 +106,8 @@
 
 ## 최근 기록
 
-- 2026-09-21 · uncommitted · docs(adr): bound the single-dashboard camera preview (D-152)
-- 2026-09-21 · uncommitted · docs(adr): separate semantic evidence, policy, and command (D-151)
-- 2026-09-21 · uncommitted · docs(adr): promote D-149 to Accepted on structural composition evidence
-- 2026-09-21 · uncommitted · docs(api-ref): vision DetectionEvidence 지연 메타 (v1.11 additive)
-- 2026-09-21 · uncommitted · docs(adr): formalize domain regroup and boundary contracts (D-147..D-150)
+- 2026-09-21 · uncommitted · docs(adr): require per-device Fleet bootstrap and two-Pinky evidence (D-154 amendment)
+- 2026-09-21 · uncommitted · docs(adr): record the surface-based UI/UX evaluation decision (D-153)
+- 2026-09-21 · uncommitted · docs(adr): separate common image from per-device SD personalization (D-154)
+- 2026-09-21 · uncommitted · docs(uiux): D-153 session 12 — re-verification catch: concurrent fleet token drift (F-11), Fleet GO withdrawn
+- 2026-09-21 · uncommitted · docs(uiux): D-153 session 11 — HOST track closed: four surfaces GO, §7.5 focal grammar

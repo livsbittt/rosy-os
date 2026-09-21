@@ -205,3 +205,28 @@
 - 변경: `test_core_logic.py`에 `TestD137MetricStopComposition` 신규 — Control 정책 obstacle 정지(bind_control_policy, 출력 0) 위에서 사람 자문 좌석이 살아 있어도 정지 유지, 깨진 패킷 후 자문 해제·프로필 복귀로도 정지 유지, vision이 만든 정지·해제·e-stop 모두 없음을 단언. vision에는 정책 입력 경로가 아예 없는 구조적 분리의 증명 — T4 "깨진 영상 + LiDAR 장애물 → 정지 유지"의 순수 합성 증명(rclpy 불요)
 - 증거: Windows 1027 passed·12 skipped, WSL Jazzy 1038 passed(cv2 4.6 `generateImageMarker` 환경 실패 1건 — 기존 불변). 계획서 진행 기록 갱신
 - gate 변화: 없음. 참고: 장애물 정지는 `evaluate_candidate`가 None(policy_stop)이 아니라 limit 경로의 (0, 0) 출력으로 온다 — 시험이 실제 계약을 따르도록 단언 수정
+
+## 2026-09-21 · uncommitted · fix(web): graph topics no longer spend the warning colour (D-153 session 8, F-08)
+
+- 변경: `styles.css`의 `.graph-topic` 채움을 `--status-warn`에서 `--series-primary`로 옮겼다 — 정상 ROS 그래프의 토픽 마커가 항상 경보 색으로 그려져 D-82 "화면에 따뜻한 것이 보이면 언제나 무언가 잘못된 것이다"를 위반했다. 토픽은 series 정체성(§6 차가운 대역)이고 노드와의 구분은 형태(사각·원)가 이미 담당한다
+- 증거: `test_dashboard_browser.py` runtime-normal 상태에 행동 게이트 신규 — 캔버스 fillStyle 정규화로 토픽 계산색과 `--status-warn` 계산색을 비교. 변이 증명: warn 되돌림 → 적색, 복원 → 녹색. 첫 게이트는 문자열 형식 불일치로 항상 통과하는 동어반복이어서 폐기·재작성했다. 대시보드 브라우저 18 passed, console_layout·token·core_api_web 43 passed
+- gate 변화: 없음
+- 결정: `.graph-node.foreign`의 crit 사용은 유지 — 외부 참가자 출현은 경보 의미다. D-153 회차8 F-08
+
+## 2026-09-21 · uncommitted · fix(web): inspect order follows §7.2 bring-up order (D-153 session 10, F-10)
+
+- 변경: `index.html` — release-card·commissioning-card를 host-panel(네트워크)
+  안에서 ROS 그래프 섹션 뒤로 이동(자체 `.host-card-grid`). §7.2 순서표
+  "network → DDS → graph → release → commissioning"과 정렬.
+  `test_console_layout.py`에 `test_the_inspect_order_follows_bringup_order`
+  게이트 신설(패널 존재만 보던 게이트에 순서가 없어 표류했음)
+- 증거: 이동 안전성 — `.host-card` CSS 클래스 스코핑·app.js의 host-panel/
+  host-card 컨테이너 참조 0(전부 id 갱신)·`data-step` 1→(그래프)→2→3 읽기
+  순서 정합. 변이 증명: 게이트 순서 뒤집기 → 적색 → 복원 → 녹색.
+  console_layout **10 passed**, host_cards·dashboard 62 passed 합산, 브라우저
+  19+10 passed. 점검 뷰 캡처 재생성(5841px — 절차 스크롤 연장은 §7.2 합법)
+- gate 변화: 없음
+- 결정: 커미셔닝·릴리즈는 그래프 건강에 의존하는 단계 — 법 순서가 의존
+  순서다. D-153 회차10 F-10
+- 교훈: "존재" 게이트는 순서를 못 지킨다 — 순서가 법 계약이면 순서 게이트를
+  별도로 세운다
