@@ -87,3 +87,8 @@
 - gate 변화: SOURCE/LOCAL만 갱신. importer 결과는 계속 `signed: false`; ARTIFACT와 G0는 승인된 offline 서명 및 publication 검증 전까지 HOLD다.
 - 결정: D-146.
 - 교훈: 외부 archive checksum 하나는 내부 identity, 경로 안전성, OCI architecture를 증명하지 않는다.
+
+## 2026-09-21 · uncommitted · test(deploy): keep control debug ports out of deploy configs (D-150)
+- 변경: test/test_control_launch_boundary.py 에 신규 가드 — deploy/robot 의 모든 텍스트 설정(yaml/service/sh/ps1/py/compose)에서 web_node 실행자명 또는 디버그 포트 28161/28162 를 금지한다. compose 자체는 기존 D-77 검사가 지킨다.
+- 증거: python -m pytest test/test_control_launch_boundary.py -q 통과. 변이 증명: compose.yaml 에 28161 주석 삽입 시 적색, 복원 후 초록 확인.
+- gate 변화: 없음
