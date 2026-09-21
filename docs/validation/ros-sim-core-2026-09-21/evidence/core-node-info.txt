@@ -1,0 +1,53 @@
+/core
+  Subscribers:
+    /amcl/transition_event: lifecycle_msgs/msg/TransitionEvent
+    /batt_state: sensor_msgs/msg/BatteryState
+    /battery/voltage: std_msgs/msg/Float32
+    /camera/preview/compressed: sensor_msgs/msg/CompressedImage
+    /controller_server/transition_event: lifecycle_msgs/msg/TransitionEvent
+    /detection_evidence: std_msgs/msg/String
+    /global_costmap/costmap_raw: nav2_msgs/msg/Costmap
+    /global_costmap/global_costmap/transition_event: lifecycle_msgs/msg/TransitionEvent
+    /imu_raw: sensor_msgs/msg/Imu
+    /line/observation: std_msgs/msg/String
+    /local_costmap/costmap_raw: nav2_msgs/msg/Costmap
+    /local_costmap/local_costmap/transition_event: lifecycle_msgs/msg/TransitionEvent
+    /map: nav_msgs/msg/OccupancyGrid
+    /map_server/transition_event: lifecycle_msgs/msg/TransitionEvent
+    /motor/ready: std_msgs/msg/Bool
+    /nav_cmd_vel: geometry_msgs/msg/Twist
+    /odom: nav_msgs/msg/Odometry
+    /plan: nav_msgs/msg/Path
+    /road/observation: std_msgs/msg/String
+    /robot/degraded_modules: std_msgs/msg/String
+    /robot/hitl_request: std_msgs/msg/String
+    /scan: sensor_msgs/msg/LaserScan
+    /slam_toolbox/transition_event: lifecycle_msgs/msg/TransitionEvent
+    /tf: tf2_msgs/msg/TFMessage
+    /tf_static: tf2_msgs/msg/TFMessage
+    /us_sensor/range: sensor_msgs/msg/Range
+  Publishers:
+    /cmd_vel: geometry_msgs/msg/Twist
+    /display/info: std_msgs/msg/String
+    /docking/collision_exemption: std_msgs/msg/Bool
+    /initialpose: geometry_msgs/msg/PoseWithCovarianceStamped
+    /parameter_events: rcl_interfaces/msg/ParameterEvent
+    /power/mode: std_msgs/msg/String
+    /rosout: rcl_interfaces/msg/Log
+  Service Servers:
+    /core/describe_parameters: rcl_interfaces/srv/DescribeParameters
+    /core/get_parameter_types: rcl_interfaces/srv/GetParameterTypes
+    /core/get_parameters: rcl_interfaces/srv/GetParameters
+    /core/get_type_description: type_description_interfaces/srv/GetTypeDescription
+    /core/list_parameters: rcl_interfaces/srv/ListParameters
+    /core/set_parameters: rcl_interfaces/srv/SetParameters
+    /core/set_parameters_atomically: rcl_interfaces/srv/SetParametersAtomically
+  Service Clients:
+    /set_led: interfaces/srv/SetLed
+    /slam_toolbox/save_map: slam_toolbox/srv/SaveMap
+    /start_motor: std_srvs/srv/Empty
+    /stop_motor: std_srvs/srv/Empty
+  Action Servers:
+
+  Action Clients:
+    /navigate_to_pose: nav2_msgs/action/NavigateToPose
