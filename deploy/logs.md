@@ -177,3 +177,12 @@
 - gate 변화: SOURCE만 갱신. Task 4 customizer가 없으면 `build-image.sh`가 계속
   fail-closed하므로 ARTIFACT는 HOLD다.
 - 결정: D-164 Task 3 source-complete.
+
+## 2026-09-22 · uncommitted · feat(sd): verify signed image before media selection
+
+- 변경: Windows writer가 디스크 조회 전에 Ed25519 `SHA256SUMS` 서명, 전체 파일
+  checksum, release/product/board/architecture, 정확한 `.img.xz` 이름과 hash를 검증한다.
+- 증거: 실제 임시 Ed25519 key로 정상·변조·identity mismatch를 실행한 writer 계약
+  `20 passed`.
+- gate 변화: SOURCE만 갱신. 실제 signed image와 물리 write가 없으므로 MEDIA HOLD.
+- 결정: D-164 Task 7 writer preflight source-complete.

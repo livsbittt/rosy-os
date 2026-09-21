@@ -154,8 +154,11 @@ sign offline; personalize only after writing each card.
   copy, expands partition 2, mounts root then boot, exposes bounded paths to one
   customizer and always unmounts/detaches/removes in reverse order. It publishes
   no raw image when setup, customization or cleanup fails.
-- Tasks 4-7: planned; existing native payload, systemd, rollback and first-boot pieces
+- Tasks 4-6: planned; existing native payload, systemd, rollback and first-boot pieces
   are inputs, not proof of a completed disk image.
+- Task 7 writer preflight: source-complete ahead of Tasks 4-6. The Windows writer
+  now verifies the Ed25519-signed checksum set and exact image manifest identity
+  before its first disk probe; offline key ceremony and real artifact remain pending.
 - Task 8: blocked until a native ARM64 run verifies the real Canonical inputs and
   produces the actual signed `.img.xz`; `base_image.verified` therefore remains false.
 - Tasks 9-10: physical and destructive; connected media remains untouched until the
