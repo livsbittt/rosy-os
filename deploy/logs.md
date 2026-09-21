@@ -154,3 +154,14 @@
   `git diff --check` 통과.
 - gate 변화: SOURCE 계약만 갱신. 실제 image가 없으므로 ARTIFACT/MEDIA는 HOLD다.
 - 결정: D-163 Task 1 완료.
+
+## 2026-09-22 · uncommitted · feat(image): verify Canonical Pi image provenance
+
+- 변경: Canonical `SHA256SUMS`, `SHA256SUMS.gpg`, Ubuntu CD Image Signing 키 지문과
+  신뢰 키링을 고정했다. fetcher는 분리 서명과 signer를 먼저 검증하고 정확한 파일명과
+  SHA-256 항목을 신뢰한 뒤 cache/download 이미지 바이트를 검증한다.
+- 증거: image-pipeline, flashable-image, Ubuntu-native 집중 계약 `67 passed` 및
+  `git diff --check` 통과.
+- gate 변화: SOURCE만 갱신. 실제 native ARM64 host 검증 전이므로
+  `base_image.verified: false`와 ARTIFACT HOLD를 유지한다.
+- 결정: D-163 Task 2 source-complete.

@@ -53,6 +53,7 @@
 
 ## 최근 기록
 
+- 2026-09-22 · uncommitted · feat(image): verify Canonical Pi image provenance
 - 2026-09-22 · uncommitted · test(image): freeze the Pinky flashable image contract
 - 2026-09-22 · uncommitted · docs(image): plan the flashable `.img.xz` pipeline (D-163)
 - 2026-09-22 · uncommitted · feat(provisioning): connect native rollback and Ubuntu first boot

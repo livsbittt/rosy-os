@@ -147,8 +147,12 @@ sign offline; personalize only after writing each card.
 
 - Task 1: source-complete. D-163, the lock and executable contract agree on the exact
   `.img.xz` filename, required signed sidecars, device-neutral fields and ISO prohibition.
-- Tasks 2-7: planned; existing native payload, systemd, rollback and first-boot pieces
+- Task 2: source-complete. The fetcher now pins Canonical's checksum document,
+  detached signature, Ubuntu image-signing key fingerprint and trusted keyring; it
+  rejects signature, signer, filename, signed-digest and downloaded-byte drift.
+- Tasks 3-7: planned; existing native payload, systemd, rollback and first-boot pieces
   are inputs, not proof of a completed disk image.
-- Task 8: blocked until a native ARM64 run produces the actual signed `.img.xz`.
+- Task 8: blocked until a native ARM64 run verifies the real Canonical inputs and
+  produces the actual signed `.img.xz`; `base_image.verified` therefore remains false.
 - Tasks 9-10: physical and destructive; connected media remains untouched until the
   signed artifact and explicit operator confirmation exist.
