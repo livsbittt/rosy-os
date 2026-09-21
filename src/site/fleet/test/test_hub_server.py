@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import pytest
 from fastapi.testclient import TestClient
 from core_common.protocol.schemas import HelloPayload, Envelope, EnvelopeType, WelcomePayload

@@ -115,7 +115,6 @@ class FleetConsole:
         #: 시험이 가짜 릴레이를 끼우는 자리. 운용에서는 None 이라 세션의 기본값을 쓴다.
         self._relay_factory = relay_factory
         self.fleet_name = fleet_name
-        self.hub = hub
         # e-stop 은 hub 의 scatter 를 그대로 쓴다 — 흩뿌림의 규칙을 두 군데 두지 않는다.
         self._hub = SiteHub(list(endpoints), dict(self._clients), fleet_name=fleet_name)
         #: 신호등 컨트롤러(ROSY-SIGNAL-001). signals.yaml 이 없는 사이트도 같은 서버로
@@ -236,7 +235,11 @@ class FleetConsole:
             self._goals.pop(robot_id, None)
             self._claims.pop(robot_id, None)
             self._queued[robot_id] = {"x": x, "y": y, "yaw": yaw, "blocked_by": blocker,
-                                      "waiting_on": [blocker], "reason": "ROUTE_CONFLICT"}
+                                      "waiting_on": [blocker], "reason": "ROUTE_CONFLICT",
+                                      # 선착 순서(누가 공유 충돌 지점에 먼저 도달하나)는
+                                      # 이 경로 위의 남은 거리로 재 단다. 취소하면 로봇이
+                                      # 경로를 잃으므로 여기에 묻어 둔다.
+                                      "route": list(route)}
             return {"accepted": True, "queued": True, "blocked_by": blocker}
 
         await self._observe()
@@ -457,6 +460,12 @@ class FleetConsole:
                 if mission.get("reason") == "YIELDING":
                     self._check_yield_worked(mission)
                 continue
+            self._release_candidates.append(robot_id)
+        # 한 번에 여러 대가 풀리면 순서를 정한다 — 로터리 선착. 점유 클레임은 상한선으로
+        # 남는다(달리는 로봇은 이 순서와 무관하게 이긴다. 여기서 고르는 것은 대기자
+        # 사이의 순서다).
+        for robot_id in self._release_order(self._release_candidates):
+            mission = self._queued[robot_id]
             self._queued.pop(robot_id, None)
             try:
                 await self.goal(robot_id, mission["x"], mission["y"], mission["yaw"])
@@ -464,6 +473,33 @@ class FleetConsole:
                 # 재하달이 실패하면 대기열에 되돌린다. 조용히 사라지면 운영자는 자기가
                 # 내린 미션이 어디로 갔는지 알 수 없다.
                 self._queued[robot_id] = mission
+
+    def _release_order(self, candidates: Sequence[str]) -> list[str]:
+        """대기 미션을 푸는 순서. 공유 충돌 지점까지 남은 경로 거리가 짧은 미션이 먼저
+        나간다 — 도로의 선착 우권이다.
+
+        점유 클레임은 이 순서 위에 있다. 달리는 로봇(클레임 있는 로봇)은 결코 여기서
+        밀려나지 않고, 고르는 것은 대기자들 사이의 순서다. 거리를 모르면(경로나 좌표
+        없음) 무한대로 밀려 robot_id 순으로 떨어진다 - 같은 상황이면 늘 같은 순서여야
+        운영자가 화면을 읽을 수 있다.
+        """
+        def key(robot_id: str) -> tuple[float, str]:
+            best = math.inf
+            mine = self._queued[robot_id]
+            mine_route = mine.get("route") or []
+            mine_pose = self._pose_of(robot_id)
+            for other in candidates:
+                if other == robot_id:
+                    continue
+                pair = traffic.closest_points(mine_route, self._queued[other].get("route") or [])
+                if pair is None:
+                    continue
+                d = traffic.remaining_distance(mine_route, mine_pose, pair[0])
+                if d is not None and d < best:
+                    best = d
+            return (best, robot_id)
+
+        return sorted(candidates, key=key)
 
     def _still_blocked(self, mission: dict) -> bool:
         """이 대기 미션이 아직 나가면 안 되는가. 묻기만 하고 아무것도 바꾸지 않는다.
