@@ -30,7 +30,7 @@ set -o pipefail
 OUT="${1:-$HOME/vendor-baseline-$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$OUT"
 
-# cap <name> <command...> — best-effort capture; absence and failure are both
+# cap NAME COMMAND... — best-effort capture; absence and failure are both
 # recorded findings, neither aborts the run.
 cap() {
   local name="$1"; shift
@@ -46,7 +46,7 @@ cap() {
 cap_redacted() {
   local name="$1"; shift
   ( "$@" 2>&1 | sed -E \
-      's/((password|passwd|passphrase|psk|token|secret|api[_-]?key)[[:space:]]*[:=][[:space:]]*)[^[:space:]]+/\1<redacted>/Ig' \
+      's/((passw(or)?d|passphrase|psk|token|secret|api[_-]?key)[[:space:]]*[:=][[:space:]]*)[^[:space:]]+/\1[redacted]/Ig' \
   ) > "$OUT/$name.txt"
   local rc=$?
   if [ $rc -ne 0 ]; then
