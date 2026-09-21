@@ -269,6 +269,27 @@ class LineFollowStatus(BaseModel):
     reason: str = "mode_off"
 
 
+class TrafficPolicyStatus(BaseModel):
+    """Semantic road evidence and the latest command-gating verdict."""
+
+    mode: str = "DISABLED"
+    state: str = "DISABLED"
+    reason: str = "policy_disabled"
+    enforced: bool = False
+    map_id: Optional[str] = None
+    scene_revision: Optional[str] = None
+    policy_revision: str = "traffic-policy-v1"
+    evidence_revision: int = 0
+    age_s: Optional[float] = None
+    stop_line_visible: bool = False
+    stop_line_distance_m: Optional[float] = None
+    crosswalk_visible: bool = False
+    signal_colour: Optional[str] = None
+    signal_confidence: float = 0.0
+    signal_conflict: bool = False
+    linear_scale: float = 0.0
+
+
 class StateSnapshot(BaseModel):
     """로봇 상태 스냅샷 — /ws/state payload와 동일 (API Ref §6.1)."""
 
@@ -286,6 +307,8 @@ class StateSnapshot(BaseModel):
     swarm: SwarmStatus = Field(default_factory=SwarmStatus)  # v1.1 additive (SWM-006)
     power: PowerStatus = Field(default_factory=PowerStatus)  # v1.4 additive (PWR-001)
     line_follow: LineFollowStatus = Field(default_factory=LineFollowStatus)  # v1.10 additive
+    traffic_policy: TrafficPolicyStatus = Field(
+        default_factory=TrafficPolicyStatus)  # v1.11 additive
     diagnostics_summary: dict[str, HealthState] = Field(default_factory=dict)
     seq: int = 0
     timestamp: str = Field(default_factory=utc_now_iso)

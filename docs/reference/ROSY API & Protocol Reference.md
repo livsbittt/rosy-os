@@ -281,6 +281,24 @@ CORE 는 이 경로들을 처리하지 않고 unix 소켓으로 Host Agent 에 �
     "angular": 0.171,
     "reason": "tracking"
   },
+  "traffic_policy": {
+    "mode": "ENFORCED",
+    "state": "WAIT_SIGNAL",
+    "reason": "signal_red",
+    "enforced": true,
+    "map_id": "map_260905_update_v2",
+    "scene_revision": "road-scene-v1",
+    "policy_revision": "traffic-policy-v1",
+    "evidence_revision": 42,
+    "age_s": 0.04,
+    "stop_line_visible": true,
+    "stop_line_distance_m": 0.08,
+    "crosswalk_visible": true,
+    "signal_colour": "RED",
+    "signal_confidence": 0.93,
+    "signal_conflict": false,
+    "linear_scale": 0.0
+  },
   "diagnostics_summary": { "rosy_core": "OK", "nav2": "OK" },
   "seq": 10241,
   "timestamp": "2026-08-29T12:00:00.123Z",
@@ -302,6 +320,14 @@ HOLD | LOST` 이며 `LOST` 는 모드를 `OFF` 로 바꾼 뒤 다시 선택하�
 해제되지 않는다. 선택되지 않은 소스, 신뢰도 미달, 원본 센서 시각 기준 stale,
 형식 오류는 모두 선속도·각속도 0으로 fail-closed 된다. `linear` 는 이 모드의
 별도 상한 0.10 m/s를 넘지 않는다(D-143).
+
+`traffic_policy` 는 v1.11 additive 다. `mode` 는 `DISABLED |
+MONITOR_ONLY | ENFORCED`, `state` 는 `DISABLED | FOLLOW | APPROACH |
+STOP_REQUIRED | WAIT_SIGNAL | PROCEED | HOLD` 다. `ENFORCED`에서는 stale,
+신호 충돌, map/scene revision 불일치, 거리 미확정이 모두 0 명령을 만든다.
+정지선에서는 신호색과 무관하게 먼저 완전 정지와 dwell을 완료한 뒤, 신뢰도
+기준을 통과한 `GREEN`만 `PROCEED`를 허용한다. `MONITOR_ONLY`는 같은 판정을
+표시하지만 주행 후보를 변경하지 않는다.
 
 `evidence` 는 v1.8 additive 다. 채널별 `{received_at, evidence, stale_after_s}` 이며, `evidence` 는 서버가 판정한 `fresh` | `delayed` | `disconnected` | `unavailable` 이다. 판정에 쓴 임계값(`stale_after_s`)도 같이 실는다. 클라이언트는 임계값을 다시 계산하지 않고 이 문자열을 그대로 표시·게이트한다. 알 수 없는 채널 키는 무시한다(API-002). `PROTOCOL_VERSION`(envelope 1.0)은 바꾸지 않는다.
 
@@ -608,6 +634,7 @@ Fleet(rosy_fleet)이 제공하는 엔드포인트. Base: `http://<fleet-host>:80
 
 | 버전 | 일자 | 내용 |
 |---|---|---|
+| v1.11 | 2026-09-21 | Additive: semantic road `traffic_policy` 상태. map/scene/policy revision과 camera evidence를 결합하고, stale/conflict/거리 미확정을 `HOLD`, 정지선 dwell 뒤 검증된 GREEN만 `PROCEED`로 판정 |
 | v1.10 | 2026-09-21 | Additive: D-143 `line-follow` 조회·모드 선택 API와 상태 스냅샷 `line_follow`. IR/카메라 소스는 상호 배타적이며 stale·저신뢰·형식 오류는 0 명령, 3초 손실은 재선택 전까지 `LOST` latch |
 | v1.9 | 2026-09-20 | Additive: §6.1.1 vision `DetectionEvidence` — 박스 정규화 좌표, `model_revision` 바인딩(D-47), 신선도 300 ms(D-136), 빈 detections/seq 점프 구분, 자문 전용(SAF-006, D-137). envelope `protocol_version` 은 1.0 유지 |
 | v1.8 | 2026-09-17 | Additive: §6.1 스냅샷에 채널별 `evidence` — 서버가 `fresh`/`delayed`/`disconnected`/`unavailable` 과 그 판정의 `stale_after_s` 를 계산해 싣는다. 타임스탬프만 주고 클라이언트가 임계값을 하드코딩하는 경로는 계약이 아니다(D-18, D-72 S3). `GET /api/v1/robot/state` 와 `/ws/state` 가 동일 필드다. envelope `protocol_version` 은 1.0 유지(PRT-006 additive / MINOR 는 문서 쪽) |
