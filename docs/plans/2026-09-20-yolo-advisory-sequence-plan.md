@@ -44,3 +44,11 @@
 - T1 → T2 → T3 → T4 → T5. 코드는 T2 스키마부터, 노드 기동은 T5까지 금지
 - 종료: 계약 시험 녹색 + ROS-SIM 주입 실측 + D-137 Status → Accepted
 - 범위 밖: 모델 선정·학습, RTSP/WebRTC, Fleet 영상 (D-136이 이미 제외)
+
+## 진행 기록
+
+- 2026-09-20: T2 스키마(`core_common/protocol/detections.py`) + T3(`ModelRegistry`) + CORE 주입 고리(`person_advisory_from`·`set_person_advisory`) 착지 (07d5da3)
+- 2026-09-21: T2 보강 — control 생산 측 스냅샷(`control.control.detection_evidence`), `inference_ms`(API Ref v1.11 additive), D-18 동기·박스 규칙 일치 시험
+- 2026-09-21: T1 완료 — 서열 계약 4건(`TestD137SequenceContract`): advisory 상한 전용·estop 불가·해금 무 vision·`vision/detections` 무발행 게이트. 변이 증명 3건
+- 2026-09-21: T4 순수 조각 — 버스트 게이트(`control.control.burst_gate`: operator 또는 corroboration만 허용, vision 단독 거절, 변이 증명), 주입 시임(`core_features.safety.manager.PersonAdvisoryFeed`: broken/stale/gap 패킷 → 자문 해제, 어떤 입력에도 예외 없음, e-stop 무관, 변이 증명). 회귀: Windows core 980 passed, WSL Jazzy 979 passed(cv2 4.6 `generateImageMarker` 환경 실패 1건 — 본 변경 무관)
+- 남음: T4 ROS-SIM fault-injection — 구독 배선이 rosy-vision 착지와 함께 필요하고 `PersonAdvisoryFeed.ingest`가 호출점이다. FP 폭주율 수치 합의(분당 FP — 안전 담당), T5 DEVICE 실츱(Hailo). D-137 Status 전환은 종료 조건 충족 후

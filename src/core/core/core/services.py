@@ -39,7 +39,13 @@ from core_features.power.manager import (
     PresenceConfig,
 )
 from core_common.profile import RobotProfile
-from core_features.safety.manager import BatteryPolicy, SafetyManager, SpeedLimits
+from core_features.safety.manager import (
+    BatteryPolicy,
+    ModelRegistry,
+    PersonAdvisoryFeed,
+    SafetyManager,
+    SpeedLimits,
+)
 from core_common.protocol.evidence import CHANNEL_STALE_AFTER_S
 from core_features.state.manager import StateManager
 from core.system.runtime import HostRuntimeProbe
@@ -151,6 +157,7 @@ class CoreServices:
     modes: ModeMachine
     command: CommandManager
     safety: SafetyManager
+    advisory_feed: PersonAdvisoryFeed
     waypoints: WaypointManager
     nav: NavigationManager
     line_follow: LineFollowManager
@@ -222,6 +229,10 @@ class CoreServices:
         safety = SafetyManager(limits, battery_policy,
                                fleet_loss_policy=str(safety_cfg.get("fleet_loss_policy", "STOP")),
                                events=events, policy_required=safety_cfg.get('control_policy_required', False))
+        # D-137 T4: 와이어 패킷 → 자문 좌석의 유일한 유입점. revision 명부는
+        # vision 슬라이스가 등록/게이트하는 몫이다(T3 계약 — "게이트 자체는
+        # vision 슬라이스가 건다"). 시계는 ros_bridge가 노드 시계로 맞춘다.
+        advisory_feed = PersonAdvisoryFeed(safety)
 
         identity = RobotIdentity.from_config(config, profile_model=profile.model)
         capability = Capability(capability_data)
@@ -284,7 +295,8 @@ class CoreServices:
         )
         return cls(config=config, identity=identity, profile=profile, capability=capability,
                    events=events, state=state, registry=registry, modes=modes,
-                   command=command, safety=safety, waypoints=waypoints, nav=nav,
+                   command=command, safety=safety, advisory_feed=advisory_feed,
+                   waypoints=waypoints, nav=nav,
                    line_follow=line_follow,
                    readiness=readiness,
                    power=power, battery=battery, docking=docking, swarm=swarm,

@@ -161,3 +161,9 @@
 - 변경: `test_core_logic.py`에 `TestD137SequenceContract` 신규 — (1) person 자문은 clip 상한만 낮추고 (0,0) 정지를 못 만든다, (2) 자문은 estop 플래그를 못 만지고(건다/떼는 것 모두 해금 아님), (3) e-stop 진입(`trigger_estop`)·해금(`release`) 몸통에 vision 토큰 없음 소스 스캔 + 자문이 살아 있어도 연산자 해금 가능, (4) `src/**` 생산 코드에 `vision/detections` 발행자 0명 — rosy-vision 착지 시 화이트리스트 단일 항목으로 열리는 게이트. `_function_body` 헬퍼로 메서드 몸통만 스캔
 - 증거: 신규 4건 녹색 + 변이 증명 3건 — clip 단독 정지 삽입 → (1) 적색, release 자문 조회 삽입 → (3) 적색, 발행 문자열 심기 → (4) 적색, 각 원복 후 녹색. 원복은 git diff 공백으로 확인. core 전체 976 passed·11 skipped (2026-09-21 Windows, PYTHONPATH)
 - gate 변화: 없음. T1 요건(계약 4건) 충족 — 남은 것은 T4(ROS-SIM 거짓음성 주입·버스트 트리거 게이트)와 T5(DEVICE 실츱)뿐. D-137 Status 전환은 계획서 종료 조건에 따름
+
+## 2026-09-21 · uncommitted · feat(safety): PersonAdvisoryFeed wire ingest seam (D-137 T4)
+
+- 변경: `safety/manager.py`에 `PersonAdvisoryFeed` 신규 — 와이어 패킷 1건을 자문 좌석에 닿게 하는 유일한 유입점(ROS 구독자 착지 시 core.bridge가 연결). `ingest()`는 model_validate → person_advisory_from(registry 게이트) → set/clear이고, 어떤 입력에도 예외로 죽지 않는다(구독자 콜백 방어 — 검증 텍스트는 밖으로 새지 않고 사유만). broken/stale/빈 검출/seq 점프는 전부 자문 해제("못 본 것"으로 상한을 유지하는 쪽이 자문의 방향이 아니다), e-stop은 어느 경로로도 안 건드린다
+- 증거: `TestPersonAdvisoryFeed` 4건 신규 녹색 + 변이 증명(`_clear` 해제 누락 변이 → stale 잔류로 clip 적색 → 원복 녹색). 발견 1건: pydantic lax가 모델 인스턴스는 재검증 없이 통과시켜 변조 confidence가 PersonAdvisory까지 도달 — ingest를 total하게 만들어 흡수하고, 시험은 와이어 실제(dict) 경로로 고정. 회귀: Windows core 980 passed·11 skipped, WSL Jazzy 979 passed + cv2 4.6 환경 실패 1건(pre-existing, 본 변경 무관). flake8 신규 블록 무경고(E128 2건 기존 라인)
+- gate 변화: 없음. T4 남은 것은 ROS-SIM fault-injection(구독 배선 = rosy-vision 착지 시, 호출점은 이 시임)과 FP 폭주율 수치 합의. 계획서에 진행 기록 섹션 추가

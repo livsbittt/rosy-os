@@ -94,6 +94,10 @@ class RosBridge:
         node.create_subscription(Float32, "battery/voltage", self._on_battery, 10)
         node.create_subscription(Twist, "nav_cmd_vel", self._on_nav_cmd_vel, 10)
         node.create_subscription(String, "line/observation", self._on_line_observation, 10)
+        # D-137 T4: 검출 증거는 boxes 토픽과 분리된 evidence 채널로 들어온다
+        # (D-136 §2). 판정은 ROS-free 피드가 하고, 이 파일은 적응만 한다.
+        node.create_subscription(String, "detection_evidence",
+                                 self._on_detection_evidence, 10)
         # Nav2 lifecycle nodes announce their authoritative goal state on
         # transition_event.  CORE never infers readiness from node discovery;
         # it requires these active transitions plus the motor adapter lease.
@@ -173,6 +177,11 @@ class RosBridge:
         self._map_pose_ts: float = 0.0
 
         self._setup_diagnostics()
+        # D-137 T4: 자문 피드의 시계를 노드 시계로 맞춘다. 패킷의 observed_at은
+        # ROS epoch 기준이라, monotonic 기본값과 섞이면 모든 패킷이 영원히
+        # stale이 되어 자문이 한 번도 살지 못한다.
+        self._svc.advisory_feed.bind_clock(
+            lambda: self._node.get_clock().now().nanoseconds / 1e9)
         self._svc.nav.executor = self
         # NAV-006 무진척 시계를 ROS 시계로 바꾼다. `use_sim_time` 이 켜진 시뮬에서는 이것이
         # sim clock 이라, 느리게 도는 기계에서도 "30 초"가 시뮬 30 초를 뜻한다. 실기에서는
@@ -198,6 +207,14 @@ class RosBridge:
     def _apply_voltage(self, voltage: float) -> None:
         """생 표본을 정책 계층에 넣고, 그것이 거른 값으로만 SAF-005를 태운다."""
         battery_policy.apply_voltage(self._svc, voltage)
+
+    def _on_detection_evidence(self, msg: String) -> None:
+        """D-137 T4: 와이어 패킷 → 자문 시임. 판정은 ROS-free 피드가 한다."""
+        try:
+            packet = json.loads(msg.data)
+        except ValueError:
+            packet = None
+        self._svc.advisory_feed.ingest(packet)
 
     def _on_nav_cmd_vel(self, msg: Twist) -> None:
         if self._svc.line_follow.active:

@@ -6,7 +6,7 @@ import time
 import math
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional
 
 from core_common.protocol.detections import DETECTION_MAX_AGE_S, DetectionEvidence
 
@@ -181,6 +181,56 @@ def person_advisory_from(evidence: DetectionEvidence, now: float, *,
     best = max(persons, key=lambda candidate: candidate.confidence)
     return PersonAdvisory(present=True, confidence=best.confidence,
                           observed_at=evidence.observed_at, max_age_s=max_age_s)
+
+
+class PersonAdvisoryFeed:
+    """와이어 패킷 → 자문 좌석의 유일한 유입점. D-137 T4 주입 시임.
+
+    ROS 구독자(rosy-vision 착지 시 core.bridge가 연결)는 와이어 JSON을 이
+    피드에만 넣는다. 검증 실패·stale·seq 점프("못 본 것")·자문 없음은 전부
+    자문 해제로 끝난다 — 못 본 것으로 상한을 유지하는 쪽이 자문의 방향이
+    아니다(상한은 낮춤일 뿐이고, metric 정지는 여기와 무관하다). e-stop은
+    절대 건드리지 않는다(D-137 §5)."""
+
+    def __init__(self, safety: SafetyManager, registry: Optional[ModelRegistry] = None,
+                 clock: Optional[Callable[[], float]] = None) -> None:
+        if not isinstance(safety, SafetyManager):
+            raise ValueError("advisory feed requires a SafetyManager")
+        if registry is not None and not isinstance(registry, ModelRegistry):
+            raise ValueError("registry must be a ModelRegistry or None")
+        self._safety = safety
+        self._registry = registry
+        self._clock = clock if clock is not None else time.monotonic
+
+    def bind_clock(self, clock: Callable[[], float]) -> None:
+        """패킷 타임스탬프와 같은 시간 기준으로 시계를 맞춘다.
+
+        ROS 구독자는 노드 시계(epoch)를 꽂는다 — monotonic 기준과 섞이면
+        observed_at의 기준이 어긋나 모든 패킷이 영원히 stale이 된다."""
+        if not callable(clock):
+            raise ValueError("advisory feed clock must be callable")
+        self._clock = clock
+
+    def ingest(self, packet: dict) -> dict:
+        """One wire packet in, one advisory verdict out: {'advisory': bool, 'reason': str}."""
+        if not isinstance(packet, dict):
+            return self._clear('invalid_packet')
+        try:
+            evidence = DetectionEvidence.model_validate(packet)
+            advisory = person_advisory_from(evidence, self._clock(),
+                                            registry=self._registry)
+        except Exception:
+            # 검증 텍스트에는 경로·시크릿이 섞일 수 있다 — 밖으로는 사유만.
+            # 구독자 콜백이 죽으면 그 뒤의 metric 경로까지 같이 흔들린다.
+            return self._clear('invalid_packet')
+        if advisory is None:
+            return self._clear('no_fresh_advisory')
+        self._safety.set_person_advisory(advisory)
+        return {'advisory': True, 'reason': 'person_advisory_set'}
+
+    def _clear(self, reason: str) -> dict:
+        self._safety.set_person_advisory(None)
+        return {'advisory': False, 'reason': reason}
 
 
 class SafetyManager:

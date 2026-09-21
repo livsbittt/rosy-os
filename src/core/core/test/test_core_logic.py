@@ -480,6 +480,31 @@ class TestPersonAdvisoryFeed:
         assert safety.estop is True
 
 
+class TestAdvisoryFeedServices:
+    """D-137 T4: CoreServices가 피드를 소유하고 ros_bridge가 부른다 — DI 확인."""
+
+    def _packet(self, observed_at):
+        return {
+            "model_revision": "yolo11n-r1", "observed_at": observed_at,
+            "seq": 41, "input_width": 640, "input_height": 640,
+            "input_fps": 10.0, "inference_ms": 12.0,
+            "detections": [{"label": "person", "x": 0.4, "y": 0.3, "w": 0.2,
+                            "h": 0.4, "confidence": 0.8, "track_id": 3}],
+        }
+
+    def test_services_feed_sets_and_clears_the_seat(self, core_client):
+        client, services = core_client()
+        verdict = services.advisory_feed.ingest(self._packet(time.monotonic()))
+        assert verdict == {'advisory': True, 'reason': 'person_advisory_set'}
+        assert services.safety.clip(0.20, 0.50)[0] == pytest.approx(0.05)
+        broken = self._packet(time.monotonic())
+        broken["detections"] = [{"label": "person", "x": 0.4, "y": 0.3,
+                                 "w": 0.2, "h": 0.4, "confidence": 2.0}]
+        services.advisory_feed.ingest(broken)
+        assert services.safety.clip(0.20, 0.50) == (pytest.approx(0.20),
+                                                    pytest.approx(0.50))
+
+
 class TestEventBus:
     def test_seq_monotone_and_history(self, bus):
         bus.publish("nav.completed")

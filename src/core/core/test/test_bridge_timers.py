@@ -140,8 +140,10 @@ class RecordingNode:
             debug=lambda *a, **k: None)
 
     def get_clock(self):
+        # nanoseconds: D-137 T4 — 브리지가 자문 피드에 노드 시계를 바인딩한다.
         return types.SimpleNamespace(
-            now=lambda: types.SimpleNamespace(to_msg=lambda: None))
+            now=lambda: types.SimpleNamespace(nanoseconds=0.0,
+                                              to_msg=lambda: None))
 
 
 @pytest.fixture
@@ -197,6 +199,7 @@ EXPECTED_SUBSCRIPTIONS = [
     ("battery/voltage", "_on_battery", 10),
     ("nav_cmd_vel", "_on_nav_cmd_vel", 10),
     ("line/observation", "_on_line_observation", 10),
+    ("detection_evidence", "_on_detection_evidence", 10),
     ("amcl/transition_event", "_on_amcl_transition", 10),
     ("map_server/transition_event", "_on_map_server_transition", 10),
     ("slam_toolbox/transition_event", "_on_slam_transition", 10),
