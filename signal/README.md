@@ -1,8 +1,8 @@
 # Rosy Traffic Signal Controller — Agent Contract
 
 - **Document ID:** ROSY-SIGNAL-001
-- **Status:** Draft contract (G-S1 벤치·G-S3 구현 전). 참조 펌웨어는 아직 없으며
-  향후 `firmware/` 아래에 둔다
+- **Status:** Reference implementation (G-S1 compile/bench·G-S3 Fleet client 전).
+  참조 펌웨어는 `firmware/`에 있고 host source-contract만 통과했다
 - **Related:** `docs/plans/2026-09-21-traffic-light-controller-research.md` (조사 보고서),
   `dock/README.md` (ROSY-DOCK-001 — 폴링 방향·자격증명 규칙의 선례),
   `docs/plans/2026-09-14-site-middleware-role-fabric-design.md` (D-59)
@@ -182,7 +182,11 @@
 
 ## 검증
 
-계약 시험 `test/test_signal_contract.py`는 펌웨어와 Fleet 클라이언트가 생기는
-G-S3에서 추가한다. 그 전에는 이 문서가 설계 입력일 뿐이며 SOURCE·ARTIFACT·DEVICE
-증거로 세지 않는다. 시험은 README의 JSON 예시와 펌웨어 소스가 갈라지지 않음을
-고정하고, 독의 `test_dock_contract.py`처럼 클라이언트 파서도 함께 대조해야 한다.
+```bash
+python -m pytest test/test_signal_contract.py -q
+```
+
+현재 host source-contract 14건은 README 예시, route·mode, fail-safe, 인증,
+단조 `seq`, 자격증명 부재, helper 정의와 Wi-Fi 입력 분리를 고정한다. 이 결과는
+Arduino compile이나 ESP32 bench가 아니다. G-S3 Fleet client가 생기면 독의
+`test_dock_contract.py`처럼 클라이언트 파서도 함께 대조해야 한다.

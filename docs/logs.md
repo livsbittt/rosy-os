@@ -1216,3 +1216,11 @@
 - gate 변화: 없음. Signal SOURCE/ARTIFACT/DEVICE 판정은 만들지 않았다.
 - 결정: 없음. `docs/plans/2026-09-21-traffic-light-controller-research.md`의 G-S2 설계 입력이다.
 - 교훈: 안전 장치 문서가 미래 파일과 시험을 현재형으로 쓰면 존재하지 않는 증거를 만든다. Draft는 예정 경로와 실제 산출물을 분리해야 한다.
+
+## 2026-09-21 · uncommitted · feat(signal): add fail-safe ESP32 reference implementation
+
+- 변경: `signal/firmware/rosy_signal/rosy_signal.ino`와 `test/test_signal_contract.py`를 추가했다. 부팅·감독자 단절 시 적색 점멸, 인증 명령, 단조 `seq`, 적·녹 충돌 거절, NVS 자격증명 경계를 구현했다.
+- 증거: host source-contract 14 passed. `modeName` 미정의와 Wi-Fi SSID/키 미분리 결함을 적색 시험 뒤 수정했다. `arduino-cli`가 없어 compile·bench·Fleet client는 아직 없다.
+- gate 변화: Signal SOURCE GO. LOCAL은 Fleet client 부재로 HOLD, ARTIFACT·DEVICE는 compile/flash/물리 relay 증거 부재로 HOLD다.
+- 결정: ROSY-SIGNAL-001 reference implementation. Fleet가 순서를 소유하며 Signal은 로봇 안전 판단을 대체하지 않는다.
+- 교훈: source 문자열 계약은 컴파일을 대신하지 못한다. helper 정의와 입력 분리는 잡아도 Arduino 툴체인과 실제 relay 출력은 별도 gate다.

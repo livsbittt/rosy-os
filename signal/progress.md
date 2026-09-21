@@ -1,0 +1,59 @@
+---
+module: signal
+logical_modules: []
+owner: 사이트 인프라
+last_verified: { commit: "uncommitted", date: 2026-09-21 }
+gates:
+  SOURCE:
+    state: GO
+    evidence: "ROSY-SIGNAL-001 host source-contract 14 passed. README ↔ 펌웨어 상태/명령, 부팅 페일세이프, 충돌 가드, token fail-closed, helper 정의, Wi-Fi 입력 분리, 자격증명 부재를 대조. Arduino compile/bench는 미실행 (2026-09-21 Windows)"
+    cmd: "python -m pytest test/test_signal_contract.py -q"
+  LOCAL:
+    state: HOLD
+    blocker: "Fleet 서버 쪽 signals 클라이언트와 엔드포인트(G-S3) 미작성. README §클라이언트 책임의 재명령·명령/구동 대조가 코드로 존재하지 않는다"
+  ROS-SIM:
+    state: PARKED
+    blocker: "시뮬레이션 대상 아님(실물 접점 장비). Gazebo 쪽 lamp 플러그인과 무관"
+  ARTIFACT:
+    state: HOLD
+    blocker: "ESP32 Arduino 펌웨어 빌드·플래시 증거 없음. 이 호스트에는 ESP32 toolchain이 없어 실행하지 않았다"
+  DEVICE:
+    state: HOLD
+    blocker: "물리 벤치(G-S1) 미실행: 신호등 제품 미확정(전압/배선/소비전류), 릴레이 모듈 3.3V 트리거 실측, 부팅 글리치로 접점 닫힘 여부 실측 없음"
+  FIELD:
+    state: PARKED
+adrs: []
+plans:
+  - docs/plans/2026-09-21-traffic-light-controller-research.md
+---
+## 지금 상태
+
+- ROSY-SIGNAL-001 reference implementation: `signal/README.md` 의 `/status`·`/command` 예시와
+  `signal/firmware/rosy_signal/rosy_signal.ino` 가 계약 시험으로 고정된다.
+  `mode`·`lamps` 는 필수(누락은 오류, 기본값 금지).
+- 펌웨어의 1차 임무는 제어가 아니라 **신뢰할 수 없음의 표시**다: 부팅·감독자 침묵
+  (10 s)·재시작 → 전 기능 적색 점멸, 새 인증 명령 전까지 유지. 마지막 명령은 NVS 에
+  저장하지 않는다(되살릴 상태를 없앤 것).
+- 명령 경로는 fail-closed다: 토큰(`X-Rosy-Token`)이 없는 장치는 read-only 상태
+  조회만 하고 어떤 명령도 수용하지 않는다. 적+녹 동시 명령은 `400 conflict`.
+- `all_red`(점등, 명령된 정지)과 `failsafe`(점멸, 고장 표시)는 다른 말이다 —
+  관제 화면이 "정지시켰다"와 "장비 고장"을 구별해야 하므로.
+- Fleet 서버 쪽 클라이언트·엔드포인트·UI 는 아직 없다(G-S3 HOLD). 로봇 CORE 는
+  신호등을 모른다(site 장비, D-59).
+
+## 다음 gate
+
+1. 신호등 제품 확정(DC 12/24V 권장) + 릴레이 모듈 조달(3.3V 트리거 확인) 후 벤치
+   G-S1: 접점 개폐 실측, 부팅 글리치로 접점 닫힘 여부 실측 → DEVICE 증거.
+2. ESP32 toolchain 환경에서 펌웨어 빌드·플래시 증거 → ARTIFACT 되돌리기.
+3. G-S3: `src/site/fleet` 에 signals 클라이언트 + `/api/fleet/signals/*` 엔드포인트
+   + 관제 UI 카드, 가짜 신호등 만으로 pytest → LOCAL 되돌리기. 이때 계약 시험에
+   클라이언트 파서 대조를 추가한다(dock 선례).
+
+## 현재 유효한 금지사항
+
+- 이 장치는 스스로 연결을 열지 않는다(서버 전용).
+- 명령·토큰·자격증명을 소스에 박지 않는다. NVS + 시리얼 규정만.
+- 적과 녹을 함께 켜는 상태는 존재할 수 없다(명령 단계에서 거절).
+- 로봇 CORE 가 신호등을 제어하거나, 신호등 보고만으로 로봇 안전 동작을 억제하는
+  설계는 하지 않는다.

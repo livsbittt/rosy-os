@@ -112,8 +112,8 @@
 
 ## 최근 기록
 
+- 2026-09-21 · uncommitted · feat(signal): add fail-safe ESP32 reference implementation
 - 2026-09-21 · uncommitted · docs(signal): record the fail-safe traffic signal draft contract
 - 2026-09-21 · uncommitted · feat(arch): integrate headless evidence, module guards, and shared web assets
 - 2026-09-21 · uncommitted · docs(research): pin the pinklab upstream stack facts behind the Rosy OS fork
 - 2026-09-21 · uncommitted · docs(adr): require per-device Fleet bootstrap and two-Pinky evidence (D-154 amendment)
-- 2026-09-21 · uncommitted · docs(adr): record the surface-based UI/UX evaluation decision (D-153)

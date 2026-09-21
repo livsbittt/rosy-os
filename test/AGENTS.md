@@ -39,6 +39,7 @@ Host-side pytest for deploy/release/motor/network contracts. These tests do **no
 | `test_dashboard_browser.py` | Optional Chromium regression (teleop zero + field-settings saves + traffic stage/apply + camera lifecycle + irreversible mode-change confirm + D-153 G2 state-matrix captures); skipped unless `ROSY_RUN_BROWSER_TESTS=1` |
 | `test_games_board_browser.py` | Optional Chromium regression for the D-101 laptop match board (real `games/host/preview` server + `games/web` assets); skipped unless `ROSY_RUN_BROWSER_TESTS=1` |
 | `test_dock_contract.py` | Dock firmware contract: `/status` fields, no Wi-Fi secrets in `dock/` sources |
+| `test_signal_contract.py` | Signal controller contract (ROSY-SIGNAL-001): fail-safe boot, conflict guard, token fail-closed, no secrets in `signal/` sources |
 
 ## Subdirectories
 
