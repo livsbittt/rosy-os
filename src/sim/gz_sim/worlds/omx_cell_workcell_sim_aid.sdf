@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <!--
-  Rosy Cell C3 OMX-F workcell (SIMULATION ONLY, D-402 / D-403 §5).
+  Rosy Cell C3 OMX-F workcell + DetachableJoint SIM AID (SIMULATION ONLY, D-402 / D-403 §5).
 
   Frame transform: Gazebo world == OMX robot_base (link0). The vendor launch
   omx_f_follower_ai_gazebo.launch.py spawns omx_f at x=y=z=0, R=P=Y=0 and the URDF
@@ -124,6 +124,19 @@
           <material><diffuse>0.9 0.35 0.2 1</diffuse></material>
         </visual>
       </link>
+    <!-- SIM AID (C3, labelled): fixed joint block <-> omx_f::link5. It starts attached; the
+           probe detaches it before any motion, attaches only after the gripper readback has
+           proved a hold, and detaches before release. It replaces the friction grasp that
+           failed in run8/run9; it is not evidence that the OMX-F gripper holds the block. -->
+      <plugin filename="gz-sim-detachable-joint-system" name="gz::sim::systems::DetachableJoint">
+        <parent_link>block</parent_link>
+        <child_model>omx_f</child_model>
+        <child_link>link5</child_link>
+        <attach_topic>/c3_sim_aid/attach</attach_topic>
+        <detach_topic>/c3_sim_aid/detach</detach_topic>
+        <output_topic>/c3_sim_aid/state</output_topic>
+        <suppress_child_warning>true</suppress_child_warning>
+      </plugin>
     </model>
 
   </world>
