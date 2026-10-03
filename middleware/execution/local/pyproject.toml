@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rosy-execution"
+name = "rosy-execution-local"
 version = "0.1.0"
-description = "ROS-free ROSY PlanBundle and existing authority projections"
+description = "ROS-free local execution evidence contracts for device owners"
 requires-python = ">=3.12"
 dependencies = ["rosy-contracts-skill==0.1.0"]
 
@@ -14,5 +14,5 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["rosy.execution.api*", "rosy.execution.site*"]
+include = ["rosy.execution.local*"]
 namespaces = true
