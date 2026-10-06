@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
-"""One robot on the 260919 track with the real robot's camera geometry (D-364 5).
+"""D-476 sim-only copy of gz_sim map_v2_fleet_real.launch.py, wall-clock mode.
+
+Why: CORE's line clock is sim seconds under use_sim_time, but the in-process safety worker's
+policy snapshot is time.monotonic and its LiDAR filter (is_robot_scan) drops sim-stamped scans,
+so the D-468/D-476 motion proof can never hold in the stock sim. On the device both are wall /
+monotonic. Here CORE and line_observer run on the wall clock; Gazebo scan/odom/camera land on
+*_gz topics and sim_wall_shims.py republishes them on the usual names with stamps shifted by
+(wall now - sim now). Needs RTF ~1. Changes vs the original: bridge_params, own image_bridge,
+use_sim_time False on core.
+
+One robot on the 260919 track with the real robot's camera geometry (D-364 5).
 
 Same track as map_v2_fleet_lane.launch.py, but the scene and the camera follow
 the device instead of the 2026-09-22 lap bench: grey carpet, white tape,
@@ -47,7 +57,8 @@ def generate_launch_description():
             os.path.join(gz_share, "launch", "launch_sim.launch.xml")),
         launch_arguments={
             "world": world,
-            "bridge_image": "true",
+            "bridge_image": "false",
+            "bridge_params": os.path.join(os.path.dirname(os.path.abspath(__file__)), "d476_bridge.yaml"),
             "cam_tilt_deg": str(REAL_TILT_DEG),
             "camera_hfov": f"{REAL_HFOV_RAD:.4f}",
             "cam_mount_z": str(REAL_CAM_MOUNT_Z),
@@ -61,7 +72,6 @@ def generate_launch_description():
             # model://control/... (lane mesh, carpet texture) needs the
             # control share on GZ_SIM_RESOURCE_PATH, as in the lap launch.
             "extra_resource_path": ":" + os.path.dirname(control_share),
-            "sim_sensors": LaunchConfiguration("sim_sensors"),
         }.items(),
     )
 
@@ -76,18 +86,24 @@ def generate_launch_description():
         DeclareLaunchArgument("camera_lane_mode", default_value="edge_left"),
         DeclareLaunchArgument("debug_overlay", default_value="false"),
         DeclareLaunchArgument("core_overlay", default_value=default_core_overlay),
-        # true: Gazebo IMU + IR floor rays on imu_raw / ir_sensor/range; pair it with a core
-        # overlay that appends config/sim_sensors_core.yaml.
-        DeclareLaunchArgument("sim_sensors", default_value="false"),
         DeclareLaunchArgument("route", default_value="[]"),
         DeclareLaunchArgument("route_start", default_value="[]"),
         simulation,
+        Node(
+            package="ros_gz_image", executable="image_bridge", name="image_bridge",
+            output="screen", arguments=["/camera/image_raw"],
+            remappings=[("/camera/image_raw", "camera/front_gz")],
+            parameters=[{"use_sim_time": True}],
+        ),
         Node(
             package="control",
             executable="line_observer_node",
             name="line_observer_node",
             output="screen",
             parameters=[line_config, {
+                # Stays on sim time: the GAZEBO ground plane is refused without use_sim_time
+                # (simulation_ground_plane). Its inputs (camera/front, odom) carry wall stamps,
+                # compared only with each other.
                 "use_sim_time": True,
                 # Gazebo has no camera controls to report stable.
                 "require_camera_controls_stable": False,
@@ -118,7 +134,7 @@ def generate_launch_description():
             executable="core",
             name="core",
             output="screen",
-            parameters=[{"use_sim_time": True}],
+            parameters=[{"use_sim_time": False}],
             # D-193 7: the dev tokens below exist only with ROSY_DEV_AUTH=1.
             additional_env={"ROSY_CONFIG": LaunchConfiguration("core_overlay"), "ROSY_DEV_AUTH": "1"},
         ),
